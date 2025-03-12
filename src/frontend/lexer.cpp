@@ -8,12 +8,17 @@ void Lexer::next_token() noexcept {
     skip_whitespaces();
 
     auto single_char = [&](Token::Type type) {
-        m_token = {type, Span::from(m_position)};
+        m_token = {type, {}, Span::from(m_position)};
         get();
     };
 
     if (eof()) {
-        m_token = {Eof, Span::from(m_position)};
+        m_token = {Eof, {}, Span::from(m_position)};
+        return;
+    }
+
+    if (std::isdigit(peek())) {
+        number();
         return;
     }
 
@@ -55,9 +60,22 @@ void Lexer::next_token() noexcept {
         single_char(Slash);
         break;
     default:
-        single_char(Invalid);
+        m_token = {Invalid, {m_at, m_at + 1}, Span::from(m_position)};
+        get();
+
         break;
     }
+}
+
+void Lexer::number() noexcept {
+    m_token = {Token::Type::IntLiteral, {m_at, m_at}, {m_position, {}}};
+
+    while (!eof() && std::isdigit(peek())) {
+        get();
+        m_token.value = {m_token.value.cbegin(), m_at};
+    }
+
+    m_token.span.end = m_position;
 }
 
 } // namespace cent

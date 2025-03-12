@@ -43,6 +43,8 @@ private:
         }
     }
 
+    void number() noexcept;
+
     Position m_position;
     Token m_token;
 
