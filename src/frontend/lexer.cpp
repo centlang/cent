@@ -105,6 +105,21 @@ void Lexer::ident() noexcept {
     }
 
     m_token.span.end = m_position;
+
+    auto keyword = [&](Token::Type type) {
+        m_token.type = type;
+        m_token.value = {};
+    };
+
+    if (m_token.value == "true") {
+        keyword(Token::Type::True);
+        return;
+    }
+
+    if (m_token.value == "false") {
+        keyword(Token::Type::False);
+        return;
+    }
 }
 
 } // namespace cent

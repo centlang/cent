@@ -33,6 +33,9 @@ struct Token {
         IntLiteral,
         FloatLiteral,
 
+        True,
+        False,
+
         Identifier
     };
 
