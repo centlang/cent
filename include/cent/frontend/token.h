@@ -30,7 +30,8 @@ struct Token {
 
         Eof,
 
-        IntLiteral
+        IntLiteral,
+        FloatLiteral
     };
 
     Type type = Type::Invalid;

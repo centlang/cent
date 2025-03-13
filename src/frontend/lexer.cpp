@@ -70,9 +70,22 @@ void Lexer::next_token() noexcept {
 void Lexer::number() noexcept {
     m_token = {Token::Type::IntLiteral, {m_at, m_at}, {m_position, {}}};
 
-    while (!eof() && std::isdigit(peek())) {
+    auto get_int = [&] {
+        while (!eof() && std::isdigit(peek())) {
+            get();
+            m_token.value = {m_token.value.cbegin(), m_at};
+        }
+    };
+
+    get_int();
+
+    if (!eof() && peek() == '.') {
         get();
+
         m_token.value = {m_token.value.cbegin(), m_at};
+        m_token.type = Token::Type::FloatLiteral;
+
+        get_int();
     }
 
     m_token.span.end = m_position;
