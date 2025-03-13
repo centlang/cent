@@ -44,6 +44,11 @@ private:
     }
 
     void number() noexcept;
+    void ident() noexcept;
+
+    [[nodiscard]] static bool is_ident(char character) noexcept {
+        return std::isalnum(character) || character == '_';
+    }
 
     Position m_position;
     Token m_token;

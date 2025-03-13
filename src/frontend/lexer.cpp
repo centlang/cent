@@ -22,6 +22,11 @@ void Lexer::next_token() noexcept {
         return;
     }
 
+    if (is_ident(peek())) {
+        ident();
+        return;
+    }
+
     switch (peek()) {
     case '(':
         single_char(LeftParen);
@@ -86,6 +91,17 @@ void Lexer::number() noexcept {
         m_token.type = Token::Type::FloatLiteral;
 
         get_int();
+    }
+
+    m_token.span.end = m_position;
+}
+
+void Lexer::ident() noexcept {
+    m_token = {Token::Type::Identifier, {m_at, m_at}, {m_position, {}}};
+
+    while (!eof() && is_ident(peek())) {
+        get();
+        m_token.value = {m_token.value.cbegin(), m_at};
     }
 
     m_token.span.end = m_position;
