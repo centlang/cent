@@ -28,6 +28,43 @@ std::unique_ptr<Program> Parser::parse() noexcept {
     return result;
 }
 
+std::vector<FnDecl::Param> Parser::parse_params() noexcept {
+    std::vector<FnDecl::Param> result;
+
+    auto parse_param = [&] {
+        auto name = expect("parameter name", Token::Type::Identifier);
+
+        if (!name) {
+            return;
+        }
+
+        if (!expect("':'", Token::Type::Colon)) {
+            return;
+        }
+
+        auto type = expect("parameter type", Token::Type::Identifier);
+
+        if (!type) {
+            return;
+        }
+
+        result.emplace_back(
+            SpanValue{name->value, name->span},
+            SpanValue{type->value, type->span});
+    };
+
+    if (match(Token::Type::Identifier)) {
+        parse_param();
+
+        while (match(Token::Type::Comma)) {
+            next();
+            parse_param();
+        }
+    }
+
+    return result;
+}
+
 void Parser::parse_fn(Program& program) noexcept {
     auto name = expect("function name", Token::Type::Identifier);
 
@@ -38,6 +75,8 @@ void Parser::parse_fn(Program& program) noexcept {
     if (!expect("'('", Token::Type::LeftParen)) {
         return;
     }
+
+    auto params = parse_params();
 
     if (!expect("')'", Token::Type::RightParen)) {
         return;
@@ -53,7 +92,7 @@ void Parser::parse_fn(Program& program) noexcept {
         Span{name->span.begin, return_type->span.end},
         FnDecl::Proto{
             {name->value, name->span},
-            {},
+            std::move(params),
             {return_type->value, return_type->span}},
         nullptr));
 }

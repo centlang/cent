@@ -4,12 +4,14 @@
 #include <memory>
 #include <optional>
 #include <string_view>
+#include <vector>
 
 #include <fmt/core.h>
 
 #include "cent/frontend/lexer.h"
 #include "cent/log.h"
 
+#include "cent/ast/fn_decl.h"
 #include "cent/ast/program.h"
 
 namespace cent {
@@ -51,6 +53,8 @@ private:
 
         return get();
     }
+
+    [[nodiscard]] std::vector<FnDecl::Param> parse_params() noexcept;
 
     void parse_fn(Program& program) noexcept;
 
