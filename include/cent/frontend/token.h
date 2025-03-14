@@ -36,6 +36,8 @@ struct Token {
         True,
         False,
 
+        Fn,
+
         Identifier
     };
 
