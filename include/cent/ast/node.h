@@ -26,6 +26,10 @@ struct Expression : Statement {
     using Statement::Statement;
 };
 
+struct Declaration : Statement {
+    using Statement::Statement;
+};
+
 } // namespace cent
 
 #endif
