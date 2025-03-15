@@ -1,3 +1,5 @@
+#include "cent/ast/literals.h"
+
 #include "cent/frontend/parser.h"
 
 namespace cent {
@@ -22,10 +24,48 @@ std::unique_ptr<Program> Parser::parse() noexcept {
             continue;
         }
 
-        expect("';'", Token::Type::Semicolon);
+        expect_semicolon();
     }
 
     return result;
+}
+
+void Parser::expect_semicolon() noexcept {
+    expect("';'", Token::Type::Semicolon);
+}
+
+void Parser::expect_stmt(BlockStmt& block) noexcept {
+    if (auto value = expect_expr()) {
+        block.body.push_back(std::move(value));
+    } else {
+        next();
+        return;
+    }
+
+    expect_semicolon();
+}
+
+std::unique_ptr<Expression> Parser::expect_expr() noexcept {
+    auto token = expect(
+        "expression", Token::Type::IntLiteral, Token::Type::FloatLiteral,
+        Token::Type::True, Token::Type::False);
+
+    if (!token) {
+        return nullptr;
+    }
+
+    switch (token->type) {
+    case Token::Type::IntLiteral:
+        return std::make_unique<IntLiteral>(token->span, token->value);
+    case Token::Type::FloatLiteral:
+        return std::make_unique<FloatLiteral>(token->span, token->value);
+    case Token::Type::True:
+        return std::make_unique<BoolLiteral>(token->span, true);
+    case Token::Type::False:
+        return std::make_unique<BoolLiteral>(token->span, false);
+    default:
+        return nullptr;
+    }
 }
 
 std::unique_ptr<BlockStmt> Parser::expect_block() noexcept {
@@ -52,6 +92,8 @@ std::unique_ptr<BlockStmt> Parser::expect_block() noexcept {
             next();
             continue;
         }
+
+        expect_stmt(*result);
     }
 
     result->span.end = peek().span.end;

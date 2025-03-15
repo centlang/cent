@@ -13,6 +13,7 @@
 
 #include "cent/ast/block_stmt.h"
 #include "cent/ast/fn_decl.h"
+#include "cent/ast/node.h"
 #include "cent/ast/program.h"
 
 namespace cent {
@@ -56,6 +57,12 @@ private:
     }
 
     [[nodiscard]] std::unique_ptr<BlockStmt> expect_block() noexcept;
+
+    void expect_semicolon() noexcept;
+
+    void expect_stmt(BlockStmt& block) noexcept;
+
+    [[nodiscard]] std::unique_ptr<Expression> expect_expr() noexcept;
 
     [[nodiscard]] std::vector<FnDecl::Param> parse_params() noexcept;
 
