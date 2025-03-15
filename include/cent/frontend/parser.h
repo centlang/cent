@@ -11,6 +11,7 @@
 #include "cent/frontend/lexer.h"
 #include "cent/log.h"
 
+#include "cent/ast/block_stmt.h"
 #include "cent/ast/fn_decl.h"
 #include "cent/ast/program.h"
 
@@ -53,6 +54,8 @@ private:
 
         return get();
     }
+
+    [[nodiscard]] std::unique_ptr<BlockStmt> expect_block() noexcept;
 
     [[nodiscard]] std::vector<FnDecl::Param> parse_params() noexcept;
 

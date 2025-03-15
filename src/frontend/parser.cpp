@@ -28,6 +28,36 @@ std::unique_ptr<Program> Parser::parse() noexcept {
     return result;
 }
 
+std::unique_ptr<BlockStmt> Parser::expect_block() noexcept {
+    auto result = std::make_unique<BlockStmt>(Span{peek().span.begin, {}});
+
+    if (!expect("'{'", Token::Type::LeftBrace)) {
+        return nullptr;
+    }
+
+    while (true) {
+        if (match(Token::Type::Eof)) {
+            result->span.end = peek().span.end;
+            error(peek().span.begin, m_filename, "expected '}'");
+
+            return result;
+        }
+
+        if (match(Token::Type::RightBrace)) {
+            next();
+            break;
+        }
+
+        if (match(Token::Type::Semicolon)) {
+            next();
+            continue;
+        }
+    }
+
+    result->span.end = peek().span.end;
+    return result;
+}
+
 std::vector<FnDecl::Param> Parser::parse_params() noexcept {
     std::vector<FnDecl::Param> result;
 
@@ -88,13 +118,19 @@ void Parser::parse_fn(Program& program) noexcept {
         return;
     }
 
+    std::unique_ptr<BlockStmt> body = nullptr;
+
+    if (match(Token::Type::LeftBrace)) {
+        body = expect_block();
+    }
+
     program.functions.push_back(std::make_unique<FnDecl>(
         Span{name->span.begin, return_type->span.end},
         FnDecl::Proto{
             {name->value, name->span},
             std::move(params),
             {return_type->value, return_type->span}},
-        nullptr));
+        std::move(body)));
 }
 
 } // namespace cent
