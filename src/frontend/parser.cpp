@@ -1,4 +1,5 @@
 #include "cent/ast/literals.h"
+#include "cent/ast/unary_expr.h"
 
 #include "cent/frontend/parser.h"
 
@@ -48,7 +49,7 @@ void Parser::expect_stmt(BlockStmt& block) noexcept {
 std::unique_ptr<Expression> Parser::expect_prefix() noexcept {
     auto token = expect(
         "expression", Token::Type::IntLiteral, Token::Type::FloatLiteral,
-        Token::Type::True, Token::Type::False);
+        Token::Type::True, Token::Type::False, Token::Type::Minus);
 
     if (!token) {
         return nullptr;
@@ -63,6 +64,14 @@ std::unique_ptr<Expression> Parser::expect_prefix() noexcept {
         return std::make_unique<BoolLiteral>(token->span, true);
     case Token::Type::False:
         return std::make_unique<BoolLiteral>(token->span, false);
+    case Token::Type::Minus:
+        if (auto value = expect_prefix()) {
+            return std::make_unique<UnaryExpr>(
+                Span{token->span.begin, value->span.end},
+                SpanValue{token->type, token->span}, std::move(value));
+        }
+
+        return nullptr;
     default:
         return nullptr;
     }
