@@ -45,7 +45,7 @@ void Parser::expect_stmt(BlockStmt& block) noexcept {
     expect_semicolon();
 }
 
-std::unique_ptr<Expression> Parser::expect_expr() noexcept {
+std::unique_ptr<Expression> Parser::expect_prefix() noexcept {
     auto token = expect(
         "expression", Token::Type::IntLiteral, Token::Type::FloatLiteral,
         Token::Type::True, Token::Type::False);
@@ -66,6 +66,41 @@ std::unique_ptr<Expression> Parser::expect_expr() noexcept {
     default:
         return nullptr;
     }
+}
+
+std::unique_ptr<BinaryExpr>
+Parser::expect_infix(std::unique_ptr<Expression> lhs) noexcept {
+    auto oper = get();
+    auto rhs = expect_bin_expr(precedence_of(oper.type) + 1);
+
+    if (!rhs) {
+        return nullptr;
+    }
+
+    Span span{lhs->span.begin, rhs->span.end};
+
+    return std::make_unique<BinaryExpr>(
+        span, SpanValue{oper.type, oper.span}, std::move(lhs), std::move(rhs));
+}
+
+std::unique_ptr<Expression>
+Parser::expect_bin_expr(std::uint8_t precedence) noexcept {
+    auto expression = expect_prefix();
+
+    while (precedence_of(peek().type) >= precedence) {
+        if (!expression) {
+            next();
+            return nullptr;
+        }
+
+        expression = expect_infix(std::move(expression));
+    }
+
+    return expression;
+}
+
+std::unique_ptr<Expression> Parser::expect_expr() noexcept {
+    return expect_bin_expr();
 }
 
 std::unique_ptr<BlockStmt> Parser::expect_block() noexcept {

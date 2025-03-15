@@ -1,6 +1,7 @@
 #ifndef CENT_FRONTEND_PARSER_H
 #define CENT_FRONTEND_PARSER_H
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string_view>
@@ -11,6 +12,7 @@
 #include "cent/frontend/lexer.h"
 #include "cent/log.h"
 
+#include "cent/ast/binary_expr.h"
 #include "cent/ast/block_stmt.h"
 #include "cent/ast/fn_decl.h"
 #include "cent/ast/node.h"
@@ -62,11 +64,34 @@ private:
 
     void expect_stmt(BlockStmt& block) noexcept;
 
+    [[nodiscard]] std::unique_ptr<Expression> expect_prefix() noexcept;
+
+    [[nodiscard]] std::unique_ptr<BinaryExpr>
+    expect_infix(std::unique_ptr<Expression> lhs) noexcept;
+
+    [[nodiscard]] std::unique_ptr<Expression>
+    expect_bin_expr(std::uint8_t precedence = 1) noexcept;
+
     [[nodiscard]] std::unique_ptr<Expression> expect_expr() noexcept;
 
     [[nodiscard]] std::vector<FnDecl::Param> parse_params() noexcept;
 
     void parse_fn(Program& program) noexcept;
+
+    [[nodiscard]] static std::uint8_t precedence_of(Token::Type type) noexcept {
+        enum { None = 0, Additive, Multiplicative };
+
+        switch (type) {
+        case Token::Type::Plus:
+        case Token::Type::Minus:
+            return Additive;
+        case Token::Type::Star:
+        case Token::Type::Slash:
+            return Multiplicative;
+        default:
+            return None;
+        }
+    }
 
     Lexer m_lexer;
     std::string_view m_filename;
