@@ -36,11 +36,19 @@ void Parser::expect_semicolon() noexcept {
 }
 
 void Parser::expect_stmt(BlockStmt& block) noexcept {
-    if (auto value = expect_expr()) {
-        block.body.push_back(std::move(value));
-    } else {
-        next();
-        return;
+    switch (peek().type) {
+    case Token::Type::LeftBrace:
+        block.body.push_back(expect_block());
+        break;
+    default:
+        if (auto value = expect_expr()) {
+            block.body.push_back(std::move(value));
+        } else {
+            next();
+            return;
+        }
+
+        break;
     }
 
     expect_semicolon();
