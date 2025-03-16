@@ -38,6 +38,9 @@ struct Token {
 
         Fn,
 
+        If,
+        Else,
+
         Identifier
     };
 

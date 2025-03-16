@@ -125,6 +125,16 @@ void Lexer::ident() noexcept {
         keyword(Token::Type::Fn);
         return;
     }
+
+    if (m_token.value == "if") {
+        keyword(Token::Type::If);
+        return;
+    }
+
+    if (m_token.value == "else") {
+        keyword(Token::Type::Else);
+        return;
+    }
 }
 
 } // namespace cent

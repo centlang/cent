@@ -40,6 +40,9 @@ void Parser::expect_stmt(BlockStmt& block) noexcept {
     case Token::Type::LeftBrace:
         block.body.push_back(expect_block());
         break;
+    case Token::Type::If:
+        block.body.push_back(parse_if_else());
+        break;
     default:
         if (auto value = expect_expr()) {
             block.body.push_back(std::move(value));
@@ -157,6 +160,36 @@ std::unique_ptr<BlockStmt> Parser::expect_block() noexcept {
 
     result->span.end = peek().span.end;
     return result;
+}
+
+std::unique_ptr<IfElse> Parser::parse_if_else() noexcept {
+    auto begin = get().span.begin;
+
+    auto condition = expect_expr();
+
+    if (!condition) {
+        return nullptr;
+    }
+
+    auto if_block = expect_block();
+
+    if (!if_block) {
+        return nullptr;
+    }
+
+    if (!expect("'else'", Token::Type::Else)) {
+        return nullptr;
+    }
+
+    auto else_block = expect_block();
+
+    if (!else_block) {
+        return nullptr;
+    }
+
+    return std::make_unique<IfElse>(
+        Span{begin, else_block->span.end}, std::move(condition),
+        std::move(if_block), std::move(else_block));
 }
 
 std::vector<FnDecl::Param> Parser::parse_params() noexcept {

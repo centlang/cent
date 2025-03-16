@@ -15,6 +15,7 @@
 #include "cent/ast/binary_expr.h"
 #include "cent/ast/block_stmt.h"
 #include "cent/ast/fn_decl.h"
+#include "cent/ast/if_else.h"
 #include "cent/ast/node.h"
 #include "cent/ast/program.h"
 
@@ -59,6 +60,8 @@ private:
     }
 
     [[nodiscard]] std::unique_ptr<BlockStmt> expect_block() noexcept;
+
+    [[nodiscard]] std::unique_ptr<IfElse> parse_if_else() noexcept;
 
     void expect_semicolon() noexcept;
 
