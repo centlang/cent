@@ -27,6 +27,21 @@ void Lexer::next_token() noexcept {
         return;
     }
 
+    auto logical_op = [&](Token::Type type) {
+        const auto* at_before = m_at;
+        auto begin = m_position;
+
+        char oper = get();
+
+        if (eof() || peek() != oper) {
+            m_token = {Invalid, {at_before, m_at}, {begin, m_position}};
+            return;
+        }
+
+        get();
+        m_token = {type, {}, {begin, m_position}};
+    };
+
     switch (peek()) {
     case '(':
         single_char(LeftParen);
@@ -63,6 +78,12 @@ void Lexer::next_token() noexcept {
         break;
     case '/':
         single_char(Slash);
+        break;
+    case '&':
+        logical_op(And);
+        break;
+    case '|':
+        logical_op(Or);
         break;
     default:
         m_token = {Invalid, {m_at, m_at + 1}, Span::from(m_position)};
