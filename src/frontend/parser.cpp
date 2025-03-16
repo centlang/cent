@@ -49,7 +49,8 @@ void Parser::expect_stmt(BlockStmt& block) noexcept {
 std::unique_ptr<Expression> Parser::expect_prefix() noexcept {
     auto token = expect(
         "expression", Token::Type::IntLiteral, Token::Type::FloatLiteral,
-        Token::Type::True, Token::Type::False, Token::Type::Minus);
+        Token::Type::True, Token::Type::False, Token::Type::Minus,
+        Token::Type::LeftParen);
 
     if (!token) {
         return nullptr;
@@ -72,6 +73,12 @@ std::unique_ptr<Expression> Parser::expect_prefix() noexcept {
         }
 
         return nullptr;
+    case Token::Type::LeftParen: {
+        auto value = expect_expr();
+        expect("')'", Token::Type::RightParen);
+
+        return value;
+    }
     default:
         return nullptr;
     }
