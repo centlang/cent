@@ -79,6 +79,9 @@ void Lexer::next_token() noexcept {
     case '/':
         single_char(Slash);
         break;
+    case '!':
+        single_char(Bang);
+        break;
     case '&':
         logical_op(And);
         break;

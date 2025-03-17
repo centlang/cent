@@ -26,6 +26,8 @@ struct Token {
         Star,
         Slash,
 
+        Bang,
+
         And,
         Or,
 

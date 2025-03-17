@@ -61,7 +61,7 @@ std::unique_ptr<Expression> Parser::expect_prefix() noexcept {
     auto token = expect(
         "expression", Token::Type::IntLiteral, Token::Type::FloatLiteral,
         Token::Type::True, Token::Type::False, Token::Type::Minus,
-        Token::Type::LeftParen);
+        Token::Type::Bang, Token::Type::LeftParen);
 
     if (!token) {
         return nullptr;
@@ -77,6 +77,7 @@ std::unique_ptr<Expression> Parser::expect_prefix() noexcept {
     case Token::Type::False:
         return std::make_unique<BoolLiteral>(token->span, false);
     case Token::Type::Minus:
+    case Token::Type::Bang:
         if (auto value = expect_prefix()) {
             return std::make_unique<UnaryExpr>(
                 Span{token->span.begin, value->span.end},
