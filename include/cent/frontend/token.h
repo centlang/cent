@@ -31,6 +31,14 @@ struct Token {
         And,
         Or,
 
+        Less,
+        Greater,
+
+        EqualEqual,
+        BangEqual,
+        GreaterEqual,
+        LessEqual,
+
         Invalid,
 
         Eof,

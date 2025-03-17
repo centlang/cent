@@ -42,6 +42,19 @@ void Lexer::next_token() noexcept {
         m_token = {type, {}, {begin, m_position}};
     };
 
+    auto cmp_op = [&](Token::Type oper, Token::Type with_equal) {
+        auto begin = m_position;
+        get();
+
+        if (eof() || peek() != '=') {
+            m_token = {oper, {}, {begin, m_position}};
+            return;
+        }
+
+        get();
+        m_token = {with_equal, {}, {begin, m_position}};
+    };
+
     switch (peek()) {
     case '(':
         single_char(LeftParen);
@@ -54,9 +67,6 @@ void Lexer::next_token() noexcept {
         break;
     case '}':
         single_char(RightBrace);
-        break;
-    case '=':
-        single_char(Equal);
         break;
     case ',':
         single_char(Comma);
@@ -79,8 +89,17 @@ void Lexer::next_token() noexcept {
     case '/':
         single_char(Slash);
         break;
+    case '=':
+        cmp_op(Equal, EqualEqual);
+        break;
     case '!':
-        single_char(Bang);
+        cmp_op(Bang, BangEqual);
+        break;
+    case '>':
+        cmp_op(Greater, GreaterEqual);
+        break;
+    case '<':
+        cmp_op(Less, LessEqual);
         break;
     case '&':
         logical_op(And);
