@@ -82,9 +82,13 @@ private:
     void parse_fn(Program& program) noexcept;
 
     [[nodiscard]] static std::uint8_t precedence_of(Token::Type type) noexcept {
-        enum { None = 0, Additive, Multiplicative };
+        enum { None = 0, Or, And, Additive, Multiplicative };
 
         switch (type) {
+        case Token::Type::Or:
+            return Or;
+        case Token::Type::And:
+            return And;
         case Token::Type::Plus:
         case Token::Type::Minus:
             return Additive;
