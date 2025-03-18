@@ -186,6 +186,18 @@ std::unique_ptr<IfElse> Parser::parse_if_else() noexcept {
 
     next();
 
+    if (match(Token::Type::If)) {
+        auto else_block = parse_if_else();
+
+        if (!else_block) {
+            return nullptr;
+        }
+
+        return std::make_unique<IfElse>(
+            Span{condition->span.begin, else_block->span.end},
+            std::move(condition), std::move(if_block), std::move(else_block));
+    }
+
     auto else_block = expect_block();
 
     if (!else_block) {
