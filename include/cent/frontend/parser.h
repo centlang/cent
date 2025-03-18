@@ -77,6 +77,11 @@ private:
 
     [[nodiscard]] std::unique_ptr<Expression> expect_expr() noexcept;
 
+    [[nodiscard]] std::optional<SpanValue<std::string_view>>
+    expect_var_type() noexcept;
+
+    void parse_var(BlockStmt& block) noexcept;
+
     [[nodiscard]] std::vector<FnDecl::Param> parse_params() noexcept;
 
     void parse_fn(Program& program) noexcept;

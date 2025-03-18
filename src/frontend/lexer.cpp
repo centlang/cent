@@ -178,6 +178,16 @@ void Lexer::ident() noexcept {
         keyword(Token::Type::Else);
         return;
     }
+
+    if (m_token.value == "let") {
+        keyword(Token::Type::Let);
+        return;
+    }
+
+    if (m_token.value == "mut") {
+        keyword(Token::Type::Mut);
+        return;
+    }
 }
 
 } // namespace cent

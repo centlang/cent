@@ -54,6 +54,9 @@ struct Token {
         If,
         Else,
 
+        Let,
+        Mut,
+
         Identifier
     };
 

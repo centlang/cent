@@ -1,5 +1,6 @@
 #include "cent/ast/literals.h"
 #include "cent/ast/unary_expr.h"
+#include "cent/ast/var_decl.h"
 
 #include "cent/frontend/parser.h"
 
@@ -42,6 +43,10 @@ void Parser::expect_stmt(BlockStmt& block) noexcept {
         break;
     case Token::Type::If:
         block.body.push_back(parse_if_else());
+        break;
+    case Token::Type::Let:
+    case Token::Type::Mut:
+        parse_var(block);
         break;
     default:
         if (auto value = expect_expr()) {
@@ -209,6 +214,51 @@ std::unique_ptr<IfElse> Parser::parse_if_else() noexcept {
         std::move(if_block), std::move(else_block));
 }
 
+std::optional<SpanValue<std::string_view>> Parser::expect_var_type() noexcept {
+    if (!expect("':'", Token::Type::Colon)) {
+        return std::nullopt;
+    }
+
+    auto token = expect("type", Token::Type::Identifier);
+
+    if (!token) {
+        return std::nullopt;
+    }
+
+    return {{token->value, token->span}};
+}
+
+void Parser::parse_var(BlockStmt& block) noexcept {
+    auto begin = peek().span.begin;
+    auto is_mutable = get().type == Token::Type::Mut;
+
+    auto name = expect("variable name", Token::Type::Identifier);
+
+    if (!name) {
+        return;
+    }
+
+    auto type = expect_var_type();
+
+    if (!type) {
+        return;
+    }
+
+    if (!expect("'='", Token::Type::Equal)) {
+        return;
+    }
+
+    auto value = expect_expr();
+
+    if (!value) {
+        return;
+    }
+
+    block.body.push_back(std::make_unique<VarDecl>(
+        Span{begin, value->span.end}, is_mutable,
+        SpanValue{name->value, name->span}, *type, std::move(value)));
+}
+
 std::vector<FnDecl::Param> Parser::parse_params() noexcept {
     std::vector<FnDecl::Param> result;
 
@@ -219,19 +269,11 @@ std::vector<FnDecl::Param> Parser::parse_params() noexcept {
             return;
         }
 
-        if (!expect("':'", Token::Type::Colon)) {
-            return;
+        if (auto type = expect_var_type()) {
+            result.emplace_back(
+                SpanValue{name->value, name->span},
+                SpanValue{type->value, type->span});
         }
-
-        auto type = expect("parameter type", Token::Type::Identifier);
-
-        if (!type) {
-            return;
-        }
-
-        result.emplace_back(
-            SpanValue{name->value, name->span},
-            SpanValue{type->value, type->span});
     };
 
     if (match(Token::Type::Identifier)) {
