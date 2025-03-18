@@ -178,9 +178,13 @@ std::unique_ptr<IfElse> Parser::parse_if_else() noexcept {
         return nullptr;
     }
 
-    if (!expect("'else'", Token::Type::Else)) {
-        return nullptr;
+    if (!match(Token::Type::Else)) {
+        return std::make_unique<IfElse>(
+            Span{condition->span.begin, if_block->span.end},
+            std::move(condition), std::move(if_block));
     }
+
+    next();
 
     auto else_block = expect_block();
 

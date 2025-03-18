@@ -15,7 +15,7 @@ struct IfElse : Statement {
     [[nodiscard]] IfElse(
         Span span, std::unique_ptr<Expression> condition,
         std::unique_ptr<BlockStmt> if_block,
-        std::unique_ptr<BlockStmt> else_block) noexcept
+        std::unique_ptr<BlockStmt> else_block = nullptr) noexcept
     : Statement{span}, condition{std::move(condition)},
       if_block{std::move(if_block)}, else_block{std::move(else_block)} {}
 
