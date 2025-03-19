@@ -1,3 +1,4 @@
+#include "cent/ast/assignment.h"
 #include "cent/ast/identifier.h"
 #include "cent/ast/literals.h"
 #include "cent/ast/unary_expr.h"
@@ -49,6 +50,13 @@ void Parser::expect_stmt(BlockStmt& block) noexcept {
     case Token::Type::Mut:
         parse_var(block);
         break;
+    case Token::Type::Identifier:
+        if (match(1, Token::Type::Equal)) {
+            parse_assignment(block);
+            break;
+        }
+
+        [[fallthrough]];
     default:
         if (auto value = expect_expr()) {
             block.body.push_back(std::move(value));
@@ -260,6 +268,21 @@ void Parser::parse_var(BlockStmt& block) noexcept {
     block.body.push_back(std::make_unique<VarDecl>(
         Span{begin, value->span.end}, is_mutable,
         SpanValue{name->value, name->span}, *type, std::move(value)));
+}
+
+void Parser::parse_assignment(BlockStmt& block) noexcept {
+    auto name = get();
+    next();
+
+    auto value = expect_expr();
+
+    if (!value) {
+        return;
+    }
+
+    block.body.push_back(std::make_unique<Assignment>(
+        Span{name.span.begin, value->span.end},
+        SpanValue{name.value, name.span}, std::move(value)));
 }
 
 std::vector<FnDecl::Param> Parser::parse_params() noexcept {

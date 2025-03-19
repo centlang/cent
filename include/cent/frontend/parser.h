@@ -2,6 +2,7 @@
 #define CENT_FRONTEND_PARSER_H
 
 #include <array>
+#include <concepts>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -55,8 +56,15 @@ private:
         m_buffer_index %= buffer_size;
     }
 
-    [[nodiscard]] bool match(auto... types) const noexcept {
-        auto type = peek().type;
+    [[nodiscard]] bool
+    match(std::same_as<Token::Type> auto... types) const noexcept {
+        return match(0, types...);
+    }
+
+    [[nodiscard]] bool match(
+        std::uint8_t ahead,
+        std::same_as<Token::Type> auto... types) const noexcept {
+        auto type = peek(ahead).type;
         return ((type == types) || ...);
     }
 
@@ -95,6 +103,8 @@ private:
     expect_var_type() noexcept;
 
     void parse_var(BlockStmt& block) noexcept;
+
+    void parse_assignment(BlockStmt& block) noexcept;
 
     [[nodiscard]] std::vector<FnDecl::Param> parse_params() noexcept;
 
