@@ -1,6 +1,7 @@
 #ifndef CENT_FRONTEND_PARSER_H
 #define CENT_FRONTEND_PARSER_H
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -25,12 +26,19 @@ class Parser {
 public:
     [[nodiscard]] Parser(
         std::string_view source, std::string_view filename) noexcept
-    : m_lexer{source}, m_filename{filename} {}
+    : m_lexer{source}, m_filename{filename} {
+        for (auto& token : m_buffer) {
+            token = m_lexer.token();
+            m_lexer.next_token();
+        }
+    }
 
     [[nodiscard]] std::unique_ptr<Program> parse() noexcept;
 
 private:
-    [[nodiscard]] auto peek() const noexcept { return m_lexer.token(); }
+    [[nodiscard]] auto peek(std::uint8_t ahead = 0) const noexcept {
+        return m_buffer[(m_buffer_index + ahead) % buffer_size];
+    }
 
     [[nodiscard]] auto get() noexcept {
         auto result = peek();
@@ -39,7 +47,13 @@ private:
         return result;
     }
 
-    void next() noexcept { m_lexer.next_token(); }
+    void next() noexcept {
+        m_buffer[m_buffer_index] = m_lexer.token();
+        m_lexer.next_token();
+
+        ++m_buffer_index;
+        m_buffer_index %= buffer_size;
+    }
 
     [[nodiscard]] bool match(auto... types) const noexcept {
         auto type = peek().type;
@@ -112,7 +126,13 @@ private:
         }
     }
 
+    static constexpr auto buffer_size = 2;
+
     Lexer m_lexer;
+
+    std::array<Token, buffer_size> m_buffer;
+    std::uint8_t m_buffer_index = 0;
+
     std::string_view m_filename;
 };
 
