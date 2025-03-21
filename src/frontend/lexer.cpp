@@ -179,6 +179,11 @@ void Lexer::ident() noexcept {
         return;
     }
 
+    if (m_token.value == "while") {
+        keyword(Token::Type::While);
+        return;
+    }
+
     if (m_token.value == "let") {
         keyword(Token::Type::Let);
         return;

@@ -104,6 +104,8 @@ private:
 
     void parse_var(BlockStmt& block) noexcept;
 
+    void parse_while(BlockStmt& block) noexcept;
+
     void parse_assignment(BlockStmt& block) noexcept;
 
     [[nodiscard]] std::vector<FnDecl::Param> parse_params() noexcept;

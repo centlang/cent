@@ -54,6 +54,8 @@ struct Token {
         If,
         Else,
 
+        While,
+
         Let,
         Mut,
 

@@ -3,6 +3,7 @@
 #include "cent/ast/literals.h"
 #include "cent/ast/unary_expr.h"
 #include "cent/ast/var_decl.h"
+#include "cent/ast/while_loop.h"
 
 #include "cent/frontend/parser.h"
 
@@ -45,6 +46,9 @@ void Parser::expect_stmt(BlockStmt& block) noexcept {
         break;
     case Token::Type::If:
         block.body.push_back(parse_if_else());
+        break;
+    case Token::Type::While:
+        parse_while(block);
         break;
     case Token::Type::Let:
     case Token::Type::Mut:
@@ -268,6 +272,25 @@ void Parser::parse_var(BlockStmt& block) noexcept {
     block.body.push_back(std::make_unique<VarDecl>(
         Span{begin, value->span.end}, is_mutable,
         SpanValue{name->value, name->span}, *type, std::move(value)));
+}
+
+void Parser::parse_while(BlockStmt& block) noexcept {
+    auto begin = get().span.begin;
+
+    auto condition = expect_expr();
+
+    if (!condition) {
+        return;
+    }
+
+    auto body = expect_block();
+
+    if (!body) {
+        return;
+    }
+
+    block.body.push_back(std::make_unique<WhileLoop>(
+        Span{begin, body->span.end}, std::move(condition), std::move(body)));
 }
 
 void Parser::parse_assignment(BlockStmt& block) noexcept {
