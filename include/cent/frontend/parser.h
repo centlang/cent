@@ -89,6 +89,9 @@ private:
 
     void expect_stmt(BlockStmt& block) noexcept;
 
+    [[nodiscard]] std::vector<std::unique_ptr<Expression>>
+    parse_args() noexcept;
+
     [[nodiscard]] std::unique_ptr<Expression> expect_prefix() noexcept;
 
     [[nodiscard]] std::unique_ptr<BinaryExpr>

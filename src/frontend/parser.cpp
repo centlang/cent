@@ -1,4 +1,5 @@
 #include "cent/ast/assignment.h"
+#include "cent/ast/call_expr.h"
 #include "cent/ast/identifier.h"
 #include "cent/ast/literals.h"
 #include "cent/ast/return_stmt.h"
@@ -79,6 +80,21 @@ void Parser::expect_stmt(BlockStmt& block) noexcept {
     expect_semicolon();
 }
 
+std::vector<std::unique_ptr<Expression>> Parser::parse_args() noexcept {
+    std::vector<std::unique_ptr<Expression>> result;
+
+    if (!match(Token::Type::RightParen)) {
+        result.push_back(expect_expr());
+
+        while (match(Token::Type::Comma)) {
+            next();
+            result.push_back(expect_expr());
+        }
+    }
+
+    return result;
+}
+
 std::unique_ptr<Expression> Parser::expect_prefix() noexcept {
     auto token = expect(
         "expression", Token::Type::IntLiteral, Token::Type::FloatLiteral,
@@ -98,8 +114,24 @@ std::unique_ptr<Expression> Parser::expect_prefix() noexcept {
         return std::make_unique<BoolLiteral>(token->span, true);
     case Token::Type::False:
         return std::make_unique<BoolLiteral>(token->span, false);
-    case Token::Type::Identifier:
-        return std::make_unique<Identifier>(token->span, token->value);
+    case Token::Type::Identifier: {
+        if (!match(Token::Type::LeftParen)) {
+            return std::make_unique<Identifier>(token->span, token->value);
+        }
+
+        next();
+
+        auto args = parse_args();
+        auto end = peek().span.end;
+
+        if (!expect("',' or ')'", Token::Type::RightParen)) {
+            return nullptr;
+        }
+
+        return std::make_unique<CallExpr>(
+            Span{token->span.begin, end}, SpanValue{token->value, token->span},
+            std::move(args));
+    }
     case Token::Type::Minus:
     case Token::Type::Bang:
         if (auto value = expect_prefix()) {
