@@ -1,6 +1,7 @@
 #include "cent/ast/assignment.h"
 #include "cent/ast/identifier.h"
 #include "cent/ast/literals.h"
+#include "cent/ast/return_stmt.h"
 #include "cent/ast/unary_expr.h"
 #include "cent/ast/var_decl.h"
 #include "cent/ast/while_loop.h"
@@ -53,6 +54,9 @@ void Parser::expect_stmt(BlockStmt& block) noexcept {
     case Token::Type::Let:
     case Token::Type::Mut:
         parse_var(block);
+        break;
+    case Token::Type::Return:
+        parse_return(block);
         break;
     case Token::Type::Identifier:
         if (match(1, Token::Type::Equal)) {
@@ -291,6 +295,19 @@ void Parser::parse_while(BlockStmt& block) noexcept {
 
     block.body.push_back(std::make_unique<WhileLoop>(
         Span{begin, body->span.end}, std::move(condition), std::move(body)));
+}
+
+void Parser::parse_return(BlockStmt& block) noexcept {
+    auto begin = get().span.begin;
+
+    auto value = expect_expr();
+
+    if (!value) {
+        return;
+    }
+
+    block.body.push_back(std::make_unique<ReturnStmt>(
+        Span{begin, value->span.end}, std::move(value)));
 }
 
 void Parser::parse_assignment(BlockStmt& block) noexcept {

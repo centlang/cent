@@ -59,6 +59,8 @@ struct Token {
         Let,
         Mut,
 
+        Return,
+
         Identifier
     };
 

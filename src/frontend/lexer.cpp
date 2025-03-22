@@ -193,6 +193,11 @@ void Lexer::ident() noexcept {
         keyword(Token::Type::Mut);
         return;
     }
+
+    if (m_token.value == "return") {
+        keyword(Token::Type::Return);
+        return;
+    }
 }
 
 } // namespace cent
