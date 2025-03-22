@@ -298,16 +298,17 @@ void Parser::parse_while(BlockStmt& block) noexcept {
 }
 
 void Parser::parse_return(BlockStmt& block) noexcept {
-    auto begin = get().span.begin;
+    auto span = get().span;
 
-    auto value = expect_expr();
+    std::unique_ptr<Expression> value = nullptr;
 
-    if (!value) {
-        return;
+    if (!match(Token::Type::Semicolon)) {
+        value = expect_expr();
     }
 
     block.body.push_back(std::make_unique<ReturnStmt>(
-        Span{begin, value->span.end}, std::move(value)));
+        Span{span.begin, value ? value->span.end : span.end},
+        std::move(value)));
 }
 
 void Parser::parse_assignment(BlockStmt& block) noexcept {
