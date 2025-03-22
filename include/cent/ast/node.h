@@ -1,6 +1,10 @@
 #ifndef CENT_AST_NODE_H
 #define CENT_AST_NODE_H
 
+#include <llvm/IR/Value.h>
+
+#include "cent/backend/codegen.h"
+
 #include "cent/span.h"
 
 namespace cent {
@@ -19,6 +23,8 @@ struct Node {
 struct Statement : Node {
     [[nodiscard]] Statement(Span span) noexcept : span{span} {}
 
+    virtual llvm::Value* codegen(Codegen& codegen) noexcept = 0;
+
     Span span;
 };
 
@@ -29,6 +35,34 @@ struct Expression : Statement {
 struct Declaration : Statement {
     using Statement::Statement;
 };
+
+namespace detail {
+
+template <typename Derived> struct Stmt : Statement {
+    using Statement::Statement;
+
+    llvm::Value* codegen(Codegen& codegen) noexcept override {
+        return codegen.generate(static_cast<Derived&>(*this));
+    }
+};
+
+template <typename Derived> struct Expr : Expression {
+    using Expression::Expression;
+
+    [[nodiscard]] llvm::Value* codegen(Codegen& codegen) noexcept override {
+        return codegen.generate(static_cast<Derived&>(*this));
+    }
+};
+
+template <typename Derived> struct Decl : Declaration {
+    using Declaration::Declaration;
+
+    llvm::Value* codegen(Codegen& codegen) noexcept override {
+        return codegen.generate(static_cast<Derived&>(*this));
+    }
+};
+
+} // namespace detail
 
 } // namespace cent
 

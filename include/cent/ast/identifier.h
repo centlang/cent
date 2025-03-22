@@ -8,9 +8,9 @@
 
 namespace cent {
 
-struct Identifier : Expression {
+struct Identifier : detail::Expr<Identifier> {
     [[nodiscard]] Identifier(Span span, std::string_view value) noexcept
-    : Expression{span}, value{value} {}
+    : Expr{span}, value{value} {}
 
     std::string_view value;
 };

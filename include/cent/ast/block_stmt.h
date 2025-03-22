@@ -8,8 +8,8 @@
 
 namespace cent {
 
-struct BlockStmt : Statement {
-    using Statement::Statement;
+struct BlockStmt : detail::Stmt<BlockStmt> {
+    using Stmt::Stmt;
 
     std::vector<std::unique_ptr<Statement>> body;
 };

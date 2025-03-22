@@ -9,10 +9,10 @@
 
 namespace cent {
 
-struct ReturnStmt : Statement {
+struct ReturnStmt : detail::Stmt<ReturnStmt> {
     [[nodiscard]] ReturnStmt(
         Span span, std::unique_ptr<Expression> value) noexcept
-    : Statement{span}, value{std::move(value)} {}
+    : Stmt{span}, value{std::move(value)} {}
 
     std::unique_ptr<Expression> value;
 };

@@ -11,12 +11,12 @@
 
 namespace cent {
 
-struct IfElse : Statement {
+struct IfElse : detail::Stmt<IfElse> {
     [[nodiscard]] IfElse(
         Span span, std::unique_ptr<Expression> condition,
         std::unique_ptr<BlockStmt> if_block,
         std::unique_ptr<Statement> else_block = nullptr) noexcept
-    : Statement{span}, condition{std::move(condition)},
+    : Stmt{span}, condition{std::move(condition)},
       if_block{std::move(if_block)}, else_block{std::move(else_block)} {}
 
     std::unique_ptr<Expression> condition;

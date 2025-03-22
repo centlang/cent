@@ -8,23 +8,23 @@
 
 namespace cent {
 
-struct IntLiteral : Expression {
+struct IntLiteral : detail::Expr<IntLiteral> {
     [[nodiscard]] IntLiteral(Span span, std::string_view value) noexcept
-    : Expression{span}, value{value} {}
+    : Expr{span}, value{value} {}
 
     std::string_view value;
 };
 
-struct FloatLiteral : Expression {
+struct FloatLiteral : detail::Expr<FloatLiteral> {
     [[nodiscard]] FloatLiteral(Span span, std::string_view value) noexcept
-    : Expression{span}, value{value} {}
+    : Expr{span}, value{value} {}
 
     std::string_view value;
 };
 
-struct BoolLiteral : Expression {
+struct BoolLiteral : detail::Expr<BoolLiteral> {
     [[nodiscard]] BoolLiteral(Span span, bool value) noexcept
-    : Expression{span}, value{value} {}
+    : Expr{span}, value{value} {}
 
     bool value;
 };

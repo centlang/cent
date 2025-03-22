@@ -12,11 +12,11 @@
 
 namespace cent {
 
-struct Assignment : Statement {
+struct Assignment : detail::Stmt<Assignment> {
     [[nodiscard]] Assignment(
         Span span, SpanValue<std::string_view> identifier,
         std::unique_ptr<Expression> value) noexcept
-    : Statement{span}, identifier{identifier}, value{std::move(value)} {}
+    : Stmt{span}, identifier{identifier}, value{std::move(value)} {}
 
     SpanValue<std::string_view> identifier;
     std::unique_ptr<Expression> value;

@@ -12,12 +12,12 @@
 
 namespace cent {
 
-struct VarDecl : Declaration {
+struct VarDecl : detail::Decl<VarDecl> {
     [[nodiscard]] VarDecl(
         Span span, bool is_mutable, SpanValue<std::string_view> name,
         SpanValue<std::string_view> type,
         std::unique_ptr<Expression> value) noexcept
-    : Declaration{span}, is_mutable{is_mutable}, name{name}, type{type},
+    : Decl{span}, is_mutable{is_mutable}, name{name}, type{type},
       value{std::move(value)} {}
 
     bool is_mutable;

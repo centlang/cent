@@ -12,11 +12,11 @@
 
 namespace cent {
 
-struct UnaryExpr : Expression {
+struct UnaryExpr : detail::Expr<UnaryExpr> {
     [[nodiscard]] UnaryExpr(
         Span span, SpanValue<Token::Type> oper,
         std::unique_ptr<Expression> value) noexcept
-    : Expression{span}, oper{oper}, value{std::move(value)} {}
+    : Expr{span}, oper{oper}, value{std::move(value)} {}
 
     SpanValue<Token::Type> oper;
     std::unique_ptr<Expression> value;

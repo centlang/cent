@@ -13,7 +13,7 @@
 
 namespace cent {
 
-struct FnDecl : Declaration {
+struct FnDecl : detail::Decl<FnDecl> {
     struct Param {
         SpanValue<std::string_view> name;
         SpanValue<std::string_view> type;
@@ -28,7 +28,7 @@ struct FnDecl : Declaration {
 
     [[nodiscard]] FnDecl(
         Span span, Proto proto, std::unique_ptr<BlockStmt> block) noexcept
-    : Declaration{span}, proto{std::move(proto)}, block{std::move(block)} {}
+    : Decl{span}, proto{std::move(proto)}, block{std::move(block)} {}
 
     Proto proto;
     std::unique_ptr<BlockStmt> block;

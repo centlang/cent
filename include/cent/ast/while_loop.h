@@ -11,11 +11,11 @@
 
 namespace cent {
 
-struct WhileLoop : Statement {
+struct WhileLoop : detail::Stmt<WhileLoop> {
     [[nodiscard]] WhileLoop(
         Span span, std::unique_ptr<Expression> condition,
         std::unique_ptr<BlockStmt> body) noexcept
-    : Statement{span}, condition{std::move(condition)}, body{std::move(body)} {}
+    : Stmt{span}, condition{std::move(condition)}, body{std::move(body)} {}
 
     std::unique_ptr<Expression> condition;
     std::unique_ptr<BlockStmt> body;

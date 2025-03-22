@@ -11,12 +11,11 @@
 
 namespace cent {
 
-struct CallExpr : Expression {
+struct CallExpr : detail::Expr<CallExpr> {
     [[nodiscard]] CallExpr(
         Span span, SpanValue<std::string_view> identifier,
         std::vector<std::unique_ptr<Expression>> arguments) noexcept
-    : Expression{span}, identifier{identifier},
-      arguments{std::move(arguments)} {}
+    : Expr{span}, identifier{identifier}, arguments{std::move(arguments)} {}
 
     SpanValue<std::string_view> identifier;
     std::vector<std::unique_ptr<Expression>> arguments;
