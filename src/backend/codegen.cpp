@@ -4,6 +4,7 @@
 
 #include "cent/ast/binary_expr.h"
 #include "cent/ast/literals.h"
+#include "cent/ast/unary_expr.h"
 
 #include "cent/backend/codegen.h"
 
@@ -40,6 +41,21 @@ llvm::Value* Codegen::generate(BinaryExpr& expr) noexcept {
         return m_builder.CreateICmpSGE(lhs, rhs);
     case LessEqual:
         return m_builder.CreateICmpSLE(lhs, rhs);
+    default:
+        return nullptr;
+    }
+}
+
+llvm::Value* Codegen::generate(UnaryExpr& expr) noexcept {
+    using enum Token::Type;
+
+    auto* value = expr.value->codegen(*this);
+
+    switch (expr.oper.value) {
+    case Minus:
+        return m_builder.CreateNeg(value);
+    case Bang:
+        return m_builder.CreateNot(value);
     default:
         return nullptr;
     }
