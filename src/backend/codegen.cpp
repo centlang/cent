@@ -3,12 +3,21 @@
 #include <llvm/IR/Constants.h>
 
 #include "cent/ast/binary_expr.h"
+#include "cent/ast/block_stmt.h"
 #include "cent/ast/literals.h"
 #include "cent/ast/unary_expr.h"
 
 #include "cent/backend/codegen.h"
 
 namespace cent {
+
+llvm::Value* Codegen::generate(BlockStmt& stmt) noexcept {
+    for (auto& statement : stmt.body) {
+        statement->codegen(*this);
+    }
+
+    return nullptr;
+}
 
 llvm::Value* Codegen::generate(BinaryExpr& expr) noexcept {
     using enum Token::Type;
