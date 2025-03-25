@@ -126,13 +126,15 @@ void Codegen::generate_fn_proto(FnDecl& decl) noexcept {
 }
 
 llvm::FunctionType* Codegen::get_fn_type(FnDecl& decl) noexcept {
-    auto* return_type = get_type(decl.proto.return_type.value);
+    auto* return_type =
+        get_type(decl.proto.return_type.span, decl.proto.return_type.value);
 
     std::vector<llvm::Type*> param_types;
     param_types.reserve(decl.proto.params.size());
 
     for (const auto& parameter : decl.proto.params) {
-        param_types.push_back(get_type(parameter.type.value));
+        param_types.push_back(
+            get_type(parameter.type.span, parameter.type.value));
     }
 
     return llvm::FunctionType::get(return_type, param_types, false);

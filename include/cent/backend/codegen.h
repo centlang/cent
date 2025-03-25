@@ -5,9 +5,14 @@
 #include <memory>
 #include <utility>
 
+#include <fmt/core.h>
+
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+
+#include "cent/log.h"
+#include "cent/span.h"
 
 namespace cent {
 
@@ -32,9 +37,11 @@ struct VarDecl;
 
 class Codegen {
 public:
-    [[nodiscard]] Codegen(std::unique_ptr<Program> program) noexcept
+    [[nodiscard]] Codegen(
+        std::unique_ptr<Program> program, std::string_view filename) noexcept
     : m_module{std::make_unique<llvm::Module>("", m_context)},
-      m_builder{m_context}, m_program{std::move(program)} {}
+      m_builder{m_context}, m_program{std::move(program)},
+      m_filename{filename} {}
 
     [[nodiscard]] std::unique_ptr<llvm::Module> generate() noexcept;
 
@@ -60,7 +67,8 @@ private:
 
     [[nodiscard]] llvm::FunctionType* get_fn_type(FnDecl& decl) noexcept;
 
-    [[nodiscard]] llvm::Type* get_type(std::string_view name) noexcept {
+    [[nodiscard]] llvm::Type*
+    get_type(Span span, std::string_view name) noexcept {
         if (name == "i32") {
             return get_i32_type();
         }
@@ -76,6 +84,8 @@ private:
         if (name == "void") {
             return get_void_type();
         }
+
+        error(span.begin, m_filename, fmt::format("undeclared type: {}", name));
 
         return nullptr;
     }
@@ -108,6 +118,8 @@ private:
     llvm::IRBuilder<> m_builder;
 
     std::unique_ptr<Program> m_program;
+
+    std::string_view m_filename;
 };
 
 } // namespace cent
