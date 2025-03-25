@@ -6,12 +6,25 @@
 #include "cent/ast/block_stmt.h"
 #include "cent/ast/fn_decl.h"
 #include "cent/ast/literals.h"
+#include "cent/ast/program.h"
 #include "cent/ast/return_stmt.h"
 #include "cent/ast/unary_expr.h"
 
 #include "cent/backend/codegen.h"
 
 namespace cent {
+
+std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
+    for (auto& function : m_program->functions) {
+        generate_fn_proto(*function);
+    }
+
+    for (auto& function : m_program->functions) {
+        function->codegen(*this);
+    }
+
+    return std::move(m_module);
+}
 
 llvm::Value* Codegen::generate(BlockStmt& stmt) noexcept {
     for (auto& statement : stmt.body) {
