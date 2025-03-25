@@ -92,6 +92,20 @@ llvm::Value* Codegen::generate(BoolLiteral& expr) noexcept {
     return llvm::ConstantInt::get(get_bool_type(), expr.value);
 }
 
+llvm::Value* Codegen::generate(FnDecl& decl) noexcept {
+    auto* entry = llvm::BasicBlock::Create(
+        m_context, "", m_module->getFunction(decl.proto.name.value));
+
+    m_builder.SetInsertPoint(entry);
+    decl.block->codegen(*this);
+
+    if (!m_builder.GetInsertBlock()->getTerminator()) {
+        m_builder.CreateRetVoid();
+    }
+
+    return nullptr;
+}
+
 void Codegen::generate_fn_proto(FnDecl& decl) noexcept {
     llvm::Function::Create(
         get_fn_type(decl), llvm::Function::ExternalLinkage,
