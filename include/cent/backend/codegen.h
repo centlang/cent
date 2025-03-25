@@ -56,6 +56,46 @@ public:
     llvm::Value* generate(VarDecl& decl) noexcept;
 
 private:
+    void generate_fn_proto(FnDecl& decl) noexcept;
+
+    [[nodiscard]] llvm::FunctionType* get_fn_type(FnDecl& decl) noexcept;
+
+    [[nodiscard]] llvm::Type* get_type(std::string_view name) noexcept {
+        if (name == "i32") {
+            return get_i32_type();
+        }
+
+        if (name == "f32") {
+            return get_f32_type();
+        }
+
+        if (name == "bool") {
+            return get_bool_type();
+        }
+
+        if (name == "void") {
+            return get_void_type();
+        }
+
+        return nullptr;
+    }
+
+    [[nodiscard]] llvm::Type* get_i32_type() noexcept {
+        return llvm::Type::getInt32Ty(m_context);
+    }
+
+    [[nodiscard]] llvm::Type* get_f32_type() noexcept {
+        return llvm::Type::getFloatTy(m_context);
+    }
+
+    [[nodiscard]] llvm::Type* get_bool_type() noexcept {
+        return llvm::Type::getInt1Ty(m_context);
+    }
+
+    [[nodiscard]] llvm::Type* get_void_type() noexcept {
+        return llvm::Type::getVoidTy(m_context);
+    }
+
     template <typename ValueType> auto from_string(std::string_view value) {
         ValueType result;
         std::from_chars(value.data(), value.data() + value.size(), result);

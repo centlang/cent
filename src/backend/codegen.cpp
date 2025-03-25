@@ -4,6 +4,7 @@
 
 #include "cent/ast/binary_expr.h"
 #include "cent/ast/block_stmt.h"
+#include "cent/ast/fn_decl.h"
 #include "cent/ast/literals.h"
 #include "cent/ast/return_stmt.h"
 #include "cent/ast/unary_expr.h"
@@ -79,17 +80,35 @@ llvm::Value* Codegen::generate(UnaryExpr& expr) noexcept {
 
 llvm::Value* Codegen::generate(IntLiteral& expr) noexcept {
     return llvm::ConstantInt::getSigned(
-        llvm::Type::getInt32Ty(m_context),
-        from_string<std::int32_t>(expr.value));
+        get_i32_type(), from_string<std::int32_t>(expr.value));
 }
 
 llvm::Value* Codegen::generate(FloatLiteral& expr) noexcept {
     return llvm::ConstantFP::get(
-        llvm::Type::getFloatTy(m_context), from_string<float>(expr.value));
+        get_f32_type(), from_string<float>(expr.value));
 }
 
 llvm::Value* Codegen::generate(BoolLiteral& expr) noexcept {
-    return llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), expr.value);
+    return llvm::ConstantInt::get(get_bool_type(), expr.value);
+}
+
+void Codegen::generate_fn_proto(FnDecl& decl) noexcept {
+    llvm::Function::Create(
+        get_fn_type(decl), llvm::Function::ExternalLinkage,
+        decl.proto.name.value, *m_module);
+}
+
+llvm::FunctionType* Codegen::get_fn_type(FnDecl& decl) noexcept {
+    auto* return_type = get_type(decl.proto.return_type.value);
+
+    std::vector<llvm::Type*> param_types;
+    param_types.reserve(decl.proto.params.size());
+
+    for (const auto& parameter : decl.proto.params) {
+        param_types.push_back(get_type(parameter.type.value));
+    }
+
+    return llvm::FunctionType::get(return_type, param_types, false);
 }
 
 } // namespace cent
