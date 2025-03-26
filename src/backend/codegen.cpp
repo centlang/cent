@@ -147,6 +147,15 @@ llvm::FunctionType* Codegen::get_fn_type(FnDecl& decl) noexcept {
             return nullptr;
         }
 
+        if (type->isVoidTy()) {
+            error(
+                parameter.name.span.begin, m_filename,
+                fmt::format(
+                    "'{}' cannot be of type 'void'", parameter.name.value));
+
+            return nullptr;
+        }
+
         param_types.push_back(type);
     }
 
