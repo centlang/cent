@@ -35,7 +35,11 @@ llvm::Value* Codegen::generate(BlockStmt& stmt) noexcept {
 }
 
 llvm::Value* Codegen::generate(ReturnStmt& stmt) noexcept {
-    m_builder.CreateRet(stmt.value->codegen(*this));
+    auto* value = stmt.value->codegen(*this);
+
+    if (value) {
+        m_builder.CreateRet(value);
+    }
 
     return nullptr;
 }
