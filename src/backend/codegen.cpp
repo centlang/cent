@@ -50,6 +50,10 @@ llvm::Value* Codegen::generate(BinaryExpr& expr) noexcept {
     auto* lhs = expr.lhs->codegen(*this);
     auto* rhs = expr.rhs->codegen(*this);
 
+    if (!lhs || !rhs) {
+        return nullptr;
+    }
+
     switch (expr.oper.value) {
     case Plus:
         return m_builder.CreateAdd(lhs, rhs);
