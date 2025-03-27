@@ -89,6 +89,10 @@ llvm::Value* Codegen::generate(UnaryExpr& expr) noexcept {
 
     auto* value = expr.value->codegen(*this);
 
+    if (!value) {
+        return nullptr;
+    }
+
     switch (expr.oper.value) {
     case Minus:
         return m_builder.CreateNeg(value);
