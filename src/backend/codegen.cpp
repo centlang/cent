@@ -4,6 +4,7 @@
 
 #include "cent/ast/binary_expr.h"
 #include "cent/ast/block_stmt.h"
+#include "cent/ast/call_expr.h"
 #include "cent/ast/fn_decl.h"
 #include "cent/ast/literals.h"
 #include "cent/ast/program.h"
@@ -115,6 +116,43 @@ llvm::Value* Codegen::generate(FloatLiteral& expr) noexcept {
 
 llvm::Value* Codegen::generate(BoolLiteral& expr) noexcept {
     return llvm::ConstantInt::get(get_bool_type(), expr.value);
+}
+
+llvm::Value* Codegen::generate(CallExpr& expr) noexcept {
+    auto* callee = m_module->getFunction(expr.identifier.value);
+
+    if (!callee) {
+        error(
+            expr.identifier.span.begin, m_filename,
+            fmt::format("undeclared function: '{}'", expr.identifier.value));
+
+        return nullptr;
+    }
+
+    auto arg_size = callee->arg_size();
+
+    if (arg_size != expr.arguments.size()) {
+        error(
+            expr.identifier.span.begin, m_filename,
+            "incorrect number of arguments passed");
+
+        return nullptr;
+    }
+
+    std::vector<llvm::Value*> arguments;
+    arguments.reserve(arg_size);
+
+    for (std::size_t i = 0; i < arg_size; ++i) {
+        auto* value = expr.arguments[i]->codegen(*this);
+
+        if (!value) {
+            return nullptr;
+        }
+
+        arguments.push_back(value);
+    }
+
+    return m_builder.CreateCall(callee, arguments);
 }
 
 llvm::Value* Codegen::generate(FnDecl& decl) noexcept {
