@@ -55,6 +55,12 @@ llvm::Value* Codegen::generate(BinaryExpr& expr) noexcept {
         return nullptr;
     }
 
+    if (lhs->getType() != rhs->getType()) {
+        error(expr.lhs->span.begin, m_filename, "type mismatch");
+
+        return nullptr;
+    }
+
     switch (expr.oper.value) {
     case Plus:
         return m_builder.CreateAdd(lhs, rhs);
