@@ -155,6 +155,12 @@ llvm::Value* Codegen::generate(CallExpr& expr) noexcept {
             return nullptr;
         }
 
+        if (value->getType() != callee->getFunctionType()->getParamType(i)) {
+            error(expr.arguments[i]->span.begin, m_filename, "type mismatch");
+
+            return nullptr;
+        }
+
         arguments.push_back(value);
     }
 
