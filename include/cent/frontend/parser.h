@@ -85,8 +85,6 @@ private:
 
     [[nodiscard]] std::unique_ptr<IfElse> parse_if_else() noexcept;
 
-    void expect_semicolon() noexcept;
-
     void expect_stmt(BlockStmt& block) noexcept;
 
     [[nodiscard]] std::vector<std::unique_ptr<Expression>>

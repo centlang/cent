@@ -28,30 +28,23 @@ std::unique_ptr<Program> Parser::parse() noexcept {
             parse_fn(*result);
         } else {
             next();
-            continue;
         }
-
-        expect_semicolon();
     }
 
     return result;
-}
-
-void Parser::expect_semicolon() noexcept {
-    expect("';'", Token::Type::Semicolon);
 }
 
 void Parser::expect_stmt(BlockStmt& block) noexcept {
     switch (peek().type) {
     case Token::Type::LeftBrace:
         block.body.push_back(expect_block());
-        break;
+        return;
     case Token::Type::If:
         block.body.push_back(parse_if_else());
-        break;
+        return;
     case Token::Type::While:
         parse_while(block);
-        break;
+        return;
     case Token::Type::Let:
     case Token::Type::Mut:
         parse_var(block);
@@ -77,7 +70,7 @@ void Parser::expect_stmt(BlockStmt& block) noexcept {
         break;
     }
 
-    expect_semicolon();
+    expect("';'", Token::Type::Semicolon);
 }
 
 std::vector<std::unique_ptr<Expression>> Parser::parse_args() noexcept {
