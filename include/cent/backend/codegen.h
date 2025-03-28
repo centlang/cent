@@ -2,6 +2,7 @@
 #define CENT_BACKEND_CODEGEN_H
 
 #include <charconv>
+#include <map>
 #include <memory>
 #include <utility>
 
@@ -63,6 +64,11 @@ public:
     llvm::Value* generate(VarDecl& decl) noexcept;
 
 private:
+    struct Variable {
+        llvm::Value* value;
+        bool is_mutable;
+    };
+
     void generate_fn_proto(FnDecl& decl) noexcept;
 
     [[nodiscard]] llvm::FunctionType* get_fn_type(FnDecl& decl) noexcept;
@@ -116,6 +122,8 @@ private:
     llvm::LLVMContext m_context;
     std::unique_ptr<llvm::Module> m_module;
     llvm::IRBuilder<> m_builder;
+
+    std::map<std::string_view, Variable> m_locals;
 
     std::unique_ptr<Program> m_program;
 

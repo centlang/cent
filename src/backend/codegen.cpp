@@ -29,9 +29,13 @@ std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
 }
 
 llvm::Value* Codegen::generate(BlockStmt& stmt) noexcept {
+    auto locals = m_locals;
+
     for (auto& statement : stmt.body) {
         statement->codegen(*this);
     }
+
+    m_locals = std::move(locals);
 
     return nullptr;
 }
@@ -210,8 +214,15 @@ llvm::Value* Codegen::generate(CallExpr& expr) noexcept {
 }
 
 llvm::Value* Codegen::generate(FnDecl& decl) noexcept {
-    auto* entry = llvm::BasicBlock::Create(
-        m_context, "", m_module->getFunction(decl.proto.name.value));
+    auto* function = m_module->getFunction(decl.proto.name.value);
+    auto* entry = llvm::BasicBlock::Create(m_context, "", function);
+
+    m_locals.clear();
+
+    for (std::size_t i = 0; i < decl.proto.params.size(); ++i) {
+        m_locals[decl.proto.params[i].name.value] = {
+            function->getArg(i), false};
+    }
 
     m_builder.SetInsertPoint(entry);
     decl.block->codegen(*this);
