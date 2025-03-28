@@ -6,6 +6,7 @@
 #include "cent/ast/block_stmt.h"
 #include "cent/ast/call_expr.h"
 #include "cent/ast/fn_decl.h"
+#include "cent/ast/if_else.h"
 #include "cent/ast/literals.h"
 #include "cent/ast/program.h"
 #include "cent/ast/return_stmt.h"
@@ -31,6 +32,47 @@ llvm::Value* Codegen::generate(BlockStmt& stmt) noexcept {
     for (auto& statement : stmt.body) {
         statement->codegen(*this);
     }
+
+    return nullptr;
+}
+
+llvm::Value* Codegen::generate(IfElse& stmt) noexcept {
+    auto* condition = stmt.condition->codegen(*this);
+
+    if (!condition) {
+        return nullptr;
+    }
+
+    auto* function = m_builder.GetInsertBlock()->getParent();
+
+    auto* if_block = llvm::BasicBlock::Create(m_context, "", function);
+    auto* end = llvm::BasicBlock::Create(m_context, "", function);
+
+    if (!stmt.else_block) {
+        m_builder.CreateCondBr(condition, if_block, end);
+
+        m_builder.SetInsertPoint(if_block);
+        stmt.if_block->codegen(*this);
+
+        m_builder.CreateBr(end);
+        m_builder.SetInsertPoint(end);
+
+        return nullptr;
+    }
+
+    auto* else_block = llvm::BasicBlock::Create(m_context, "", function);
+    m_builder.CreateCondBr(condition, if_block, else_block);
+
+    m_builder.SetInsertPoint(if_block);
+    stmt.if_block->codegen(*this);
+
+    m_builder.CreateBr(end);
+
+    m_builder.SetInsertPoint(else_block);
+    stmt.else_block->codegen(*this);
+
+    m_builder.CreateBr(end);
+    m_builder.SetInsertPoint(end);
 
     return nullptr;
 }
