@@ -59,7 +59,10 @@ llvm::Value* Codegen::generate(IfElse& stmt) noexcept {
         m_builder.SetInsertPoint(if_block);
         stmt.if_block->codegen(*this);
 
-        m_builder.CreateBr(end);
+        if (!m_builder.GetInsertBlock()->getTerminator()) {
+            m_builder.CreateBr(end);
+        }
+
         m_builder.SetInsertPoint(end);
 
         return nullptr;
@@ -71,12 +74,17 @@ llvm::Value* Codegen::generate(IfElse& stmt) noexcept {
     m_builder.SetInsertPoint(if_block);
     stmt.if_block->codegen(*this);
 
-    m_builder.CreateBr(end);
+    if (!m_builder.GetInsertBlock()->getTerminator()) {
+        m_builder.CreateBr(end);
+    }
 
     m_builder.SetInsertPoint(else_block);
     stmt.else_block->codegen(*this);
 
-    m_builder.CreateBr(end);
+    if (!m_builder.GetInsertBlock()->getTerminator()) {
+        m_builder.CreateBr(end);
+    }
+
     m_builder.SetInsertPoint(end);
 
     return nullptr;
