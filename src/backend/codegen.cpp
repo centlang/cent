@@ -94,9 +94,17 @@ llvm::Value* Codegen::generate(IfElse& stmt) noexcept {
 llvm::Value* Codegen::generate(ReturnStmt& stmt) noexcept {
     auto* value = stmt.value->codegen(*this);
 
-    if (value) {
-        m_builder.CreateRet(value);
+    if (!value) {
+        return nullptr;
     }
+
+    if (value->getType() != m_builder.getCurrentFunctionReturnType()) {
+        error(stmt.value->span.begin, m_filename, "type mismatch");
+
+        return nullptr;
+    }
+
+    m_builder.CreateRet(value);
 
     return nullptr;
 }
