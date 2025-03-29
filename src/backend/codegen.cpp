@@ -6,6 +6,7 @@
 #include "cent/ast/block_stmt.h"
 #include "cent/ast/call_expr.h"
 #include "cent/ast/fn_decl.h"
+#include "cent/ast/identifier.h"
 #include "cent/ast/if_else.h"
 #include "cent/ast/literals.h"
 #include "cent/ast/program.h"
@@ -168,6 +169,26 @@ llvm::Value* Codegen::generate(FloatLiteral& expr) noexcept {
 
 llvm::Value* Codegen::generate(BoolLiteral& expr) noexcept {
     return llvm::ConstantInt::get(get_bool_type(), expr.value);
+}
+
+llvm::Value* Codegen::generate(Identifier& expr) noexcept {
+    auto iterator = m_locals.find(expr.value);
+
+    if (iterator == m_locals.end()) {
+        error(
+            expr.span.begin, m_filename,
+            fmt::format("undeclared variable: '{}'", expr.value));
+
+        return nullptr;
+    }
+
+    auto* value = iterator->second.value;
+
+    if (auto* variable = llvm::dyn_cast<llvm::AllocaInst>(value)) {
+        return m_builder.CreateLoad(variable->getAllocatedType(), variable);
+    }
+
+    return value;
 }
 
 llvm::Value* Codegen::generate(CallExpr& expr) noexcept {
