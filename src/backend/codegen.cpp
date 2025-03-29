@@ -12,6 +12,7 @@
 #include "cent/ast/program.h"
 #include "cent/ast/return_stmt.h"
 #include "cent/ast/unary_expr.h"
+#include "cent/ast/var_decl.h"
 
 #include "cent/backend/codegen.h"
 
@@ -259,6 +260,33 @@ llvm::Value* Codegen::generate(FnDecl& decl) noexcept {
     if (!m_builder.GetInsertBlock()->getTerminator()) {
         m_builder.CreateRetVoid();
     }
+
+    return nullptr;
+}
+
+llvm::Value* Codegen::generate(VarDecl& decl) noexcept {
+    auto* value = decl.value->codegen(*this);
+
+    if (!value) {
+        return nullptr;
+    }
+
+    auto* type = get_type(decl.type.span, decl.type.value);
+
+    if (!type) {
+        return nullptr;
+    }
+
+    if (type != value->getType()) {
+        error(decl.value->span.begin, m_filename, "type mismatch");
+
+        return nullptr;
+    }
+
+    auto* variable = m_builder.CreateAlloca(type);
+    m_builder.CreateStore(value, variable);
+
+    m_locals[decl.name.value] = {variable, decl.is_mutable};
 
     return nullptr;
 }
