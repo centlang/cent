@@ -2,6 +2,7 @@
 
 #include <llvm/IR/Constants.h>
 
+#include "cent/ast/assignment.h"
 #include "cent/ast/binary_expr.h"
 #include "cent/ast/block_stmt.h"
 #include "cent/ast/call_expr.h"
@@ -28,6 +29,48 @@ std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
     }
 
     return std::move(m_module);
+}
+
+llvm::Value* Codegen::generate(Assignment& stmt) noexcept {
+    auto* value = stmt.value->codegen(*this);
+
+    if (!value) {
+        return nullptr;
+    }
+
+    auto iterator = m_locals.find(stmt.identifier.value);
+
+    if (iterator == m_locals.end()) {
+        error(
+            stmt.identifier.span.begin, m_filename,
+            fmt::format("undeclared variable: '{}'", stmt.identifier.value));
+
+        return nullptr;
+    }
+
+    if (!iterator->second.is_mutable) {
+        error(
+            stmt.identifier.span.begin, m_filename,
+            fmt::format("'{}' is immutable", stmt.identifier.value));
+
+        return nullptr;
+    }
+
+    auto* variable = llvm::dyn_cast<llvm::AllocaInst>(iterator->second.value);
+
+    if (!variable) {
+        return nullptr;
+    }
+
+    if (variable->getAllocatedType() != value->getType()) {
+        error(stmt.value->span.begin, m_filename, "type mismatch");
+
+        return nullptr;
+    }
+
+    m_builder.CreateStore(value, variable);
+
+    return nullptr;
 }
 
 llvm::Value* Codegen::generate(BlockStmt& stmt) noexcept {
