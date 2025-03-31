@@ -342,27 +342,34 @@ llvm::Value* Codegen::generate(FnDecl& decl) noexcept {
 }
 
 llvm::Value* Codegen::generate(VarDecl& decl) noexcept {
-    auto* value = decl.value->codegen(*this);
-
-    if (!value) {
-        return nullptr;
-    }
-
     auto* type = get_type(decl.type.span, decl.type.value);
 
     if (!type) {
         return nullptr;
     }
 
-    if (type != value->getType()) {
-        error(decl.value->span.begin, m_filename, "type mismatch");
+    auto* variable = m_builder.CreateAlloca(type);
+    llvm::Value* value = nullptr;
 
-        return nullptr;
+    if (decl.value) {
+        value = decl.value->codegen(*this);
+
+        if (!value) {
+            return nullptr;
+        }
+
+        if (type != value->getType()) {
+            error(decl.value->span.begin, m_filename, "type mismatch");
+
+            return nullptr;
+        }
     }
 
-    auto* variable = m_builder.CreateAlloca(type);
-    m_builder.CreateStore(value, variable);
+    if (!value) {
+        value = llvm::Constant::getNullValue(type);
+    }
 
+    m_builder.CreateStore(value, variable);
     m_locals[decl.name.value] = {variable, decl.is_mutable};
 
     return nullptr;
