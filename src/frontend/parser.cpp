@@ -288,9 +288,15 @@ void Parser::parse_var(BlockStmt& block) noexcept {
         return;
     }
 
-    if (!expect("'='", Token::Type::Equal)) {
+    if (!match(Token::Type::Equal)) {
+        block.body.push_back(std::make_unique<VarDecl>(
+            Span{begin, type->span.end}, is_mutable,
+            SpanValue{name->value, name->span}, *type, nullptr));
+
         return;
     }
+
+    next();
 
     auto value = expect_expr();
 
