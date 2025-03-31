@@ -14,6 +14,7 @@
 #include "cent/ast/return_stmt.h"
 #include "cent/ast/unary_expr.h"
 #include "cent/ast/var_decl.h"
+#include "cent/ast/while_loop.h"
 
 #include "cent/backend/codegen.h"
 
@@ -148,6 +149,31 @@ llvm::Value* Codegen::generate(ReturnStmt& stmt) noexcept {
     }
 
     m_builder.CreateRet(value);
+
+    return nullptr;
+}
+
+llvm::Value* Codegen::generate(WhileLoop& stmt) noexcept {
+    auto* condition = stmt.condition->codegen(*this);
+
+    if (!condition) {
+        return nullptr;
+    }
+
+    auto* function = m_builder.GetInsertBlock()->getParent();
+
+    auto* body = llvm::BasicBlock::Create(m_context, "", function);
+    auto* end = llvm::BasicBlock::Create(m_context, "", function);
+
+    m_builder.CreateCondBr(condition, body, end);
+
+    m_builder.SetInsertPoint(body);
+    stmt.body->codegen(*this);
+
+    condition = stmt.condition->codegen(*this);
+    m_builder.CreateCondBr(condition, body, end);
+
+    m_builder.SetInsertPoint(end);
 
     return nullptr;
 }
