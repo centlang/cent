@@ -96,9 +96,10 @@ llvm::Value* Codegen::generate(IfElse& stmt) noexcept {
     auto* function = m_builder.GetInsertBlock()->getParent();
 
     auto* if_block = llvm::BasicBlock::Create(m_context, "", function);
-    auto* end = llvm::BasicBlock::Create(m_context, "", function);
 
     if (!stmt.else_block) {
+        auto* end = llvm::BasicBlock::Create(m_context, "", function);
+
         m_builder.CreateCondBr(condition, if_block, end);
 
         m_builder.SetInsertPoint(if_block);
@@ -119,17 +120,29 @@ llvm::Value* Codegen::generate(IfElse& stmt) noexcept {
     m_builder.SetInsertPoint(if_block);
     stmt.if_block->codegen(*this);
 
+    llvm::BasicBlock* end = nullptr;
+
     if (!m_builder.GetInsertBlock()->getTerminator()) {
+        end = llvm::BasicBlock::Create(m_context, "", function);
         m_builder.CreateBr(end);
     }
 
     m_builder.SetInsertPoint(else_block);
     stmt.else_block->codegen(*this);
 
-    if (!m_builder.GetInsertBlock()->getTerminator()) {
-        m_builder.CreateBr(end);
+    if (m_builder.GetInsertBlock()->getTerminator()) {
+        if (end) {
+            m_builder.SetInsertPoint(end);
+        }
+
+        return nullptr;
     }
 
+    if (!end) {
+        end = llvm::BasicBlock::Create(m_context, "", function);
+    }
+
+    m_builder.CreateBr(end);
     m_builder.SetInsertPoint(end);
 
     return nullptr;
