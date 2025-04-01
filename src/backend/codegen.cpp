@@ -136,6 +136,18 @@ llvm::Value* Codegen::generate(IfElse& stmt) noexcept {
 }
 
 llvm::Value* Codegen::generate(ReturnStmt& stmt) noexcept {
+    if (!stmt.value) {
+        if (!m_builder.getCurrentFunctionReturnType()->isVoidTy()) {
+            error(stmt.span.begin, m_filename, "type mismatch");
+
+            return nullptr;
+        }
+
+        m_builder.CreateRetVoid();
+
+        return nullptr;
+    }
+
     auto* value = stmt.value->codegen(*this);
 
     if (!value) {
