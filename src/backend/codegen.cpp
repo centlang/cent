@@ -334,9 +334,19 @@ llvm::Value* Codegen::generate(FnDecl& decl) noexcept {
     m_builder.SetInsertPoint(entry);
     decl.block->codegen(*this);
 
-    if (!m_builder.GetInsertBlock()->getTerminator()) {
-        m_builder.CreateRetVoid();
+    if (m_builder.GetInsertBlock()->getTerminator()) {
+        return nullptr;
     }
+
+    if (!function->getReturnType()->isVoidTy()) {
+        error(
+            decl.proto.name.span.begin, m_filename,
+            "non-void function does not return a value");
+
+        return nullptr;
+    }
+
+    m_builder.CreateRetVoid();
 
     return nullptr;
 }
