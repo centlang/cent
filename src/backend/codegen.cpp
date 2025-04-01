@@ -348,6 +348,14 @@ llvm::Value* Codegen::generate(VarDecl& decl) noexcept {
         return nullptr;
     }
 
+    if (type->isVoidTy()) {
+        error(
+            decl.name.span.begin, m_filename,
+            fmt::format("'{}' cannot be of type 'void'", decl.name.value));
+
+        return nullptr;
+    }
+
     auto* variable = m_builder.CreateAlloca(type);
     llvm::Value* value = nullptr;
 
