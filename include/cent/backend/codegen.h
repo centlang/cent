@@ -34,6 +34,8 @@ struct Identifier;
 struct CallExpr;
 
 struct FnDecl;
+struct Struct;
+
 struct VarDecl;
 
 class Codegen {
@@ -61,6 +63,8 @@ public:
     llvm::Value* generate(CallExpr& expr) noexcept;
 
     llvm::Value* generate(FnDecl& decl) noexcept;
+    llvm::Value* generate(Struct& decl) noexcept;
+
     llvm::Value* generate(VarDecl& decl) noexcept;
 
 private:

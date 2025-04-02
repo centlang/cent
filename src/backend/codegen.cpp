@@ -21,6 +21,14 @@
 namespace cent {
 
 std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
+    for (auto& struct_decl : m_program->structs) {
+        llvm::StructType::create(m_context, struct_decl->name.value);
+    }
+
+    for (auto& struct_decl : m_program->structs) {
+        struct_decl->codegen(*this);
+    }
+
     for (auto& function : m_program->functions) {
         generate_fn_proto(*function);
     }
@@ -372,6 +380,36 @@ llvm::Value* Codegen::generate(FnDecl& decl) noexcept {
     }
 
     m_builder.CreateRetVoid();
+
+    return nullptr;
+}
+
+llvm::Value* Codegen::generate(Struct& decl) noexcept {
+    auto* struct_type =
+        llvm::StructType::getTypeByName(m_context, decl.name.value);
+
+    std::vector<llvm::Type*> fields;
+    fields.reserve(decl.fields.size());
+
+    for (const auto& field : decl.fields) {
+        auto* type = get_type(field.type.span, field.type.value);
+
+        if (!type) {
+            return nullptr;
+        }
+
+        if (type->isVoidTy()) {
+            error(
+                field.name.span.begin, m_filename,
+                fmt::format("'{}' cannot be of type 'void'", field.name.value));
+
+            return nullptr;
+        }
+
+        fields.push_back(type);
+    }
+
+    struct_type->setBody(fields);
 
     return nullptr;
 }
