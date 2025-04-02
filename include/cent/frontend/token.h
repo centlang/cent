@@ -50,6 +50,7 @@ struct Token {
         False,
 
         Fn,
+        Struct,
 
         If,
         Else,

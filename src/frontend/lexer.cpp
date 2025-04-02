@@ -169,6 +169,11 @@ void Lexer::ident() noexcept {
         return;
     }
 
+    if (m_token.value == "struct") {
+        keyword(Token::Type::Struct);
+        return;
+    }
+
     if (m_token.value == "if") {
         keyword(Token::Type::If);
         return;

@@ -20,6 +20,7 @@
 #include "cent/ast/if_else.h"
 #include "cent/ast/node.h"
 #include "cent/ast/program.h"
+#include "cent/ast/struct.h"
 
 namespace cent {
 
@@ -112,8 +113,10 @@ private:
     void parse_assignment(BlockStmt& block) noexcept;
 
     [[nodiscard]] std::vector<FnDecl::Param> parse_params() noexcept;
+    [[nodiscard]] std::vector<Struct::Field> parse_fields() noexcept;
 
     void parse_fn(Program& program) noexcept;
+    void parse_struct(Program& program) noexcept;
 
     [[nodiscard]] static std::uint8_t precedence_of(Token::Type type) noexcept {
         enum { None = 0, Or, And, Comparison, Additive, Multiplicative };

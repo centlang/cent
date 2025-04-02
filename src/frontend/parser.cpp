@@ -24,11 +24,21 @@ std::unique_ptr<Program> Parser::parse() noexcept {
             continue;
         }
 
-        if (expect("function declaration", Token::Type::Fn)) {
-            parse_fn(*result);
-        } else {
+        if (match(Token::Type::Fn)) {
             next();
+            parse_fn(*result);
+
+            continue;
         }
+
+        if (match(Token::Type::Struct)) {
+            next();
+            parse_struct(*result);
+
+            continue;
+        }
+
+        error(get().span.begin, m_filename, "expected declaration");
     }
 
     return result;
@@ -386,6 +396,32 @@ std::vector<FnDecl::Param> Parser::parse_params() noexcept {
     return result;
 }
 
+std::vector<Struct::Field> Parser::parse_fields() noexcept {
+    std::vector<Struct::Field> result;
+
+    auto parse_field = [&] {
+        auto name = get();
+
+        if (auto type = expect_var_type()) {
+            result.emplace_back(
+                SpanValue{name.value, name.span},
+                SpanValue{type->value, type->span});
+        }
+    };
+
+    while (match(Token::Type::Identifier)) {
+        parse_field();
+
+        if (match(Token::Type::RightBrace)) {
+            break;
+        }
+
+        expect("','", Token::Type::Comma);
+    }
+
+    return result;
+}
+
 void Parser::parse_fn(Program& program) noexcept {
     auto name = expect("function name", Token::Type::Identifier);
 
@@ -422,6 +458,30 @@ void Parser::parse_fn(Program& program) noexcept {
             std::move(params),
             {return_type->value, return_type->span}},
         std::move(body)));
+}
+
+void Parser::parse_struct(Program& program) noexcept {
+    auto name = expect("struct name", Token::Type::Identifier);
+
+    if (!name) {
+        return;
+    }
+
+    if (!expect("'{'", Token::Type::LeftBrace)) {
+        return;
+    }
+
+    auto fields = parse_fields();
+
+    auto end = peek().span.end;
+
+    if (!expect("'}'", Token::Type::RightBrace)) {
+        return;
+    }
+
+    program.structs.push_back(std::make_unique<Struct>(
+        Span{name->span.begin, end}, SpanValue{name->value, name->span},
+        std::move(fields)));
 }
 
 } // namespace cent
