@@ -79,6 +79,12 @@ private:
 
     [[nodiscard]] llvm::Type*
     get_type(Span span, std::string_view name) noexcept {
+        auto* struct_type = llvm::StructType::getTypeByName(m_context, name);
+
+        if (struct_type) {
+            return struct_type;
+        }
+
         if (name == "i32") {
             return get_i32_type();
         }
