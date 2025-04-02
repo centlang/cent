@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "cent/ast/fn_decl.h"
+#include "cent/ast/struct.h"
 
 namespace cent {
 
@@ -15,6 +16,7 @@ struct Program : Node {
     : functions{std::move(functions)} {}
 
     std::vector<std::unique_ptr<FnDecl>> functions;
+    std::vector<std::unique_ptr<Struct>> structs;
 };
 
 } // namespace cent
