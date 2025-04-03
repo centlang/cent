@@ -32,6 +32,7 @@ struct FloatLiteral;
 struct BoolLiteral;
 struct Identifier;
 struct CallExpr;
+struct MemberExpr;
 
 struct FnDecl;
 struct Struct;
@@ -61,6 +62,7 @@ public:
     llvm::Value* generate(BoolLiteral& expr) noexcept;
     llvm::Value* generate(Identifier& expr) noexcept;
     llvm::Value* generate(CallExpr& expr) noexcept;
+    llvm::Value* generate(MemberExpr& expr) noexcept;
 
     llvm::Value* generate(FnDecl& decl) noexcept;
     llvm::Value* generate(Struct& decl) noexcept;

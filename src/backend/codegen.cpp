@@ -10,6 +10,7 @@
 #include "cent/ast/identifier.h"
 #include "cent/ast/if_else.h"
 #include "cent/ast/literals.h"
+#include "cent/ast/member_expr.h"
 #include "cent/ast/program.h"
 #include "cent/ast/return_stmt.h"
 #include "cent/ast/unary_expr.h"
@@ -301,13 +302,7 @@ llvm::Value* Codegen::generate(Identifier& expr) noexcept {
         return nullptr;
     }
 
-    auto* value = iterator->second.value;
-
-    if (auto* variable = llvm::dyn_cast<llvm::AllocaInst>(value)) {
-        return m_builder.CreateLoad(variable->getAllocatedType(), variable);
-    }
-
-    return value;
+    return iterator->second.value;
 }
 
 llvm::Value* Codegen::generate(CallExpr& expr) noexcept {
@@ -351,6 +346,38 @@ llvm::Value* Codegen::generate(CallExpr& expr) noexcept {
     }
 
     return m_builder.CreateCall(callee, arguments);
+}
+
+llvm::Value* Codegen::generate(MemberExpr& expr) noexcept {
+    auto* variable =
+        llvm::dyn_cast<llvm::AllocaInst>(expr.parent->codegen(*this));
+
+    if (!variable) {
+        return nullptr;
+    }
+
+    auto* struct_type =
+        llvm::dyn_cast<llvm::StructType>(variable->getAllocatedType());
+
+    if (!struct_type) {
+        error(
+            expr.member.span.begin, m_filename,
+            "member access of a non-structure type");
+
+        return nullptr;
+    }
+
+    auto iterator = m_members[struct_type].find(expr.member.value);
+
+    if (iterator == m_members[struct_type].end()) {
+        error(
+            expr.member.span.begin, m_filename,
+            fmt::format("no such member: '{}'", expr.member.value));
+
+        return nullptr;
+    }
+
+    return m_builder.CreateStructGEP(struct_type, variable, iterator->second);
 }
 
 llvm::Value* Codegen::generate(FnDecl& decl) noexcept {
