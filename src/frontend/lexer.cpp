@@ -71,6 +71,9 @@ void Lexer::next_token() noexcept {
     case ',':
         single_char(Comma);
         break;
+    case '.':
+        single_char(Dot);
+        break;
     case ':':
         single_char(Colon);
         break;

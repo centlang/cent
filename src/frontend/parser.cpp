@@ -2,6 +2,7 @@
 #include "cent/ast/call_expr.h"
 #include "cent/ast/identifier.h"
 #include "cent/ast/literals.h"
+#include "cent/ast/member_expr.h"
 #include "cent/ast/return_stmt.h"
 #include "cent/ast/unary_expr.h"
 #include "cent/ast/var_decl.h"
@@ -155,6 +156,33 @@ std::unique_ptr<Expression> Parser::expect_prefix() noexcept {
     }
 }
 
+[[nodiscard]] std::unique_ptr<Expression>
+Parser::expect_member_expr() noexcept {
+    auto expression = expect_prefix();
+
+    while (match(Token::Type::Dot)) {
+        next();
+
+        if (!expression) {
+            return nullptr;
+        }
+
+        auto member = expect("member name", Token::Type::Identifier);
+
+        if (!member) {
+            return nullptr;
+        }
+
+        Span span{expression->span.begin, member->span.end};
+
+        expression = std::make_unique<MemberExpr>(
+            span, std::move(expression),
+            SpanValue{member->value, member->span});
+    }
+
+    return expression;
+}
+
 std::unique_ptr<BinaryExpr>
 Parser::expect_infix(std::unique_ptr<Expression> lhs) noexcept {
     auto oper = get();
@@ -172,7 +200,7 @@ Parser::expect_infix(std::unique_ptr<Expression> lhs) noexcept {
 
 std::unique_ptr<Expression>
 Parser::expect_bin_expr(std::uint8_t precedence) noexcept {
-    auto expression = expect_prefix();
+    auto expression = expect_member_expr();
 
     while (precedence_of(peek().type) >= precedence) {
         if (!expression) {

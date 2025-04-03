@@ -93,6 +93,8 @@ private:
 
     [[nodiscard]] std::unique_ptr<Expression> expect_prefix() noexcept;
 
+    [[nodiscard]] std::unique_ptr<Expression> expect_member_expr() noexcept;
+
     [[nodiscard]] std::unique_ptr<BinaryExpr>
     expect_infix(std::unique_ptr<Expression> lhs) noexcept;
 
