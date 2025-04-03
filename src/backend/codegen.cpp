@@ -384,14 +384,18 @@ llvm::Value* Codegen::generate(FnDecl& decl) noexcept {
     auto* function = m_module->getFunction(decl.proto.name.value);
     auto* entry = llvm::BasicBlock::Create(m_context, "", function);
 
+    m_builder.SetInsertPoint(entry);
+
     m_locals.clear();
 
     for (std::size_t i = 0; i < decl.proto.params.size(); ++i) {
-        m_locals[decl.proto.params[i].name.value] = {
-            function->getArg(i), false};
+        auto* value = function->getArg(i);
+        auto* variable = m_builder.CreateAlloca(value->getType());
+
+        m_builder.CreateStore(value, variable);
+        m_locals[decl.proto.params[i].name.value] = {variable, false};
     }
 
-    m_builder.SetInsertPoint(entry);
     decl.block->codegen(*this);
 
     if (m_builder.GetInsertBlock()->getTerminator()) {
