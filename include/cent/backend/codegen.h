@@ -135,6 +135,9 @@ private:
 
     std::map<std::string_view, Variable> m_locals;
 
+    std::map<llvm::StructType*, std::map<std::string_view, std::size_t>>
+        m_members;
+
     std::unique_ptr<Program> m_program;
 
     std::string_view m_filename;

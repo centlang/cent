@@ -391,7 +391,9 @@ llvm::Value* Codegen::generate(Struct& decl) noexcept {
     std::vector<llvm::Type*> fields;
     fields.reserve(decl.fields.size());
 
-    for (const auto& field : decl.fields) {
+    for (std::size_t i = 0; i < decl.fields.size(); ++i) {
+        auto field = decl.fields[i];
+
         auto* type = get_type(field.type.span, field.type.value);
 
         if (!type) {
@@ -407,6 +409,7 @@ llvm::Value* Codegen::generate(Struct& decl) noexcept {
         }
 
         fields.push_back(type);
+        m_members[struct_type][field.name.value] = i;
     }
 
     struct_type->setBody(fields);
