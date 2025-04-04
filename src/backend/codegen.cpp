@@ -42,7 +42,7 @@ std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
 }
 
 llvm::Value* Codegen::generate(Assignment& stmt) noexcept {
-    auto* value = stmt.value->codegen(*this);
+    auto* value = generate(*stmt.value);
 
     if (!value) {
         return nullptr;
@@ -96,7 +96,7 @@ llvm::Value* Codegen::generate(BlockStmt& stmt) noexcept {
 }
 
 llvm::Value* Codegen::generate(IfElse& stmt) noexcept {
-    auto* condition = stmt.condition->codegen(*this);
+    auto* condition = generate(*stmt.condition);
 
     if (!condition) {
         return nullptr;
@@ -170,7 +170,7 @@ llvm::Value* Codegen::generate(ReturnStmt& stmt) noexcept {
         return nullptr;
     }
 
-    auto* value = stmt.value->codegen(*this);
+    auto* value = generate(*stmt.value);
 
     if (!value) {
         return nullptr;
@@ -188,7 +188,7 @@ llvm::Value* Codegen::generate(ReturnStmt& stmt) noexcept {
 }
 
 llvm::Value* Codegen::generate(WhileLoop& stmt) noexcept {
-    auto* condition = stmt.condition->codegen(*this);
+    auto* condition = generate(*stmt.condition);
 
     if (!condition) {
         return nullptr;
@@ -204,7 +204,7 @@ llvm::Value* Codegen::generate(WhileLoop& stmt) noexcept {
     m_builder.SetInsertPoint(body);
     stmt.body->codegen(*this);
 
-    condition = stmt.condition->codegen(*this);
+    condition = generate(*stmt.condition);
     m_builder.CreateCondBr(condition, body, end);
 
     m_builder.SetInsertPoint(end);
@@ -215,8 +215,8 @@ llvm::Value* Codegen::generate(WhileLoop& stmt) noexcept {
 llvm::Value* Codegen::generate(BinaryExpr& expr) noexcept {
     using enum Token::Type;
 
-    auto* lhs = expr.lhs->codegen(*this);
-    auto* rhs = expr.rhs->codegen(*this);
+    auto* lhs = generate(*expr.lhs);
+    auto* rhs = generate(*expr.rhs);
 
     if (!lhs || !rhs) {
         return nullptr;
@@ -261,7 +261,7 @@ llvm::Value* Codegen::generate(BinaryExpr& expr) noexcept {
 llvm::Value* Codegen::generate(UnaryExpr& expr) noexcept {
     using enum Token::Type;
 
-    auto* value = expr.value->codegen(*this);
+    auto* value = generate(*expr.value);
 
     if (!value) {
         return nullptr;
@@ -330,7 +330,7 @@ llvm::Value* Codegen::generate(CallExpr& expr) noexcept {
     arguments.reserve(arg_size);
 
     for (std::size_t i = 0; i < arg_size; ++i) {
-        auto* value = expr.arguments[i]->codegen(*this);
+        auto* value = generate(*expr.arguments[i]);
 
         if (!value) {
             return nullptr;
@@ -467,7 +467,7 @@ llvm::Value* Codegen::generate(VarDecl& decl) noexcept {
     llvm::Value* value = nullptr;
 
     if (decl.value) {
-        value = decl.value->codegen(*this);
+        value = generate(*decl.value);
 
         if (!value) {
             return nullptr;
@@ -488,6 +488,20 @@ llvm::Value* Codegen::generate(VarDecl& decl) noexcept {
     m_locals[decl.name.value] = {variable, decl.is_mutable};
 
     return nullptr;
+}
+
+llvm::Value* Codegen::generate(Expression& expr) noexcept {
+    auto* result = expr.codegen(*this);
+
+    if (auto* variable = llvm::dyn_cast_or_null<llvm::AllocaInst>(result)) {
+        return m_builder.CreateLoad(variable->getAllocatedType(), variable);
+    }
+
+    if (auto* ptr = llvm::dyn_cast_or_null<llvm::GetElementPtrInst>(result)) {
+        return m_builder.CreateLoad(ptr->getResultElementType(), ptr);
+    }
+
+    return result;
 }
 
 void Codegen::generate_fn_proto(FnDecl& decl) noexcept {

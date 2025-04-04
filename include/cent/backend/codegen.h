@@ -39,6 +39,8 @@ struct Struct;
 
 struct VarDecl;
 
+struct Expression;
+
 class Codegen {
 public:
     [[nodiscard]] Codegen(
@@ -74,6 +76,8 @@ private:
         llvm::Value* value;
         bool is_mutable;
     };
+
+    llvm::Value* generate(Expression& expr) noexcept;
 
     void generate_fn_proto(FnDecl& decl) noexcept;
 
