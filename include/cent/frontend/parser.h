@@ -112,7 +112,8 @@ private:
 
     void parse_return(BlockStmt& block) noexcept;
 
-    void parse_assignment(BlockStmt& block) noexcept;
+    void parse_assignment(
+        BlockStmt& block, std::unique_ptr<Expression> variable) noexcept;
 
     [[nodiscard]] std::vector<FnDecl::Param> parse_params() noexcept;
     [[nodiscard]] std::vector<Struct::Field> parse_fields() noexcept;

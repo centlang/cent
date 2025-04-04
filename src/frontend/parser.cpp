@@ -63,20 +63,19 @@ void Parser::expect_stmt(BlockStmt& block) noexcept {
     case Token::Type::Return:
         parse_return(block);
         break;
-    case Token::Type::Identifier:
-        if (match(1, Token::Type::Equal)) {
-            parse_assignment(block);
-            break;
-        }
-
-        [[fallthrough]];
     default:
-        if (auto value = expect_expr()) {
-            block.body.push_back(std::move(value));
-        } else {
+        auto value = expect_expr();
+
+        if (!value) {
             next();
             return;
         }
+
+        if (!match(Token::Type::Equal)) {
+            block.body.push_back(std::move(value));
+        }
+
+        parse_assignment(block, std::move(value));
 
         break;
     }
@@ -380,8 +379,8 @@ void Parser::parse_return(BlockStmt& block) noexcept {
         std::move(value)));
 }
 
-void Parser::parse_assignment(BlockStmt& block) noexcept {
-    auto name = get();
+void Parser::parse_assignment(
+    BlockStmt& block, std::unique_ptr<Expression> variable) noexcept {
     next();
 
     auto value = expect_expr();
@@ -391,8 +390,8 @@ void Parser::parse_assignment(BlockStmt& block) noexcept {
     }
 
     block.body.push_back(std::make_unique<Assignment>(
-        Span{name.span.begin, value->span.end},
-        SpanValue{name.value, name.span}, std::move(value)));
+        Span{variable->span.begin, value->span.end}, std::move(variable),
+        std::move(value)));
 }
 
 std::vector<FnDecl::Param> Parser::parse_params() noexcept {
