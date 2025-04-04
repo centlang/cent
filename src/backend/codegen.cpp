@@ -42,37 +42,40 @@ std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
 }
 
 llvm::Value* Codegen::generate(Assignment& stmt) noexcept {
+    auto* var = stmt.variable->codegen(*this);
+
+    if (!var) {
+        return nullptr;
+    }
+
     auto* value = generate(*stmt.value);
 
     if (!value) {
         return nullptr;
     }
 
-    auto iterator = m_locals.find(stmt.identifier.value);
+    if (auto* variable = llvm::dyn_cast<llvm::AllocaInst>(var)) {
+        if (variable->getAllocatedType() != value->getType()) {
+            error(stmt.value->span.begin, m_filename, "type mismatch");
 
-    if (iterator == m_locals.end()) {
-        error(
-            stmt.identifier.span.begin, m_filename,
-            fmt::format("undeclared variable: '{}'", stmt.identifier.value));
+            return nullptr;
+        }
 
-        return nullptr;
-    }
-
-    if (!iterator->second.is_mutable) {
-        error(
-            stmt.identifier.span.begin, m_filename,
-            fmt::format("'{}' is immutable", stmt.identifier.value));
+        m_builder.CreateStore(value, variable);
 
         return nullptr;
     }
 
-    auto* variable = llvm::dyn_cast<llvm::AllocaInst>(iterator->second.value);
+    auto* variable = llvm::dyn_cast<llvm::GetElementPtrInst>(var);
 
     if (!variable) {
+        error(
+            stmt.variable->span.begin, m_filename, "cannot assign to a value");
+
         return nullptr;
     }
 
-    if (variable->getAllocatedType() != value->getType()) {
+    if (variable->getResultElementType() != value->getType()) {
         error(stmt.value->span.begin, m_filename, "type mismatch");
 
         return nullptr;
