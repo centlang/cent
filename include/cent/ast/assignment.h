@@ -2,23 +2,20 @@
 #define CENT_AST_ASSIGNMENT_H
 
 #include <memory>
-#include <string_view>
 #include <utility>
 
-#include "cent/span.h"
-
 #include "cent/ast/node.h"
-#include "cent/ast/span_value.h"
+#include "cent/span.h"
 
 namespace cent {
 
 struct Assignment : detail::Stmt<Assignment> {
     [[nodiscard]] Assignment(
-        Span span, SpanValue<std::string_view> identifier,
+        Span span, std::unique_ptr<Expression> variable,
         std::unique_ptr<Expression> value) noexcept
-    : Stmt{span}, identifier{identifier}, value{std::move(value)} {}
+    : Stmt{span}, variable{std::move(variable)}, value{std::move(value)} {}
 
-    SpanValue<std::string_view> identifier;
+    std::unique_ptr<Expression> variable;
     std::unique_ptr<Expression> value;
 };
 
