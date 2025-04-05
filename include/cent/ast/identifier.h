@@ -6,7 +6,7 @@
 #include "cent/ast/node.h"
 #include "cent/span.h"
 
-namespace cent {
+namespace cent::ast {
 
 struct Identifier : detail::Expr<Identifier> {
     [[nodiscard]] Identifier(Span span, std::string_view value) noexcept
@@ -15,6 +15,6 @@ struct Identifier : detail::Expr<Identifier> {
     std::string_view value;
 };
 
-} // namespace cent
+} // namespace cent::ast
 
 #endif

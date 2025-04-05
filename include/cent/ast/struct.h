@@ -7,7 +7,7 @@
 #include "cent/ast/node.h"
 #include "cent/ast/span_value.h"
 
-namespace cent {
+namespace cent::ast {
 
 struct Struct : detail::Decl<Struct> {
     struct Field {
@@ -24,6 +24,6 @@ struct Struct : detail::Decl<Struct> {
     std::vector<Field> fields;
 };
 
-} // namespace cent
+} // namespace cent::ast
 
 #endif

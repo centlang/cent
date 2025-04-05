@@ -15,7 +15,7 @@
 #include "cent/log.h"
 #include "cent/span.h"
 
-namespace cent {
+namespace cent::ast {
 
 struct Program;
 
@@ -41,47 +41,52 @@ struct VarDecl;
 
 struct Expression;
 
+} // namespace cent::ast
+
+namespace cent::backend {
+
+struct Variable {
+    llvm::Value* value;
+    bool is_mutable;
+};
+
 class Codegen {
 public:
     [[nodiscard]] Codegen(
-        std::unique_ptr<Program> program, std::string_view filename) noexcept
+        std::unique_ptr<ast::Program> program,
+        std::string_view filename) noexcept
     : m_module{std::make_unique<llvm::Module>("", m_context)},
       m_builder{m_context}, m_program{std::move(program)},
       m_filename{filename} {}
 
     [[nodiscard]] std::unique_ptr<llvm::Module> generate() noexcept;
 
-    llvm::Value* generate(Assignment& stmt) noexcept;
-    llvm::Value* generate(BlockStmt& stmt) noexcept;
-    llvm::Value* generate(IfElse& stmt) noexcept;
-    llvm::Value* generate(ReturnStmt& stmt) noexcept;
-    llvm::Value* generate(WhileLoop& stmt) noexcept;
+    llvm::Value* generate(ast::Assignment& stmt) noexcept;
+    llvm::Value* generate(ast::BlockStmt& stmt) noexcept;
+    llvm::Value* generate(ast::IfElse& stmt) noexcept;
+    llvm::Value* generate(ast::ReturnStmt& stmt) noexcept;
+    llvm::Value* generate(ast::WhileLoop& stmt) noexcept;
 
-    llvm::Value* generate(BinaryExpr& expr) noexcept;
-    llvm::Value* generate(UnaryExpr& expr) noexcept;
-    llvm::Value* generate(IntLiteral& expr) noexcept;
-    llvm::Value* generate(FloatLiteral& expr) noexcept;
-    llvm::Value* generate(BoolLiteral& expr) noexcept;
-    llvm::Value* generate(Identifier& expr) noexcept;
-    llvm::Value* generate(CallExpr& expr) noexcept;
-    llvm::Value* generate(MemberExpr& expr) noexcept;
+    llvm::Value* generate(ast::BinaryExpr& expr) noexcept;
+    llvm::Value* generate(ast::UnaryExpr& expr) noexcept;
+    llvm::Value* generate(ast::IntLiteral& expr) noexcept;
+    llvm::Value* generate(ast::FloatLiteral& expr) noexcept;
+    llvm::Value* generate(ast::BoolLiteral& expr) noexcept;
+    llvm::Value* generate(ast::Identifier& expr) noexcept;
+    llvm::Value* generate(ast::CallExpr& expr) noexcept;
+    llvm::Value* generate(ast::MemberExpr& expr) noexcept;
 
-    llvm::Value* generate(FnDecl& decl) noexcept;
-    llvm::Value* generate(Struct& decl) noexcept;
+    llvm::Value* generate(ast::FnDecl& decl) noexcept;
+    llvm::Value* generate(ast::Struct& decl) noexcept;
 
-    llvm::Value* generate(VarDecl& decl) noexcept;
+    llvm::Value* generate(ast::VarDecl& decl) noexcept;
 
 private:
-    struct Variable {
-        llvm::Value* value;
-        bool is_mutable;
-    };
+    llvm::Value* generate(ast::Expression& expr) noexcept;
 
-    llvm::Value* generate(Expression& expr) noexcept;
+    void generate_fn_proto(ast::FnDecl& decl) noexcept;
 
-    void generate_fn_proto(FnDecl& decl) noexcept;
-
-    [[nodiscard]] llvm::FunctionType* get_fn_type(FnDecl& decl) noexcept;
+    [[nodiscard]] llvm::FunctionType* get_fn_type(ast::FnDecl& decl) noexcept;
 
     [[nodiscard]] llvm::Type*
     get_type(Span span, std::string_view name) noexcept {
@@ -144,11 +149,11 @@ private:
     std::map<llvm::StructType*, std::map<std::string_view, std::size_t>>
         m_members;
 
-    std::unique_ptr<Program> m_program;
+    std::unique_ptr<ast::Program> m_program;
 
     std::string_view m_filename;
 };
 
-} // namespace cent
+} // namespace cent::backend
 
 #endif

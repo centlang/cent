@@ -11,7 +11,7 @@
 #include "cent/ast/node.h"
 #include "cent/ast/span_value.h"
 
-namespace cent {
+namespace cent::ast {
 
 struct FnDecl : detail::Decl<FnDecl> {
     struct Param {
@@ -34,6 +34,6 @@ struct FnDecl : detail::Decl<FnDecl> {
     std::unique_ptr<BlockStmt> block;
 };
 
-} // namespace cent
+} // namespace cent::ast
 
 #endif

@@ -10,20 +10,21 @@
 #include "cent/ast/node.h"
 #include "cent/ast/span_value.h"
 
-namespace cent {
+namespace cent::ast {
 
 struct BinaryExpr : detail::Expr<BinaryExpr> {
     [[nodiscard]] BinaryExpr(
-        Span span, SpanValue<Token::Type> oper, std::unique_ptr<Expression> lhs,
+        Span span, SpanValue<frontend::Token::Type> oper,
+        std::unique_ptr<Expression> lhs,
         std::unique_ptr<Expression> rhs) noexcept
     : Expr{span}, oper{oper}, lhs{std::move(lhs)}, rhs{std::move(rhs)} {}
 
-    SpanValue<Token::Type> oper;
+    SpanValue<frontend::Token::Type> oper;
 
     std::unique_ptr<Expression> lhs;
     std::unique_ptr<Expression> rhs;
 };
 
-} // namespace cent
+} // namespace cent::ast
 
 #endif

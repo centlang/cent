@@ -7,7 +7,7 @@
 #include "cent/ast/node.h"
 #include "cent/span.h"
 
-namespace cent {
+namespace cent::ast {
 
 struct Assignment : detail::Stmt<Assignment> {
     [[nodiscard]] Assignment(
@@ -19,6 +19,6 @@ struct Assignment : detail::Stmt<Assignment> {
     std::unique_ptr<Expression> value;
 };
 
-} // namespace cent
+} // namespace cent::ast
 
 #endif

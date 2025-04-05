@@ -22,7 +22,7 @@
 #include "cent/ast/program.h"
 #include "cent/ast/struct.h"
 
-namespace cent {
+namespace cent::frontend {
 
 class Parser {
 public:
@@ -35,7 +35,7 @@ public:
         }
     }
 
-    [[nodiscard]] std::unique_ptr<Program> parse() noexcept;
+    [[nodiscard]] std::unique_ptr<ast::Program> parse() noexcept;
 
 private:
     [[nodiscard]] auto peek(std::uint8_t ahead = 0) const noexcept {
@@ -82,44 +82,46 @@ private:
         return get();
     }
 
-    [[nodiscard]] std::unique_ptr<BlockStmt> expect_block() noexcept;
+    [[nodiscard]] std::unique_ptr<ast::BlockStmt> expect_block() noexcept;
 
-    [[nodiscard]] std::unique_ptr<IfElse> parse_if_else() noexcept;
+    [[nodiscard]] std::unique_ptr<ast::IfElse> parse_if_else() noexcept;
 
-    void expect_stmt(BlockStmt& block) noexcept;
+    void expect_stmt(ast::BlockStmt& block) noexcept;
 
-    [[nodiscard]] std::vector<std::unique_ptr<Expression>>
+    [[nodiscard]] std::vector<std::unique_ptr<ast::Expression>>
     parse_args() noexcept;
 
-    [[nodiscard]] std::unique_ptr<Expression> expect_prefix() noexcept;
+    [[nodiscard]] std::unique_ptr<ast::Expression> expect_prefix() noexcept;
 
-    [[nodiscard]] std::unique_ptr<Expression> expect_member_expr() noexcept;
+    [[nodiscard]] std::unique_ptr<ast::Expression>
+    expect_member_expr() noexcept;
 
-    [[nodiscard]] std::unique_ptr<BinaryExpr>
-    expect_infix(std::unique_ptr<Expression> lhs) noexcept;
+    [[nodiscard]] std::unique_ptr<ast::BinaryExpr>
+    expect_infix(std::unique_ptr<ast::Expression> lhs) noexcept;
 
-    [[nodiscard]] std::unique_ptr<Expression>
+    [[nodiscard]] std::unique_ptr<ast::Expression>
     expect_bin_expr(std::uint8_t precedence = 1) noexcept;
 
-    [[nodiscard]] std::unique_ptr<Expression> expect_expr() noexcept;
+    [[nodiscard]] std::unique_ptr<ast::Expression> expect_expr() noexcept;
 
-    [[nodiscard]] std::optional<SpanValue<std::string_view>>
+    [[nodiscard]] std::optional<ast::SpanValue<std::string_view>>
     expect_var_type() noexcept;
 
-    void parse_var(BlockStmt& block) noexcept;
+    void parse_var(ast::BlockStmt& block) noexcept;
 
-    void parse_while(BlockStmt& block) noexcept;
+    void parse_while(ast::BlockStmt& block) noexcept;
 
-    void parse_return(BlockStmt& block) noexcept;
+    void parse_return(ast::BlockStmt& block) noexcept;
 
     void parse_assignment(
-        BlockStmt& block, std::unique_ptr<Expression> variable) noexcept;
+        ast::BlockStmt& block,
+        std::unique_ptr<ast::Expression> variable) noexcept;
 
-    [[nodiscard]] std::vector<FnDecl::Param> parse_params() noexcept;
-    [[nodiscard]] std::vector<Struct::Field> parse_fields() noexcept;
+    [[nodiscard]] std::vector<ast::FnDecl::Param> parse_params() noexcept;
+    [[nodiscard]] std::vector<ast::Struct::Field> parse_fields() noexcept;
 
-    [[nodiscard]] bool parse_fn(Program& program) noexcept;
-    [[nodiscard]] bool parse_struct(Program& program) noexcept;
+    [[nodiscard]] bool parse_fn(ast::Program& program) noexcept;
+    [[nodiscard]] bool parse_struct(ast::Program& program) noexcept;
 
     [[nodiscard]] static std::uint8_t precedence_of(Token::Type type) noexcept {
         enum { None = 0, Or, And, Comparison, Additive, Multiplicative };
@@ -157,6 +159,6 @@ private:
     std::string_view m_filename;
 };
 
-} // namespace cent
+} // namespace cent::frontend
 
 #endif

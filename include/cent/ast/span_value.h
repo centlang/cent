@@ -3,13 +3,13 @@
 
 #include "cent/span.h"
 
-namespace cent {
+namespace cent::ast {
 
 template <typename ValueType> struct SpanValue {
     ValueType value;
     Span span;
 };
 
-} // namespace cent
+} // namespace cent::ast
 
 #endif

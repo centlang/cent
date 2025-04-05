@@ -7,7 +7,7 @@
 #include "cent/frontend/token.h"
 #include "cent/position.h"
 
-namespace cent {
+namespace cent::frontend {
 
 class Lexer {
 public:
@@ -57,6 +57,6 @@ private:
     std::string_view::const_iterator m_end;
 };
 
-} // namespace cent
+} // namespace cent::frontend
 
 #endif

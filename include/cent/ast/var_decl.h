@@ -10,7 +10,7 @@
 #include "cent/ast/node.h"
 #include "cent/ast/span_value.h"
 
-namespace cent {
+namespace cent::ast {
 
 struct VarDecl : detail::Decl<VarDecl> {
     [[nodiscard]] VarDecl(
@@ -28,6 +28,6 @@ struct VarDecl : detail::Decl<VarDecl> {
     std::unique_ptr<Expression> value;
 };
 
-} // namespace cent
+} // namespace cent::ast
 
 #endif

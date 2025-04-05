@@ -1,6 +1,6 @@
 #include "cent/frontend/lexer.h"
 
-namespace cent {
+namespace cent::frontend {
 
 void Lexer::next_token() noexcept {
     using enum Token::Type;
@@ -208,4 +208,4 @@ void Lexer::ident() noexcept {
     }
 }
 
-} // namespace cent
+} // namespace cent::frontend

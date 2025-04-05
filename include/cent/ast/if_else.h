@@ -9,7 +9,7 @@
 #include "cent/ast/block_stmt.h"
 #include "cent/ast/node.h"
 
-namespace cent {
+namespace cent::ast {
 
 struct IfElse : detail::Stmt<IfElse> {
     [[nodiscard]] IfElse(
@@ -25,6 +25,6 @@ struct IfElse : detail::Stmt<IfElse> {
     std::unique_ptr<Statement> else_block;
 };
 
-} // namespace cent
+} // namespace cent::ast
 
 #endif

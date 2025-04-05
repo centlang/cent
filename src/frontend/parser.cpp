@@ -10,16 +10,16 @@
 
 #include "cent/frontend/parser.h"
 
-namespace cent {
+namespace cent::frontend {
 
-std::unique_ptr<Program> Parser::parse() noexcept {
+std::unique_ptr<ast::Program> Parser::parse() noexcept {
     auto skip_until_decl = [&] {
         while (!match(Token::Type::Eof, Token::Type::Fn, Token::Type::Struct)) {
             next();
         }
     };
 
-    auto result = std::make_unique<Program>();
+    auto result = std::make_unique<ast::Program>();
 
     while (true) {
         if (match(Token::Type::Eof)) {
@@ -58,7 +58,7 @@ std::unique_ptr<Program> Parser::parse() noexcept {
     return result;
 }
 
-void Parser::expect_stmt(BlockStmt& block) noexcept {
+void Parser::expect_stmt(ast::BlockStmt& block) noexcept {
     switch (peek().type) {
     case Token::Type::LeftBrace:
         block.body.push_back(expect_block());
@@ -96,8 +96,8 @@ void Parser::expect_stmt(BlockStmt& block) noexcept {
     expect("';'", Token::Type::Semicolon);
 }
 
-std::vector<std::unique_ptr<Expression>> Parser::parse_args() noexcept {
-    std::vector<std::unique_ptr<Expression>> result;
+std::vector<std::unique_ptr<ast::Expression>> Parser::parse_args() noexcept {
+    std::vector<std::unique_ptr<ast::Expression>> result;
 
     if (!match(Token::Type::RightParen)) {
         result.push_back(expect_expr());
@@ -111,7 +111,7 @@ std::vector<std::unique_ptr<Expression>> Parser::parse_args() noexcept {
     return result;
 }
 
-std::unique_ptr<Expression> Parser::expect_prefix() noexcept {
+std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
     auto token = expect(
         "expression", Token::Type::IntLiteral, Token::Type::FloatLiteral,
         Token::Type::True, Token::Type::False, Token::Type::Identifier,
@@ -123,16 +123,16 @@ std::unique_ptr<Expression> Parser::expect_prefix() noexcept {
 
     switch (token->type) {
     case Token::Type::IntLiteral:
-        return std::make_unique<IntLiteral>(token->span, token->value);
+        return std::make_unique<ast::IntLiteral>(token->span, token->value);
     case Token::Type::FloatLiteral:
-        return std::make_unique<FloatLiteral>(token->span, token->value);
+        return std::make_unique<ast::FloatLiteral>(token->span, token->value);
     case Token::Type::True:
-        return std::make_unique<BoolLiteral>(token->span, true);
+        return std::make_unique<ast::BoolLiteral>(token->span, true);
     case Token::Type::False:
-        return std::make_unique<BoolLiteral>(token->span, false);
+        return std::make_unique<ast::BoolLiteral>(token->span, false);
     case Token::Type::Identifier: {
         if (!match(Token::Type::LeftParen)) {
-            return std::make_unique<Identifier>(token->span, token->value);
+            return std::make_unique<ast::Identifier>(token->span, token->value);
         }
 
         next();
@@ -144,16 +144,16 @@ std::unique_ptr<Expression> Parser::expect_prefix() noexcept {
             return nullptr;
         }
 
-        return std::make_unique<CallExpr>(
-            Span{token->span.begin, end}, SpanValue{token->value, token->span},
-            std::move(args));
+        return std::make_unique<ast::CallExpr>(
+            Span{token->span.begin, end},
+            ast::SpanValue{token->value, token->span}, std::move(args));
     }
     case Token::Type::Minus:
     case Token::Type::Bang:
         if (auto value = expect_prefix()) {
-            return std::make_unique<UnaryExpr>(
+            return std::make_unique<ast::UnaryExpr>(
                 Span{token->span.begin, value->span.end},
-                SpanValue{token->type, token->span}, std::move(value));
+                ast::SpanValue{token->type, token->span}, std::move(value));
         }
 
         return nullptr;
@@ -168,7 +168,7 @@ std::unique_ptr<Expression> Parser::expect_prefix() noexcept {
     }
 }
 
-[[nodiscard]] std::unique_ptr<Expression>
+[[nodiscard]] std::unique_ptr<ast::Expression>
 Parser::expect_member_expr() noexcept {
     auto expression = expect_prefix();
 
@@ -187,16 +187,16 @@ Parser::expect_member_expr() noexcept {
 
         Span span{expression->span.begin, member->span.end};
 
-        expression = std::make_unique<MemberExpr>(
+        expression = std::make_unique<ast::MemberExpr>(
             span, std::move(expression),
-            SpanValue{member->value, member->span});
+            ast::SpanValue{member->value, member->span});
     }
 
     return expression;
 }
 
-std::unique_ptr<BinaryExpr>
-Parser::expect_infix(std::unique_ptr<Expression> lhs) noexcept {
+std::unique_ptr<ast::BinaryExpr>
+Parser::expect_infix(std::unique_ptr<ast::Expression> lhs) noexcept {
     auto oper = get();
     auto rhs = expect_bin_expr(precedence_of(oper.type) + 1);
 
@@ -206,11 +206,12 @@ Parser::expect_infix(std::unique_ptr<Expression> lhs) noexcept {
 
     Span span{lhs->span.begin, rhs->span.end};
 
-    return std::make_unique<BinaryExpr>(
-        span, SpanValue{oper.type, oper.span}, std::move(lhs), std::move(rhs));
+    return std::make_unique<ast::BinaryExpr>(
+        span, ast::SpanValue{oper.type, oper.span}, std::move(lhs),
+        std::move(rhs));
 }
 
-std::unique_ptr<Expression>
+std::unique_ptr<ast::Expression>
 Parser::expect_bin_expr(std::uint8_t precedence) noexcept {
     auto expression = expect_member_expr();
 
@@ -226,12 +227,12 @@ Parser::expect_bin_expr(std::uint8_t precedence) noexcept {
     return expression;
 }
 
-std::unique_ptr<Expression> Parser::expect_expr() noexcept {
+std::unique_ptr<ast::Expression> Parser::expect_expr() noexcept {
     return expect_bin_expr();
 }
 
-std::unique_ptr<BlockStmt> Parser::expect_block() noexcept {
-    auto result = std::make_unique<BlockStmt>(Span{peek().span.begin, {}});
+std::unique_ptr<ast::BlockStmt> Parser::expect_block() noexcept {
+    auto result = std::make_unique<ast::BlockStmt>(Span{peek().span.begin, {}});
 
     if (!expect("'{'", Token::Type::LeftBrace)) {
         return nullptr;
@@ -262,7 +263,7 @@ std::unique_ptr<BlockStmt> Parser::expect_block() noexcept {
     return result;
 }
 
-std::unique_ptr<IfElse> Parser::parse_if_else() noexcept {
+std::unique_ptr<ast::IfElse> Parser::parse_if_else() noexcept {
     auto begin = get().span.begin;
 
     auto condition = expect_expr();
@@ -278,7 +279,7 @@ std::unique_ptr<IfElse> Parser::parse_if_else() noexcept {
     }
 
     if (!match(Token::Type::Else)) {
-        return std::make_unique<IfElse>(
+        return std::make_unique<ast::IfElse>(
             Span{condition->span.begin, if_block->span.end},
             std::move(condition), std::move(if_block));
     }
@@ -292,7 +293,7 @@ std::unique_ptr<IfElse> Parser::parse_if_else() noexcept {
             return nullptr;
         }
 
-        return std::make_unique<IfElse>(
+        return std::make_unique<ast::IfElse>(
             Span{condition->span.begin, else_block->span.end},
             std::move(condition), std::move(if_block), std::move(else_block));
     }
@@ -303,12 +304,13 @@ std::unique_ptr<IfElse> Parser::parse_if_else() noexcept {
         return nullptr;
     }
 
-    return std::make_unique<IfElse>(
+    return std::make_unique<ast::IfElse>(
         Span{begin, else_block->span.end}, std::move(condition),
         std::move(if_block), std::move(else_block));
 }
 
-std::optional<SpanValue<std::string_view>> Parser::expect_var_type() noexcept {
+std::optional<ast::SpanValue<std::string_view>>
+Parser::expect_var_type() noexcept {
     if (!expect("':'", Token::Type::Colon)) {
         return std::nullopt;
     }
@@ -322,7 +324,7 @@ std::optional<SpanValue<std::string_view>> Parser::expect_var_type() noexcept {
     return {{token->value, token->span}};
 }
 
-void Parser::parse_var(BlockStmt& block) noexcept {
+void Parser::parse_var(ast::BlockStmt& block) noexcept {
     auto begin = peek().span.begin;
     auto is_mutable = get().type == Token::Type::Mut;
 
@@ -339,9 +341,9 @@ void Parser::parse_var(BlockStmt& block) noexcept {
     }
 
     if (!match(Token::Type::Equal)) {
-        block.body.push_back(std::make_unique<VarDecl>(
+        block.body.push_back(std::make_unique<ast::VarDecl>(
             Span{begin, type->span.end}, is_mutable,
-            SpanValue{name->value, name->span}, *type, nullptr));
+            ast::SpanValue{name->value, name->span}, *type, nullptr));
 
         return;
     }
@@ -354,12 +356,12 @@ void Parser::parse_var(BlockStmt& block) noexcept {
         return;
     }
 
-    block.body.push_back(std::make_unique<VarDecl>(
+    block.body.push_back(std::make_unique<ast::VarDecl>(
         Span{begin, value->span.end}, is_mutable,
-        SpanValue{name->value, name->span}, *type, std::move(value)));
+        ast::SpanValue{name->value, name->span}, *type, std::move(value)));
 }
 
-void Parser::parse_while(BlockStmt& block) noexcept {
+void Parser::parse_while(ast::BlockStmt& block) noexcept {
     auto begin = get().span.begin;
 
     auto condition = expect_expr();
@@ -374,26 +376,26 @@ void Parser::parse_while(BlockStmt& block) noexcept {
         return;
     }
 
-    block.body.push_back(std::make_unique<WhileLoop>(
+    block.body.push_back(std::make_unique<ast::WhileLoop>(
         Span{begin, body->span.end}, std::move(condition), std::move(body)));
 }
 
-void Parser::parse_return(BlockStmt& block) noexcept {
+void Parser::parse_return(ast::BlockStmt& block) noexcept {
     auto span = get().span;
 
-    std::unique_ptr<Expression> value = nullptr;
+    std::unique_ptr<ast::Expression> value = nullptr;
 
     if (!match(Token::Type::Semicolon)) {
         value = expect_expr();
     }
 
-    block.body.push_back(std::make_unique<ReturnStmt>(
+    block.body.push_back(std::make_unique<ast::ReturnStmt>(
         Span{span.begin, value ? value->span.end : span.end},
         std::move(value)));
 }
 
 void Parser::parse_assignment(
-    BlockStmt& block, std::unique_ptr<Expression> variable) noexcept {
+    ast::BlockStmt& block, std::unique_ptr<ast::Expression> variable) noexcept {
     next();
 
     auto value = expect_expr();
@@ -402,13 +404,13 @@ void Parser::parse_assignment(
         return;
     }
 
-    block.body.push_back(std::make_unique<Assignment>(
+    block.body.push_back(std::make_unique<ast::Assignment>(
         Span{variable->span.begin, value->span.end}, std::move(variable),
         std::move(value)));
 }
 
-std::vector<FnDecl::Param> Parser::parse_params() noexcept {
-    std::vector<FnDecl::Param> result;
+std::vector<ast::FnDecl::Param> Parser::parse_params() noexcept {
+    std::vector<ast::FnDecl::Param> result;
 
     auto parse_param = [&] {
         auto name = expect("parameter name", Token::Type::Identifier);
@@ -419,8 +421,8 @@ std::vector<FnDecl::Param> Parser::parse_params() noexcept {
 
         if (auto type = expect_var_type()) {
             result.emplace_back(
-                SpanValue{name->value, name->span},
-                SpanValue{type->value, type->span});
+                ast::SpanValue{name->value, name->span},
+                ast::SpanValue{type->value, type->span});
         }
     };
 
@@ -436,16 +438,16 @@ std::vector<FnDecl::Param> Parser::parse_params() noexcept {
     return result;
 }
 
-std::vector<Struct::Field> Parser::parse_fields() noexcept {
-    std::vector<Struct::Field> result;
+std::vector<ast::Struct::Field> Parser::parse_fields() noexcept {
+    std::vector<ast::Struct::Field> result;
 
     auto parse_field = [&] {
         auto name = get();
 
         if (auto type = expect_var_type()) {
             result.emplace_back(
-                SpanValue{name.value, name.span},
-                SpanValue{type->value, type->span});
+                ast::SpanValue{name.value, name.span},
+                ast::SpanValue{type->value, type->span});
         }
     };
 
@@ -462,7 +464,7 @@ std::vector<Struct::Field> Parser::parse_fields() noexcept {
     return result;
 }
 
-bool Parser::parse_fn(Program& program) noexcept {
+bool Parser::parse_fn(ast::Program& program) noexcept {
     auto name = expect("function name", Token::Type::Identifier);
 
     if (!name) {
@@ -485,15 +487,15 @@ bool Parser::parse_fn(Program& program) noexcept {
         return false;
     }
 
-    std::unique_ptr<BlockStmt> body = nullptr;
+    std::unique_ptr<ast::BlockStmt> body = nullptr;
 
     if (match(Token::Type::LeftBrace)) {
         body = expect_block();
     }
 
-    program.functions.push_back(std::make_unique<FnDecl>(
+    program.functions.push_back(std::make_unique<ast::FnDecl>(
         Span{name->span.begin, return_type->span.end},
-        FnDecl::Proto{
+        ast::FnDecl::Proto{
             {name->value, name->span},
             std::move(params),
             {return_type->value, return_type->span}},
@@ -502,7 +504,7 @@ bool Parser::parse_fn(Program& program) noexcept {
     return true;
 }
 
-bool Parser::parse_struct(Program& program) noexcept {
+bool Parser::parse_struct(ast::Program& program) noexcept {
     auto name = expect("struct name", Token::Type::Identifier);
 
     if (!name) {
@@ -521,11 +523,11 @@ bool Parser::parse_struct(Program& program) noexcept {
         return false;
     }
 
-    program.structs.push_back(std::make_unique<Struct>(
-        Span{name->span.begin, end}, SpanValue{name->value, name->span},
+    program.structs.push_back(std::make_unique<ast::Struct>(
+        Span{name->span.begin, end}, ast::SpanValue{name->value, name->span},
         std::move(fields)));
 
     return true;
 }
 
-} // namespace cent
+} // namespace cent::frontend

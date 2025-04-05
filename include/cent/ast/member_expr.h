@@ -9,7 +9,7 @@
 #include "cent/ast/node.h"
 #include "cent/ast/span_value.h"
 
-namespace cent {
+namespace cent::ast {
 
 struct MemberExpr : detail::Expr<MemberExpr> {
     [[nodiscard]] MemberExpr(
@@ -21,6 +21,6 @@ struct MemberExpr : detail::Expr<MemberExpr> {
     SpanValue<std::string_view> member;
 };
 
-} // namespace cent
+} // namespace cent::ast
 
 #endif

@@ -6,7 +6,7 @@
 
 #include "cent/ast/node.h"
 
-namespace cent {
+namespace cent::ast {
 
 struct BlockStmt : detail::Stmt<BlockStmt> {
     using Stmt::Stmt;
@@ -14,6 +14,6 @@ struct BlockStmt : detail::Stmt<BlockStmt> {
     std::vector<std::unique_ptr<Statement>> body;
 };
 
-} // namespace cent
+} // namespace cent::ast
 
 #endif

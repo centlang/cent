@@ -19,7 +19,7 @@
 
 #include "cent/backend/codegen.h"
 
-namespace cent {
+namespace cent::backend {
 
 std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
     for (auto& struct_decl : m_program->structs) {
@@ -41,7 +41,7 @@ std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
     return std::move(m_module);
 }
 
-llvm::Value* Codegen::generate(Assignment& stmt) noexcept {
+llvm::Value* Codegen::generate(ast::Assignment& stmt) noexcept {
     auto* var = stmt.variable->codegen(*this);
 
     if (!var) {
@@ -86,7 +86,7 @@ llvm::Value* Codegen::generate(Assignment& stmt) noexcept {
     return nullptr;
 }
 
-llvm::Value* Codegen::generate(BlockStmt& stmt) noexcept {
+llvm::Value* Codegen::generate(ast::BlockStmt& stmt) noexcept {
     auto locals = m_locals;
 
     for (auto& statement : stmt.body) {
@@ -98,7 +98,7 @@ llvm::Value* Codegen::generate(BlockStmt& stmt) noexcept {
     return nullptr;
 }
 
-llvm::Value* Codegen::generate(IfElse& stmt) noexcept {
+llvm::Value* Codegen::generate(ast::IfElse& stmt) noexcept {
     auto* condition = generate(*stmt.condition);
 
     if (!condition) {
@@ -160,7 +160,7 @@ llvm::Value* Codegen::generate(IfElse& stmt) noexcept {
     return nullptr;
 }
 
-llvm::Value* Codegen::generate(ReturnStmt& stmt) noexcept {
+llvm::Value* Codegen::generate(ast::ReturnStmt& stmt) noexcept {
     if (!stmt.value) {
         if (!m_builder.getCurrentFunctionReturnType()->isVoidTy()) {
             error(stmt.span.begin, m_filename, "type mismatch");
@@ -190,7 +190,7 @@ llvm::Value* Codegen::generate(ReturnStmt& stmt) noexcept {
     return nullptr;
 }
 
-llvm::Value* Codegen::generate(WhileLoop& stmt) noexcept {
+llvm::Value* Codegen::generate(ast::WhileLoop& stmt) noexcept {
     auto* condition = generate(*stmt.condition);
 
     if (!condition) {
@@ -215,8 +215,8 @@ llvm::Value* Codegen::generate(WhileLoop& stmt) noexcept {
     return nullptr;
 }
 
-llvm::Value* Codegen::generate(BinaryExpr& expr) noexcept {
-    using enum Token::Type;
+llvm::Value* Codegen::generate(ast::BinaryExpr& expr) noexcept {
+    using enum frontend::Token::Type;
 
     auto* lhs = generate(*expr.lhs);
     auto* rhs = generate(*expr.rhs);
@@ -261,8 +261,8 @@ llvm::Value* Codegen::generate(BinaryExpr& expr) noexcept {
     }
 }
 
-llvm::Value* Codegen::generate(UnaryExpr& expr) noexcept {
-    using enum Token::Type;
+llvm::Value* Codegen::generate(ast::UnaryExpr& expr) noexcept {
+    using enum frontend::Token::Type;
 
     auto* value = generate(*expr.value);
 
@@ -280,21 +280,21 @@ llvm::Value* Codegen::generate(UnaryExpr& expr) noexcept {
     }
 }
 
-llvm::Value* Codegen::generate(IntLiteral& expr) noexcept {
+llvm::Value* Codegen::generate(ast::IntLiteral& expr) noexcept {
     return llvm::ConstantInt::getSigned(
         get_i32_type(), from_string<std::int32_t>(expr.value));
 }
 
-llvm::Value* Codegen::generate(FloatLiteral& expr) noexcept {
+llvm::Value* Codegen::generate(ast::FloatLiteral& expr) noexcept {
     return llvm::ConstantFP::get(
         get_f32_type(), from_string<float>(expr.value));
 }
 
-llvm::Value* Codegen::generate(BoolLiteral& expr) noexcept {
+llvm::Value* Codegen::generate(ast::BoolLiteral& expr) noexcept {
     return llvm::ConstantInt::get(get_bool_type(), expr.value);
 }
 
-llvm::Value* Codegen::generate(Identifier& expr) noexcept {
+llvm::Value* Codegen::generate(ast::Identifier& expr) noexcept {
     auto iterator = m_locals.find(expr.value);
 
     if (iterator == m_locals.end()) {
@@ -308,7 +308,7 @@ llvm::Value* Codegen::generate(Identifier& expr) noexcept {
     return iterator->second.value;
 }
 
-llvm::Value* Codegen::generate(CallExpr& expr) noexcept {
+llvm::Value* Codegen::generate(ast::CallExpr& expr) noexcept {
     auto* callee = m_module->getFunction(expr.identifier.value);
 
     if (!callee) {
@@ -351,7 +351,7 @@ llvm::Value* Codegen::generate(CallExpr& expr) noexcept {
     return m_builder.CreateCall(callee, arguments);
 }
 
-llvm::Value* Codegen::generate(MemberExpr& expr) noexcept {
+llvm::Value* Codegen::generate(ast::MemberExpr& expr) noexcept {
     auto* variable =
         llvm::dyn_cast<llvm::AllocaInst>(expr.parent->codegen(*this));
 
@@ -383,7 +383,7 @@ llvm::Value* Codegen::generate(MemberExpr& expr) noexcept {
     return m_builder.CreateStructGEP(struct_type, variable, iterator->second);
 }
 
-llvm::Value* Codegen::generate(FnDecl& decl) noexcept {
+llvm::Value* Codegen::generate(ast::FnDecl& decl) noexcept {
     auto* function = m_module->getFunction(decl.proto.name.value);
     auto* entry = llvm::BasicBlock::Create(m_context, "", function);
 
@@ -418,7 +418,7 @@ llvm::Value* Codegen::generate(FnDecl& decl) noexcept {
     return nullptr;
 }
 
-llvm::Value* Codegen::generate(Struct& decl) noexcept {
+llvm::Value* Codegen::generate(ast::Struct& decl) noexcept {
     auto* struct_type =
         llvm::StructType::getTypeByName(m_context, decl.name.value);
 
@@ -451,7 +451,7 @@ llvm::Value* Codegen::generate(Struct& decl) noexcept {
     return nullptr;
 }
 
-llvm::Value* Codegen::generate(VarDecl& decl) noexcept {
+llvm::Value* Codegen::generate(ast::VarDecl& decl) noexcept {
     auto* type = get_type(decl.type.span, decl.type.value);
 
     if (!type) {
@@ -493,7 +493,7 @@ llvm::Value* Codegen::generate(VarDecl& decl) noexcept {
     return nullptr;
 }
 
-llvm::Value* Codegen::generate(Expression& expr) noexcept {
+llvm::Value* Codegen::generate(ast::Expression& expr) noexcept {
     auto* result = expr.codegen(*this);
 
     if (auto* variable = llvm::dyn_cast_or_null<llvm::AllocaInst>(result)) {
@@ -507,7 +507,7 @@ llvm::Value* Codegen::generate(Expression& expr) noexcept {
     return result;
 }
 
-void Codegen::generate_fn_proto(FnDecl& decl) noexcept {
+void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
     auto* type = get_fn_type(decl);
 
     if (type) {
@@ -517,7 +517,7 @@ void Codegen::generate_fn_proto(FnDecl& decl) noexcept {
     }
 }
 
-llvm::FunctionType* Codegen::get_fn_type(FnDecl& decl) noexcept {
+llvm::FunctionType* Codegen::get_fn_type(ast::FnDecl& decl) noexcept {
     auto* return_type =
         get_type(decl.proto.return_type.span, decl.proto.return_type.value);
 
@@ -550,4 +550,4 @@ llvm::FunctionType* Codegen::get_fn_type(FnDecl& decl) noexcept {
     return llvm::FunctionType::get(return_type, param_types, false);
 }
 
-} // namespace cent
+} // namespace cent::backend

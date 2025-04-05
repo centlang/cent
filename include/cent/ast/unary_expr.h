@@ -10,18 +10,18 @@
 #include "cent/ast/node.h"
 #include "cent/ast/span_value.h"
 
-namespace cent {
+namespace cent::ast {
 
 struct UnaryExpr : detail::Expr<UnaryExpr> {
     [[nodiscard]] UnaryExpr(
-        Span span, SpanValue<Token::Type> oper,
+        Span span, SpanValue<frontend::Token::Type> oper,
         std::unique_ptr<Expression> value) noexcept
     : Expr{span}, oper{oper}, value{std::move(value)} {}
 
-    SpanValue<Token::Type> oper;
+    SpanValue<frontend::Token::Type> oper;
     std::unique_ptr<Expression> value;
 };
 
-} // namespace cent
+} // namespace cent::ast
 
 #endif

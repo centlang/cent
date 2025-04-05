@@ -6,7 +6,7 @@
 
 #include "cent/span.h"
 
-namespace cent {
+namespace cent::frontend {
 
 struct Token {
     enum struct Type : std::uint8_t {
@@ -72,6 +72,6 @@ struct Token {
     Span span;
 };
 
-} // namespace cent
+} // namespace cent::frontend
 
 #endif

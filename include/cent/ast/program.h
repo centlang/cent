@@ -8,7 +8,7 @@
 #include "cent/ast/fn_decl.h"
 #include "cent/ast/struct.h"
 
-namespace cent {
+namespace cent::ast {
 
 struct Program : Node {
     [[nodiscard]] Program(
@@ -19,6 +19,6 @@ struct Program : Node {
     std::vector<std::unique_ptr<Struct>> structs;
 };
 
-} // namespace cent
+} // namespace cent::ast
 
 #endif

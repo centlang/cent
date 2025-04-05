@@ -9,7 +9,7 @@
 #include "cent/ast/block_stmt.h"
 #include "cent/ast/node.h"
 
-namespace cent {
+namespace cent::ast {
 
 struct WhileLoop : detail::Stmt<WhileLoop> {
     [[nodiscard]] WhileLoop(
@@ -21,6 +21,6 @@ struct WhileLoop : detail::Stmt<WhileLoop> {
     std::unique_ptr<BlockStmt> body;
 };
 
-} // namespace cent
+} // namespace cent::ast
 
 #endif

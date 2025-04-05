@@ -7,7 +7,7 @@
 #include "cent/ast/node.h"
 #include "cent/span.h"
 
-namespace cent {
+namespace cent::ast {
 
 struct ReturnStmt : detail::Stmt<ReturnStmt> {
     [[nodiscard]] ReturnStmt(
@@ -17,6 +17,6 @@ struct ReturnStmt : detail::Stmt<ReturnStmt> {
     std::unique_ptr<Expression> value;
 };
 
-} // namespace cent
+} // namespace cent::ast
 
 #endif

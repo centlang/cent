@@ -9,7 +9,7 @@
 #include "cent/ast/node.h"
 #include "cent/ast/span_value.h"
 
-namespace cent {
+namespace cent::ast {
 
 struct CallExpr : detail::Expr<CallExpr> {
     [[nodiscard]] CallExpr(
@@ -21,6 +21,6 @@ struct CallExpr : detail::Expr<CallExpr> {
     std::vector<std::unique_ptr<Expression>> arguments;
 };
 
-} // namespace cent
+} // namespace cent::ast
 
 #endif

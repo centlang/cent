@@ -7,7 +7,7 @@
 
 #include "cent/span.h"
 
-namespace cent {
+namespace cent::ast {
 
 struct Node {
     [[nodiscard]] Node() noexcept = default;
@@ -23,7 +23,7 @@ struct Node {
 struct Statement : Node {
     [[nodiscard]] Statement(Span span) noexcept : span{span} {}
 
-    virtual llvm::Value* codegen(Codegen& codegen) noexcept = 0;
+    virtual llvm::Value* codegen(backend::Codegen& codegen) noexcept = 0;
 
     Span span;
 };
@@ -41,7 +41,7 @@ namespace detail {
 template <typename Derived> struct Stmt : Statement {
     using Statement::Statement;
 
-    llvm::Value* codegen(Codegen& codegen) noexcept override {
+    llvm::Value* codegen(backend::Codegen& codegen) noexcept override {
         return codegen.generate(static_cast<Derived&>(*this));
     }
 };
@@ -49,7 +49,8 @@ template <typename Derived> struct Stmt : Statement {
 template <typename Derived> struct Expr : Expression {
     using Expression::Expression;
 
-    [[nodiscard]] llvm::Value* codegen(Codegen& codegen) noexcept override {
+    [[nodiscard]] llvm::Value*
+    codegen(backend::Codegen& codegen) noexcept override {
         return codegen.generate(static_cast<Derived&>(*this));
     }
 };
@@ -57,13 +58,13 @@ template <typename Derived> struct Expr : Expression {
 template <typename Derived> struct Decl : Declaration {
     using Declaration::Declaration;
 
-    llvm::Value* codegen(Codegen& codegen) noexcept override {
+    llvm::Value* codegen(backend::Codegen& codegen) noexcept override {
         return codegen.generate(static_cast<Derived&>(*this));
     }
 };
 
 } // namespace detail
 
-} // namespace cent
+} // namespace cent::ast
 
 #endif

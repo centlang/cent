@@ -6,7 +6,7 @@
 #include "cent/ast/node.h"
 #include "cent/span.h"
 
-namespace cent {
+namespace cent::ast {
 
 struct IntLiteral : detail::Expr<IntLiteral> {
     [[nodiscard]] IntLiteral(Span span, std::string_view value) noexcept
@@ -29,6 +29,6 @@ struct BoolLiteral : detail::Expr<BoolLiteral> {
     bool value;
 };
 
-} // namespace cent
+} // namespace cent::ast
 
 #endif
