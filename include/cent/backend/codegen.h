@@ -15,6 +15,8 @@
 #include "cent/log.h"
 #include "cent/span.h"
 
+#include "cent/backend/variable.h"
+
 namespace cent::ast {
 
 struct Program;
@@ -44,11 +46,6 @@ struct Expression;
 } // namespace cent::ast
 
 namespace cent::backend {
-
-struct Variable {
-    llvm::Value* value;
-    bool is_mutable;
-};
 
 class Codegen {
 public:
