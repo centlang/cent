@@ -13,6 +13,12 @@
 namespace cent {
 
 std::unique_ptr<Program> Parser::parse() noexcept {
+    auto skip_until_decl = [&] {
+        while (!match(Token::Type::Eof, Token::Type::Fn, Token::Type::Struct)) {
+            next();
+        }
+    };
+
     auto result = std::make_unique<Program>();
 
     while (true) {
@@ -27,19 +33,26 @@ std::unique_ptr<Program> Parser::parse() noexcept {
 
         if (match(Token::Type::Fn)) {
             next();
-            parse_fn(*result);
+
+            if (!parse_fn(*result)) {
+                skip_until_decl();
+            }
 
             continue;
         }
 
         if (match(Token::Type::Struct)) {
             next();
-            parse_struct(*result);
+
+            if (!parse_struct(*result)) {
+                skip_until_decl();
+            }
 
             continue;
         }
 
         error(get().span.begin, m_filename, "expected declaration");
+        skip_until_decl();
     }
 
     return result;
@@ -449,27 +462,27 @@ std::vector<Struct::Field> Parser::parse_fields() noexcept {
     return result;
 }
 
-void Parser::parse_fn(Program& program) noexcept {
+bool Parser::parse_fn(Program& program) noexcept {
     auto name = expect("function name", Token::Type::Identifier);
 
     if (!name) {
-        return;
+        return false;
     }
 
     if (!expect("'('", Token::Type::LeftParen)) {
-        return;
+        return false;
     }
 
     auto params = parse_params();
 
     if (!expect("')'", Token::Type::RightParen)) {
-        return;
+        return false;
     }
 
     auto return_type = expect("return type", Token::Type::Identifier);
 
     if (!return_type) {
-        return;
+        return false;
     }
 
     std::unique_ptr<BlockStmt> body = nullptr;
@@ -485,17 +498,19 @@ void Parser::parse_fn(Program& program) noexcept {
             std::move(params),
             {return_type->value, return_type->span}},
         std::move(body)));
+
+    return true;
 }
 
-void Parser::parse_struct(Program& program) noexcept {
+bool Parser::parse_struct(Program& program) noexcept {
     auto name = expect("struct name", Token::Type::Identifier);
 
     if (!name) {
-        return;
+        return false;
     }
 
     if (!expect("'{'", Token::Type::LeftBrace)) {
-        return;
+        return false;
     }
 
     auto fields = parse_fields();
@@ -503,12 +518,14 @@ void Parser::parse_struct(Program& program) noexcept {
     auto end = peek().span.end;
 
     if (!expect("'}'", Token::Type::RightBrace)) {
-        return;
+        return false;
     }
 
     program.structs.push_back(std::make_unique<Struct>(
         Span{name->span.begin, end}, SpanValue{name->value, name->span},
         std::move(fields)));
+
+    return true;
 }
 
 } // namespace cent

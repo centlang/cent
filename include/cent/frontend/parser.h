@@ -118,8 +118,8 @@ private:
     [[nodiscard]] std::vector<FnDecl::Param> parse_params() noexcept;
     [[nodiscard]] std::vector<Struct::Field> parse_fields() noexcept;
 
-    void parse_fn(Program& program) noexcept;
-    void parse_struct(Program& program) noexcept;
+    [[nodiscard]] bool parse_fn(Program& program) noexcept;
+    [[nodiscard]] bool parse_struct(Program& program) noexcept;
 
     [[nodiscard]] static std::uint8_t precedence_of(Token::Type type) noexcept {
         enum { None = 0, Or, And, Comparison, Additive, Multiplicative };
