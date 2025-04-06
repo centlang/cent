@@ -41,7 +41,24 @@ std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
     return std::move(m_module);
 }
 
-llvm::Value* Codegen::generate(ast::Assignment& stmt) noexcept {
+llvm::Type* Codegen::generate([[maybe_unused]] types::I32& type) noexcept {
+    return llvm::Type::getInt32Ty(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::F32& type) noexcept {
+    return llvm::Type::getFloatTy(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::Bool& type) noexcept {
+    return llvm::Type::getInt1Ty(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::Void& type) noexcept {
+    return llvm::Type::getVoidTy(m_context);
+}
+
+llvm::Value*
+Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
     auto* var = stmt.variable->codegen(*this);
 
     if (!var) {

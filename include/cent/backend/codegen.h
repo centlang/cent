@@ -47,6 +47,18 @@ struct Expression;
 
 namespace cent::backend {
 
+namespace types {
+
+struct I32;
+
+struct F32;
+
+struct Bool;
+
+struct Void;
+
+} // namespace types
+
 class Codegen {
 public:
     [[nodiscard]] Codegen(
@@ -57,6 +69,11 @@ public:
       m_filename{filename} {}
 
     [[nodiscard]] std::unique_ptr<llvm::Module> generate() noexcept;
+
+    llvm::Type* generate(types::I32& type) noexcept;
+    llvm::Type* generate(types::F32& type) noexcept;
+    llvm::Type* generate(types::Bool& type) noexcept;
+    llvm::Type* generate(types::Void& type) noexcept;
 
     llvm::Value* generate(ast::Assignment& stmt) noexcept;
     llvm::Value* generate(ast::BlockStmt& stmt) noexcept;
