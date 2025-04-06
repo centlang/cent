@@ -5,6 +5,7 @@ OBJ_DIR := obj
 BIN_DIR := bin
 
 CPP := c++
+CLANG_TIDY := clang-tidy
 
 CPP_FLAGS := -pedantic -Wall -Wextra -std=c++20 -O3 -c -I$(INCLUDE_DIR) \
     -fno-exceptions
@@ -37,4 +38,7 @@ install: $(TARGET) | $(DEST_BIN_DIR)
 clean:
 	rm -rf $(OBJ_DIR) $(BIN_DIR)
 
-.PHONY: all clean install
+check: $(SRC_FILES)
+	$(CLANG_TIDY) $^ -- $(CPP_FLAGS)
+
+.PHONY: all clean install check
