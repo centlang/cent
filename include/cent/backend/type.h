@@ -20,6 +20,17 @@ struct Type {
     virtual llvm::Type* codegen(backend::Codegen& codegen) noexcept = 0;
 };
 
+namespace detail {
+
+template <typename Derived> struct Type : backend::Type {
+    [[nodiscard]] llvm::Type*
+    codegen(backend::Codegen& codegen) noexcept override {
+        return codegen.generate(static_cast<Derived&>(*this));
+    }
+};
+
+} // namespace detail
+
 } // namespace cent::backend
 
 #endif
