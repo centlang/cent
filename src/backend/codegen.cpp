@@ -42,12 +42,28 @@ std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
     return std::move(m_module);
 }
 
+llvm::Type* Codegen::generate([[maybe_unused]] types::I8& type) noexcept {
+    return llvm::Type::getInt8Ty(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::I16& type) noexcept {
+    return llvm::Type::getInt16Ty(m_context);
+}
+
 llvm::Type* Codegen::generate([[maybe_unused]] types::I32& type) noexcept {
     return llvm::Type::getInt32Ty(m_context);
 }
 
+llvm::Type* Codegen::generate([[maybe_unused]] types::I64& type) noexcept {
+    return llvm::Type::getInt64Ty(m_context);
+}
+
 llvm::Type* Codegen::generate([[maybe_unused]] types::F32& type) noexcept {
     return llvm::Type::getFloatTy(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::F64& type) noexcept {
+    return llvm::Type::getDoubleTy(m_context);
 }
 
 llvm::Type* Codegen::generate([[maybe_unused]] types::Bool& type) noexcept {

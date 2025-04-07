@@ -49,12 +49,15 @@ namespace cent::backend {
 
 namespace types {
 
+struct I8;
+struct I16;
 struct I32;
+struct I64;
 
 struct F32;
+struct F64;
 
 struct Bool;
-
 struct Void;
 
 struct Struct;
@@ -72,10 +75,17 @@ public:
 
     [[nodiscard]] std::unique_ptr<llvm::Module> generate() noexcept;
 
+    llvm::Type* generate(types::I8& type) noexcept;
+    llvm::Type* generate(types::I16& type) noexcept;
     llvm::Type* generate(types::I32& type) noexcept;
+    llvm::Type* generate(types::I64& type) noexcept;
+
     llvm::Type* generate(types::F32& type) noexcept;
+    llvm::Type* generate(types::F64& type) noexcept;
+
     llvm::Type* generate(types::Bool& type) noexcept;
     llvm::Type* generate(types::Void& type) noexcept;
+
     llvm::Type* generate(types::Struct& type) noexcept;
 
     llvm::Value* generate(ast::Assignment& stmt) noexcept;
