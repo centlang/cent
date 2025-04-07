@@ -12,7 +12,6 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 
-#include "cent/log.h"
 #include "cent/span.h"
 
 #include "cent/backend/variable.h"
@@ -63,6 +62,8 @@ struct Void;
 struct Struct;
 
 } // namespace types
+
+struct Type;
 
 class Codegen {
 public:
@@ -115,50 +116,8 @@ private:
 
     [[nodiscard]] llvm::FunctionType* get_fn_type(ast::FnDecl& decl) noexcept;
 
-    [[nodiscard]] llvm::Type*
-    get_type(Span span, std::string_view name) noexcept {
-        auto* struct_type = llvm::StructType::getTypeByName(m_context, name);
-
-        if (struct_type) {
-            return struct_type;
-        }
-
-        if (name == "i32") {
-            return get_i32_type();
-        }
-
-        if (name == "f32") {
-            return get_f32_type();
-        }
-
-        if (name == "bool") {
-            return get_bool_type();
-        }
-
-        if (name == "void") {
-            return get_void_type();
-        }
-
-        error(span.begin, m_filename, fmt::format("undeclared type: {}", name));
-
-        return nullptr;
-    }
-
-    [[nodiscard]] llvm::Type* get_i32_type() noexcept {
-        return llvm::Type::getInt32Ty(m_context);
-    }
-
-    [[nodiscard]] llvm::Type* get_f32_type() noexcept {
-        return llvm::Type::getFloatTy(m_context);
-    }
-
-    [[nodiscard]] llvm::Type* get_bool_type() noexcept {
-        return llvm::Type::getInt1Ty(m_context);
-    }
-
-    [[nodiscard]] llvm::Type* get_void_type() noexcept {
-        return llvm::Type::getVoidTy(m_context);
-    }
+    [[nodiscard]] std::unique_ptr<Type>
+    get_type(Span span, std::string_view name) noexcept;
 
     template <typename ValueType> auto from_string(std::string_view value) {
         ValueType result;

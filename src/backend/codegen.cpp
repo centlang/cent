@@ -2,6 +2,8 @@
 
 #include <llvm/IR/Constants.h>
 
+#include "cent/log.h"
+
 #include "cent/ast/assignment.h"
 #include "cent/ast/binary_expr.h"
 #include "cent/ast/block_stmt.h"
@@ -17,8 +19,10 @@
 #include "cent/ast/var_decl.h"
 #include "cent/ast/while_loop.h"
 
-#include "cent/backend/codegen.h"
+#include "cent/backend/types/primitive.h"
 #include "cent/backend/types/struct.h"
+
+#include "cent/backend/codegen.h"
 
 namespace cent::backend {
 
@@ -320,16 +324,17 @@ llvm::Value* Codegen::generate(ast::UnaryExpr& expr) noexcept {
 
 llvm::Value* Codegen::generate(ast::IntLiteral& expr) noexcept {
     return llvm::ConstantInt::getSigned(
-        get_i32_type(), from_string<std::int32_t>(expr.value));
+        llvm::Type::getInt32Ty(m_context),
+        from_string<std::int32_t>(expr.value));
 }
 
 llvm::Value* Codegen::generate(ast::FloatLiteral& expr) noexcept {
     return llvm::ConstantFP::get(
-        get_f32_type(), from_string<float>(expr.value));
+        llvm::Type::getFloatTy(m_context), from_string<float>(expr.value));
 }
 
 llvm::Value* Codegen::generate(ast::BoolLiteral& expr) noexcept {
-    return llvm::ConstantInt::get(get_bool_type(), expr.value);
+    return llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), expr.value);
 }
 
 llvm::Value* Codegen::generate(ast::Identifier& expr) noexcept {
@@ -466,13 +471,15 @@ llvm::Value* Codegen::generate(ast::Struct& decl) noexcept {
     for (std::size_t i = 0; i < decl.fields.size(); ++i) {
         auto field = decl.fields[i];
 
-        auto* type = get_type(field.type.span, field.type.value);
+        auto type = get_type(field.type.span, field.type.value);
 
         if (!type) {
             return nullptr;
         }
 
-        if (type->isVoidTy()) {
+        auto* llvm_type = type->codegen(*this);
+
+        if (llvm_type->isVoidTy()) {
             error(
                 field.name.span.begin, m_filename,
                 fmt::format("'{}' cannot be of type 'void'", field.name.value));
@@ -480,7 +487,7 @@ llvm::Value* Codegen::generate(ast::Struct& decl) noexcept {
             return nullptr;
         }
 
-        fields.push_back(type);
+        fields.push_back(llvm_type);
         m_members[struct_type][field.name.value] = i;
     }
 
@@ -490,13 +497,15 @@ llvm::Value* Codegen::generate(ast::Struct& decl) noexcept {
 }
 
 llvm::Value* Codegen::generate(ast::VarDecl& decl) noexcept {
-    auto* type = get_type(decl.type.span, decl.type.value);
+    auto type = get_type(decl.type.span, decl.type.value);
 
     if (!type) {
         return nullptr;
     }
 
-    if (type->isVoidTy()) {
+    auto* llvm_type = type->codegen(*this);
+
+    if (llvm_type->isVoidTy()) {
         error(
             decl.name.span.begin, m_filename,
             fmt::format("'{}' cannot be of type 'void'", decl.name.value));
@@ -504,7 +513,7 @@ llvm::Value* Codegen::generate(ast::VarDecl& decl) noexcept {
         return nullptr;
     }
 
-    auto* variable = m_builder.CreateAlloca(type);
+    auto* variable = m_builder.CreateAlloca(llvm_type);
     llvm::Value* value = nullptr;
 
     if (decl.value) {
@@ -514,7 +523,7 @@ llvm::Value* Codegen::generate(ast::VarDecl& decl) noexcept {
             return nullptr;
         }
 
-        if (type != value->getType()) {
+        if (llvm_type != value->getType()) {
             error(decl.value->span.begin, m_filename, "type mismatch");
 
             return nullptr;
@@ -522,7 +531,7 @@ llvm::Value* Codegen::generate(ast::VarDecl& decl) noexcept {
     }
 
     if (!value) {
-        value = llvm::Constant::getNullValue(type);
+        value = llvm::Constant::getNullValue(llvm_type);
     }
 
     m_builder.CreateStore(value, variable);
@@ -556,24 +565,28 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
 }
 
 llvm::FunctionType* Codegen::get_fn_type(ast::FnDecl& decl) noexcept {
-    auto* return_type =
+    auto return_type =
         get_type(decl.proto.return_type.span, decl.proto.return_type.value);
 
     if (!return_type) {
         return nullptr;
     }
 
+    auto* llvm_return_type = return_type->codegen(*this);
+
     std::vector<llvm::Type*> param_types;
     param_types.reserve(decl.proto.params.size());
 
     for (const auto& parameter : decl.proto.params) {
-        auto* type = get_type(parameter.type.span, parameter.type.value);
+        auto type = get_type(parameter.type.span, parameter.type.value);
 
         if (!type) {
             return nullptr;
         }
 
-        if (type->isVoidTy()) {
+        auto* llvm_type = type->codegen(*this);
+
+        if (llvm_type->isVoidTy()) {
             error(
                 parameter.name.span.begin, m_filename,
                 fmt::format(
@@ -582,10 +595,55 @@ llvm::FunctionType* Codegen::get_fn_type(ast::FnDecl& decl) noexcept {
             return nullptr;
         }
 
-        param_types.push_back(type);
+        param_types.push_back(llvm_type);
     }
 
-    return llvm::FunctionType::get(return_type, param_types, false);
+    return llvm::FunctionType::get(llvm_return_type, param_types, false);
+}
+
+std::unique_ptr<Type>
+Codegen::get_type(Span span, std::string_view name) noexcept {
+    auto* struct_type = llvm::StructType::getTypeByName(m_context, name);
+
+    if (struct_type) {
+        return std::make_unique<types::Struct>(struct_type);
+    }
+
+    if (name == "i8") {
+        return std::make_unique<types::I8>();
+    }
+
+    if (name == "i16") {
+        return std::make_unique<types::I16>();
+    }
+
+    if (name == "i32") {
+        return std::make_unique<types::I32>();
+    }
+
+    if (name == "i64") {
+        return std::make_unique<types::I64>();
+    }
+
+    if (name == "f32") {
+        return std::make_unique<types::F32>();
+    }
+
+    if (name == "f64") {
+        return std::make_unique<types::F64>();
+    }
+
+    if (name == "bool") {
+        return std::make_unique<types::Bool>();
+    }
+
+    if (name == "void") {
+        return std::make_unique<types::Void>();
+    }
+
+    error(span.begin, m_filename, fmt::format("undeclared type: {}", name));
+
+    return nullptr;
 }
 
 } // namespace cent::backend
