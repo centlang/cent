@@ -18,6 +18,7 @@
 #include "cent/ast/while_loop.h"
 
 #include "cent/backend/codegen.h"
+#include "cent/backend/types/struct.h"
 
 namespace cent::backend {
 
@@ -55,6 +56,10 @@ llvm::Type* Codegen::generate([[maybe_unused]] types::Bool& type) noexcept {
 
 llvm::Type* Codegen::generate([[maybe_unused]] types::Void& type) noexcept {
     return llvm::Type::getVoidTy(m_context);
+}
+
+llvm::Type* Codegen::generate(types::Struct& type) noexcept {
+    return type.type;
 }
 
 llvm::Value*

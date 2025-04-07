@@ -57,6 +57,8 @@ struct Bool;
 
 struct Void;
 
+struct Struct;
+
 } // namespace types
 
 class Codegen {
@@ -74,6 +76,7 @@ public:
     llvm::Type* generate(types::F32& type) noexcept;
     llvm::Type* generate(types::Bool& type) noexcept;
     llvm::Type* generate(types::Void& type) noexcept;
+    llvm::Type* generate(types::Struct& type) noexcept;
 
     llvm::Value* generate(ast::Assignment& stmt) noexcept;
     llvm::Value* generate(ast::BlockStmt& stmt) noexcept;
