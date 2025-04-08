@@ -116,8 +116,7 @@ private:
 
     [[nodiscard]] llvm::FunctionType* get_fn_type(ast::FnDecl& decl) noexcept;
 
-    [[nodiscard]] std::unique_ptr<Type>
-    get_type(Span span, std::string_view name) noexcept;
+    [[nodiscard]] Type* get_type(Span span, std::string_view name) noexcept;
 
     template <typename ValueType> auto from_string(std::string_view value) {
         ValueType result;
@@ -130,6 +129,7 @@ private:
     std::unique_ptr<llvm::Module> m_module;
     llvm::IRBuilder<> m_builder;
 
+    std::map<std::string_view, std::shared_ptr<Type>> m_types;
     std::map<std::string_view, Variable> m_locals;
 
     std::map<llvm::StructType*, std::map<std::string_view, std::size_t>>

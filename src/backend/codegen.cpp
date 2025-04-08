@@ -19,6 +19,8 @@
 #include "cent/ast/var_decl.h"
 #include "cent/ast/while_loop.h"
 
+#include "cent/backend/type.h"
+
 #include "cent/backend/types/primitive.h"
 #include "cent/backend/types/struct.h"
 
@@ -27,6 +29,16 @@
 namespace cent::backend {
 
 std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
+    m_types = {
+        {"i8", std::make_shared<types::I8>()},
+        {"i16", std::make_shared<types::I16>()},
+        {"i32", std::make_shared<types::I32>()},
+        {"i64", std::make_shared<types::I64>()},
+        {"f32", std::make_shared<types::F32>()},
+        {"f64", std::make_shared<types::F64>()},
+        {"bool", std::make_shared<types::Bool>()},
+        {"void", std::make_shared<types::Void>()}};
+
     for (auto& struct_decl : m_program->structs) {
         llvm::StructType::create(m_context, struct_decl->name.value);
     }
@@ -471,7 +483,7 @@ llvm::Value* Codegen::generate(ast::Struct& decl) noexcept {
     for (std::size_t i = 0; i < decl.fields.size(); ++i) {
         auto field = decl.fields[i];
 
-        auto type = get_type(field.type.span, field.type.value);
+        auto* type = get_type(field.type.span, field.type.value);
 
         if (!type) {
             return nullptr;
@@ -493,11 +505,13 @@ llvm::Value* Codegen::generate(ast::Struct& decl) noexcept {
 
     struct_type->setBody(fields);
 
+    m_types[decl.name.value] = std::make_shared<types::Struct>(struct_type);
+
     return nullptr;
 }
 
 llvm::Value* Codegen::generate(ast::VarDecl& decl) noexcept {
-    auto type = get_type(decl.type.span, decl.type.value);
+    auto* type = get_type(decl.type.span, decl.type.value);
 
     if (!type) {
         return nullptr;
@@ -565,7 +579,7 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
 }
 
 llvm::FunctionType* Codegen::get_fn_type(ast::FnDecl& decl) noexcept {
-    auto return_type =
+    auto* return_type =
         get_type(decl.proto.return_type.span, decl.proto.return_type.value);
 
     if (!return_type) {
@@ -578,7 +592,7 @@ llvm::FunctionType* Codegen::get_fn_type(ast::FnDecl& decl) noexcept {
     param_types.reserve(decl.proto.params.size());
 
     for (const auto& parameter : decl.proto.params) {
-        auto type = get_type(parameter.type.span, parameter.type.value);
+        auto* type = get_type(parameter.type.span, parameter.type.value);
 
         if (!type) {
             return nullptr;
@@ -601,49 +615,17 @@ llvm::FunctionType* Codegen::get_fn_type(ast::FnDecl& decl) noexcept {
     return llvm::FunctionType::get(llvm_return_type, param_types, false);
 }
 
-std::unique_ptr<Type>
-Codegen::get_type(Span span, std::string_view name) noexcept {
-    auto* struct_type = llvm::StructType::getTypeByName(m_context, name);
+Type* Codegen::get_type(Span span, std::string_view name) noexcept {
+    auto iterator = m_types.find(name);
 
-    if (struct_type) {
-        return std::make_unique<types::Struct>(struct_type);
+    if (iterator == m_types.end()) {
+        error(
+            span.begin, m_filename, fmt::format("undeclared type: '{}'", name));
+
+        return nullptr;
     }
 
-    if (name == "i8") {
-        return std::make_unique<types::I8>();
-    }
-
-    if (name == "i16") {
-        return std::make_unique<types::I16>();
-    }
-
-    if (name == "i32") {
-        return std::make_unique<types::I32>();
-    }
-
-    if (name == "i64") {
-        return std::make_unique<types::I64>();
-    }
-
-    if (name == "f32") {
-        return std::make_unique<types::F32>();
-    }
-
-    if (name == "f64") {
-        return std::make_unique<types::F64>();
-    }
-
-    if (name == "bool") {
-        return std::make_unique<types::Bool>();
-    }
-
-    if (name == "void") {
-        return std::make_unique<types::Void>();
-    }
-
-    error(span.begin, m_filename, fmt::format("undeclared type: {}", name));
-
-    return nullptr;
+    return iterator->second.get();
 }
 
 } // namespace cent::backend
