@@ -1,9 +1,10 @@
 #ifndef CENT_AST_NODE_H
 #define CENT_AST_NODE_H
 
-#include <llvm/IR/Value.h>
+#include <optional>
 
 #include "cent/backend/codegen.h"
+#include "cent/backend/value.h"
 
 #include "cent/span.h"
 
@@ -23,7 +24,8 @@ struct Node {
 struct Statement : Node {
     [[nodiscard]] Statement(Span span) noexcept : span{span} {}
 
-    virtual llvm::Value* codegen(backend::Codegen& codegen) noexcept = 0;
+    virtual std::optional<backend::Value>
+    codegen(backend::Codegen& codegen) noexcept = 0;
 
     Span span;
 };
@@ -41,7 +43,8 @@ namespace detail {
 template <typename Derived> struct Stmt : Statement {
     using Statement::Statement;
 
-    llvm::Value* codegen(backend::Codegen& codegen) noexcept override {
+    std::optional<backend::Value>
+    codegen(backend::Codegen& codegen) noexcept override {
         return codegen.generate(static_cast<Derived&>(*this));
     }
 };
@@ -49,7 +52,7 @@ template <typename Derived> struct Stmt : Statement {
 template <typename Derived> struct Expr : Expression {
     using Expression::Expression;
 
-    [[nodiscard]] llvm::Value*
+    [[nodiscard]] std::optional<backend::Value>
     codegen(backend::Codegen& codegen) noexcept override {
         return codegen.generate(static_cast<Derived&>(*this));
     }
@@ -58,7 +61,8 @@ template <typename Derived> struct Expr : Expression {
 template <typename Derived> struct Decl : Declaration {
     using Declaration::Declaration;
 
-    llvm::Value* codegen(backend::Codegen& codegen) noexcept override {
+    std::optional<backend::Value>
+    codegen(backend::Codegen& codegen) noexcept override {
         return codegen.generate(static_cast<Derived&>(*this));
     }
 };

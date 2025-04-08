@@ -3,10 +3,12 @@
 
 #include <llvm/IR/Value.h>
 
+#include "cent/backend/value.h"
+
 namespace cent::backend {
 
 struct Variable {
-    llvm::Value* value;
+    Value value;
     bool is_mutable;
 };
 

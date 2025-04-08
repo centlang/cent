@@ -4,6 +4,7 @@
 #include <charconv>
 #include <map>
 #include <memory>
+#include <optional>
 #include <utility>
 
 #include <fmt/core.h>
@@ -60,9 +61,11 @@ struct Bool;
 struct Void;
 
 struct Struct;
+struct Function;
 
 } // namespace types
 
+struct Value;
 struct Type;
 
 class Codegen {
@@ -88,33 +91,32 @@ public:
     llvm::Type* generate(types::Void& type) noexcept;
 
     llvm::Type* generate(types::Struct& type) noexcept;
+    llvm::Type* generate(types::Function& type) noexcept;
 
-    llvm::Value* generate(ast::Assignment& stmt) noexcept;
-    llvm::Value* generate(ast::BlockStmt& stmt) noexcept;
-    llvm::Value* generate(ast::IfElse& stmt) noexcept;
-    llvm::Value* generate(ast::ReturnStmt& stmt) noexcept;
-    llvm::Value* generate(ast::WhileLoop& stmt) noexcept;
+    std::optional<Value> generate(ast::Assignment& stmt) noexcept;
+    std::optional<Value> generate(ast::BlockStmt& stmt) noexcept;
+    std::optional<Value> generate(ast::IfElse& stmt) noexcept;
+    std::optional<Value> generate(ast::ReturnStmt& stmt) noexcept;
+    std::optional<Value> generate(ast::WhileLoop& stmt) noexcept;
 
-    llvm::Value* generate(ast::BinaryExpr& expr) noexcept;
-    llvm::Value* generate(ast::UnaryExpr& expr) noexcept;
-    llvm::Value* generate(ast::IntLiteral& expr) noexcept;
-    llvm::Value* generate(ast::FloatLiteral& expr) noexcept;
-    llvm::Value* generate(ast::BoolLiteral& expr) noexcept;
-    llvm::Value* generate(ast::Identifier& expr) noexcept;
-    llvm::Value* generate(ast::CallExpr& expr) noexcept;
-    llvm::Value* generate(ast::MemberExpr& expr) noexcept;
+    std::optional<Value> generate(ast::BinaryExpr& expr) noexcept;
+    std::optional<Value> generate(ast::UnaryExpr& expr) noexcept;
+    std::optional<Value> generate(ast::IntLiteral& expr) noexcept;
+    std::optional<Value> generate(ast::FloatLiteral& expr) noexcept;
+    std::optional<Value> generate(ast::BoolLiteral& expr) noexcept;
+    std::optional<Value> generate(ast::Identifier& expr) noexcept;
+    std::optional<Value> generate(ast::CallExpr& expr) noexcept;
+    std::optional<Value> generate(ast::MemberExpr& expr) noexcept;
 
-    llvm::Value* generate(ast::FnDecl& decl) noexcept;
-    llvm::Value* generate(ast::Struct& decl) noexcept;
+    std::optional<Value> generate(ast::FnDecl& decl) noexcept;
+    std::optional<Value> generate(ast::Struct& decl) noexcept;
 
-    llvm::Value* generate(ast::VarDecl& decl) noexcept;
+    std::optional<Value> generate(ast::VarDecl& decl) noexcept;
 
 private:
-    llvm::Value* generate(ast::Expression& expr) noexcept;
+    std::optional<Value> generate(ast::Expression& expr) noexcept;
 
     void generate_fn_proto(ast::FnDecl& decl) noexcept;
-
-    [[nodiscard]] llvm::FunctionType* get_fn_type(ast::FnDecl& decl) noexcept;
 
     [[nodiscard]] Type* get_type(Span span, std::string_view name) noexcept;
 
@@ -131,6 +133,9 @@ private:
 
     std::map<std::string_view, std::shared_ptr<Type>> m_types;
     std::map<std::string_view, Variable> m_locals;
+
+    std::map<llvm::Function*, std::shared_ptr<types::Function>> m_functions;
+    std::map<llvm::StructType*, std::shared_ptr<types::Struct>> m_structs;
 
     std::map<llvm::StructType*, std::map<std::string_view, std::size_t>>
         m_members;

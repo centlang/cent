@@ -20,7 +20,9 @@
 #include "cent/ast/while_loop.h"
 
 #include "cent/backend/type.h"
+#include "cent/backend/value.h"
 
+#include "cent/backend/types/function.h"
 #include "cent/backend/types/primitive.h"
 #include "cent/backend/types/struct.h"
 
@@ -94,53 +96,57 @@ llvm::Type* Codegen::generate(types::Struct& type) noexcept {
     return type.type;
 }
 
-llvm::Value*
+llvm::Type* Codegen::generate(types::Function& type) noexcept {
+    return type.function;
+}
+
+std::optional<Value>
 Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
-    auto* var = stmt.variable->codegen(*this);
+    auto var = stmt.variable->codegen(*this);
 
     if (!var) {
-        return nullptr;
+        return std::nullopt;
     }
 
-    auto* value = generate(*stmt.value);
+    auto value = generate(*stmt.value);
 
     if (!value) {
-        return nullptr;
+        return std::nullopt;
     }
 
-    if (auto* variable = llvm::dyn_cast<llvm::AllocaInst>(var)) {
-        if (variable->getAllocatedType() != value->getType()) {
+    if (auto* variable = llvm::dyn_cast<llvm::AllocaInst>(var->value)) {
+        if (variable->getAllocatedType() != value->value->getType()) {
             error(stmt.value->span.begin, m_filename, "type mismatch");
 
-            return nullptr;
+            return std::nullopt;
         }
 
-        m_builder.CreateStore(value, variable);
+        m_builder.CreateStore(value->value, variable);
 
-        return nullptr;
+        return std::nullopt;
     }
 
-    auto* variable = llvm::dyn_cast<llvm::GetElementPtrInst>(var);
+    auto* variable = llvm::dyn_cast<llvm::GetElementPtrInst>(var->value);
 
     if (!variable) {
         error(
             stmt.variable->span.begin, m_filename, "cannot assign to a value");
 
-        return nullptr;
+        return std::nullopt;
     }
 
-    if (variable->getResultElementType() != value->getType()) {
+    if (variable->getResultElementType() != value->value->getType()) {
         error(stmt.value->span.begin, m_filename, "type mismatch");
 
-        return nullptr;
+        return std::nullopt;
     }
 
-    m_builder.CreateStore(value, variable);
+    m_builder.CreateStore(value->value, variable);
 
-    return nullptr;
+    return std::nullopt;
 }
 
-llvm::Value* Codegen::generate(ast::BlockStmt& stmt) noexcept {
+std::optional<Value> Codegen::generate(ast::BlockStmt& stmt) noexcept {
     auto locals = m_locals;
 
     for (auto& statement : stmt.body) {
@@ -149,14 +155,14 @@ llvm::Value* Codegen::generate(ast::BlockStmt& stmt) noexcept {
 
     m_locals = std::move(locals);
 
-    return nullptr;
+    return std::nullopt;
 }
 
-llvm::Value* Codegen::generate(ast::IfElse& stmt) noexcept {
-    auto* condition = generate(*stmt.condition);
+std::optional<Value> Codegen::generate(ast::IfElse& stmt) noexcept {
+    auto condition = generate(*stmt.condition);
 
     if (!condition) {
-        return nullptr;
+        return std::nullopt;
     }
 
     auto* function = m_builder.GetInsertBlock()->getParent();
@@ -166,7 +172,7 @@ llvm::Value* Codegen::generate(ast::IfElse& stmt) noexcept {
     if (!stmt.else_block) {
         auto* end = llvm::BasicBlock::Create(m_context, "", function);
 
-        m_builder.CreateCondBr(condition, if_block, end);
+        m_builder.CreateCondBr(condition->value, if_block, end);
 
         m_builder.SetInsertPoint(if_block);
         stmt.if_block->codegen(*this);
@@ -177,11 +183,11 @@ llvm::Value* Codegen::generate(ast::IfElse& stmt) noexcept {
 
         m_builder.SetInsertPoint(end);
 
-        return nullptr;
+        return std::nullopt;
     }
 
     auto* else_block = llvm::BasicBlock::Create(m_context, "", function);
-    m_builder.CreateCondBr(condition, if_block, else_block);
+    m_builder.CreateCondBr(condition->value, if_block, else_block);
 
     m_builder.SetInsertPoint(if_block);
     stmt.if_block->codegen(*this);
@@ -201,7 +207,7 @@ llvm::Value* Codegen::generate(ast::IfElse& stmt) noexcept {
             m_builder.SetInsertPoint(end);
         }
 
-        return nullptr;
+        return std::nullopt;
     }
 
     if (!end) {
@@ -211,44 +217,44 @@ llvm::Value* Codegen::generate(ast::IfElse& stmt) noexcept {
     m_builder.CreateBr(end);
     m_builder.SetInsertPoint(end);
 
-    return nullptr;
+    return std::nullopt;
 }
 
-llvm::Value* Codegen::generate(ast::ReturnStmt& stmt) noexcept {
+std::optional<Value> Codegen::generate(ast::ReturnStmt& stmt) noexcept {
     if (!stmt.value) {
         if (!m_builder.getCurrentFunctionReturnType()->isVoidTy()) {
             error(stmt.span.begin, m_filename, "type mismatch");
 
-            return nullptr;
+            return std::nullopt;
         }
 
         m_builder.CreateRetVoid();
 
-        return nullptr;
+        return std::nullopt;
     }
 
-    auto* value = generate(*stmt.value);
+    auto value = generate(*stmt.value);
 
     if (!value) {
-        return nullptr;
+        return std::nullopt;
     }
 
-    if (value->getType() != m_builder.getCurrentFunctionReturnType()) {
+    if (value->value->getType() != m_builder.getCurrentFunctionReturnType()) {
         error(stmt.value->span.begin, m_filename, "type mismatch");
 
-        return nullptr;
+        return std::nullopt;
     }
 
-    m_builder.CreateRet(value);
+    m_builder.CreateRet(value->value);
 
-    return nullptr;
+    return std::nullopt;
 }
 
-llvm::Value* Codegen::generate(ast::WhileLoop& stmt) noexcept {
-    auto* condition = generate(*stmt.condition);
+std::optional<Value> Codegen::generate(ast::WhileLoop& stmt) noexcept {
+    auto condition = generate(*stmt.condition);
 
     if (!condition) {
-        return nullptr;
+        return std::nullopt;
     }
 
     auto* function = m_builder.GetInsertBlock()->getParent();
@@ -256,100 +262,109 @@ llvm::Value* Codegen::generate(ast::WhileLoop& stmt) noexcept {
     auto* body = llvm::BasicBlock::Create(m_context, "", function);
     auto* end = llvm::BasicBlock::Create(m_context, "", function);
 
-    m_builder.CreateCondBr(condition, body, end);
+    m_builder.CreateCondBr(condition->value, body, end);
 
     m_builder.SetInsertPoint(body);
     stmt.body->codegen(*this);
 
     condition = generate(*stmt.condition);
-    m_builder.CreateCondBr(condition, body, end);
+    m_builder.CreateCondBr(condition->value, body, end);
 
     m_builder.SetInsertPoint(end);
 
-    return nullptr;
+    return std::nullopt;
 }
 
-llvm::Value* Codegen::generate(ast::BinaryExpr& expr) noexcept {
+std::optional<Value> Codegen::generate(ast::BinaryExpr& expr) noexcept {
     using enum frontend::Token::Type;
 
-    auto* lhs = generate(*expr.lhs);
-    auto* rhs = generate(*expr.rhs);
+    auto lhs = generate(*expr.lhs);
+    auto rhs = generate(*expr.rhs);
 
     if (!lhs || !rhs) {
-        return nullptr;
+        return std::nullopt;
     }
 
-    if (lhs->getType() != rhs->getType()) {
+    if (lhs->type != rhs->type) {
         error(expr.lhs->span.begin, m_filename, "type mismatch");
 
-        return nullptr;
+        return std::nullopt;
     }
 
-    switch (expr.oper.value) {
-    case Plus:
-        return m_builder.CreateAdd(lhs, rhs);
-    case Minus:
-        return m_builder.CreateSub(lhs, rhs);
-    case Star:
-        return m_builder.CreateMul(lhs, rhs);
-    case Slash:
-        return m_builder.CreateSDiv(lhs, rhs);
-    case And:
-        return m_builder.CreateAnd(lhs, rhs);
-    case Or:
-        return m_builder.CreateOr(lhs, rhs);
-    case Less:
-        return m_builder.CreateICmpSLT(lhs, rhs);
-    case Greater:
-        return m_builder.CreateICmpSGT(lhs, rhs);
-    case EqualEqual:
-        return m_builder.CreateICmpEQ(lhs, rhs);
-    case BangEqual:
-        return m_builder.CreateICmpNE(lhs, rhs);
-    case GreaterEqual:
-        return m_builder.CreateICmpSGE(lhs, rhs);
-    case LessEqual:
-        return m_builder.CreateICmpSLE(lhs, rhs);
-    default:
-        return nullptr;
-    }
+    auto* value = [&]() -> llvm::Value* {
+        switch (expr.oper.value) {
+        case Plus:
+            return m_builder.CreateAdd(lhs->value, rhs->value);
+        case Minus:
+            return m_builder.CreateSub(lhs->value, rhs->value);
+        case Star:
+            return m_builder.CreateMul(lhs->value, rhs->value);
+        case Slash:
+            return m_builder.CreateSDiv(lhs->value, rhs->value);
+        case And:
+            return m_builder.CreateAnd(lhs->value, rhs->value);
+        case Or:
+            return m_builder.CreateOr(lhs->value, rhs->value);
+        case Less:
+            return m_builder.CreateICmpSLT(lhs->value, rhs->value);
+        case Greater:
+            return m_builder.CreateICmpSGT(lhs->value, rhs->value);
+        case EqualEqual:
+            return m_builder.CreateICmpEQ(lhs->value, rhs->value);
+        case BangEqual:
+            return m_builder.CreateICmpNE(lhs->value, rhs->value);
+        case GreaterEqual:
+            return m_builder.CreateICmpSGE(lhs->value, rhs->value);
+        case LessEqual:
+            return m_builder.CreateICmpSLE(lhs->value, rhs->value);
+        default:
+            return nullptr;
+        }
+    }();
+
+    return Value{lhs->type, value};
 }
 
-llvm::Value* Codegen::generate(ast::UnaryExpr& expr) noexcept {
+std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
     using enum frontend::Token::Type;
 
-    auto* value = generate(*expr.value);
+    auto value = generate(*expr.value);
 
     if (!value) {
-        return nullptr;
+        return std::nullopt;
     }
 
     switch (expr.oper.value) {
     case Minus:
-        return m_builder.CreateNeg(value);
+        return Value{value->type, m_builder.CreateNeg(value->value)};
     case Bang:
-        return m_builder.CreateNot(value);
+        return Value{value->type, m_builder.CreateNot(value->value)};
     default:
-        return nullptr;
+        return std::nullopt;
     }
 }
 
-llvm::Value* Codegen::generate(ast::IntLiteral& expr) noexcept {
-    return llvm::ConstantInt::getSigned(
-        llvm::Type::getInt32Ty(m_context),
-        from_string<std::int32_t>(expr.value));
+std::optional<Value> Codegen::generate(ast::IntLiteral& expr) noexcept {
+    return Value{
+        m_types["i32"].get(), llvm::ConstantInt::getSigned(
+                                  llvm::Type::getInt32Ty(m_context),
+                                  from_string<std::int32_t>(expr.value))};
 }
 
-llvm::Value* Codegen::generate(ast::FloatLiteral& expr) noexcept {
-    return llvm::ConstantFP::get(
-        llvm::Type::getFloatTy(m_context), from_string<float>(expr.value));
+std::optional<Value> Codegen::generate(ast::FloatLiteral& expr) noexcept {
+    return Value{
+        m_types["f32"].get(),
+        llvm::ConstantFP::get(
+            llvm::Type::getFloatTy(m_context), from_string<float>(expr.value))};
 }
 
-llvm::Value* Codegen::generate(ast::BoolLiteral& expr) noexcept {
-    return llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), expr.value);
+std::optional<Value> Codegen::generate(ast::BoolLiteral& expr) noexcept {
+    return Value{
+        m_types["bool"].get(),
+        llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), expr.value)};
 }
 
-llvm::Value* Codegen::generate(ast::Identifier& expr) noexcept {
+std::optional<Value> Codegen::generate(ast::Identifier& expr) noexcept {
     auto iterator = m_locals.find(expr.value);
 
     if (iterator == m_locals.end()) {
@@ -357,13 +372,13 @@ llvm::Value* Codegen::generate(ast::Identifier& expr) noexcept {
             expr.span.begin, m_filename,
             fmt::format("undeclared variable: '{}'", expr.value));
 
-        return nullptr;
+        return std::nullopt;
     }
 
     return iterator->second.value;
 }
 
-llvm::Value* Codegen::generate(ast::CallExpr& expr) noexcept {
+std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
     auto* callee = m_module->getFunction(expr.identifier.value);
 
     if (!callee) {
@@ -371,7 +386,7 @@ llvm::Value* Codegen::generate(ast::CallExpr& expr) noexcept {
             expr.identifier.span.begin, m_filename,
             fmt::format("undeclared function: '{}'", expr.identifier.value));
 
-        return nullptr;
+        return std::nullopt;
     }
 
     auto arg_size = callee->arg_size();
@@ -381,37 +396,45 @@ llvm::Value* Codegen::generate(ast::CallExpr& expr) noexcept {
             expr.identifier.span.begin, m_filename,
             "incorrect number of arguments passed");
 
-        return nullptr;
+        return std::nullopt;
     }
 
     std::vector<llvm::Value*> arguments;
     arguments.reserve(arg_size);
 
     for (std::size_t i = 0; i < arg_size; ++i) {
-        auto* value = generate(*expr.arguments[i]);
+        auto value = generate(*expr.arguments[i]);
 
         if (!value) {
-            return nullptr;
+            return std::nullopt;
         }
 
-        if (value->getType() != callee->getFunctionType()->getParamType(i)) {
+        if (value->value->getType() !=
+            callee->getFunctionType()->getParamType(i)) {
             error(expr.arguments[i]->span.begin, m_filename, "type mismatch");
 
-            return nullptr;
+            return std::nullopt;
         }
 
-        arguments.push_back(value);
+        arguments.push_back(value->value);
     }
 
-    return m_builder.CreateCall(callee, arguments);
+    return Value{
+        m_functions[callee]->return_type,
+        m_builder.CreateCall(callee, arguments)};
 }
 
-llvm::Value* Codegen::generate(ast::MemberExpr& expr) noexcept {
-    auto* variable =
-        llvm::dyn_cast<llvm::AllocaInst>(expr.parent->codegen(*this));
+std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
+    auto parent = expr.parent->codegen(*this);
+
+    if (!parent) {
+        return std::nullopt;
+    }
+
+    auto* variable = llvm::dyn_cast<llvm::AllocaInst>(parent->value);
 
     if (!variable) {
-        return nullptr;
+        return std::nullopt;
     }
 
     auto* struct_type =
@@ -422,7 +445,7 @@ llvm::Value* Codegen::generate(ast::MemberExpr& expr) noexcept {
             expr.member.span.begin, m_filename,
             "member access of a non-structure type");
 
-        return nullptr;
+        return std::nullopt;
     }
 
     auto iterator = m_members[struct_type].find(expr.member.value);
@@ -432,13 +455,15 @@ llvm::Value* Codegen::generate(ast::MemberExpr& expr) noexcept {
             expr.member.span.begin, m_filename,
             fmt::format("no such member: '{}'", expr.member.value));
 
-        return nullptr;
+        return std::nullopt;
     }
 
-    return m_builder.CreateStructGEP(struct_type, variable, iterator->second);
+    return Value{
+        m_structs[struct_type]->fields[iterator->second],
+        m_builder.CreateStructGEP(struct_type, variable, iterator->second)};
 }
 
-llvm::Value* Codegen::generate(ast::FnDecl& decl) noexcept {
+std::optional<Value> Codegen::generate(ast::FnDecl& decl) noexcept {
     auto* function = m_module->getFunction(decl.proto.name.value);
     auto* entry = llvm::BasicBlock::Create(m_context, "", function);
 
@@ -451,13 +476,14 @@ llvm::Value* Codegen::generate(ast::FnDecl& decl) noexcept {
         auto* variable = m_builder.CreateAlloca(value->getType());
 
         m_builder.CreateStore(value, variable);
-        m_locals[decl.proto.params[i].name.value] = {variable, false};
+        m_locals[decl.proto.params[i].name.value] = {
+            Value{m_functions[function]->param_types[i], variable}, false};
     }
 
     decl.block->codegen(*this);
 
     if (m_builder.GetInsertBlock()->getTerminator()) {
-        return nullptr;
+        return std::nullopt;
     }
 
     if (!function->getReturnType()->isVoidTy()) {
@@ -465,19 +491,22 @@ llvm::Value* Codegen::generate(ast::FnDecl& decl) noexcept {
             decl.proto.name.span.begin, m_filename,
             "non-void function does not return a value");
 
-        return nullptr;
+        return std::nullopt;
     }
 
     m_builder.CreateRetVoid();
 
-    return nullptr;
+    return std::nullopt;
 }
 
-llvm::Value* Codegen::generate(ast::Struct& decl) noexcept {
+std::optional<Value> Codegen::generate(ast::Struct& decl) noexcept {
     auto* struct_type =
         llvm::StructType::getTypeByName(m_context, decl.name.value);
 
-    std::vector<llvm::Type*> fields;
+    std::vector<llvm::Type*> llvm_fields;
+    std::vector<Type*> fields;
+
+    llvm_fields.reserve(decl.fields.size());
     fields.reserve(decl.fields.size());
 
     for (std::size_t i = 0; i < decl.fields.size(); ++i) {
@@ -486,7 +515,7 @@ llvm::Value* Codegen::generate(ast::Struct& decl) noexcept {
         auto* type = get_type(field.type.span, field.type.value);
 
         if (!type) {
-            return nullptr;
+            return std::nullopt;
         }
 
         auto* llvm_type = type->codegen(*this);
@@ -496,25 +525,30 @@ llvm::Value* Codegen::generate(ast::Struct& decl) noexcept {
                 field.name.span.begin, m_filename,
                 fmt::format("'{}' cannot be of type 'void'", field.name.value));
 
-            return nullptr;
+            return std::nullopt;
         }
 
-        fields.push_back(llvm_type);
+        llvm_fields.push_back(llvm_type);
+        fields.push_back(type);
+
         m_members[struct_type][field.name.value] = i;
     }
 
-    struct_type->setBody(fields);
+    struct_type->setBody(llvm_fields);
 
-    m_types[decl.name.value] = std::make_shared<types::Struct>(struct_type);
+    auto type = std::make_shared<types::Struct>(struct_type, std::move(fields));
 
-    return nullptr;
+    m_types[decl.name.value] = type;
+    m_structs[struct_type] = type;
+
+    return std::nullopt;
 }
 
-llvm::Value* Codegen::generate(ast::VarDecl& decl) noexcept {
+std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
     auto* type = get_type(decl.type.span, decl.type.value);
 
     if (!type) {
-        return nullptr;
+        return std::nullopt;
     }
 
     auto* llvm_type = type->codegen(*this);
@@ -524,78 +558,81 @@ llvm::Value* Codegen::generate(ast::VarDecl& decl) noexcept {
             decl.name.span.begin, m_filename,
             fmt::format("'{}' cannot be of type 'void'", decl.name.value));
 
-        return nullptr;
+        return std::nullopt;
     }
 
     auto* variable = m_builder.CreateAlloca(llvm_type);
-    llvm::Value* value = nullptr;
+    std::optional<Value> value = std::nullopt;
 
     if (decl.value) {
         value = generate(*decl.value);
 
         if (!value) {
-            return nullptr;
+            return std::nullopt;
         }
 
-        if (llvm_type != value->getType()) {
+        if (type != value->type) {
             error(decl.value->span.begin, m_filename, "type mismatch");
 
-            return nullptr;
+            return std::nullopt;
         }
     }
 
     if (!value) {
-        value = llvm::Constant::getNullValue(llvm_type);
+        value = Value{type, llvm::Constant::getNullValue(llvm_type)};
     }
 
-    m_builder.CreateStore(value, variable);
-    m_locals[decl.name.value] = {variable, decl.is_mutable};
+    m_builder.CreateStore(value->value, variable);
+    m_locals[decl.name.value] = {Value{type, variable}, decl.is_mutable};
 
-    return nullptr;
+    return std::nullopt;
 }
 
-llvm::Value* Codegen::generate(ast::Expression& expr) noexcept {
-    auto* result = expr.codegen(*this);
+std::optional<Value> Codegen::generate(ast::Expression& expr) noexcept {
+    auto result = expr.codegen(*this);
 
-    if (auto* variable = llvm::dyn_cast_or_null<llvm::AllocaInst>(result)) {
-        return m_builder.CreateLoad(variable->getAllocatedType(), variable);
+    if (!result) {
+        return std::nullopt;
     }
 
-    if (auto* ptr = llvm::dyn_cast_or_null<llvm::GetElementPtrInst>(result)) {
-        return m_builder.CreateLoad(ptr->getResultElementType(), ptr);
+    if (auto* variable =
+            llvm::dyn_cast_or_null<llvm::AllocaInst>(result->value)) {
+        return Value{
+            result->type,
+            m_builder.CreateLoad(variable->getAllocatedType(), variable)};
+    }
+
+    if (auto* ptr =
+            llvm::dyn_cast_or_null<llvm::GetElementPtrInst>(result->value)) {
+        return Value{
+            result->type,
+            m_builder.CreateLoad(ptr->getResultElementType(), ptr)};
     }
 
     return result;
 }
 
 void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
-    auto* type = get_fn_type(decl);
-
-    if (type) {
-        llvm::Function::Create(
-            type, llvm::Function::ExternalLinkage, decl.proto.name.value,
-            *m_module);
-    }
-}
-
-llvm::FunctionType* Codegen::get_fn_type(ast::FnDecl& decl) noexcept {
     auto* return_type =
         get_type(decl.proto.return_type.span, decl.proto.return_type.value);
 
     if (!return_type) {
-        return nullptr;
+        return;
     }
 
     auto* llvm_return_type = return_type->codegen(*this);
 
-    std::vector<llvm::Type*> param_types;
+    std::vector<llvm::Type*> llvm_param_types;
+    std::vector<Type*> param_types;
+
+    llvm_param_types.reserve(decl.proto.params.size());
     param_types.reserve(decl.proto.params.size());
 
     for (const auto& parameter : decl.proto.params) {
         auto* type = get_type(parameter.type.span, parameter.type.value);
 
         if (!type) {
-            return nullptr;
+            return;
         }
 
         auto* llvm_type = type->codegen(*this);
@@ -606,13 +643,22 @@ llvm::FunctionType* Codegen::get_fn_type(ast::FnDecl& decl) noexcept {
                 fmt::format(
                     "'{}' cannot be of type 'void'", parameter.name.value));
 
-            return nullptr;
+            return;
         }
 
-        param_types.push_back(llvm_type);
+        llvm_param_types.push_back(llvm_type);
+        param_types.push_back(type);
     }
 
-    return llvm::FunctionType::get(llvm_return_type, param_types, false);
+    auto* type =
+        llvm::FunctionType::get(llvm_return_type, llvm_param_types, false);
+
+    auto* function = llvm::Function::Create(
+        type, llvm::Function::ExternalLinkage, decl.proto.name.value,
+        *m_module);
+
+    m_functions[function] = std::make_shared<types::Function>(
+        type, return_type, std::move(param_types));
 }
 
 Type* Codegen::get_type(Span span, std::string_view name) noexcept {

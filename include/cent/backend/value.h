@@ -3,9 +3,9 @@
 
 #include <llvm/IR/Value.h>
 
-#include "cent/backend/type.h"
-
 namespace cent::backend {
+
+struct Type;
 
 struct Value {
     Type* type;
