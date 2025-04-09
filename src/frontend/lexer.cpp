@@ -130,12 +130,28 @@ void Lexer::number() noexcept {
 
     get_int();
 
-    if (!eof() && peek() == '.') {
+    if (!eof() && (peek() == 'i' || peek() == 'u')) {
         get();
+        get_int();
 
-        m_token.value = {m_token.value.cbegin(), m_at};
-        m_token.type = Token::Type::FloatLiteral;
+        m_token.span.end = m_position;
+        return;
+    }
 
+    if (eof() || peek() != '.') {
+        m_token.span.end = m_position;
+        return;
+    }
+
+    get();
+
+    m_token.value = {m_token.value.cbegin(), m_at};
+    m_token.type = Token::Type::FloatLiteral;
+
+    get_int();
+
+    if (!eof() && peek() == 'f') {
+        get();
         get_int();
     }
 
