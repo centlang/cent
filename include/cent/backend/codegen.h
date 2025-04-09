@@ -54,6 +54,11 @@ struct I16;
 struct I32;
 struct I64;
 
+struct U8;
+struct U16;
+struct U32;
+struct U64;
+
 struct F32;
 struct F64;
 
@@ -83,6 +88,11 @@ public:
     llvm::Type* generate(types::I16& type) noexcept;
     llvm::Type* generate(types::I32& type) noexcept;
     llvm::Type* generate(types::I64& type) noexcept;
+
+    llvm::Type* generate(types::U8& type) noexcept;
+    llvm::Type* generate(types::U16& type) noexcept;
+    llvm::Type* generate(types::U32& type) noexcept;
+    llvm::Type* generate(types::U64& type) noexcept;
 
     llvm::Type* generate(types::F32& type) noexcept;
     llvm::Type* generate(types::F64& type) noexcept;
