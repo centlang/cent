@@ -1,7 +1,6 @@
 #ifndef CENT_BACKEND_CODEGEN_H
 #define CENT_BACKEND_CODEGEN_H
 
-#include <charconv>
 #include <map>
 #include <memory>
 #include <optional>
@@ -129,13 +128,6 @@ private:
     void generate_fn_proto(ast::FnDecl& decl) noexcept;
 
     [[nodiscard]] Type* get_type(Span span, std::string_view name) noexcept;
-
-    template <typename ValueType> auto from_string(std::string_view value) {
-        ValueType result;
-        std::from_chars(value.data(), value.data() + value.size(), result);
-
-        return result;
-    }
 
     llvm::LLVMContext m_context;
     std::unique_ptr<llvm::Module> m_module;

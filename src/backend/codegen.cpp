@@ -1,3 +1,4 @@
+#include <charconv>
 #include <cstdint>
 
 #include <llvm/IR/Constants.h>
@@ -375,17 +376,170 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
 }
 
 std::optional<Value> Codegen::generate(ast::IntLiteral& expr) noexcept {
+    bool failed = false;
+
+    auto with_type_suffix = [&]<typename Type>(
+                                std::string_view suffix,
+                                bool is_signed) -> std::optional<Value> {
+        if (!expr.value.ends_with(suffix)) {
+            return std::nullopt;
+        }
+
+        Type value{};
+
+        auto [pointer, result] = std::from_chars(
+            expr.value.begin(), expr.value.end() - suffix.size(), value);
+
+        if (result == std::errc::result_out_of_range) {
+            error(expr.span.begin, m_filename, "integer out of range");
+
+            failed = true;
+            return std::nullopt;
+        }
+
+        auto* type = m_types[suffix].get();
+        auto* llvm_type = type->codegen(*this);
+
+        return Value{type, llvm::ConstantInt::get(llvm_type, value, is_signed)};
+    };
+
+    if (auto value = with_type_suffix.operator()<std::int8_t>("i8", true)) {
+        return value;
+    }
+
+    if (failed) {
+        return std::nullopt;
+    }
+
+    if (auto value = with_type_suffix.operator()<std::int16_t>("i16", true)) {
+        return value;
+    }
+
+    if (failed) {
+        return std::nullopt;
+    }
+
+    if (auto value = with_type_suffix.operator()<std::int32_t>("i32", true)) {
+        return value;
+    }
+
+    if (failed) {
+        return std::nullopt;
+    }
+
+    if (auto value = with_type_suffix.operator()<std::int64_t>("i64", true)) {
+        return value;
+    }
+
+    if (failed) {
+        return std::nullopt;
+    }
+
+    if (auto value = with_type_suffix.operator()<std::uint8_t>("u8", false)) {
+        return value;
+    }
+
+    if (failed) {
+        return std::nullopt;
+    }
+
+    if (auto value = with_type_suffix.operator()<std::uint16_t>("u16", false)) {
+        return value;
+    }
+
+    if (failed) {
+        return std::nullopt;
+    }
+
+    if (auto value = with_type_suffix.operator()<std::uint32_t>("u32", false)) {
+        return value;
+    }
+
+    if (failed) {
+        return std::nullopt;
+    }
+
+    if (auto value = with_type_suffix.operator()<std::uint64_t>("u64", false)) {
+        return value;
+    }
+
+    if (failed) {
+        return std::nullopt;
+    }
+
+    std::int32_t value{};
+
+    auto [pointer, result] =
+        std::from_chars(expr.value.begin(), expr.value.end(), value);
+
+    if (result == std::errc::result_out_of_range) {
+        error(expr.span.begin, m_filename, "integer out of range");
+
+        return std::nullopt;
+    }
+
     return Value{
-        m_types["i32"].get(), llvm::ConstantInt::getSigned(
-                                  llvm::Type::getInt32Ty(m_context),
-                                  from_string<std::int32_t>(expr.value))};
+        m_types["i32"].get(),
+        llvm::ConstantInt::getSigned(llvm::Type::getInt32Ty(m_context), value)};
 }
 
 std::optional<Value> Codegen::generate(ast::FloatLiteral& expr) noexcept {
+    bool failed = false;
+
+    auto with_type_suffix =
+        [&]<typename Type>(std::string_view suffix) -> std::optional<Value> {
+        if (!expr.value.ends_with(suffix)) {
+            return std::nullopt;
+        }
+
+        Type value{};
+
+        auto [pointer, result] = std::from_chars(
+            expr.value.begin(), expr.value.end() - suffix.size(), value);
+
+        if (result == std::errc::result_out_of_range) {
+            error(expr.span.begin, m_filename, "float out of range");
+
+            failed = true;
+            return std::nullopt;
+        }
+
+        auto* type = m_types[suffix].get();
+        auto* llvm_type = type->codegen(*this);
+
+        return Value{type, llvm::ConstantFP::get(llvm_type, value)};
+    };
+
+    if (auto value = with_type_suffix.operator()<float>("f32")) {
+        return value;
+    }
+
+    if (failed) {
+        return std::nullopt;
+    }
+
+    if (auto value = with_type_suffix.operator()<double>("f64")) {
+        return value;
+    }
+
+    if (failed) {
+        return std::nullopt;
+    }
+
+    float value{};
+
+    auto [pointer, result] =
+        std::from_chars(expr.value.begin(), expr.value.end(), value);
+
+    if (result == std::errc::result_out_of_range) {
+        error(expr.span.begin, m_filename, "float out of range");
+
+        return std::nullopt;
+    }
+
     return Value{
         m_types["f32"].get(),
-        llvm::ConstantFP::get(
-            llvm::Type::getFloatTy(m_context), from_string<float>(expr.value))};
+        llvm::ConstantFP::get(llvm::Type::getFloatTy(m_context), value)};
 }
 
 std::optional<Value> Codegen::generate(ast::BoolLiteral& expr) noexcept {
