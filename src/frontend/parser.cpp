@@ -1,3 +1,4 @@
+#include "cent/ast/as_expr.h"
 #include "cent/ast/assignment.h"
 #include "cent/ast/call_expr.h"
 #include "cent/ast/identifier.h"
@@ -192,7 +193,21 @@ Parser::expect_member_expr() noexcept {
             ast::SpanValue{member->value, member->span});
     }
 
-    return expression;
+    if (!match(Token::Type::As)) {
+        return expression;
+    }
+
+    next();
+
+    auto type = expect("type", Token::Type::Identifier);
+
+    if (!type) {
+        return nullptr;
+    }
+
+    return std::make_unique<ast::AsExpr>(
+        Span{expression->span.begin, type->span.end}, std::move(expression),
+        ast::SpanValue{type->value, type->span});
 }
 
 std::unique_ptr<ast::BinaryExpr>

@@ -193,6 +193,11 @@ void Lexer::ident() noexcept {
         return;
     }
 
+    if (m_token.value == "as") {
+        keyword(Token::Type::As);
+        return;
+    }
+
     if (m_token.value == "if") {
         keyword(Token::Type::If);
         return;

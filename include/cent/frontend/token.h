@@ -53,6 +53,8 @@ struct Token {
         Fn,
         Struct,
 
+        As,
+
         If,
         Else,
 
