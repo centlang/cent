@@ -1,9 +1,11 @@
 #ifndef CENT_AST_NODE_H
 #define CENT_AST_NODE_H
 
+#include <memory>
 #include <optional>
 
 #include "cent/backend/codegen.h"
+#include "cent/backend/type.h"
 #include "cent/backend/value.h"
 
 #include "cent/span.h"
@@ -19,6 +21,15 @@ struct Node {
 
     auto operator=(const Node&) = delete;
     auto operator=(Node&&) = delete;
+};
+
+struct Type : Node {
+    [[nodiscard]] Type(Span span) noexcept : span{span} {}
+
+    virtual std::shared_ptr<backend::Type>
+    codegen(backend::Codegen& codegen) noexcept = 0;
+
+    Span span;
 };
 
 struct Statement : Node {
@@ -39,6 +50,15 @@ struct Declaration : Statement {
 };
 
 namespace detail {
+
+template <typename Derived> struct Type : ast::Type {
+    using ast::Type::Type;
+
+    std::shared_ptr<backend::Type>
+    codegen(backend::Codegen& codegen) noexcept override {
+        return codegen.generate(static_cast<Derived&>(*this));
+    }
+};
 
 template <typename Derived> struct Stmt : Statement {
     using Statement::Statement;
