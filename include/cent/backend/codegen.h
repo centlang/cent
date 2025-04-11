@@ -34,6 +34,7 @@ struct BoolLiteral;
 struct Identifier;
 struct CallExpr;
 struct MemberExpr;
+struct AsExpr;
 
 struct FnDecl;
 struct Struct;
@@ -116,6 +117,7 @@ public:
     std::optional<Value> generate(ast::Identifier& expr) noexcept;
     std::optional<Value> generate(ast::CallExpr& expr) noexcept;
     std::optional<Value> generate(ast::MemberExpr& expr) noexcept;
+    std::optional<Value> generate(ast::AsExpr& expr) noexcept;
 
     std::optional<Value> generate(ast::FnDecl& decl) noexcept;
     std::optional<Value> generate(ast::Struct& decl) noexcept;

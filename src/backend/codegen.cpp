@@ -5,6 +5,7 @@
 
 #include "cent/log.h"
 
+#include "cent/ast/as_expr.h"
 #include "cent/ast/assignment.h"
 #include "cent/ast/binary_expr.h"
 #include "cent/ast/block_stmt.h"
@@ -645,6 +646,53 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
     return Value{
         m_structs[struct_type]->fields[iterator->second],
         m_builder.CreateStructGEP(struct_type, variable, iterator->second)};
+}
+
+std::optional<Value> Codegen::generate(ast::AsExpr& expr) noexcept {
+    using enum llvm::Instruction::CastOps;
+
+    auto value = generate(*expr.value);
+
+    if (!value) {
+        return std::nullopt;
+    }
+
+    auto* type = get_type(expr.type.span, expr.type.value);
+
+    if (!type) {
+        return std::nullopt;
+    }
+
+    auto* llvm_type = type->codegen(*this);
+
+    std::size_t from_size = value->value->getType()->getPrimitiveSizeInBits();
+    std::size_t to_size = llvm_type->getPrimitiveSizeInBits();
+
+    llvm::Instruction::CastOps cast_op = CastOpsEnd;
+
+    if (value->type->is_float() && type->is_signed_int()) {
+        cast_op = FPToSI;
+    } else if (value->type->is_float() && type->is_unsigned_int()) {
+        cast_op = FPToUI;
+    } else if (value->type->is_signed_int() && type->is_float()) {
+        cast_op = SIToFP;
+    } else if (value->type->is_unsigned_int() && type->is_float()) {
+        cast_op = UIToFP;
+    } else if (to_size > from_size) {
+        if (value->type->is_float() && type->is_float()) {
+            cast_op = FPExt;
+        } else {
+            cast_op = value->type->is_unsigned_int() && type->is_signed_int()
+                          ? ZExt
+                          : SExt;
+        }
+    } else if (to_size < from_size) {
+        cast_op = value->type->is_float() && type->is_float() ? FPTrunc : Trunc;
+    } else {
+        return value;
+    }
+
+    return Value{type, m_builder.CreateCast(cast_op, value->value, llvm_type)};
 }
 
 std::optional<Value> Codegen::generate(ast::FnDecl& decl) noexcept {

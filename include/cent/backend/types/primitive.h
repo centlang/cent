@@ -37,8 +37,13 @@ struct U64 : detail::Type<U64> {
     bool is_unsigned_int() noexcept override { return true; };
 };
 
-struct F32 : detail::Type<F32> {};
-struct F64 : detail::Type<F64> {};
+struct F32 : detail::Type<F32> {
+    bool is_float() noexcept override { return true; };
+};
+
+struct F64 : detail::Type<F64> {
+    bool is_float() noexcept override { return true; };
+};
 
 struct Bool : detail::Type<Bool> {};
 struct Void : detail::Type<Void> {};
