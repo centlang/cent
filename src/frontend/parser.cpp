@@ -524,6 +524,12 @@ bool Parser::parse_fn(ast::Program& program) noexcept {
 
     if (match(Token::Type::LeftBrace)) {
         body = expect_block();
+    } else if (match(Token::Type::Semicolon)) {
+        next();
+    } else {
+        error(peek().span.begin, m_filename, "expected '{' or ';'");
+
+        return false;
     }
 
     program.functions.push_back(std::make_unique<ast::FnDecl>(
