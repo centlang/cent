@@ -1,6 +1,7 @@
 #ifndef CENT_AST_STRUCT_H
 #define CENT_AST_STRUCT_H
 
+#include <memory>
 #include <string_view>
 #include <vector>
 
@@ -12,7 +13,7 @@ namespace cent::ast {
 struct Struct : detail::Decl<Struct> {
     struct Field {
         SpanValue<std::string_view> name;
-        SpanValue<std::string_view> type;
+        std::unique_ptr<Type> type;
     };
 
     [[nodiscard]] Struct(

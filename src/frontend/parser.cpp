@@ -4,6 +4,7 @@
 #include "cent/ast/identifier.h"
 #include "cent/ast/literals.h"
 #include "cent/ast/member_expr.h"
+#include "cent/ast/named_type.h"
 #include "cent/ast/return_stmt.h"
 #include "cent/ast/unary_expr.h"
 #include "cent/ast/var_decl.h"
@@ -207,7 +208,7 @@ Parser::expect_member_expr() noexcept {
 
     return std::make_unique<ast::AsExpr>(
         Span{expression->span.begin, type->span.end}, std::move(expression),
-        ast::SpanValue{type->value, type->span});
+        std::make_unique<ast::NamedType>(type->span, type->value));
 }
 
 std::unique_ptr<ast::BinaryExpr>
@@ -358,7 +359,9 @@ void Parser::parse_var(ast::BlockStmt& block) noexcept {
     if (!match(Token::Type::Equal)) {
         block.body.push_back(std::make_unique<ast::VarDecl>(
             Span{begin, type->span.end}, is_mutable,
-            ast::SpanValue{name->value, name->span}, *type, nullptr));
+            ast::SpanValue{name->value, name->span},
+            std::make_unique<ast::NamedType>(type->span, type->value),
+            nullptr));
 
         return;
     }
@@ -373,7 +376,9 @@ void Parser::parse_var(ast::BlockStmt& block) noexcept {
 
     block.body.push_back(std::make_unique<ast::VarDecl>(
         Span{begin, value->span.end}, is_mutable,
-        ast::SpanValue{name->value, name->span}, *type, std::move(value)));
+        ast::SpanValue{name->value, name->span},
+        std::make_unique<ast::NamedType>(type->span, type->value),
+        std::move(value)));
 }
 
 void Parser::parse_while(ast::BlockStmt& block) noexcept {
@@ -437,7 +442,7 @@ std::vector<ast::FnDecl::Param> Parser::parse_params() noexcept {
         if (auto type = expect_var_type()) {
             result.emplace_back(
                 ast::SpanValue{name->value, name->span},
-                ast::SpanValue{type->value, type->span});
+                std::make_unique<ast::NamedType>(type->span, type->value));
         }
     };
 
@@ -462,7 +467,7 @@ std::vector<ast::Struct::Field> Parser::parse_fields() noexcept {
         if (auto type = expect_var_type()) {
             result.emplace_back(
                 ast::SpanValue{name.value, name.span},
-                ast::SpanValue{type->value, type->span});
+                std::make_unique<ast::NamedType>(type->span, type->value));
         }
     };
 
@@ -513,7 +518,8 @@ bool Parser::parse_fn(ast::Program& program) noexcept {
         ast::FnDecl::Proto{
             {name->value, name->span},
             std::move(params),
-            {return_type->value, return_type->span}},
+            std::make_unique<ast::NamedType>(
+                return_type->span, return_type->value)},
         std::move(body)));
 
     return true;

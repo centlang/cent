@@ -15,15 +15,14 @@ namespace cent::ast {
 struct VarDecl : detail::Decl<VarDecl> {
     [[nodiscard]] VarDecl(
         Span span, bool is_mutable, SpanValue<std::string_view> name,
-        SpanValue<std::string_view> type,
-        std::unique_ptr<Expression> value) noexcept
-    : Decl{span}, is_mutable{is_mutable}, name{name}, type{type},
+        std::unique_ptr<Type> type, std::unique_ptr<Expression> value) noexcept
+    : Decl{span}, is_mutable{is_mutable}, name{name}, type{std::move(type)},
       value{std::move(value)} {}
 
     bool is_mutable;
 
     SpanValue<std::string_view> name;
-    SpanValue<std::string_view> type;
+    std::unique_ptr<Type> type;
 
     std::unique_ptr<Expression> value;
 };

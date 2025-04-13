@@ -16,14 +16,14 @@ namespace cent::ast {
 struct FnDecl : detail::Decl<FnDecl> {
     struct Param {
         SpanValue<std::string_view> name;
-        SpanValue<std::string_view> type;
+        std::unique_ptr<Type> type;
     };
 
     struct Proto {
         SpanValue<std::string_view> name;
 
         std::vector<Param> params;
-        SpanValue<std::string_view> return_type;
+        std::unique_ptr<Type> return_type;
     };
 
     [[nodiscard]] FnDecl(
