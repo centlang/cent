@@ -104,8 +104,9 @@ private:
 
     [[nodiscard]] std::unique_ptr<ast::Expression> expect_expr() noexcept;
 
-    [[nodiscard]] std::optional<ast::SpanValue<std::string_view>>
-    expect_var_type() noexcept;
+    [[nodiscard]] std::unique_ptr<ast::Type> expect_var_type() noexcept;
+
+    [[nodiscard]] std::unique_ptr<ast::Type> expect_type() noexcept;
 
     void parse_var(ast::BlockStmt& block) noexcept;
 

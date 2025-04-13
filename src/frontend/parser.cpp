@@ -5,6 +5,7 @@
 #include "cent/ast/literals.h"
 #include "cent/ast/member_expr.h"
 #include "cent/ast/named_type.h"
+#include "cent/ast/pointer.h"
 #include "cent/ast/return_stmt.h"
 #include "cent/ast/unary_expr.h"
 #include "cent/ast/var_decl.h"
@@ -200,7 +201,7 @@ Parser::expect_member_expr() noexcept {
 
     next();
 
-    auto type = expect("type", Token::Type::Identifier);
+    auto type = expect_type();
 
     if (!type) {
         return nullptr;
@@ -208,7 +209,7 @@ Parser::expect_member_expr() noexcept {
 
     return std::make_unique<ast::AsExpr>(
         Span{expression->span.begin, type->span.end}, std::move(expression),
-        std::make_unique<ast::NamedType>(type->span, type->value));
+        std::move(type));
 }
 
 std::unique_ptr<ast::BinaryExpr>
@@ -325,19 +326,36 @@ std::unique_ptr<ast::IfElse> Parser::parse_if_else() noexcept {
         std::move(if_block), std::move(else_block));
 }
 
-std::optional<ast::SpanValue<std::string_view>>
-Parser::expect_var_type() noexcept {
+std::unique_ptr<ast::Type> Parser::expect_var_type() noexcept {
     if (!expect("':'", Token::Type::Colon)) {
-        return std::nullopt;
+        return nullptr;
     }
 
-    auto token = expect("type", Token::Type::Identifier);
+    return expect_type();
+}
 
-    if (!token) {
-        return std::nullopt;
+std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
+    auto begin = peek().span.begin;
+
+    if (match(Token::Type::Star)) {
+        next();
+        auto type = expect_type();
+
+        if (!type) {
+            return nullptr;
+        }
+
+        return std::make_unique<ast::Pointer>(
+            Span{begin, type->span.end}, std::move(type));
     }
 
-    return {{token->value, token->span}};
+    auto type = expect("type", Token::Type::Identifier);
+
+    if (!type) {
+        return nullptr;
+    }
+
+    return std::make_unique<ast::NamedType>(Span{type->span}, type->value);
 }
 
 void Parser::parse_var(ast::BlockStmt& block) noexcept {
@@ -359,9 +377,7 @@ void Parser::parse_var(ast::BlockStmt& block) noexcept {
     if (!match(Token::Type::Equal)) {
         block.body.push_back(std::make_unique<ast::VarDecl>(
             Span{begin, type->span.end}, is_mutable,
-            ast::SpanValue{name->value, name->span},
-            std::make_unique<ast::NamedType>(type->span, type->value),
-            nullptr));
+            ast::SpanValue{name->value, name->span}, std::move(type), nullptr));
 
         return;
     }
@@ -376,8 +392,7 @@ void Parser::parse_var(ast::BlockStmt& block) noexcept {
 
     block.body.push_back(std::make_unique<ast::VarDecl>(
         Span{begin, value->span.end}, is_mutable,
-        ast::SpanValue{name->value, name->span},
-        std::make_unique<ast::NamedType>(type->span, type->value),
+        ast::SpanValue{name->value, name->span}, std::move(type),
         std::move(value)));
 }
 
@@ -441,8 +456,7 @@ std::vector<ast::FnDecl::Param> Parser::parse_params() noexcept {
 
         if (auto type = expect_var_type()) {
             result.emplace_back(
-                ast::SpanValue{name->value, name->span},
-                std::make_unique<ast::NamedType>(type->span, type->value));
+                ast::SpanValue{name->value, name->span}, std::move(type));
         }
     };
 
@@ -466,8 +480,7 @@ std::vector<ast::Struct::Field> Parser::parse_fields() noexcept {
 
         if (auto type = expect_var_type()) {
             result.emplace_back(
-                ast::SpanValue{name.value, name.span},
-                std::make_unique<ast::NamedType>(type->span, type->value));
+                ast::SpanValue{name.value, name.span}, std::move(type));
         }
     };
 
@@ -501,7 +514,7 @@ bool Parser::parse_fn(ast::Program& program) noexcept {
         return false;
     }
 
-    auto return_type = expect("return type", Token::Type::Identifier);
+    auto return_type = expect_type();
 
     if (!return_type) {
         return false;
@@ -518,8 +531,7 @@ bool Parser::parse_fn(ast::Program& program) noexcept {
         ast::FnDecl::Proto{
             {name->value, name->span},
             std::move(params),
-            std::make_unique<ast::NamedType>(
-                return_type->span, return_type->value)},
+            std::move(return_type)},
         std::move(body)));
 
     return true;
