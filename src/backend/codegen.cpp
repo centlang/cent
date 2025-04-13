@@ -62,7 +62,9 @@ std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
     }
 
     for (auto& function : m_program->functions) {
-        function->codegen(*this);
+        if (function->block) {
+            function->codegen(*this);
+        }
     }
 
     return std::move(m_module);
