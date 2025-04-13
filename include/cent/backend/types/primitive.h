@@ -1,6 +1,9 @@
 #ifndef CENT_BACKEND_TYPES_PRIMITIVE_H
 #define CENT_BACKEND_TYPES_PRIMITIVE_H
 
+#include <memory>
+#include <utility>
+
 #include "cent/backend/type.h"
 
 namespace cent::backend::types {
@@ -47,6 +50,13 @@ struct F64 : detail::Type<F64> {
 
 struct Bool : detail::Type<Bool> {};
 struct Void : detail::Type<Void> {};
+
+struct Pointer : detail::Type<Pointer> {
+    [[nodiscard]] Pointer(std::shared_ptr<backend::Type> type) noexcept
+    : type{std::move(type)} {}
+
+    std::shared_ptr<backend::Type> type;
+};
 
 } // namespace cent::backend::types
 

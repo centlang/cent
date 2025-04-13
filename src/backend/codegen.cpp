@@ -15,6 +15,8 @@
 #include "cent/ast/if_else.h"
 #include "cent/ast/literals.h"
 #include "cent/ast/member_expr.h"
+#include "cent/ast/named_type.h"
+#include "cent/ast/pointer.h"
 #include "cent/ast/program.h"
 #include "cent/ast/return_stmt.h"
 #include "cent/ast/unary_expr.h"
@@ -66,6 +68,30 @@ std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
     return std::move(m_module);
 }
 
+std::shared_ptr<Type> Codegen::generate(ast::NamedType& type) noexcept {
+    auto iterator = m_types.find(type.value);
+
+    if (iterator == m_types.end()) {
+        error(
+            type.span.begin, m_filename,
+            fmt::format("undeclared type: '{}'", type.value));
+
+        return nullptr;
+    }
+
+    return iterator->second;
+}
+
+std::shared_ptr<Type> Codegen::generate(ast::Pointer& type) noexcept {
+    auto points_to = type.type->codegen(*this);
+
+    if (!points_to) {
+        return nullptr;
+    }
+
+    return std::make_shared<types::Pointer>(points_to);
+}
+
 llvm::Type* Codegen::generate([[maybe_unused]] types::I8& type) noexcept {
     return llvm::Type::getInt8Ty(m_context);
 }
@@ -112,6 +138,12 @@ llvm::Type* Codegen::generate([[maybe_unused]] types::Bool& type) noexcept {
 
 llvm::Type* Codegen::generate([[maybe_unused]] types::Void& type) noexcept {
     return llvm::Type::getVoidTy(m_context);
+}
+
+llvm::Type* Codegen::generate(types::Pointer& type) noexcept {
+    auto* llvm_type = type.type->codegen(*this);
+
+    return llvm_type->getPointerTo();
 }
 
 llvm::Type* Codegen::generate(types::Struct& type) noexcept {
@@ -657,7 +689,7 @@ std::optional<Value> Codegen::generate(ast::AsExpr& expr) noexcept {
         return std::nullopt;
     }
 
-    auto* type = get_type(expr.type.span, expr.type.value);
+    auto type = expr.type->codegen(*this);
 
     if (!type) {
         return std::nullopt;
@@ -692,7 +724,8 @@ std::optional<Value> Codegen::generate(ast::AsExpr& expr) noexcept {
         return value;
     }
 
-    return Value{type, m_builder.CreateCast(cast_op, value->value, llvm_type)};
+    return Value{
+        type.get(), m_builder.CreateCast(cast_op, value->value, llvm_type)};
 }
 
 std::optional<Value> Codegen::generate(ast::FnDecl& decl) noexcept {
@@ -742,9 +775,9 @@ std::optional<Value> Codegen::generate(ast::Struct& decl) noexcept {
     fields.reserve(decl.fields.size());
 
     for (std::size_t i = 0; i < decl.fields.size(); ++i) {
-        auto field = decl.fields[i];
+        auto& field = decl.fields[i];
 
-        auto* type = get_type(field.type.span, field.type.value);
+        auto type = field.type->codegen(*this);
 
         if (!type) {
             return std::nullopt;
@@ -761,7 +794,7 @@ std::optional<Value> Codegen::generate(ast::Struct& decl) noexcept {
         }
 
         llvm_fields.push_back(llvm_type);
-        fields.push_back(type);
+        fields.push_back(type.get());
 
         m_members[struct_type][field.name.value] = i;
     }
@@ -777,7 +810,7 @@ std::optional<Value> Codegen::generate(ast::Struct& decl) noexcept {
 }
 
 std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
-    auto* type = get_type(decl.type.span, decl.type.value);
+    auto type = decl.type->codegen(*this);
 
     if (!type) {
         return std::nullopt;
@@ -803,7 +836,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
             return std::nullopt;
         }
 
-        if (type != value->type) {
+        if (type.get() != value->type) {
             error(decl.value->span.begin, m_filename, "type mismatch");
 
             return std::nullopt;
@@ -811,11 +844,11 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
     }
 
     if (!value) {
-        value = Value{type, llvm::Constant::getNullValue(llvm_type)};
+        value = Value{type.get(), llvm::Constant::getNullValue(llvm_type)};
     }
 
     m_builder.CreateStore(value->value, variable);
-    m_locals[decl.name.value] = {Value{type, variable}, decl.is_mutable};
+    m_locals[decl.name.value] = {Value{type.get(), variable}, decl.is_mutable};
 
     return std::nullopt;
 }
@@ -845,8 +878,7 @@ std::optional<Value> Codegen::generate(ast::Expression& expr) noexcept {
 }
 
 void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
-    auto* return_type =
-        get_type(decl.proto.return_type.span, decl.proto.return_type.value);
+    auto return_type = decl.proto.return_type->codegen(*this);
 
     if (!return_type) {
         return;
@@ -861,7 +893,7 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
     param_types.reserve(decl.proto.params.size());
 
     for (const auto& parameter : decl.proto.params) {
-        auto* type = get_type(parameter.type.span, parameter.type.value);
+        auto type = parameter.type->codegen(*this);
 
         if (!type) {
             return;
@@ -879,7 +911,7 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
         }
 
         llvm_param_types.push_back(llvm_type);
-        param_types.push_back(type);
+        param_types.push_back(type.get());
     }
 
     auto* type =
@@ -890,20 +922,7 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
         *m_module);
 
     m_functions[function] = std::make_shared<types::Function>(
-        type, return_type, std::move(param_types));
-}
-
-Type* Codegen::get_type(Span span, std::string_view name) noexcept {
-    auto iterator = m_types.find(name);
-
-    if (iterator == m_types.end()) {
-        error(
-            span.begin, m_filename, fmt::format("undeclared type: '{}'", name));
-
-        return nullptr;
-    }
-
-    return iterator->second.get();
+        type, return_type.get(), std::move(param_types));
 }
 
 } // namespace cent::backend

@@ -18,6 +18,9 @@
 
 namespace cent::ast {
 
+struct NamedType;
+struct Pointer;
+
 struct Program;
 
 struct Assignment;
@@ -65,6 +68,8 @@ struct F64;
 struct Bool;
 struct Void;
 
+struct Pointer;
+
 struct Struct;
 struct Function;
 
@@ -84,6 +89,9 @@ public:
 
     [[nodiscard]] std::unique_ptr<llvm::Module> generate() noexcept;
 
+    std::shared_ptr<Type> generate(ast::NamedType& type) noexcept;
+    std::shared_ptr<Type> generate(ast::Pointer& type) noexcept;
+
     llvm::Type* generate(types::I8& type) noexcept;
     llvm::Type* generate(types::I16& type) noexcept;
     llvm::Type* generate(types::I32& type) noexcept;
@@ -99,6 +107,8 @@ public:
 
     llvm::Type* generate(types::Bool& type) noexcept;
     llvm::Type* generate(types::Void& type) noexcept;
+
+    llvm::Type* generate(types::Pointer& type) noexcept;
 
     llvm::Type* generate(types::Struct& type) noexcept;
     llvm::Type* generate(types::Function& type) noexcept;
@@ -128,8 +138,6 @@ private:
     std::optional<Value> generate(ast::Expression& expr) noexcept;
 
     void generate_fn_proto(ast::FnDecl& decl) noexcept;
-
-    [[nodiscard]] Type* get_type(Span span, std::string_view name) noexcept;
 
     llvm::LLVMContext m_context;
     std::unique_ptr<llvm::Module> m_module;
