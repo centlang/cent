@@ -533,8 +533,10 @@ bool Parser::parse_fn(ast::Program& program) noexcept {
         return false;
     }
 
+    Span span{name->span.begin, return_type->span.end};
+
     program.functions.push_back(std::make_unique<ast::FnDecl>(
-        Span{name->span.begin, return_type->span.end},
+        span,
         ast::FnDecl::Proto{
             {name->value, name->span},
             std::move(params),
