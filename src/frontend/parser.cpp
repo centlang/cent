@@ -89,6 +89,7 @@ void Parser::expect_stmt(ast::BlockStmt& block) noexcept {
 
         if (!match(Token::Type::Equal)) {
             block.body.push_back(std::move(value));
+            break;
         }
 
         parse_assignment(block, std::move(value));
