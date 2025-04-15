@@ -416,6 +416,21 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
         return Value{value->type, m_builder.CreateNeg(value->value)};
     case Bang:
         return Value{value->type, m_builder.CreateNot(value->value)};
+    case Star: {
+        if (!value->type->is_pointer()) {
+            error(
+                expr.span.begin, m_filename,
+                "dereference of a non-pointer type");
+
+            return std::nullopt;
+        }
+
+        auto& pointer = static_cast<types::Pointer&>(*value->type);
+        auto* llvm_type = pointer.type->codegen(*this);
+
+        return Value{
+            pointer.type, m_builder.CreateLoad(llvm_type, value->value)};
+    }
     default:
         return std::nullopt;
     }
