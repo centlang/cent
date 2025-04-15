@@ -515,10 +515,14 @@ bool Parser::parse_fn(ast::Program& program) noexcept {
         return false;
     }
 
-    auto return_type = expect_type();
+    std::unique_ptr<ast::Type> return_type = nullptr;
 
-    if (!return_type) {
-        return false;
+    if (!match(Token::Type::LeftBrace)) {
+        return_type = expect_type();
+
+        if (!return_type) {
+            return false;
+        }
     }
 
     std::unique_ptr<ast::BlockStmt> body = nullptr;
@@ -533,10 +537,8 @@ bool Parser::parse_fn(ast::Program& program) noexcept {
         return false;
     }
 
-    Span span{name->span.begin, return_type->span.end};
-
     program.functions.push_back(std::make_unique<ast::FnDecl>(
-        span,
+        name->span,
         ast::FnDecl::Proto{
             {name->value, name->span},
             std::move(params),

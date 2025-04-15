@@ -889,7 +889,9 @@ std::optional<Value> Codegen::generate(ast::Expression& expr) noexcept {
 }
 
 void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
-    auto return_type = decl.proto.return_type->codegen(*this);
+    auto return_type = decl.proto.return_type
+                           ? decl.proto.return_type->codegen(*this)
+                           : m_types["void"];
 
     if (!return_type) {
         return;
