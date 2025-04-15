@@ -55,6 +55,8 @@ struct Pointer : detail::Type<Pointer> {
     [[nodiscard]] Pointer(std::shared_ptr<backend::Type> type) noexcept
     : type{std::move(type)} {}
 
+    bool is_pointer() noexcept override { return true; };
+
     std::shared_ptr<backend::Type> type;
 };
 

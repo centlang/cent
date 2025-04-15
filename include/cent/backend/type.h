@@ -22,6 +22,7 @@ struct Type {
     virtual bool is_signed_int() noexcept { return false; };
     virtual bool is_unsigned_int() noexcept { return false; };
     virtual bool is_float() noexcept { return false; };
+    virtual bool is_pointer() noexcept { return false; }
 };
 
 namespace detail {

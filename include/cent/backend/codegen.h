@@ -89,6 +89,8 @@ public:
 
     [[nodiscard]] std::unique_ptr<llvm::Module> generate() noexcept;
 
+    [[nodiscard]] bool types_equal(Type& lhs, Type& rhs) noexcept;
+
     std::shared_ptr<Type> generate(ast::NamedType& type) noexcept;
     std::shared_ptr<Type> generate(ast::Pointer& type) noexcept;
 
