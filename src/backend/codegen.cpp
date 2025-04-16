@@ -358,6 +358,35 @@ std::optional<Value> Codegen::generate(ast::BinaryExpr& expr) noexcept {
         return std::nullopt;
     }
 
+    switch (expr.oper.value) {
+    case Plus:
+    case Minus:
+    case Star:
+    case Slash:
+    case Less:
+    case Greater:
+    case GreaterEqual:
+    case LessEqual: {
+        auto type = lhs->type;
+
+        if (!type->is_signed_int() && !type->is_unsigned_int() &&
+            !type->is_float()) {
+            error(expr.lhs->span.begin, m_filename, "type mismatch");
+        }
+
+        break;
+    }
+    case And:
+    case Or:
+        if (!lhs->type->is_bool()) {
+            error(expr.lhs->span.begin, m_filename, "type mismatch");
+        }
+
+        break;
+    default:
+        break;
+    };
+
     auto* value = [&]() -> llvm::Value* {
         switch (expr.oper.value) {
         case Plus:
