@@ -413,8 +413,25 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
 
     switch (expr.oper.value) {
     case Minus:
+        if (!value->type->is_signed_int() && !value->type->is_unsigned_int() &&
+            !value->type->is_float()) {
+            error(
+                expr.span.begin, m_filename,
+                "cannot apply '-' to a non-number type");
+
+            return std::nullopt;
+        }
+
         return Value{value->type, m_builder.CreateNeg(value->value)};
     case Bang:
+        if (!value->type->is_bool()) {
+            error(
+                expr.span.begin, m_filename,
+                "cannot apply '!' to a non-boolean type");
+
+            return std::nullopt;
+        }
+
         return Value{value->type, m_builder.CreateNot(value->value)};
     case Star: {
         if (!value->type->is_pointer()) {

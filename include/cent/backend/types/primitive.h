@@ -48,7 +48,10 @@ struct F64 : detail::Type<F64> {
     bool is_float() noexcept override { return true; };
 };
 
-struct Bool : detail::Type<Bool> {};
+struct Bool : detail::Type<Bool> {
+    bool is_bool() noexcept override { return true; };
+};
+
 struct Void : detail::Type<Void> {};
 
 struct Pointer : detail::Type<Pointer> {
