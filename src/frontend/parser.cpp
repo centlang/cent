@@ -156,7 +156,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
     case Token::Type::Minus:
     case Token::Type::Bang:
     case Token::Type::Star:
-        if (auto value = expect_prefix()) {
+        if (auto value = expect_member_expr()) {
             return std::make_unique<ast::UnaryExpr>(
                 Span{token->span.begin, value->span.end},
                 ast::SpanValue{token->type, token->span}, std::move(value));
