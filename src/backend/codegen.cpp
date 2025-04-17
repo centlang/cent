@@ -721,14 +721,14 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
         return std::nullopt;
     }
 
-    auto* variable = llvm::dyn_cast<llvm::AllocaInst>(parent->value);
+    auto* type = (parent->type->is_pointer()
+                      ? static_cast<types::Pointer&>(*parent->type).type
+                      : parent->type)
+                     ->codegen(*this);
 
-    if (!variable) {
-        return std::nullopt;
-    }
+    auto* value = parent->value;
 
-    auto* struct_type =
-        llvm::dyn_cast<llvm::StructType>(variable->getAllocatedType());
+    auto* struct_type = llvm::dyn_cast<llvm::StructType>(type);
 
     if (!struct_type) {
         error(
@@ -750,7 +750,7 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
 
     return Value{
         m_structs[struct_type]->fields[iterator->second],
-        m_builder.CreateStructGEP(struct_type, variable, iterator->second)};
+        m_builder.CreateStructGEP(struct_type, value, iterator->second)};
 }
 
 std::optional<Value> Codegen::generate(ast::AsExpr& expr) noexcept {
