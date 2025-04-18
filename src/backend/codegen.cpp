@@ -775,6 +775,10 @@ std::optional<Value> Codegen::generate(ast::AsExpr& expr) noexcept {
 
     auto* llvm_type = type->codegen(*this);
 
+    if (value->type->is_pointer() && type->is_pointer()) {
+        return Value{type, value->value};
+    }
+
     std::size_t from_size = value->value->getType()->getPrimitiveSizeInBits();
     std::size_t to_size = llvm_type->getPrimitiveSizeInBits();
 
