@@ -2,6 +2,7 @@
 #include <cstdint>
 
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/Instructions.h>
 
 #include "cent/log.h"
 
@@ -472,10 +473,8 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
         }
 
         auto& pointer = static_cast<types::Pointer&>(*value->type);
-        auto* llvm_type = pointer.type->codegen(*this);
 
-        return Value{
-            pointer.type, m_builder.CreateLoad(llvm_type, value->value)};
+        return Value{pointer.type, value->value};
     }
     default:
         return std::nullopt;
@@ -937,6 +936,16 @@ std::optional<Value> Codegen::generate(ast::Expression& expr) noexcept {
         return Value{
             result->type,
             m_builder.CreateLoad(variable->getAllocatedType(), variable)};
+    }
+
+    if (auto* value = llvm::dyn_cast_or_null<llvm::LoadInst>(result->value)) {
+        auto* type = result->type->codegen(*this);
+
+        if (value->getType()->isPointerTy()) {
+            return Value{result->type, m_builder.CreateLoad(type, value)};
+        }
+
+        return result;
     }
 
     if (auto* ptr =
