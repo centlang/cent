@@ -727,6 +727,12 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
 
     auto* value = parent->value;
 
+    if (parent->type->is_pointer()) {
+        if (auto* variable = llvm::dyn_cast<llvm::AllocaInst>(value)) {
+            value = m_builder.CreateLoad(variable->getAllocatedType(), value);
+        }
+    }
+
     auto* struct_type = llvm::dyn_cast<llvm::StructType>(type);
 
     if (!struct_type) {
