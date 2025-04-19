@@ -371,13 +371,23 @@ void Parser::parse_var(ast::BlockStmt& block) noexcept {
         return;
     }
 
-    auto type = expect_var_type();
+    std::unique_ptr<ast::Type> type = nullptr;
 
-    if (!type) {
-        return;
+    if (match(Token::Type::Colon)) {
+        type = expect_var_type();
+
+        if (!type) {
+            return;
+        }
     }
 
     if (!match(Token::Type::Equal)) {
+        if (!type) {
+            error(peek().span.begin, m_filename, "expected '=' or ':'");
+
+            return;
+        }
+
         block.body.push_back(std::make_unique<ast::VarDecl>(
             Span{begin, type->span.end}, is_mutable,
             ast::SpanValue{name->value, name->span}, std::move(type), nullptr));

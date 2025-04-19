@@ -891,13 +891,37 @@ std::optional<Value> Codegen::generate(ast::Struct& decl) noexcept {
 }
 
 std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
-    auto type = decl.type->codegen(*this);
+    std::optional<Value> value = std::nullopt;
+    std::shared_ptr<Type> type = nullptr;
 
-    if (!type) {
-        return std::nullopt;
+    llvm::Type* llvm_type = nullptr;
+
+    if (decl.type) {
+        type = decl.type->codegen(*this);
+
+        if (!type) {
+            return std::nullopt;
+        }
+
+        llvm_type = type->codegen(*this);
     }
 
-    auto* llvm_type = type->codegen(*this);
+    if (decl.value) {
+        value = generate(*decl.value);
+
+        if (!value) {
+            return std::nullopt;
+        }
+
+        if (type && !types_equal(*type, *value->type)) {
+            error(decl.value->span.begin, m_filename, "type mismatch");
+
+            return std::nullopt;
+        }
+
+        type = value->type;
+        llvm_type = value->value->getType();
+    }
 
     if (llvm_type->isVoidTy()) {
         error(
@@ -908,27 +932,14 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
     }
 
     auto* variable = m_builder.CreateAlloca(llvm_type);
-    std::optional<Value> value = std::nullopt;
 
-    if (decl.value) {
-        value = generate(*decl.value);
-
-        if (!value) {
-            return std::nullopt;
-        }
-
-        if (!types_equal(*type, *value->type)) {
-            error(decl.value->span.begin, m_filename, "type mismatch");
-
-            return std::nullopt;
-        }
+    if (value) {
+        m_builder.CreateStore(value->value, variable);
+    } else {
+        m_builder.CreateStore(
+            llvm::Constant::getNullValue(llvm_type), variable);
     }
 
-    if (!value) {
-        value = Value{type, llvm::Constant::getNullValue(llvm_type)};
-    }
-
-    m_builder.CreateStore(value->value, variable);
     m_locals[decl.name.value] = {Value{type, variable}, decl.is_mutable};
 
     return std::nullopt;
