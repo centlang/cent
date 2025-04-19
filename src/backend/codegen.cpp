@@ -457,8 +457,11 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
 
     switch (expr.oper.value) {
     case Minus:
-        if (!value->type->is_signed_int() && !value->type->is_unsigned_int() &&
-            !value->type->is_float()) {
+        if (value->type->is_float()) {
+            return Value{value->type, m_builder.CreateFNeg(value->value)};
+        }
+
+        if (!value->type->is_signed_int() && !value->type->is_unsigned_int()) {
             error(
                 expr.span.begin, m_filename,
                 "cannot apply '-' to a non-number type");
