@@ -9,10 +9,12 @@
 namespace cent::ast {
 
 struct Pointer : detail::Type<Pointer> {
-    [[nodiscard]] Pointer(Span span, std::unique_ptr<ast::Type> type) noexcept
-    : Type{span}, type{std::move(type)} {}
+    [[nodiscard]] Pointer(
+        Span span, std::unique_ptr<ast::Type> type, bool is_mutable) noexcept
+    : Type{span}, type{std::move(type)}, is_mutable{is_mutable} {}
 
     std::unique_ptr<ast::Type> type;
+    bool is_mutable;
 };
 
 } // namespace cent::ast

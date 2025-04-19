@@ -107,7 +107,7 @@ std::shared_ptr<Type> Codegen::generate(ast::Pointer& type) noexcept {
         return nullptr;
     }
 
-    return std::make_shared<types::Pointer>(points_to);
+    return std::make_shared<types::Pointer>(points_to, type.is_mutable);
 }
 
 llvm::Type* Codegen::generate([[maybe_unused]] types::I8& type) noexcept {
@@ -201,6 +201,12 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
     }
 
     if (auto* variable = llvm::dyn_cast<llvm::AllocaInst>(var->value)) {
+        m_builder.CreateStore(value->value, variable);
+
+        return std::nullopt;
+    }
+
+    if (auto* variable = llvm::dyn_cast<llvm::LoadInst>(var->value)) {
         m_builder.CreateStore(value->value, variable);
 
         return std::nullopt;
@@ -482,7 +488,7 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
 
         auto& pointer = static_cast<types::Pointer&>(*value->type);
 
-        return Value{pointer.type, value->value};
+        return Value{pointer.type, value->value, pointer.is_mutable};
     }
     default:
         return std::nullopt;
@@ -728,10 +734,18 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
         return std::nullopt;
     }
 
-    auto* type = (parent->type->is_pointer()
-                      ? static_cast<types::Pointer&>(*parent->type).type
-                      : parent->type)
-                     ->codegen(*this);
+    bool is_mutable = false;
+    llvm::Type* type = nullptr;
+
+    if (parent->type->is_pointer()) {
+        auto& pointer = static_cast<types::Pointer&>(*parent->type);
+
+        is_mutable = pointer.is_mutable;
+        type = pointer.type->codegen(*this);
+    } else {
+        is_mutable = parent->is_mutable;
+        type = parent->type->codegen(*this);
+    }
 
     auto* value = parent->value;
 
@@ -764,7 +778,7 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
     return Value{
         m_structs[struct_type]->fields[iterator->second],
         m_builder.CreateStructGEP(struct_type, value, iterator->second),
-        parent->is_mutable};
+        is_mutable};
 }
 
 std::optional<Value> Codegen::generate(ast::AsExpr& expr) noexcept {
@@ -965,14 +979,17 @@ std::optional<Value> Codegen::generate(ast::Expression& expr) noexcept {
             llvm::dyn_cast_or_null<llvm::AllocaInst>(result->value)) {
         return Value{
             result->type,
-            m_builder.CreateLoad(variable->getAllocatedType(), variable)};
+            m_builder.CreateLoad(variable->getAllocatedType(), variable),
+            result->is_mutable};
     }
 
     if (auto* value = llvm::dyn_cast_or_null<llvm::LoadInst>(result->value)) {
         auto* type = result->type->codegen(*this);
 
-        if (value->getType()->isPointerTy()) {
-            return Value{result->type, m_builder.CreateLoad(type, value)};
+        if (value->getType()->isPointerTy() && !result->type->is_pointer()) {
+            return Value{
+                result->type, m_builder.CreateLoad(type, value),
+                result->is_mutable};
         }
 
         return result;
@@ -982,7 +999,8 @@ std::optional<Value> Codegen::generate(ast::Expression& expr) noexcept {
             llvm::dyn_cast_or_null<llvm::GetElementPtrInst>(result->value)) {
         return Value{
             result->type,
-            m_builder.CreateLoad(ptr->getResultElementType(), ptr)};
+            m_builder.CreateLoad(ptr->getResultElementType(), ptr),
+            result->is_mutable};
     }
 
     return result;

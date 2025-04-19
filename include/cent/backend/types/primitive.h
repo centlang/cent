@@ -55,12 +55,14 @@ struct Bool : detail::Type<Bool> {
 struct Void : detail::Type<Void> {};
 
 struct Pointer : detail::Type<Pointer> {
-    [[nodiscard]] Pointer(std::shared_ptr<backend::Type> type) noexcept
-    : type{std::move(type)} {}
+    [[nodiscard]] Pointer(
+        std::shared_ptr<backend::Type> type, bool is_mutable) noexcept
+    : type{std::move(type)}, is_mutable{is_mutable} {}
 
     bool is_pointer() noexcept override { return true; };
 
     std::shared_ptr<backend::Type> type;
+    bool is_mutable;
 };
 
 } // namespace cent::backend::types

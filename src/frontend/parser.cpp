@@ -342,6 +342,14 @@ std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
 
     if (match(Token::Type::Star)) {
         next();
+
+        bool is_mutable = false;
+
+        if (match(Token::Type::Mut)) {
+            is_mutable = true;
+            next();
+        }
+
         auto type = expect_type();
 
         if (!type) {
@@ -349,7 +357,7 @@ std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
         }
 
         return std::make_unique<ast::Pointer>(
-            Span{begin, type->span.end}, std::move(type));
+            Span{begin, type->span.end}, std::move(type), is_mutable);
     }
 
     auto type = expect("type", Token::Type::Identifier);
