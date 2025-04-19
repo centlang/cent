@@ -12,10 +12,6 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 
-#include "cent/span.h"
-
-#include "cent/backend/variable.h"
-
 namespace cent::ast {
 
 struct NamedType;
@@ -146,7 +142,7 @@ private:
     llvm::IRBuilder<> m_builder;
 
     std::map<std::string_view, std::shared_ptr<Type>> m_types;
-    std::map<std::string_view, Variable> m_locals;
+    std::map<std::string_view, Value> m_locals;
 
     std::map<llvm::Function*, std::shared_ptr<types::Function>> m_functions;
     std::map<llvm::StructType*, std::shared_ptr<types::Struct>> m_structs;

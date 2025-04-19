@@ -12,6 +12,8 @@ struct Type;
 struct Value {
     std::shared_ptr<Type> type;
     llvm::Value* value;
+
+    bool is_mutable = false;
 };
 
 } // namespace cent::backend

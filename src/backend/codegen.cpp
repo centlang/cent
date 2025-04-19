@@ -192,6 +192,14 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
         return std::nullopt;
     }
 
+    if (!var->is_mutable) {
+        error(
+            stmt.value->span.begin, m_filename,
+            "cannot assign to an immutable value");
+
+        return std::nullopt;
+    }
+
     if (auto* variable = llvm::dyn_cast<llvm::AllocaInst>(var->value)) {
         m_builder.CreateStore(value->value, variable);
 
@@ -665,7 +673,7 @@ std::optional<Value> Codegen::generate(ast::Identifier& expr) noexcept {
         return std::nullopt;
     }
 
-    return iterator->second.value;
+    return iterator->second;
 }
 
 std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
@@ -755,7 +763,8 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
 
     return Value{
         m_structs[struct_type]->fields[iterator->second],
-        m_builder.CreateStructGEP(struct_type, value, iterator->second)};
+        m_builder.CreateStructGEP(struct_type, value, iterator->second),
+        parent->is_mutable};
 }
 
 std::optional<Value> Codegen::generate(ast::AsExpr& expr) noexcept {
@@ -823,7 +832,7 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) noexcept {
 
         m_builder.CreateStore(value, variable);
         m_locals[decl.proto.params[i].name.value] = {
-            Value{m_functions[function]->param_types[i], variable}, false};
+            m_functions[function]->param_types[i], variable};
     }
 
     decl.block->codegen(*this);
@@ -940,7 +949,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
             llvm::Constant::getNullValue(llvm_type), variable);
     }
 
-    m_locals[decl.name.value] = {Value{type, variable}, decl.is_mutable};
+    m_locals[decl.name.value] = {type, variable, decl.is_mutable};
 
     return std::nullopt;
 }
