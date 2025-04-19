@@ -30,6 +30,7 @@ struct UnaryExpr;
 struct IntLiteral;
 struct FloatLiteral;
 struct BoolLiteral;
+struct StructLiteral;
 struct Identifier;
 struct CallExpr;
 struct MemberExpr;
@@ -122,6 +123,7 @@ public:
     std::optional<Value> generate(ast::IntLiteral& expr) noexcept;
     std::optional<Value> generate(ast::FloatLiteral& expr) noexcept;
     std::optional<Value> generate(ast::BoolLiteral& expr) noexcept;
+    std::optional<Value> generate(ast::StructLiteral& expr) noexcept;
     std::optional<Value> generate(ast::Identifier& expr) noexcept;
     std::optional<Value> generate(ast::CallExpr& expr) noexcept;
     std::optional<Value> generate(ast::MemberExpr& expr) noexcept;

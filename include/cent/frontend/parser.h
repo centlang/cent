@@ -18,6 +18,7 @@
 #include "cent/ast/block_stmt.h"
 #include "cent/ast/fn_decl.h"
 #include "cent/ast/if_else.h"
+#include "cent/ast/literals.h"
 #include "cent/ast/node.h"
 #include "cent/ast/program.h"
 #include "cent/ast/struct.h"
@@ -90,6 +91,9 @@ private:
 
     [[nodiscard]] std::vector<std::unique_ptr<ast::Expression>>
     parse_args() noexcept;
+
+    [[nodiscard]] std::vector<ast::StructLiteral::Field>
+    parse_field_values() noexcept;
 
     [[nodiscard]] std::unique_ptr<ast::Expression> expect_prefix() noexcept;
 

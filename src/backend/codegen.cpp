@@ -668,6 +668,66 @@ std::optional<Value> Codegen::generate(ast::BoolLiteral& expr) noexcept {
         llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), expr.value)};
 }
 
+std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
+    auto* llvm_type =
+        llvm::StructType::getTypeByName(m_context, expr.name.value);
+
+    if (!llvm_type) {
+        error(
+            expr.name.span.begin, m_filename,
+            fmt::format("undeclared structure: '{}'", expr.name.value));
+
+        return std::nullopt;
+    }
+
+    auto* variable = m_builder.CreateAlloca(llvm_type);
+
+    auto& members = m_members[llvm_type];
+    auto& type = m_structs[llvm_type];
+
+    if (expr.fields.size() != type->fields.size()) {
+        error(
+            expr.name.span.begin, m_filename,
+            "incorrect number of fields initialized");
+
+        return std::nullopt;
+    }
+
+    for (auto& field : expr.fields) {
+        auto value = generate(*field.value);
+
+        if (!value) {
+            return std::nullopt;
+        }
+
+        auto iterator = members.find(field.name.value);
+
+        if (iterator == members.end()) {
+            error(
+                field.name.span.begin, m_filename,
+                fmt::format("no such member: '{}'", field.name.value));
+
+            return std::nullopt;
+        }
+
+        auto index = iterator->second;
+
+        if (!types_equal(*type->fields[index], *value->type)) {
+            error(
+                expr.fields[index].value->span.begin, m_filename,
+                "type mismatch");
+
+            return std::nullopt;
+        }
+
+        auto* pointer = m_builder.CreateStructGEP(llvm_type, variable, index);
+
+        m_builder.CreateStore(value->value, pointer);
+    }
+
+    return Value{type, variable};
+}
+
 std::optional<Value> Codegen::generate(ast::Identifier& expr) noexcept {
     auto iterator = m_locals.find(expr.value);
 

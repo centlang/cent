@@ -115,6 +115,33 @@ std::vector<std::unique_ptr<ast::Expression>> Parser::parse_args() noexcept {
     return result;
 }
 
+std::vector<ast::StructLiteral::Field> Parser::parse_field_values() noexcept {
+    std::vector<ast::StructLiteral::Field> result;
+
+    auto parse_field = [&] {
+        auto name = get();
+
+        expect("':'", Token::Type::Colon);
+
+        if (auto value = expect_expr()) {
+            result.emplace_back(
+                ast::SpanValue{name.value, name.span}, std::move(value));
+        }
+    };
+
+    while (match(Token::Type::Identifier)) {
+        parse_field();
+
+        if (match(Token::Type::RightBrace)) {
+            break;
+        }
+
+        expect("','", Token::Type::Comma);
+    }
+
+    return result;
+}
+
 std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
     auto token = expect(
         "expression", Token::Type::IntLiteral, Token::Type::FloatLiteral,
@@ -136,6 +163,21 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
     case Token::Type::False:
         return std::make_unique<ast::BoolLiteral>(token->span, false);
     case Token::Type::Identifier: {
+        if (match(Token::Type::LeftBrace)) {
+            next();
+
+            auto fields = parse_field_values();
+            auto end = peek().span.end;
+
+            if (!expect("',' or '}'", Token::Type::RightBrace)) {
+                return nullptr;
+            }
+
+            return std::make_unique<ast::StructLiteral>(
+                Span{token->span.begin, end},
+                ast::SpanValue{token->value, token->span}, std::move(fields));
+        }
+
         if (!match(Token::Type::LeftParen)) {
             return std::make_unique<ast::Identifier>(token->span, token->value);
         }
