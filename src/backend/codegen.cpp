@@ -391,8 +391,8 @@ std::optional<Value> Codegen::generate(ast::BinaryExpr& expr) noexcept {
 
         break;
     }
-    case And:
-    case Or:
+    case AndAnd:
+    case OrOr:
         if (!lhs->type->is_bool()) {
             error(expr.lhs->span.begin, m_filename, "type mismatch");
         }
@@ -420,9 +420,9 @@ std::optional<Value> Codegen::generate(ast::BinaryExpr& expr) noexcept {
             return lhs->type->is_signed_int()
                        ? m_builder.CreateSDiv(lhs->value, rhs->value)
                        : m_builder.CreateUDiv(lhs->value, rhs->value);
-        case And:
+        case AndAnd:
             return m_builder.CreateAnd(lhs->value, rhs->value);
-        case Or:
+        case OrOr:
             return m_builder.CreateOr(lhs->value, rhs->value);
         case Less:
             return lhs->type->is_signed_int()
@@ -455,7 +455,8 @@ std::optional<Value> Codegen::generate(ast::BinaryExpr& expr) noexcept {
 std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
     using enum frontend::Token::Type;
 
-    auto value = generate(*expr.value);
+    auto value = expr.oper.value == And ? expr.value->codegen(*this)
+                                        : generate(*expr.value);
 
     if (!value) {
         return std::nullopt;
@@ -499,6 +500,19 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
 
         return Value{pointer.type, value->value, pointer.is_mutable};
     }
+    case And:
+        if (!llvm::isa<llvm::AllocaInst>(value->value) &&
+            !llvm::isa<llvm::GetElementPtrInst>(value->value)) {
+            error(
+                expr.span.begin, m_filename,
+                "taking the reference of a non-variable value");
+
+            return std::nullopt;
+        }
+
+        return Value{
+            std::make_shared<types::Pointer>(value->type, value->is_mutable),
+            value->value, false, true};
     default:
         return std::nullopt;
     }
@@ -1044,6 +1058,10 @@ std::optional<Value> Codegen::generate(ast::Expression& expr) noexcept {
         return std::nullopt;
     }
 
+    if (result->is_ref) {
+        return result;
+    }
+
     if (auto* variable =
             llvm::dyn_cast_or_null<llvm::AllocaInst>(result->value)) {
         return Value{
@@ -1060,8 +1078,6 @@ std::optional<Value> Codegen::generate(ast::Expression& expr) noexcept {
                 result->type, m_builder.CreateLoad(type, value),
                 result->is_mutable};
         }
-
-        return result;
     }
 
     if (auto* ptr =

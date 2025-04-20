@@ -14,6 +14,7 @@ struct Value {
     llvm::Value* value;
 
     bool is_mutable = false;
+    bool is_ref = false;
 };
 
 } // namespace cent::backend

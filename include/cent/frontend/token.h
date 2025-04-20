@@ -32,6 +32,9 @@ struct Token {
         And,
         Or,
 
+        AndAnd,
+        OrOr,
+
         Less,
         Greater,
 

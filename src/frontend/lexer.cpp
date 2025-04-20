@@ -27,14 +27,12 @@ void Lexer::next_token() noexcept {
         return;
     }
 
-    auto logical_op = [&](Token::Type type) {
-        const auto* at_before = m_at;
+    auto logical_op = [&](Token::Type single, Token::Type type) {
         auto begin = m_position;
-
         char oper = get();
 
         if (eof() || peek() != oper) {
-            m_token = {Invalid, {at_before, m_at}, {begin, m_position}};
+            m_token = {single, {}, {begin, m_position}};
             return;
         }
 
@@ -105,10 +103,10 @@ void Lexer::next_token() noexcept {
         cmp_op(Less, LessEqual);
         break;
     case '&':
-        logical_op(And);
+        logical_op(And, AndAnd);
         break;
     case '|':
-        logical_op(Or);
+        logical_op(Or, OrOr);
         break;
     default:
         m_token = {Invalid, {m_at, m_at + 1}, Span::from(m_position)};

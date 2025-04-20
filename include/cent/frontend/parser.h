@@ -132,9 +132,9 @@ private:
         enum { None = 0, Or, And, Comparison, Additive, Multiplicative };
 
         switch (type) {
-        case Token::Type::Or:
+        case Token::Type::OrOr:
             return Or;
-        case Token::Type::And:
+        case Token::Type::AndAnd:
             return And;
         case Token::Type::Less:
         case Token::Type::Greater:
