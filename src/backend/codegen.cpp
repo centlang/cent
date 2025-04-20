@@ -405,11 +405,17 @@ std::optional<Value> Codegen::generate(ast::BinaryExpr& expr) noexcept {
     auto* value = [&]() -> llvm::Value* {
         switch (expr.oper.value) {
         case Plus:
-            return m_builder.CreateAdd(lhs->value, rhs->value);
+            return lhs->type->is_float()
+                       ? m_builder.CreateFAdd(lhs->value, rhs->value)
+                       : m_builder.CreateAdd(lhs->value, rhs->value);
         case Minus:
-            return m_builder.CreateSub(lhs->value, rhs->value);
+            return lhs->type->is_float()
+                       ? m_builder.CreateFSub(lhs->value, rhs->value)
+                       : m_builder.CreateSub(lhs->value, rhs->value);
         case Star:
-            return m_builder.CreateMul(lhs->value, rhs->value);
+            return lhs->type->is_float()
+                       ? m_builder.CreateFMul(lhs->value, rhs->value)
+                       : m_builder.CreateMul(lhs->value, rhs->value);
         case Slash:
             return lhs->type->is_signed_int()
                        ? m_builder.CreateSDiv(lhs->value, rhs->value)
