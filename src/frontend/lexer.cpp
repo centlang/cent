@@ -87,9 +87,22 @@ void Lexer::next_token() noexcept {
     case '*':
         single_char(Star);
         break;
-    case '/':
-        single_char(Slash);
+    case '/': {
+        auto begin = m_position;
+        get();
+
+        if (eof() || peek() != '/') {
+            m_token = {Slash, {}, {begin, m_position}};
+            return;
+        }
+
+        while (!eof() && peek() != '\n') {
+            get();
+        }
+
+        next_token();
         break;
+    }
     case '=':
         cmp_op(Equal, EqualEqual);
         break;
