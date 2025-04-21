@@ -221,12 +221,12 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
 Parser::expect_member_expr() noexcept {
     auto expression = expect_prefix();
 
+    if (!expression) {
+        return nullptr;
+    }
+
     while (match(Token::Type::Dot)) {
         next();
-
-        if (!expression) {
-            return nullptr;
-        }
 
         auto member = expect("member name", Token::Type::Identifier);
 
