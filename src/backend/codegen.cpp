@@ -520,18 +520,47 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
 
 std::optional<Value> Codegen::generate(ast::IntLiteral& expr) noexcept {
     bool failed = false;
+    auto literal = expr.value;
+
+    std::uint8_t base = [&] {
+        static constexpr auto hex = 16;
+        static constexpr auto oct = 8;
+        static constexpr auto bin = 2;
+        static constexpr auto dec = 10;
+
+        if (literal.starts_with("0x")) {
+            literal = {literal.cbegin() + 2, literal.cend()};
+
+            return hex;
+        }
+
+        if (literal.starts_with("0o")) {
+            literal = {literal.cbegin() + 2, literal.cend()};
+
+            return oct;
+        }
+
+        if (literal.starts_with("0b")) {
+            literal = {literal.cbegin() + 2, literal.cend()};
+
+            return bin;
+        }
+
+        return dec;
+    }();
 
     auto with_type_suffix = [&]<typename Type>(
                                 std::string_view suffix,
                                 bool is_signed) -> std::optional<Value> {
-        if (!expr.value.ends_with(suffix)) {
+        if (!literal.ends_with(suffix)) {
             return std::nullopt;
         }
 
         Type value{};
+        literal = {literal.cbegin(), literal.cend() - suffix.size()};
 
-        auto [pointer, result] = std::from_chars(
-            expr.value.begin(), expr.value.end() - suffix.size(), value);
+        auto [pointer, result] =
+            std::from_chars(literal.cbegin(), literal.cend(), value, base);
 
         if (result == std::errc::result_out_of_range) {
             error(expr.span.begin, m_filename, "integer out of range");
@@ -613,7 +642,7 @@ std::optional<Value> Codegen::generate(ast::IntLiteral& expr) noexcept {
     std::int32_t value{};
 
     auto [pointer, result] =
-        std::from_chars(expr.value.begin(), expr.value.end(), value);
+        std::from_chars(literal.begin(), literal.end(), value, base);
 
     if (result == std::errc::result_out_of_range) {
         error(expr.span.begin, m_filename, "integer out of range");

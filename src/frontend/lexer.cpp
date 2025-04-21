@@ -139,6 +139,15 @@ void Lexer::number() noexcept {
         }
     };
 
+    if (peek() == '0') {
+        get();
+
+        if (!eof() && (peek() == 'x' || peek() == 'o' || peek() == 'b')) {
+            get();
+            m_token.value = {m_token.value.cbegin(), m_at};
+        }
+    }
+
     get_int();
 
     if (!eof() && (peek() == 'i' || peek() == 'u')) {
