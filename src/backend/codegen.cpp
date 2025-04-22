@@ -80,7 +80,8 @@ bool Codegen::types_equal(Type& lhs, Type& rhs) noexcept {
         auto& lhs_pointer = static_cast<types::Pointer&>(lhs);
         auto& rhs_pointer = static_cast<types::Pointer&>(rhs);
 
-        return types_equal(*lhs_pointer.type, *rhs_pointer.type);
+        return lhs_pointer.is_mutable == rhs_pointer.is_mutable &&
+               types_equal(*lhs_pointer.type, *rhs_pointer.type);
     }
 
     return false;
