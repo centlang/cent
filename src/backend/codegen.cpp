@@ -403,54 +403,66 @@ std::optional<Value> Codegen::generate(ast::BinaryExpr& expr) noexcept {
         break;
     };
 
-    auto* value = [&]() -> llvm::Value* {
-        switch (expr.oper.value) {
-        case Plus:
-            return lhs->type->is_float()
-                       ? m_builder.CreateFAdd(lhs->value, rhs->value)
-                       : m_builder.CreateAdd(lhs->value, rhs->value);
-        case Minus:
-            return lhs->type->is_float()
-                       ? m_builder.CreateFSub(lhs->value, rhs->value)
-                       : m_builder.CreateSub(lhs->value, rhs->value);
-        case Star:
-            return lhs->type->is_float()
-                       ? m_builder.CreateFMul(lhs->value, rhs->value)
-                       : m_builder.CreateMul(lhs->value, rhs->value);
-        case Slash:
-            return lhs->type->is_signed_int()
-                       ? m_builder.CreateSDiv(lhs->value, rhs->value)
-                       : m_builder.CreateUDiv(lhs->value, rhs->value);
-        case AndAnd:
-            return m_builder.CreateAnd(lhs->value, rhs->value);
-        case OrOr:
-            return m_builder.CreateOr(lhs->value, rhs->value);
-        case Less:
-            return lhs->type->is_signed_int()
-                       ? m_builder.CreateICmpSLT(lhs->value, rhs->value)
-                       : m_builder.CreateICmpULT(lhs->value, rhs->value);
-        case Greater:
-            return lhs->type->is_signed_int()
-                       ? m_builder.CreateICmpSGT(lhs->value, rhs->value)
-                       : m_builder.CreateICmpUGT(lhs->value, rhs->value);
-        case EqualEqual:
-            return m_builder.CreateICmpEQ(lhs->value, rhs->value);
-        case BangEqual:
-            return m_builder.CreateICmpNE(lhs->value, rhs->value);
-        case GreaterEqual:
-            return lhs->type->is_signed_int()
-                       ? m_builder.CreateICmpSGE(lhs->value, rhs->value)
-                       : m_builder.CreateICmpUGE(lhs->value, rhs->value);
-        case LessEqual:
-            return lhs->type->is_signed_int()
-                       ? m_builder.CreateICmpSLE(lhs->value, rhs->value)
-                       : m_builder.CreateICmpULE(lhs->value, rhs->value);
-        default:
-            return nullptr;
-        }
-    }();
-
-    return Value{lhs->type, value};
+    switch (expr.oper.value) {
+    case Plus:
+        return Value{
+            lhs->type, lhs->type->is_float()
+                           ? m_builder.CreateFAdd(lhs->value, rhs->value)
+                           : m_builder.CreateAdd(lhs->value, rhs->value)};
+    case Minus:
+        return Value{
+            lhs->type, lhs->type->is_float()
+                           ? m_builder.CreateFSub(lhs->value, rhs->value)
+                           : m_builder.CreateSub(lhs->value, rhs->value)};
+    case Star:
+        return Value{
+            lhs->type, lhs->type->is_float()
+                           ? m_builder.CreateFMul(lhs->value, rhs->value)
+                           : m_builder.CreateMul(lhs->value, rhs->value)};
+    case Slash:
+        return Value{
+            lhs->type, lhs->type->is_signed_int()
+                           ? m_builder.CreateSDiv(lhs->value, rhs->value)
+                           : m_builder.CreateUDiv(lhs->value, rhs->value)};
+    case AndAnd:
+        return Value{
+            m_types["bool"], m_builder.CreateAnd(lhs->value, rhs->value)};
+    case OrOr:
+        return Value{
+            m_types["bool"], m_builder.CreateOr(lhs->value, rhs->value)};
+    case Less:
+        return Value{
+            m_types["bool"],
+            lhs->type->is_signed_int()
+                ? m_builder.CreateICmpSLT(lhs->value, rhs->value)
+                : m_builder.CreateICmpULT(lhs->value, rhs->value)};
+    case Greater:
+        return Value{
+            m_types["bool"],
+            lhs->type->is_signed_int()
+                ? m_builder.CreateICmpSGT(lhs->value, rhs->value)
+                : m_builder.CreateICmpUGT(lhs->value, rhs->value)};
+    case EqualEqual:
+        return Value{
+            m_types["bool"], m_builder.CreateICmpEQ(lhs->value, rhs->value)};
+    case BangEqual:
+        return Value{
+            m_types["bool"], m_builder.CreateICmpNE(lhs->value, rhs->value)};
+    case GreaterEqual:
+        return Value{
+            m_types["bool"],
+            lhs->type->is_signed_int()
+                ? m_builder.CreateICmpSGE(lhs->value, rhs->value)
+                : m_builder.CreateICmpUGE(lhs->value, rhs->value)};
+    case LessEqual:
+        return Value{
+            m_types["bool"],
+            lhs->type->is_signed_int()
+                ? m_builder.CreateICmpSLE(lhs->value, rhs->value)
+                : m_builder.CreateICmpULE(lhs->value, rhs->value)};
+    default:
+        return std::nullopt;
+    }
 }
 
 std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
