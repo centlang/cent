@@ -242,6 +242,13 @@ Parser::expect_member_expr() noexcept {
             ast::SpanValue{member->value, member->span});
     }
 
+    return expression;
+}
+
+[[nodiscard]] std::unique_ptr<ast::Expression>
+Parser::expect_as_expr() noexcept {
+    auto expression = expect_member_expr();
+
     if (!match(Token::Type::As)) {
         return expression;
     }
@@ -277,7 +284,7 @@ Parser::expect_infix(std::unique_ptr<ast::Expression> lhs) noexcept {
 
 std::unique_ptr<ast::Expression>
 Parser::expect_bin_expr(std::uint8_t precedence) noexcept {
-    auto expression = expect_member_expr();
+    auto expression = expect_as_expr();
 
     while (precedence_of(peek().type) >= precedence) {
         if (!expression) {
