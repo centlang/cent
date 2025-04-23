@@ -1,6 +1,8 @@
 #ifndef CENT_BACKEND_TYPES_PRIMITIVE_H
 #define CENT_BACKEND_TYPES_PRIMITIVE_H
 
+#include <llvm/IR/DerivedTypes.h>
+
 #include <memory>
 #include <utility>
 
@@ -63,6 +65,13 @@ struct Pointer : detail::Type<Pointer> {
 
     std::shared_ptr<backend::Type> type;
     bool is_mutable;
+};
+
+struct Optional : detail::Type<Optional> {
+    [[nodiscard]] Optional(std::shared_ptr<backend::Type> type) noexcept
+    : type{std::move(type)} {}
+
+    std::shared_ptr<backend::Type> type;
 };
 
 } // namespace cent::backend::types

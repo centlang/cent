@@ -28,6 +28,7 @@ struct Token {
         Slash,
 
         Bang,
+        QuestionMark,
 
         And,
         Or,

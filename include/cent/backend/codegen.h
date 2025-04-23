@@ -16,6 +16,7 @@ namespace cent::ast {
 
 struct NamedType;
 struct Pointer;
+struct Optional;
 
 struct Program;
 
@@ -66,6 +67,7 @@ struct Bool;
 struct Void;
 
 struct Pointer;
+struct Optional;
 
 struct Struct;
 struct Function;
@@ -90,6 +92,7 @@ public:
 
     std::shared_ptr<Type> generate(ast::NamedType& type) noexcept;
     std::shared_ptr<Type> generate(ast::Pointer& type) noexcept;
+    std::shared_ptr<Type> generate(ast::Optional& type) noexcept;
 
     llvm::Type* generate(types::I8& type) noexcept;
     llvm::Type* generate(types::I16& type) noexcept;
@@ -108,6 +111,7 @@ public:
     llvm::Type* generate(types::Void& type) noexcept;
 
     llvm::Type* generate(types::Pointer& type) noexcept;
+    llvm::Type* generate(types::Optional& type) noexcept;
 
     llvm::Type* generate(types::Struct& type) noexcept;
     llvm::Type* generate(types::Function& type) noexcept;

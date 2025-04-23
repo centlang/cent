@@ -1,3 +1,4 @@
+#include <array>
 #include <charconv>
 #include <cstdint>
 
@@ -17,6 +18,7 @@
 #include "cent/ast/literals.h"
 #include "cent/ast/member_expr.h"
 #include "cent/ast/named_type.h"
+#include "cent/ast/optional.h"
 #include "cent/ast/pointer.h"
 #include "cent/ast/program.h"
 #include "cent/ast/return_stmt.h"
@@ -111,6 +113,16 @@ std::shared_ptr<Type> Codegen::generate(ast::Pointer& type) noexcept {
     return std::make_shared<types::Pointer>(points_to, type.is_mutable);
 }
 
+std::shared_ptr<Type> Codegen::generate(ast::Optional& type) noexcept {
+    auto contained = type.type->codegen(*this);
+
+    if (!contained) {
+        return nullptr;
+    }
+
+    return std::make_shared<types::Optional>(contained);
+}
+
 llvm::Type* Codegen::generate([[maybe_unused]] types::I8& type) noexcept {
     return llvm::Type::getInt8Ty(m_context);
 }
@@ -167,6 +179,15 @@ llvm::Type* Codegen::generate(types::Pointer& type) noexcept {
 
 llvm::Type* Codegen::generate(types::Struct& type) noexcept {
     return type.type;
+}
+
+llvm::Type* Codegen::generate(types::Optional& type) noexcept {
+    auto* contained = type.type->codegen(*this);
+
+    std::array<llvm::Type*, 2> fields = {
+        contained, llvm::Type::getInt1Ty(m_context)};
+
+    return llvm::StructType::create(fields);
 }
 
 llvm::Type* Codegen::generate(types::Function& type) noexcept {

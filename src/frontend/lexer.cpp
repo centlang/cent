@@ -87,6 +87,9 @@ void Lexer::next_token() noexcept {
     case '*':
         single_char(Star);
         break;
+    case '?':
+        single_char(QuestionMark);
+        break;
     case '/': {
         auto begin = m_position;
         get();

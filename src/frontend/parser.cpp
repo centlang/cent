@@ -5,6 +5,7 @@
 #include "cent/ast/literals.h"
 #include "cent/ast/member_expr.h"
 #include "cent/ast/named_type.h"
+#include "cent/ast/optional.h"
 #include "cent/ast/pointer.h"
 #include "cent/ast/return_stmt.h"
 #include "cent/ast/unary_expr.h"
@@ -401,6 +402,19 @@ std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
 
         return std::make_unique<ast::Pointer>(
             Span{begin, type->span.end}, std::move(type), is_mutable);
+    }
+
+    if (match(Token::Type::QuestionMark)) {
+        next();
+
+        auto type = expect_type();
+
+        if (!type) {
+            return nullptr;
+        }
+
+        return std::make_unique<ast::Optional>(
+            Span{begin, type->span.end}, std::move(type));
     }
 
     auto type = expect("type", Token::Type::Identifier);
