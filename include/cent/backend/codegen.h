@@ -89,6 +89,8 @@ public:
     [[nodiscard]] std::unique_ptr<llvm::Module> generate() noexcept;
 
     [[nodiscard]] bool types_equal(Type& lhs, Type& rhs) noexcept;
+    [[nodiscard]] std::optional<Value>
+    implicit_cast(std::shared_ptr<Type>& type, Value& value) noexcept;
 
     std::shared_ptr<Type> generate(ast::NamedType& type) noexcept;
     std::shared_ptr<Type> generate(ast::Pointer& type) noexcept;
@@ -142,6 +144,9 @@ private:
     std::optional<Value> generate(ast::Expression& expr) noexcept;
 
     void generate_fn_proto(ast::FnDecl& decl) noexcept;
+
+    static constexpr auto optional_member_value = 0;
+    static constexpr auto optional_member_bool = 1;
 
     llvm::LLVMContext m_context;
     std::unique_ptr<llvm::Module> m_module;

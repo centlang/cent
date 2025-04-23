@@ -89,6 +89,40 @@ bool Codegen::types_equal(Type& lhs, Type& rhs) noexcept {
     return false;
 }
 
+std::optional<Value>
+Codegen::implicit_cast(std::shared_ptr<Type>& type, Value& value) noexcept {
+    if (types_equal(*type, *value.type)) {
+        return value;
+    }
+
+    if (!type->is_optional()) {
+        return std::nullopt;
+    }
+
+    auto& contained = static_cast<types::Optional&>(*type).type;
+
+    if (!types_equal(*contained, *value.type)) {
+        return std::nullopt;
+    }
+
+    auto* llvm_type = type->codegen(*this);
+    auto* variable = m_builder.CreateAlloca(llvm_type);
+
+    auto* value_ptr =
+        m_builder.CreateStructGEP(llvm_type, variable, optional_member_value);
+
+    auto* bool_ptr =
+        m_builder.CreateStructGEP(llvm_type, variable, optional_member_bool);
+
+    m_builder.CreateStore(value.value, value_ptr);
+
+    m_builder.CreateStore(
+        llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), true),
+        bool_ptr);
+
+    return Value{type, variable};
+}
+
 std::shared_ptr<Type> Codegen::generate(ast::NamedType& type) noexcept {
     auto iterator = m_types.find(type.value);
 
@@ -1082,7 +1116,9 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
             return std::nullopt;
         }
 
-        if (type && !types_equal(*type, *value->type)) {
+        value = implicit_cast(type, *value);
+
+        if (!value) {
             error(decl.value->span.begin, m_filename, "type mismatch");
 
             return std::nullopt;

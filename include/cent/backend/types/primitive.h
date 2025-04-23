@@ -71,6 +71,8 @@ struct Optional : detail::Type<Optional> {
     [[nodiscard]] Optional(std::shared_ptr<backend::Type> type) noexcept
     : type{std::move(type)} {}
 
+    bool is_optional() noexcept override { return true; };
+
     std::shared_ptr<backend::Type> type;
 };
 
