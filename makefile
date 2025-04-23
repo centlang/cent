@@ -4,10 +4,10 @@ INCLUDE_DIR := include
 OBJ_DIR := obj
 BIN_DIR := bin
 
-CPP := c++
+CXX := c++
 CLANG_TIDY := clang-tidy
 
-CPP_FLAGS := -pedantic -Wall -Wextra -std=c++20 -O3 -c -I$(INCLUDE_DIR) \
+CXX_FLAGS := -pedantic -Wall -Wextra -std=c++20 -O3 -c -I$(INCLUDE_DIR) \
     -fno-exceptions
 
 LD_FLAGS := -lLLVM -lfmt
@@ -25,12 +25,12 @@ all: $(TARGET)
 $(TARGET): $(OBJ_FILES)
 	@mkdir -p $(@D)
 
-	$(CPP) -o $@ $^ $(LD_FLAGS)
+	$(CXX) -o $@ $^ $(LD_FLAGS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(@D)
 
-	$(CPP) -o $@ $< $(CPP_FLAGS)
+	$(CXX) -o $@ $< $(CXX_FLAGS)
 
 install: $(TARGET) | $(DEST_BIN_DIR)
 	cp $(TARGET) $(DEST_BIN_DIR)
@@ -39,6 +39,6 @@ clean:
 	rm -rf $(OBJ_DIR) $(BIN_DIR)
 
 check: $(SRC_FILES)
-	$(CLANG_TIDY) $^ -- $(CPP_FLAGS)
+	$(CLANG_TIDY) $^ -- $(CXX_FLAGS)
 
 .PHONY: all clean install check
