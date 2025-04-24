@@ -40,7 +40,7 @@ void Lexer::next_token() noexcept {
         m_token = {type, {}, {begin, m_position}};
     };
 
-    auto cmp_op = [&](Token::Type oper, Token::Type with_equal) {
+    auto with_equal = [&](Token::Type oper, Token::Type with_eq) {
         auto begin = m_position;
         get();
 
@@ -50,7 +50,7 @@ void Lexer::next_token() noexcept {
         }
 
         get();
-        m_token = {with_equal, {}, {begin, m_position}};
+        m_token = {with_eq, {}, {begin, m_position}};
     };
 
     switch (peek()) {
@@ -79,13 +79,13 @@ void Lexer::next_token() noexcept {
         single_char(Semicolon);
         break;
     case '+':
-        single_char(Plus);
+        with_equal(Plus, PlusEqual);
         break;
     case '-':
-        single_char(Minus);
+        with_equal(Minus, MinusEqual);
         break;
     case '*':
-        single_char(Star);
+        with_equal(Star, StarEqual);
         break;
     case '?':
         single_char(QuestionMark);
@@ -94,7 +94,19 @@ void Lexer::next_token() noexcept {
         auto begin = m_position;
         get();
 
-        if (eof() || peek() != '/') {
+        if (eof()) {
+            m_token = {Slash, {}, {begin, m_position}};
+            return;
+        }
+
+        if (peek() == '=') {
+            get();
+            m_token = {SlashEqual, {}, {begin, m_position}};
+
+            return;
+        }
+
+        if (peek() != '/') {
             m_token = {Slash, {}, {begin, m_position}};
             return;
         }
@@ -107,16 +119,16 @@ void Lexer::next_token() noexcept {
         break;
     }
     case '=':
-        cmp_op(Equal, EqualEqual);
+        with_equal(Equal, EqualEqual);
         break;
     case '!':
-        cmp_op(Bang, BangEqual);
+        with_equal(Bang, BangEqual);
         break;
     case '>':
-        cmp_op(Greater, GreaterEqual);
+        with_equal(Greater, GreaterEqual);
         break;
     case '<':
-        cmp_op(Less, LessEqual);
+        with_equal(Less, LessEqual);
         break;
     case '&':
         logical_op(And, AndAnd);

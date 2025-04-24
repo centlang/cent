@@ -88,12 +88,15 @@ void Parser::expect_stmt(ast::BlockStmt& block) noexcept {
             return;
         }
 
-        if (!match(Token::Type::Equal)) {
+        if (!match(
+                Token::Type::Equal, Token::Type::PlusEqual,
+                Token::Type::MinusEqual, Token::Type::StarEqual,
+                Token::Type::SlashEqual)) {
             block.body.push_back(std::move(value));
             break;
         }
 
-        parse_assignment(block, std::move(value));
+        parse_assignment(block, std::move(value), peek());
 
         break;
     }
@@ -515,7 +518,8 @@ void Parser::parse_return(ast::BlockStmt& block) noexcept {
 }
 
 void Parser::parse_assignment(
-    ast::BlockStmt& block, std::unique_ptr<ast::Expression> variable) noexcept {
+    ast::BlockStmt& block, std::unique_ptr<ast::Expression> variable,
+    Token oper) noexcept {
     next();
 
     auto value = expect_expr();
@@ -526,7 +530,7 @@ void Parser::parse_assignment(
 
     block.body.push_back(std::make_unique<ast::Assignment>(
         Span{variable->span.begin, value->span.end}, std::move(variable),
-        std::move(value)));
+        std::move(value), ast::SpanValue{oper.type, oper.span}));
 }
 
 std::vector<ast::FnDecl::Param> Parser::parse_params() noexcept {

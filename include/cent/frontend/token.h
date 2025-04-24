@@ -27,6 +27,11 @@ struct Token {
         Star,
         Slash,
 
+        PlusEqual,
+        MinusEqual,
+        StarEqual,
+        SlashEqual,
+
         Bang,
         QuestionMark,
 

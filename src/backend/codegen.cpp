@@ -238,6 +238,32 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
 
     auto value = generate(*stmt.value);
 
+    auto without_equal = [](frontend::Token::Type type) {
+        using enum frontend::Token::Type;
+
+        switch (type) {
+        case PlusEqual:
+            return Plus;
+        case MinusEqual:
+            return Minus;
+        case StarEqual:
+            return Star;
+        case SlashEqual:
+            return Slash;
+        default:
+            return Eof;
+        }
+    };
+
+    if (stmt.oper.value != frontend::Token::Type::Equal) {
+        auto var_value = load_value(*var);
+
+        value = generate_bin_expr(
+            ast::SpanValue<Value&>{var_value, stmt.variable->span},
+            ast::SpanValue<Value&>{*value, stmt.value->span},
+            ast::SpanValue{without_equal(stmt.oper.value), stmt.oper.span});
+    }
+
     if (!value) {
         return std::nullopt;
     }
@@ -423,101 +449,9 @@ std::optional<Value> Codegen::generate(ast::BinaryExpr& expr) noexcept {
         return std::nullopt;
     }
 
-    if (!types_equal(*lhs->type, *rhs->type)) {
-        error(expr.lhs->span.begin, m_filename, "type mismatch");
-
-        return std::nullopt;
-    }
-
-    switch (expr.oper.value) {
-    case Plus:
-    case Minus:
-    case Star:
-    case Slash:
-    case Less:
-    case Greater:
-    case GreaterEqual:
-    case LessEqual: {
-        auto type = lhs->type;
-
-        if (!type->is_signed_int() && !type->is_unsigned_int() &&
-            !type->is_float()) {
-            error(expr.lhs->span.begin, m_filename, "type mismatch");
-        }
-
-        break;
-    }
-    case AndAnd:
-    case OrOr:
-        if (!lhs->type->is_bool()) {
-            error(expr.lhs->span.begin, m_filename, "type mismatch");
-        }
-
-        break;
-    default:
-        break;
-    };
-
-    switch (expr.oper.value) {
-    case Plus:
-        return Value{
-            lhs->type, lhs->type->is_float()
-                           ? m_builder.CreateFAdd(lhs->value, rhs->value)
-                           : m_builder.CreateAdd(lhs->value, rhs->value)};
-    case Minus:
-        return Value{
-            lhs->type, lhs->type->is_float()
-                           ? m_builder.CreateFSub(lhs->value, rhs->value)
-                           : m_builder.CreateSub(lhs->value, rhs->value)};
-    case Star:
-        return Value{
-            lhs->type, lhs->type->is_float()
-                           ? m_builder.CreateFMul(lhs->value, rhs->value)
-                           : m_builder.CreateMul(lhs->value, rhs->value)};
-    case Slash:
-        return Value{
-            lhs->type, lhs->type->is_signed_int()
-                           ? m_builder.CreateSDiv(lhs->value, rhs->value)
-                           : m_builder.CreateUDiv(lhs->value, rhs->value)};
-    case AndAnd:
-        return Value{
-            m_types["bool"], m_builder.CreateAnd(lhs->value, rhs->value)};
-    case OrOr:
-        return Value{
-            m_types["bool"], m_builder.CreateOr(lhs->value, rhs->value)};
-    case Less:
-        return Value{
-            m_types["bool"],
-            lhs->type->is_signed_int()
-                ? m_builder.CreateICmpSLT(lhs->value, rhs->value)
-                : m_builder.CreateICmpULT(lhs->value, rhs->value)};
-    case Greater:
-        return Value{
-            m_types["bool"],
-            lhs->type->is_signed_int()
-                ? m_builder.CreateICmpSGT(lhs->value, rhs->value)
-                : m_builder.CreateICmpUGT(lhs->value, rhs->value)};
-    case EqualEqual:
-        return Value{
-            m_types["bool"], m_builder.CreateICmpEQ(lhs->value, rhs->value)};
-    case BangEqual:
-        return Value{
-            m_types["bool"], m_builder.CreateICmpNE(lhs->value, rhs->value)};
-    case GreaterEqual:
-        return Value{
-            m_types["bool"],
-            lhs->type->is_signed_int()
-                ? m_builder.CreateICmpSGE(lhs->value, rhs->value)
-                : m_builder.CreateICmpUGE(lhs->value, rhs->value)};
-    case LessEqual:
-        return Value{
-            m_types["bool"],
-            lhs->type->is_signed_int()
-                ? m_builder.CreateICmpSLE(lhs->value, rhs->value)
-                : m_builder.CreateICmpULE(lhs->value, rhs->value)};
-    default:
-        return std::nullopt;
-    }
+    return generate_bin_expr(
+        ast::SpanValue<Value&>{*lhs, expr.lhs->span},
+        ast::SpanValue<Value&>{*rhs, expr.rhs->span}, expr.oper);
 }
 
 std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
@@ -1159,37 +1093,153 @@ std::optional<Value> Codegen::generate(ast::Expression& expr) noexcept {
         return std::nullopt;
     }
 
-    if (result->is_ref) {
-        return result;
+    return load_value(*result);
+}
+
+std::optional<Value> Codegen::generate_bin_expr(
+    ast::SpanValue<Value&> lhs, ast::SpanValue<Value&> rhs,
+    ast::SpanValue<frontend::Token::Type> oper) noexcept {
+    using enum frontend::Token::Type;
+
+    if (!types_equal(*lhs.value.type, *rhs.value.type)) {
+        error(lhs.span.begin, m_filename, "type mismatch");
+
+        return std::nullopt;
+    }
+
+    switch (oper.value) {
+    case Plus:
+    case Minus:
+    case Star:
+    case Slash:
+    case Less:
+    case Greater:
+    case GreaterEqual:
+    case LessEqual: {
+        auto type = lhs.value.type;
+
+        if (!type->is_signed_int() && !type->is_unsigned_int() &&
+            !type->is_float()) {
+            error(lhs.span.begin, m_filename, "type mismatch");
+
+            return std::nullopt;
+        }
+
+        break;
+    }
+    case AndAnd:
+    case OrOr:
+        if (!lhs.value.type->is_bool()) {
+            error(lhs.span.begin, m_filename, "type mismatch");
+
+            return std::nullopt;
+        }
+
+        break;
+    default:
+        break;
+    };
+
+    switch (oper.value) {
+    case Plus:
+        return Value{
+            lhs.value.type,
+            lhs.value.type->is_float()
+                ? m_builder.CreateFAdd(lhs.value.value, rhs.value.value)
+                : m_builder.CreateAdd(lhs.value.value, rhs.value.value)};
+    case Minus:
+        return Value{
+            lhs.value.type,
+            lhs.value.type->is_float()
+                ? m_builder.CreateFSub(lhs.value.value, rhs.value.value)
+                : m_builder.CreateSub(lhs.value.value, rhs.value.value)};
+    case Star:
+        return Value{
+            lhs.value.type,
+            lhs.value.type->is_float()
+                ? m_builder.CreateFMul(lhs.value.value, rhs.value.value)
+                : m_builder.CreateMul(lhs.value.value, rhs.value.value)};
+    case Slash:
+        return Value{
+            lhs.value.type,
+            lhs.value.type->is_signed_int()
+                ? m_builder.CreateSDiv(lhs.value.value, rhs.value.value)
+                : m_builder.CreateUDiv(lhs.value.value, rhs.value.value)};
+    case AndAnd:
+        return Value{
+            m_types["bool"],
+            m_builder.CreateAnd(lhs.value.value, rhs.value.value)};
+    case OrOr:
+        return Value{
+            m_types["bool"],
+            m_builder.CreateOr(lhs.value.value, rhs.value.value)};
+    case Less:
+        return Value{
+            m_types["bool"],
+            lhs.value.type->is_signed_int()
+                ? m_builder.CreateICmpSLT(lhs.value.value, rhs.value.value)
+                : m_builder.CreateICmpULT(lhs.value.value, rhs.value.value)};
+    case Greater:
+        return Value{
+            m_types["bool"],
+            lhs.value.type->is_signed_int()
+                ? m_builder.CreateICmpSGT(lhs.value.value, rhs.value.value)
+                : m_builder.CreateICmpUGT(lhs.value.value, rhs.value.value)};
+    case EqualEqual:
+        return Value{
+            m_types["bool"],
+            m_builder.CreateICmpEQ(lhs.value.value, rhs.value.value)};
+    case BangEqual:
+        return Value{
+            m_types["bool"],
+            m_builder.CreateICmpNE(lhs.value.value, rhs.value.value)};
+    case GreaterEqual:
+        return Value{
+            m_types["bool"],
+            lhs.value.type->is_signed_int()
+                ? m_builder.CreateICmpSGE(lhs.value.value, rhs.value.value)
+                : m_builder.CreateICmpUGE(lhs.value.value, rhs.value.value)};
+    case LessEqual:
+        return Value{
+            m_types["bool"],
+            lhs.value.type->is_signed_int()
+                ? m_builder.CreateICmpSLE(lhs.value.value, rhs.value.value)
+                : m_builder.CreateICmpULE(lhs.value.value, rhs.value.value)};
+    default:
+        return std::nullopt;
+    }
+}
+
+Value Codegen::load_value(Value& value) noexcept {
+    if (value.is_ref) {
+        return value;
     }
 
     if (auto* variable =
-            llvm::dyn_cast_or_null<llvm::AllocaInst>(result->value)) {
+            llvm::dyn_cast_or_null<llvm::AllocaInst>(value.value)) {
         return Value{
-            result->type,
+            value.type,
             m_builder.CreateLoad(variable->getAllocatedType(), variable),
-            result->is_mutable};
+            value.is_mutable};
     }
 
-    if (auto* value = llvm::dyn_cast_or_null<llvm::LoadInst>(result->value)) {
-        auto* type = result->type->codegen(*this);
+    if (auto* val = llvm::dyn_cast_or_null<llvm::LoadInst>(value.value)) {
+        auto* type = value.type->codegen(*this);
 
-        if (value->getType()->isPointerTy() && !result->type->is_pointer()) {
+        if (val->getType()->isPointerTy() && !value.type->is_pointer()) {
             return Value{
-                result->type, m_builder.CreateLoad(type, value),
-                result->is_mutable};
+                value.type, m_builder.CreateLoad(type, val), value.is_mutable};
         }
     }
 
     if (auto* ptr =
-            llvm::dyn_cast_or_null<llvm::GetElementPtrInst>(result->value)) {
+            llvm::dyn_cast_or_null<llvm::GetElementPtrInst>(value.value)) {
         return Value{
-            result->type,
-            m_builder.CreateLoad(ptr->getResultElementType(), ptr),
-            result->is_mutable};
+            value.type, m_builder.CreateLoad(ptr->getResultElementType(), ptr),
+            value.is_mutable};
     }
 
-    return result;
+    return value;
 }
 
 void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {

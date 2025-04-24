@@ -12,6 +12,9 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 
+#include "cent/ast/span_value.h"
+#include "cent/frontend/token.h"
+
 namespace cent::ast {
 
 struct NamedType;
@@ -142,6 +145,12 @@ public:
 
 private:
     std::optional<Value> generate(ast::Expression& expr) noexcept;
+
+    std::optional<Value> generate_bin_expr(
+        ast::SpanValue<Value&> lhs, ast::SpanValue<Value&> rhs,
+        ast::SpanValue<frontend::Token::Type> oper) noexcept;
+
+    Value load_value(Value& value) noexcept;
 
     void generate_fn_proto(ast::FnDecl& decl) noexcept;
 

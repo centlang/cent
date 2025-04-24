@@ -121,8 +121,8 @@ private:
     void parse_return(ast::BlockStmt& block) noexcept;
 
     void parse_assignment(
-        ast::BlockStmt& block,
-        std::unique_ptr<ast::Expression> variable) noexcept;
+        ast::BlockStmt& block, std::unique_ptr<ast::Expression> variable,
+        Token oper) noexcept;
 
     [[nodiscard]] std::vector<ast::FnDecl::Param> parse_params() noexcept;
     [[nodiscard]] std::vector<ast::Struct::Field> parse_fields() noexcept;
