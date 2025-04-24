@@ -1116,16 +1116,18 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
             return std::nullopt;
         }
 
-        value = implicit_cast(type, *value);
+        if (!type) {
+            type = value->type;
+            llvm_type = value->type->codegen(*this);
+        } else {
+            value = implicit_cast(type, *value);
 
-        if (!value) {
-            error(decl.value->span.begin, m_filename, "type mismatch");
+            if (!value) {
+                error(decl.value->span.begin, m_filename, "type mismatch");
 
-            return std::nullopt;
+                return std::nullopt;
+            }
         }
-
-        type = value->type;
-        llvm_type = value->value->getType();
     }
 
     if (llvm_type->isVoidTy()) {
