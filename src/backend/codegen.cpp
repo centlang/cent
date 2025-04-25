@@ -1100,7 +1100,9 @@ std::optional<Value> Codegen::generate_bin_expr(
     ast::SpanValue<frontend::Token::Type> oper) noexcept {
     using enum frontend::Token::Type;
 
-    if (!types_equal(*lhs.value.type, *rhs.value.type)) {
+    auto right = cast(lhs.value.type, rhs.value);
+
+    if (!right) {
         error(lhs.span.begin, m_filename, "type mismatch");
 
         return std::nullopt;
@@ -1144,66 +1146,65 @@ std::optional<Value> Codegen::generate_bin_expr(
         return Value{
             lhs.value.type,
             lhs.value.type->is_float()
-                ? m_builder.CreateFAdd(lhs.value.value, rhs.value.value)
-                : m_builder.CreateAdd(lhs.value.value, rhs.value.value)};
+                ? m_builder.CreateFAdd(lhs.value.value, right->value)
+                : m_builder.CreateAdd(lhs.value.value, right->value)};
     case Minus:
         return Value{
             lhs.value.type,
             lhs.value.type->is_float()
-                ? m_builder.CreateFSub(lhs.value.value, rhs.value.value)
-                : m_builder.CreateSub(lhs.value.value, rhs.value.value)};
+                ? m_builder.CreateFSub(lhs.value.value, right->value)
+                : m_builder.CreateSub(lhs.value.value, right->value)};
     case Star:
         return Value{
             lhs.value.type,
             lhs.value.type->is_float()
-                ? m_builder.CreateFMul(lhs.value.value, rhs.value.value)
-                : m_builder.CreateMul(lhs.value.value, rhs.value.value)};
+                ? m_builder.CreateFMul(lhs.value.value, right->value)
+                : m_builder.CreateMul(lhs.value.value, right->value)};
     case Slash:
         return Value{
             lhs.value.type,
             lhs.value.type->is_signed_int()
-                ? m_builder.CreateSDiv(lhs.value.value, rhs.value.value)
-                : m_builder.CreateUDiv(lhs.value.value, rhs.value.value)};
+                ? m_builder.CreateSDiv(lhs.value.value, right->value)
+                : m_builder.CreateUDiv(lhs.value.value, right->value)};
     case AndAnd:
         return Value{
             m_types["bool"],
-            m_builder.CreateAnd(lhs.value.value, rhs.value.value)};
+            m_builder.CreateAnd(lhs.value.value, right->value)};
     case OrOr:
         return Value{
-            m_types["bool"],
-            m_builder.CreateOr(lhs.value.value, rhs.value.value)};
+            m_types["bool"], m_builder.CreateOr(lhs.value.value, right->value)};
     case Less:
         return Value{
             m_types["bool"],
             lhs.value.type->is_signed_int()
-                ? m_builder.CreateICmpSLT(lhs.value.value, rhs.value.value)
-                : m_builder.CreateICmpULT(lhs.value.value, rhs.value.value)};
+                ? m_builder.CreateICmpSLT(lhs.value.value, right->value)
+                : m_builder.CreateICmpULT(lhs.value.value, right->value)};
     case Greater:
         return Value{
             m_types["bool"],
             lhs.value.type->is_signed_int()
-                ? m_builder.CreateICmpSGT(lhs.value.value, rhs.value.value)
-                : m_builder.CreateICmpUGT(lhs.value.value, rhs.value.value)};
+                ? m_builder.CreateICmpSGT(lhs.value.value, right->value)
+                : m_builder.CreateICmpUGT(lhs.value.value, right->value)};
     case EqualEqual:
         return Value{
             m_types["bool"],
-            m_builder.CreateICmpEQ(lhs.value.value, rhs.value.value)};
+            m_builder.CreateICmpEQ(lhs.value.value, right->value)};
     case BangEqual:
         return Value{
             m_types["bool"],
-            m_builder.CreateICmpNE(lhs.value.value, rhs.value.value)};
+            m_builder.CreateICmpNE(lhs.value.value, right->value)};
     case GreaterEqual:
         return Value{
             m_types["bool"],
             lhs.value.type->is_signed_int()
-                ? m_builder.CreateICmpSGE(lhs.value.value, rhs.value.value)
-                : m_builder.CreateICmpUGE(lhs.value.value, rhs.value.value)};
+                ? m_builder.CreateICmpSGE(lhs.value.value, right->value)
+                : m_builder.CreateICmpUGE(lhs.value.value, right->value)};
     case LessEqual:
         return Value{
             m_types["bool"],
             lhs.value.type->is_signed_int()
-                ? m_builder.CreateICmpSLE(lhs.value.value, rhs.value.value)
-                : m_builder.CreateICmpULE(lhs.value.value, rhs.value.value)};
+                ? m_builder.CreateICmpSLE(lhs.value.value, right->value)
+                : m_builder.CreateICmpULE(lhs.value.value, right->value)};
     default:
         return std::nullopt;
     }
