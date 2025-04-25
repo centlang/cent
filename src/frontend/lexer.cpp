@@ -194,7 +194,9 @@ void Lexer::number() noexcept {
 }
 
 void Lexer::ident() noexcept {
-    m_token = {Token::Type::Identifier, {m_at, m_at}, {m_position, {}}};
+    using enum Token::Type;
+
+    m_token = {Identifier, {m_at, m_at}, {m_position, {}}};
 
     while (!eof() && is_ident(peek())) {
         get();
@@ -209,57 +211,57 @@ void Lexer::ident() noexcept {
     };
 
     if (m_token.value == "true") {
-        keyword(Token::Type::True);
+        keyword(True);
         return;
     }
 
     if (m_token.value == "false") {
-        keyword(Token::Type::False);
+        keyword(False);
         return;
     }
 
     if (m_token.value == "fn") {
-        keyword(Token::Type::Fn);
+        keyword(Fn);
         return;
     }
 
     if (m_token.value == "struct") {
-        keyword(Token::Type::Struct);
+        keyword(Struct);
         return;
     }
 
     if (m_token.value == "as") {
-        keyword(Token::Type::As);
+        keyword(As);
         return;
     }
 
     if (m_token.value == "if") {
-        keyword(Token::Type::If);
+        keyword(If);
         return;
     }
 
     if (m_token.value == "else") {
-        keyword(Token::Type::Else);
+        keyword(Else);
         return;
     }
 
     if (m_token.value == "while") {
-        keyword(Token::Type::While);
+        keyword(While);
         return;
     }
 
     if (m_token.value == "let") {
-        keyword(Token::Type::Let);
+        keyword(Let);
         return;
     }
 
     if (m_token.value == "mut") {
-        keyword(Token::Type::Mut);
+        keyword(Mut);
         return;
     }
 
     if (m_token.value == "return") {
-        keyword(Token::Type::Return);
+        keyword(Return);
         return;
     }
 }

@@ -131,25 +131,34 @@ private:
     [[nodiscard]] bool parse_struct(ast::Program& program) noexcept;
 
     [[nodiscard]] static std::uint8_t precedence_of(Token::Type type) noexcept {
-        enum { None = 0, Or, And, Comparison, Additive, Multiplicative };
+        using enum Token::Type;
+
+        enum Precedence {
+            None = 0,
+            Or,
+            And,
+            Comparison,
+            Additive,
+            Multiplicative
+        };
 
         switch (type) {
-        case Token::Type::OrOr:
-            return Or;
-        case Token::Type::AndAnd:
-            return And;
-        case Token::Type::Less:
-        case Token::Type::Greater:
-        case Token::Type::EqualEqual:
-        case Token::Type::BangEqual:
-        case Token::Type::GreaterEqual:
-        case Token::Type::LessEqual:
+        case OrOr:
+            return Precedence::Or;
+        case AndAnd:
+            return Precedence::And;
+        case Less:
+        case Greater:
+        case EqualEqual:
+        case BangEqual:
+        case GreaterEqual:
+        case LessEqual:
             return Comparison;
-        case Token::Type::Plus:
-        case Token::Type::Minus:
+        case Plus:
+        case Minus:
             return Additive;
-        case Token::Type::Star:
-        case Token::Type::Slash:
+        case Star:
+        case Slash:
             return Multiplicative;
         default:
             return None;

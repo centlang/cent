@@ -17,8 +17,10 @@
 namespace cent::frontend {
 
 std::unique_ptr<ast::Program> Parser::parse() noexcept {
+    using enum Token::Type;
+
     auto skip_until_decl = [&] {
-        while (!match(Token::Type::Eof, Token::Type::Fn, Token::Type::Struct)) {
+        while (!match(Eof, Fn, Struct)) {
             next();
         }
     };
@@ -26,16 +28,16 @@ std::unique_ptr<ast::Program> Parser::parse() noexcept {
     auto result = std::make_unique<ast::Program>();
 
     while (true) {
-        if (match(Token::Type::Eof)) {
+        if (match(Eof)) {
             break;
         }
 
-        if (match(Token::Type::Semicolon)) {
+        if (match(Semicolon)) {
             next();
             continue;
         }
 
-        if (match(Token::Type::Fn)) {
+        if (match(Fn)) {
             next();
 
             if (!parse_fn(*result)) {
@@ -45,7 +47,7 @@ std::unique_ptr<ast::Program> Parser::parse() noexcept {
             continue;
         }
 
-        if (match(Token::Type::Struct)) {
+        if (match(Struct)) {
             next();
 
             if (!parse_struct(*result)) {
@@ -63,21 +65,23 @@ std::unique_ptr<ast::Program> Parser::parse() noexcept {
 }
 
 void Parser::expect_stmt(ast::BlockStmt& block) noexcept {
+    using enum Token::Type;
+
     switch (peek().type) {
-    case Token::Type::LeftBrace:
+    case LeftBrace:
         block.body.push_back(expect_block());
         return;
-    case Token::Type::If:
+    case If:
         block.body.push_back(parse_if_else());
         return;
-    case Token::Type::While:
+    case While:
         parse_while(block);
         return;
-    case Token::Type::Let:
-    case Token::Type::Mut:
+    case Let:
+    case Mut:
         parse_var(block);
         break;
-    case Token::Type::Return:
+    case Return:
         parse_return(block);
         break;
     default:
@@ -88,10 +92,7 @@ void Parser::expect_stmt(ast::BlockStmt& block) noexcept {
             return;
         }
 
-        if (!match(
-                Token::Type::Equal, Token::Type::PlusEqual,
-                Token::Type::MinusEqual, Token::Type::StarEqual,
-                Token::Type::SlashEqual)) {
+        if (!match(Equal, PlusEqual, MinusEqual, StarEqual, SlashEqual)) {
             block.body.push_back(std::move(value));
             break;
         }
@@ -147,33 +148,33 @@ std::vector<ast::StructLiteral::Field> Parser::parse_field_values() noexcept {
 }
 
 std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
+    using enum Token::Type;
+
     auto token = expect(
-        "expression", Token::Type::IntLiteral, Token::Type::FloatLiteral,
-        Token::Type::True, Token::Type::False, Token::Type::Identifier,
-        Token::Type::Minus, Token::Type::Bang, Token::Type::Star,
-        Token::Type::And, Token::Type::LeftParen);
+        "expression", IntLiteral, FloatLiteral, True, False, Identifier, Minus,
+        Bang, Star, And, LeftParen);
 
     if (!token) {
         return nullptr;
     }
 
     switch (token->type) {
-    case Token::Type::IntLiteral:
+    case IntLiteral:
         return std::make_unique<ast::IntLiteral>(token->span, token->value);
-    case Token::Type::FloatLiteral:
+    case FloatLiteral:
         return std::make_unique<ast::FloatLiteral>(token->span, token->value);
-    case Token::Type::True:
+    case True:
         return std::make_unique<ast::BoolLiteral>(token->span, true);
-    case Token::Type::False:
+    case False:
         return std::make_unique<ast::BoolLiteral>(token->span, false);
-    case Token::Type::Identifier: {
-        if (match(Token::Type::LeftBrace)) {
+    case Identifier: {
+        if (match(LeftBrace)) {
             next();
 
             auto fields = parse_field_values();
             auto end = peek().span.end;
 
-            if (!expect("',' or '}'", Token::Type::RightBrace)) {
+            if (!expect("',' or '}'", RightBrace)) {
                 return nullptr;
             }
 
@@ -182,7 +183,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
                 ast::SpanValue{token->value, token->span}, std::move(fields));
         }
 
-        if (!match(Token::Type::LeftParen)) {
+        if (!match(LeftParen)) {
             return std::make_unique<ast::Identifier>(token->span, token->value);
         }
 
@@ -191,7 +192,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
         auto args = parse_args();
         auto end = peek().span.end;
 
-        if (!expect("',' or ')'", Token::Type::RightParen)) {
+        if (!expect("',' or ')'", RightParen)) {
             return nullptr;
         }
 
@@ -199,10 +200,10 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
             Span{token->span.begin, end},
             ast::SpanValue{token->value, token->span}, std::move(args));
     }
-    case Token::Type::Minus:
-    case Token::Type::Bang:
-    case Token::Type::Star:
-    case Token::Type::And:
+    case Minus:
+    case Bang:
+    case Star:
+    case And:
         if (auto value = expect_member_expr()) {
             return std::make_unique<ast::UnaryExpr>(
                 Span{token->span.begin, value->span.end},
@@ -210,9 +211,9 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
         }
 
         return nullptr;
-    case Token::Type::LeftParen: {
+    case LeftParen: {
         auto value = expect_expr();
-        expect("')'", Token::Type::RightParen);
+        expect("')'", RightParen);
 
         return value;
     }
