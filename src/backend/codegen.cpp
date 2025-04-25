@@ -828,13 +828,13 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
             return std::nullopt;
         }
 
-        if (!types_equal(*value->type, *callee->param_types[i])) {
+        if (auto val = implicit_cast(callee->param_types[i], *value)) {
+            arguments.push_back(val->value);
+        } else {
             error(expr.arguments[i]->span.begin, m_filename, "type mismatch");
 
             return std::nullopt;
         }
-
-        arguments.push_back(value->value);
     }
 
     return Value{
