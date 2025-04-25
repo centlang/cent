@@ -89,38 +89,68 @@ bool Codegen::types_equal(Type& lhs, Type& rhs) noexcept {
     return false;
 }
 
-std::optional<Value>
-Codegen::implicit_cast(std::shared_ptr<Type>& type, Value& value) noexcept {
+std::optional<Value> Codegen::cast(
+    std::shared_ptr<Type>& type, Value& value, bool implicit) noexcept {
+    using enum llvm::Instruction::CastOps;
+
     if (types_equal(*type, *value.type)) {
         return value;
     }
 
-    if (!type->is_optional()) {
-        return std::nullopt;
-    }
-
-    auto& contained = static_cast<types::Optional&>(*type).type;
-
-    if (!types_equal(*contained, *value.type)) {
-        return std::nullopt;
-    }
-
     auto* llvm_type = type->codegen(*this);
-    auto* variable = m_builder.CreateAlloca(llvm_type);
 
-    auto* value_ptr =
-        m_builder.CreateStructGEP(llvm_type, variable, optional_member_value);
+    if (type->is_optional()) {
+        auto& contained = static_cast<types::Optional&>(*type).type;
 
-    auto* bool_ptr =
-        m_builder.CreateStructGEP(llvm_type, variable, optional_member_bool);
+        if (!types_equal(*contained, *value.type)) {
+            return std::nullopt;
+        }
 
-    m_builder.CreateStore(value.value, value_ptr);
+        auto* variable = m_builder.CreateAlloca(llvm_type);
 
-    m_builder.CreateStore(
-        llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), true),
-        bool_ptr);
+        auto* value_ptr = m_builder.CreateStructGEP(
+            llvm_type, variable, optional_member_value);
 
-    return Value{type, variable};
+        auto* bool_ptr = m_builder.CreateStructGEP(
+            llvm_type, variable, optional_member_bool);
+
+        m_builder.CreateStore(value.value, value_ptr);
+
+        m_builder.CreateStore(
+            llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), true),
+            bool_ptr);
+
+        return Value{type, variable};
+    }
+
+    std::size_t from_size = value.value->getType()->getPrimitiveSizeInBits();
+    std::size_t to_size = llvm_type->getPrimitiveSizeInBits();
+
+    llvm::Instruction::CastOps cast_op = CastOpsEnd;
+
+    if (!implicit && value.type->is_float() && type->is_signed_int()) {
+        cast_op = FPToSI;
+    } else if (!implicit && value.type->is_float() && type->is_unsigned_int()) {
+        cast_op = FPToUI;
+    } else if (value.type->is_signed_int() && type->is_float()) {
+        cast_op = SIToFP;
+    } else if (value.type->is_unsigned_int() && type->is_float()) {
+        cast_op = UIToFP;
+    } else if (to_size > from_size) {
+        if (value.type->is_float() && type->is_float()) {
+            cast_op = FPExt;
+        } else {
+            cast_op = value.type->is_unsigned_int() && type->is_signed_int()
+                          ? ZExt
+                          : SExt;
+        }
+    } else if (!implicit && to_size < from_size) {
+        cast_op = value.type->is_float() && type->is_float() ? FPTrunc : Trunc;
+    } else {
+        return value;
+    }
+
+    return Value{type, m_builder.CreateCast(cast_op, value.value, llvm_type)};
 }
 
 std::shared_ptr<Type> Codegen::generate(ast::NamedType& type) noexcept {
@@ -828,7 +858,7 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
             return std::nullopt;
         }
 
-        if (auto val = implicit_cast(callee->param_types[i], *value)) {
+        if (auto val = cast(callee->param_types[i], *value)) {
             arguments.push_back(val->value);
         } else {
             error(expr.arguments[i]->span.begin, m_filename, "type mismatch");
@@ -910,40 +940,11 @@ std::optional<Value> Codegen::generate(ast::AsExpr& expr) noexcept {
         return std::nullopt;
     }
 
-    auto* llvm_type = type->codegen(*this);
-
     if (value->type->is_pointer() && type->is_pointer()) {
         return Value{type, value->value};
     }
 
-    std::size_t from_size = value->value->getType()->getPrimitiveSizeInBits();
-    std::size_t to_size = llvm_type->getPrimitiveSizeInBits();
-
-    llvm::Instruction::CastOps cast_op = CastOpsEnd;
-
-    if (value->type->is_float() && type->is_signed_int()) {
-        cast_op = FPToSI;
-    } else if (value->type->is_float() && type->is_unsigned_int()) {
-        cast_op = FPToUI;
-    } else if (value->type->is_signed_int() && type->is_float()) {
-        cast_op = SIToFP;
-    } else if (value->type->is_unsigned_int() && type->is_float()) {
-        cast_op = UIToFP;
-    } else if (to_size > from_size) {
-        if (value->type->is_float() && type->is_float()) {
-            cast_op = FPExt;
-        } else {
-            cast_op = value->type->is_unsigned_int() && type->is_signed_int()
-                          ? ZExt
-                          : SExt;
-        }
-    } else if (to_size < from_size) {
-        cast_op = value->type->is_float() && type->is_float() ? FPTrunc : Trunc;
-    } else {
-        return value;
-    }
-
-    return Value{type, m_builder.CreateCast(cast_op, value->value, llvm_type)};
+    return cast(type, *value, false);
 }
 
 std::optional<Value> Codegen::generate(ast::FnDecl& decl) noexcept {
@@ -1054,7 +1055,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
             type = value->type;
             llvm_type = value->type->codegen(*this);
         } else {
-            value = implicit_cast(type, *value);
+            value = cast(type, *value);
 
             if (!value) {
                 error(decl.value->span.begin, m_filename, "type mismatch");
