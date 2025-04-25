@@ -433,13 +433,11 @@ std::optional<Value> Codegen::generate(ast::ReturnStmt& stmt) noexcept {
         return std::nullopt;
     }
 
-    if (!types_equal(*value->type, *m_functions[function]->return_type)) {
+    if (auto val = cast(m_functions[function]->return_type, *value)) {
+        m_builder.CreateRet(val->value);
+    } else {
         error(stmt.value->span.begin, m_filename, "type mismatch");
-
-        return std::nullopt;
     }
-
-    m_builder.CreateRet(value->value);
 
     return std::nullopt;
 }
