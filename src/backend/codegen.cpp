@@ -298,7 +298,9 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
         return std::nullopt;
     }
 
-    if (!types_equal(*var->type, *value->type)) {
+    auto val = cast(var->type, *value);
+
+    if (!val) {
         error(stmt.value->span.begin, m_filename, "type mismatch");
 
         return std::nullopt;
@@ -313,13 +315,13 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
     }
 
     if (auto* variable = llvm::dyn_cast<llvm::AllocaInst>(var->value)) {
-        m_builder.CreateStore(value->value, variable);
+        m_builder.CreateStore(val->value, variable);
 
         return std::nullopt;
     }
 
     if (auto* variable = llvm::dyn_cast<llvm::LoadInst>(var->value)) {
-        m_builder.CreateStore(value->value, variable);
+        m_builder.CreateStore(val->value, variable);
 
         return std::nullopt;
     }
@@ -333,7 +335,7 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
         return std::nullopt;
     }
 
-    m_builder.CreateStore(value->value, variable);
+    m_builder.CreateStore(val->value, variable);
 
     return std::nullopt;
 }
