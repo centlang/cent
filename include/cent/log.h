@@ -17,11 +17,17 @@ log(std::string_view type, Position position, std::string_view filename,
         type, message);
 }
 
+inline void log(std::string_view type, std::string_view message) noexcept {
+    fmt::print(stderr, "{}: {}\n", type, message);
+}
+
 inline void error(
     Position position, std::string_view filename,
     std::string_view message) noexcept {
     log("error", position, filename, message);
 }
+
+inline void error(std::string_view message) noexcept { log("error", message); }
 
 inline void warning(
     Position position, std::string_view filename,
@@ -29,11 +35,17 @@ inline void warning(
     log("warning", position, filename, message);
 }
 
+inline void warning(std::string_view message) noexcept {
+    log("warning", message);
+}
+
 inline void note(
     Position position, std::string_view filename,
     std::string_view message) noexcept {
     log("note", position, filename, message);
 }
+
+inline void note(std::string_view message) noexcept { log("note", message); }
 
 } // namespace cent
 
