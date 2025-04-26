@@ -796,7 +796,9 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
 
         auto index = iterator->second;
 
-        if (!types_equal(*type->fields[index], *value->type)) {
+        auto val = cast(type->fields[index], *value);
+
+        if (!val) {
             error(
                 expr.fields[index].value->span.begin, m_filename,
                 "type mismatch");
