@@ -4,9 +4,13 @@
 #include <filesystem>
 
 #include <llvm/IR/Module.h>
+#include <llvm/Passes/OptimizationLevel.h>
 #include <llvm/Target/TargetMachine.h>
 
 namespace cent::backend {
+
+void optimize_module(
+    llvm::Module& module, llvm::OptimizationLevel opt_level) noexcept;
 
 [[nodiscard]] bool emit_obj(
     llvm::Module& module, llvm::TargetMachine& machine,
