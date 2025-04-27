@@ -1165,6 +1165,12 @@ std::optional<Value> Codegen::generate_bin_expr(
                 ? m_builder.CreateFMul(lhs.value.value, right->value)
                 : m_builder.CreateMul(lhs.value.value, right->value)};
     case Slash:
+        if (lhs.value.type->is_float()) {
+            return Value{
+                lhs.value.type,
+                m_builder.CreateFDiv(lhs.value.value, right->value)};
+        }
+
         return Value{
             lhs.value.type,
             lhs.value.type->is_signed_int()
