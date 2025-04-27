@@ -18,44 +18,15 @@
 
 #include "cent/log.h"
 
-void help() noexcept { fmt::print("Usage: centc FILE\n"); }
+void help() noexcept { fmt::print("Usage: centc FILE...\n"); }
 
 int main(int argc, char** argv) {
     std::span args{argv, static_cast<std::size_t>(argc)};
 
-    if (args.size() != 2) {
+    if (args.size() < 2) {
         help();
 
         return 0;
-    }
-
-    std::string filename = args[1];
-    std::ifstream file{filename};
-
-    if (!file) {
-        cent::error(
-            fmt::format("could not open file: {}", std::strerror(errno)));
-
-        return 1;
-    }
-
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-
-    std::string code = buffer.str();
-
-    cent::frontend::Parser parser{code, filename};
-    auto program = parser.parse();
-
-    if (!program) {
-        return 1;
-    }
-
-    cent::backend::Codegen codegen{std::move(program), filename};
-    auto module = codegen.generate();
-
-    if (!module) {
-        return 1;
     }
 
     auto triple = llvm::sys::getDefaultTargetTriple();
@@ -79,15 +50,46 @@ int main(int argc, char** argv) {
     auto* machine = target->createTargetMachine(
         triple, "generic", "", llvm::TargetOptions{}, llvm::Reloc::PIC_);
 
-    module->setDataLayout(machine->createDataLayout());
-    module->setTargetTriple(triple);
+    for (const char* arg_cstr : args.subspan(1)) {
+        std::string arg = arg_cstr;
+        std::ifstream file{arg};
 
-    cent::backend::optimize_module(*module, llvm::OptimizationLevel::O3);
+        if (!file) {
+            cent::error(
+                fmt::format("could not open file: {}", std::strerror(errno)));
 
-    if (!cent::backend::emit_obj(
-            *module, *machine,
-            filename.substr(0, filename.find_last_of('.')) + ".o")) {
-        return 1;
+            return 1;
+        }
+
+        std::ostringstream buffer;
+        buffer << file.rdbuf();
+
+        std::string code = buffer.str();
+
+        cent::frontend::Parser parser{code, arg};
+        auto program = parser.parse();
+
+        if (!program) {
+            return 1;
+        }
+
+        cent::backend::Codegen codegen{std::move(program), arg};
+        auto module = codegen.generate();
+
+        if (!module) {
+            return 1;
+        }
+
+        module->setDataLayout(machine->createDataLayout());
+        module->setTargetTriple(triple);
+
+        cent::backend::optimize_module(*module, llvm::OptimizationLevel::O3);
+
+        if (!cent::backend::emit_obj(
+                *module, *machine,
+                arg.substr(0, arg.find_last_of('.')) + ".o")) {
+            return 1;
+        }
     }
 
     return 0;
