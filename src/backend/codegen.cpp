@@ -52,23 +52,7 @@ std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
         {"bool", std::make_shared<types::Bool>()},
         {"void", std::make_shared<types::Void>()}};
 
-    for (auto& struct_decl : m_program->structs) {
-        llvm::StructType::create(m_context, struct_decl->name.value);
-    }
-
-    for (auto& struct_decl : m_program->structs) {
-        struct_decl->codegen(*this);
-    }
-
-    for (auto& function : m_program->functions) {
-        generate_fn_proto(*function);
-    }
-
-    for (auto& function : m_program->functions) {
-        if (function->block) {
-            function->codegen(*this);
-        }
-    }
+    generate(*m_program);
 
     return std::move(m_module);
 }
@@ -1091,6 +1075,34 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
     m_locals[decl.name.value] = {type, variable, decl.is_mutable};
 
     return std::nullopt;
+}
+
+void Codegen::generate(ast::Module& module, bool generate_impl) noexcept {
+    for (auto& submodule : module.submodules) {
+        generate(*submodule, false);
+    }
+
+    for (auto& struct_decl : module.structs) {
+        llvm::StructType::create(m_context, struct_decl->name.value);
+    }
+
+    for (auto& struct_decl : module.structs) {
+        struct_decl->codegen(*this);
+    }
+
+    for (auto& function : module.functions) {
+        generate_fn_proto(*function);
+    }
+
+    if (!generate_impl) {
+        return;
+    }
+
+    for (auto& function : module.functions) {
+        if (function->block) {
+            function->codegen(*this);
+        }
+    }
 }
 
 std::optional<Value> Codegen::generate(ast::Expression& expr) noexcept {
