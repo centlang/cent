@@ -2,7 +2,7 @@
 #define CENT_AST_STRUCT_H
 
 #include <memory>
-#include <string_view>
+#include <string>
 #include <vector>
 
 #include "cent/ast/node.h"
@@ -12,16 +12,16 @@ namespace cent::ast {
 
 struct Struct : detail::Decl<Struct> {
     struct Field {
-        SpanValue<std::string_view> name;
+        SpanValue<std::string> name;
         std::unique_ptr<Type> type;
     };
 
     [[nodiscard]] Struct(
-        Span span, SpanValue<std::string_view> name,
+        Span span, SpanValue<std::string> name,
         std::vector<Field> fields) noexcept
-    : Decl{span}, name{name}, fields{std::move(fields)} {}
+    : Decl{span}, name{std::move(name)}, fields{std::move(fields)} {}
 
-    SpanValue<std::string_view> name;
+    SpanValue<std::string> name;
     std::vector<Field> fields;
 };
 

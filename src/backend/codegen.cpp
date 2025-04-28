@@ -552,7 +552,7 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
 
 std::optional<Value> Codegen::generate(ast::IntLiteral& expr) noexcept {
     bool failed = false;
-    auto literal = expr.value;
+    std::string_view literal = expr.value;
 
     std::uint8_t base = [&] {
         static constexpr auto hex = 16;
@@ -561,19 +561,19 @@ std::optional<Value> Codegen::generate(ast::IntLiteral& expr) noexcept {
         static constexpr auto dec = 10;
 
         if (literal.starts_with("0x")) {
-            literal = {literal.cbegin() + 2, literal.cend()};
+            literal = literal.substr(2);
 
             return hex;
         }
 
         if (literal.starts_with("0o")) {
-            literal = {literal.cbegin() + 2, literal.cend()};
+            literal = literal.substr(2);
 
             return oct;
         }
 
         if (literal.starts_with("0b")) {
-            literal = {literal.cbegin() + 2, literal.cend()};
+            literal = literal.substr(2);
 
             return bin;
         }
@@ -589,7 +589,7 @@ std::optional<Value> Codegen::generate(ast::IntLiteral& expr) noexcept {
         }
 
         Type value{};
-        literal = {literal.cbegin(), literal.cend() - suffix.size()};
+        literal = literal.substr(0, literal.size() - suffix.size());
 
         auto [pointer, result] =
             std::from_chars(literal.cbegin(), literal.cend(), value, base);
@@ -674,7 +674,7 @@ std::optional<Value> Codegen::generate(ast::IntLiteral& expr) noexcept {
     std::int32_t value{};
 
     auto [pointer, result] =
-        std::from_chars(literal.begin(), literal.end(), value, base);
+        std::from_chars(literal.cbegin(), literal.cend(), value, base);
 
     if (result == std::errc::result_out_of_range) {
         error(expr.span.begin, m_filename, "integer out of range");
@@ -690,6 +690,8 @@ std::optional<Value> Codegen::generate(ast::IntLiteral& expr) noexcept {
 std::optional<Value> Codegen::generate(ast::FloatLiteral& expr) noexcept {
     bool failed = false;
 
+    std::string_view literal = expr.value;
+
     auto with_type_suffix =
         [&]<typename Type>(std::string_view suffix) -> std::optional<Value> {
         if (!expr.value.ends_with(suffix)) {
@@ -698,8 +700,10 @@ std::optional<Value> Codegen::generate(ast::FloatLiteral& expr) noexcept {
 
         Type value{};
 
-        auto [pointer, result] = std::from_chars(
-            expr.value.begin(), expr.value.end() - suffix.size(), value);
+        literal = literal.substr(0, literal.size() - suffix.size());
+
+        auto [pointer, result] =
+            std::from_chars(literal.cbegin(), literal.cend(), value);
 
         if (result == std::errc::result_out_of_range) {
             error(expr.span.begin, m_filename, "float out of range");
@@ -733,7 +737,7 @@ std::optional<Value> Codegen::generate(ast::FloatLiteral& expr) noexcept {
     float value{};
 
     auto [pointer, result] =
-        std::from_chars(expr.value.begin(), expr.value.end(), value);
+        std::from_chars(literal.cbegin(), literal.cend(), value);
 
     if (result == std::errc::result_out_of_range) {
         error(expr.span.begin, m_filename, "float out of range");

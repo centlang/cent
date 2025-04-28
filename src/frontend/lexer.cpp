@@ -92,7 +92,6 @@ void Lexer::next_token() noexcept {
         break;
     case '/': {
         auto begin = m_position;
-        get();
 
         if (eof()) {
             m_token = {Slash, {}, {begin, m_position}};
@@ -137,36 +136,33 @@ void Lexer::next_token() noexcept {
         logical_op(Or, OrOr);
         break;
     default:
-        m_token = {Invalid, {m_at, m_at + 1}, Span::from(m_position)};
-        get();
+        m_token = {Invalid, std::string{get()}, Span::from(m_position)};
 
         break;
     }
 }
 
 void Lexer::number() noexcept {
-    m_token = {Token::Type::IntLiteral, {m_at, m_at}, {m_position, {}}};
+    m_token = {Token::Type::IntLiteral, {}, {m_position, {}}};
 
     auto get_int = [&] {
         while (!eof() && std::isdigit(peek())) {
-            get();
-            m_token.value = {m_token.value.cbegin(), m_at};
+            m_token.value += get();
         }
     };
 
     if (peek() == '0') {
-        get();
+        m_token.value += get();
 
         if (!eof() && (peek() == 'x' || peek() == 'o' || peek() == 'b')) {
-            get();
-            m_token.value = {m_token.value.cbegin(), m_at};
+            m_token.value += get();
         }
     }
 
     get_int();
 
     if (!eof() && (peek() == 'i' || peek() == 'u')) {
-        get();
+        m_token.value += get();
         get_int();
 
         m_token.span.end = m_position;
@@ -178,15 +174,13 @@ void Lexer::number() noexcept {
         return;
     }
 
-    get();
-
-    m_token.value = {m_token.value.cbegin(), m_at};
+    m_token.value += get();
     m_token.type = Token::Type::FloatLiteral;
 
     get_int();
 
     if (!eof() && peek() == 'f') {
-        get();
+        m_token.value += get();
         get_int();
     }
 
@@ -196,11 +190,10 @@ void Lexer::number() noexcept {
 void Lexer::ident() noexcept {
     using enum Token::Type;
 
-    m_token = {Identifier, {m_at, m_at}, {m_position, {}}};
+    m_token = {Identifier, {}, {m_position, {}}};
 
     while (!eof() && is_ident(peek())) {
-        get();
-        m_token.value = {m_token.value.cbegin(), m_at};
+        m_token.value += get();
     }
 
     m_token.span.end = m_position;

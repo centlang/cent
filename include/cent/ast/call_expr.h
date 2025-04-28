@@ -2,7 +2,7 @@
 #define CENT_AST_CALL_EXPR_H
 
 #include <memory>
-#include <string_view>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -13,11 +13,12 @@ namespace cent::ast {
 
 struct CallExpr : detail::Expr<CallExpr> {
     [[nodiscard]] CallExpr(
-        Span span, SpanValue<std::string_view> identifier,
+        Span span, SpanValue<std::string> identifier,
         std::vector<std::unique_ptr<Expression>> arguments) noexcept
-    : Expr{span}, identifier{identifier}, arguments{std::move(arguments)} {}
+    : Expr{span}, identifier{std::move(identifier)},
+      arguments{std::move(arguments)} {}
 
-    SpanValue<std::string_view> identifier;
+    SpanValue<std::string> identifier;
     std::vector<std::unique_ptr<Expression>> arguments;
 };
 

@@ -2,7 +2,7 @@
 #define CENT_AST_VAR_DECL_H
 
 #include <memory>
-#include <string_view>
+#include <string>
 #include <utility>
 
 #include "cent/span.h"
@@ -14,14 +14,14 @@ namespace cent::ast {
 
 struct VarDecl : detail::Decl<VarDecl> {
     [[nodiscard]] VarDecl(
-        Span span, bool is_mutable, SpanValue<std::string_view> name,
+        Span span, bool is_mutable, SpanValue<std::string> name,
         std::unique_ptr<Type> type, std::unique_ptr<Expression> value) noexcept
-    : Decl{span}, is_mutable{is_mutable}, name{name}, type{std::move(type)},
-      value{std::move(value)} {}
+    : Decl{span}, is_mutable{is_mutable}, name{std::move(name)},
+      type{std::move(type)}, value{std::move(value)} {}
 
     bool is_mutable;
 
-    SpanValue<std::string_view> name;
+    SpanValue<std::string> name;
     std::unique_ptr<Type> type;
 
     std::unique_ptr<Expression> value;

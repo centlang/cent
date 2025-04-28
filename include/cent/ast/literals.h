@@ -1,7 +1,7 @@
 #ifndef CENT_AST_LITERALS_H
 #define CENT_AST_LITERALS_H
 
-#include <string_view>
+#include <string>
 #include <vector>
 
 #include "cent/span.h"
@@ -12,17 +12,17 @@
 namespace cent::ast {
 
 struct IntLiteral : detail::Expr<IntLiteral> {
-    [[nodiscard]] IntLiteral(Span span, std::string_view value) noexcept
-    : Expr{span}, value{value} {}
+    [[nodiscard]] IntLiteral(Span span, std::string value) noexcept
+    : Expr{span}, value{std::move(value)} {}
 
-    std::string_view value;
+    std::string value;
 };
 
 struct FloatLiteral : detail::Expr<FloatLiteral> {
-    [[nodiscard]] FloatLiteral(Span span, std::string_view value) noexcept
-    : Expr{span}, value{value} {}
+    [[nodiscard]] FloatLiteral(Span span, std::string value) noexcept
+    : Expr{span}, value{std::move(value)} {}
 
-    std::string_view value;
+    std::string value;
 };
 
 struct BoolLiteral : detail::Expr<BoolLiteral> {
@@ -34,16 +34,16 @@ struct BoolLiteral : detail::Expr<BoolLiteral> {
 
 struct StructLiteral : detail::Expr<StructLiteral> {
     struct Field {
-        SpanValue<std::string_view> name;
+        SpanValue<std::string> name;
         std::unique_ptr<Expression> value;
     };
 
     [[nodiscard]] StructLiteral(
-        Span span, SpanValue<std::string_view> name,
+        Span span, SpanValue<std::string> name,
         std::vector<Field> fields) noexcept
-    : Expr{span}, name{name}, fields{std::move(fields)} {}
+    : Expr{span}, name{std::move(name)}, fields{std::move(fields)} {}
 
-    SpanValue<std::string_view> name;
+    SpanValue<std::string> name;
     std::vector<Field> fields;
 };
 

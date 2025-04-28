@@ -2,7 +2,7 @@
 #define CENT_AST_MEMBER_EXPR_H
 
 #include <memory>
-#include <string_view>
+#include <string>
 
 #include "cent/span.h"
 
@@ -14,11 +14,11 @@ namespace cent::ast {
 struct MemberExpr : detail::Expr<MemberExpr> {
     [[nodiscard]] MemberExpr(
         Span span, std::unique_ptr<Expression> parent,
-        SpanValue<std::string_view> member) noexcept
-    : Expr{span}, parent{std::move(parent)}, member{member} {}
+        SpanValue<std::string> member) noexcept
+    : Expr{span}, parent{std::move(parent)}, member{std::move(member)} {}
 
     std::unique_ptr<Expression> parent;
-    SpanValue<std::string_view> member;
+    SpanValue<std::string> member;
 };
 
 } // namespace cent::ast

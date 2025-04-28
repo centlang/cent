@@ -2,6 +2,7 @@
 #define CENT_AST_FN_DECL_H
 
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -15,12 +16,12 @@ namespace cent::ast {
 
 struct FnDecl : detail::Decl<FnDecl> {
     struct Param {
-        SpanValue<std::string_view> name;
+        SpanValue<std::string> name;
         std::unique_ptr<Type> type;
     };
 
     struct Proto {
-        SpanValue<std::string_view> name;
+        SpanValue<std::string> name;
 
         std::vector<Param> params;
         std::unique_ptr<Type> return_type;

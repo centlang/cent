@@ -2,7 +2,7 @@
 #define CENT_FRONTEND_TOKEN_H
 
 #include <cstdint>
-#include <string_view>
+#include <string>
 
 #include "cent/span.h"
 
@@ -79,7 +79,7 @@ struct Token {
     };
 
     Type type = Type::Invalid;
-    std::string_view value;
+    std::string value;
 
     Span span;
 };
