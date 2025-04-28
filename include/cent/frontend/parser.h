@@ -19,8 +19,8 @@
 #include "cent/ast/fn_decl.h"
 #include "cent/ast/if_else.h"
 #include "cent/ast/literals.h"
+#include "cent/ast/module.h"
 #include "cent/ast/node.h"
-#include "cent/ast/program.h"
 #include "cent/ast/struct.h"
 
 namespace cent::frontend {
@@ -36,7 +36,7 @@ public:
         }
     }
 
-    [[nodiscard]] std::unique_ptr<ast::Program> parse() noexcept;
+    [[nodiscard]] std::unique_ptr<ast::Module> parse() noexcept;
 
 private:
     [[nodiscard]] auto peek(std::uint8_t ahead = 0) const noexcept {
@@ -127,8 +127,9 @@ private:
     [[nodiscard]] std::vector<ast::FnDecl::Param> parse_params() noexcept;
     [[nodiscard]] std::vector<ast::Struct::Field> parse_fields() noexcept;
 
-    [[nodiscard]] bool parse_fn(ast::Program& program) noexcept;
-    [[nodiscard]] bool parse_struct(ast::Program& program) noexcept;
+    [[nodiscard]] bool parse_fn(ast::Module& module) noexcept;
+    [[nodiscard]] bool parse_struct(ast::Module& module) noexcept;
+    [[nodiscard]] bool parse_with(ast::Module& module) noexcept;
 
     [[nodiscard]] static std::uint8_t precedence_of(Token::Type type) noexcept {
         using enum Token::Type;

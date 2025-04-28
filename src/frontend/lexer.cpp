@@ -230,6 +230,11 @@ void Lexer::ident() noexcept {
         return;
     }
 
+    if (m_token.value == "with") {
+        keyword(With);
+        return;
+    }
+
     if (m_token.value == "as") {
         keyword(As);
         return;

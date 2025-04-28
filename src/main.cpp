@@ -1,8 +1,6 @@
 #include <cstdio>
 #include <cstring>
-#include <fstream>
 #include <span>
-#include <sstream>
 
 #include <fmt/core.h>
 
@@ -17,6 +15,7 @@
 #include "cent/frontend/parser.h"
 
 #include "cent/log.h"
+#include "cent/util.h"
 
 void help() noexcept { fmt::print("Usage: centc FILE...\n"); }
 
@@ -52,21 +51,14 @@ int main(int argc, char** argv) {
 
     for (const char* arg_cstr : args.subspan(1)) {
         std::string arg = arg_cstr;
-        std::ifstream file{arg};
 
-        if (!file) {
-            cent::error(
-                fmt::format("could not open file: {}", std::strerror(errno)));
+        auto code = cent::read_file(arg);
 
+        if (!code) {
             return 1;
         }
 
-        std::ostringstream buffer;
-        buffer << file.rdbuf();
-
-        std::string code = buffer.str();
-
-        cent::frontend::Parser parser{code, arg};
+        cent::frontend::Parser parser{*code, arg};
         auto program = parser.parse();
 
         if (!program) {

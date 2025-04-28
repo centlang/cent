@@ -1,5 +1,5 @@
-#ifndef CENT_AST_PROGRAM_H
-#define CENT_AST_PROGRAM_H
+#ifndef CENT_AST_MODULE_H
+#define CENT_AST_MODULE_H
 
 #include <memory>
 #include <utility>
@@ -10,13 +10,15 @@
 
 namespace cent::ast {
 
-struct Program : Node {
-    [[nodiscard]] Program(
+struct Module : Node {
+    [[nodiscard]] Module(
         std::vector<std::unique_ptr<FnDecl>> functions = {}) noexcept
     : functions{std::move(functions)} {}
 
     std::vector<std::unique_ptr<FnDecl>> functions;
     std::vector<std::unique_ptr<Struct>> structs;
+
+    std::vector<std::unique_ptr<Module>> submodules;
 };
 
 } // namespace cent::ast

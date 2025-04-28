@@ -1,3 +1,5 @@
+#include "cent/util.h"
+
 #include "cent/ast/as_expr.h"
 #include "cent/ast/assignment.h"
 #include "cent/ast/call_expr.h"
@@ -12,20 +14,22 @@
 #include "cent/ast/var_decl.h"
 #include "cent/ast/while_loop.h"
 
+#include "cent/modules.h"
+
 #include "cent/frontend/parser.h"
 
 namespace cent::frontend {
 
-std::unique_ptr<ast::Program> Parser::parse() noexcept {
+std::unique_ptr<ast::Module> Parser::parse() noexcept {
     using enum Token::Type;
 
     auto skip_until_decl = [&] {
-        while (!match(Eof, Fn, Struct)) {
+        while (!match(Eof, Fn, Struct, With)) {
             next();
         }
     };
 
-    auto result = std::make_unique<ast::Program>();
+    auto result = std::make_unique<ast::Module>();
 
     while (true) {
         if (match(Eof)) {
@@ -53,6 +57,18 @@ std::unique_ptr<ast::Program> Parser::parse() noexcept {
             if (!parse_struct(*result)) {
                 skip_until_decl();
             }
+
+            continue;
+        }
+
+        if (match(With)) {
+            next();
+
+            if (!parse_with(*result)) {
+                skip_until_decl();
+            }
+
+            expect("';'", Token::Type::Semicolon);
 
             continue;
         }
@@ -587,7 +603,7 @@ std::vector<ast::Struct::Field> Parser::parse_fields() noexcept {
     return result;
 }
 
-bool Parser::parse_fn(ast::Program& program) noexcept {
+bool Parser::parse_fn(ast::Module& module) noexcept {
     auto name = expect("function name", Token::Type::Identifier);
 
     if (!name) {
@@ -626,7 +642,7 @@ bool Parser::parse_fn(ast::Program& program) noexcept {
         return false;
     }
 
-    program.functions.push_back(std::make_unique<ast::FnDecl>(
+    module.functions.push_back(std::make_unique<ast::FnDecl>(
         name->span,
         ast::FnDecl::Proto{
             {name->value, name->span},
@@ -637,7 +653,7 @@ bool Parser::parse_fn(ast::Program& program) noexcept {
     return true;
 }
 
-bool Parser::parse_struct(ast::Program& program) noexcept {
+bool Parser::parse_struct(ast::Module& module) noexcept {
     auto name = expect("struct name", Token::Type::Identifier);
 
     if (!name) {
@@ -656,9 +672,44 @@ bool Parser::parse_struct(ast::Program& program) noexcept {
         return false;
     }
 
-    program.structs.push_back(std::make_unique<ast::Struct>(
+    module.structs.push_back(std::make_unique<ast::Struct>(
         Span{name->span.begin, end}, ast::SpanValue{name->value, name->span},
         std::move(fields)));
+
+    return true;
+}
+
+bool Parser::parse_with(ast::Module& module) noexcept {
+    auto name = expect("module name", Token::Type::Identifier);
+
+    if (!name) {
+        return false;
+    }
+
+    auto file = cent::find_module(name->value);
+
+    if (!file) {
+        error(
+            name->span.begin, m_filename,
+            fmt::format("could not find module '{}'", name->value));
+
+        return false;
+    }
+
+    auto code = cent::read_file(*file);
+
+    if (!code) {
+        return false;
+    }
+
+    Parser parser{*code, file->relative_path().string()};
+    auto submodule = parser.parse();
+
+    if (!submodule) {
+        return false;
+    }
+
+    module.submodules.push_back(std::move(submodule));
 
     return true;
 }

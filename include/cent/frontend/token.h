@@ -61,6 +61,7 @@ struct Token {
 
         Fn,
         Struct,
+        With,
 
         As,
 

@@ -21,7 +21,7 @@ struct NamedType;
 struct Pointer;
 struct Optional;
 
-struct Program;
+struct Module;
 
 struct Assignment;
 struct BlockStmt;
@@ -83,7 +83,7 @@ struct Type;
 class Codegen {
 public:
     [[nodiscard]] Codegen(
-        std::unique_ptr<ast::Program> program,
+        std::unique_ptr<ast::Module> program,
         std::string_view filename) noexcept
     : m_module{std::make_unique<llvm::Module>("", m_context)},
       m_builder{m_context}, m_program{std::move(program)},
@@ -172,7 +172,7 @@ private:
     std::map<llvm::StructType*, std::map<std::string_view, std::size_t>>
         m_members;
 
-    std::unique_ptr<ast::Program> m_program;
+    std::unique_ptr<ast::Module> m_program;
 
     std::string_view m_filename;
 };
