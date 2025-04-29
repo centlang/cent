@@ -50,6 +50,8 @@ struct F64 : detail::Type<F64> {
     bool is_float() noexcept override { return true; };
 };
 
+struct Str : detail::Type<Str> {};
+
 struct Bool : detail::Type<Bool> {
     bool is_bool() noexcept override { return true; };
 };

@@ -54,6 +54,9 @@ void Lexer::next_token() noexcept {
     };
 
     switch (peek()) {
+    case '"':
+        string();
+        break;
     case '(':
         single_char(LeftParen);
         break;
@@ -185,6 +188,27 @@ void Lexer::number() noexcept {
     }
 
     m_token.span.end = m_position;
+}
+
+void Lexer::string() noexcept {
+    get();
+
+    m_token = {Token::Type::StrLiteral, {}, {m_position, {}}};
+
+    while (true) {
+        if (eof()) {
+            m_token.type = Token::Type::Invalid;
+            return;
+        }
+
+        if (peek() == '"') {
+            get();
+            return;
+        }
+
+        m_token.value += get();
+        m_token.span.end = m_position;
+    }
 }
 
 void Lexer::ident() noexcept {

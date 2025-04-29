@@ -44,6 +44,7 @@ private:
     }
 
     void number() noexcept;
+    void string() noexcept;
     void ident() noexcept;
 
     [[nodiscard]] static bool is_ident(char character) noexcept {

@@ -36,6 +36,7 @@ struct BinaryExpr;
 struct UnaryExpr;
 struct IntLiteral;
 struct FloatLiteral;
+struct StrLiteral;
 struct BoolLiteral;
 struct StructLiteral;
 struct Identifier;
@@ -69,6 +70,8 @@ struct U64;
 
 struct F32;
 struct F64;
+
+struct Str;
 
 struct Bool;
 struct Void;
@@ -119,6 +122,8 @@ public:
     llvm::Type* generate(types::F32& type) noexcept;
     llvm::Type* generate(types::F64& type) noexcept;
 
+    llvm::Type* generate(types::Str& type) noexcept;
+
     llvm::Type* generate(types::Bool& type) noexcept;
     llvm::Type* generate(types::Void& type) noexcept;
 
@@ -138,6 +143,7 @@ public:
     std::optional<Value> generate(ast::UnaryExpr& expr) noexcept;
     std::optional<Value> generate(ast::IntLiteral& expr) noexcept;
     std::optional<Value> generate(ast::FloatLiteral& expr) noexcept;
+    std::optional<Value> generate(ast::StrLiteral& expr) noexcept;
     std::optional<Value> generate(ast::BoolLiteral& expr) noexcept;
     std::optional<Value> generate(ast::StructLiteral& expr) noexcept;
     std::optional<Value> generate(ast::Identifier& expr) noexcept;

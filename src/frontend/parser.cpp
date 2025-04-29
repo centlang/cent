@@ -182,8 +182,8 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
     using enum Token::Type;
 
     auto token = expect(
-        "expression", IntLiteral, FloatLiteral, True, False, Identifier, Minus,
-        Bang, Star, And, LeftParen);
+        "expression", IntLiteral, FloatLiteral, StrLiteral, True, False,
+        Identifier, Minus, Bang, Star, And, LeftParen);
 
     if (!token) {
         return nullptr;
@@ -194,6 +194,8 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
         return std::make_unique<ast::IntLiteral>(token->span, token->value);
     case FloatLiteral:
         return std::make_unique<ast::FloatLiteral>(token->span, token->value);
+    case StrLiteral:
+        return std::make_unique<ast::StrLiteral>(token->span, token->value);
     case True:
         return std::make_unique<ast::BoolLiteral>(token->span, true);
     case False:

@@ -50,6 +50,7 @@ std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
         {"u64", std::make_shared<types::U64>()},
         {"f32", std::make_shared<types::F32>()},
         {"f64", std::make_shared<types::F64>()},
+        {"str", std::make_shared<types::Str>()},
         {"bool", std::make_shared<types::Bool>()},
         {"void", std::make_shared<types::Void>()}};
 
@@ -211,6 +212,10 @@ llvm::Type* Codegen::generate([[maybe_unused]] types::F32& type) noexcept {
 
 llvm::Type* Codegen::generate([[maybe_unused]] types::F64& type) noexcept {
     return llvm::Type::getDoubleTy(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::Str& type) noexcept {
+    return llvm::Type::getInt8Ty(m_context)->getPointerTo();
 }
 
 llvm::Type* Codegen::generate([[maybe_unused]] types::Bool& type) noexcept {
@@ -734,6 +739,11 @@ std::optional<Value> Codegen::generate(ast::FloatLiteral& expr) noexcept {
     return Value{
         m_primitive_types["f32"],
         llvm::ConstantFP::get(llvm::Type::getFloatTy(m_context), value)};
+}
+
+std::optional<Value> Codegen::generate(ast::StrLiteral& expr) noexcept {
+    return Value{
+        m_primitive_types["str"], m_builder.CreateGlobalString(expr.value)};
 }
 
 std::optional<Value> Codegen::generate(ast::BoolLiteral& expr) noexcept {

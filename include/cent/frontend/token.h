@@ -55,6 +55,7 @@ struct Token {
         Eof,
 
         IntLiteral,
+        StrLiteral,
         FloatLiteral,
 
         True,

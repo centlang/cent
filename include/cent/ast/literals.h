@@ -25,6 +25,13 @@ struct FloatLiteral : detail::Expr<FloatLiteral> {
     std::string value;
 };
 
+struct StrLiteral : detail::Expr<StrLiteral> {
+    [[nodiscard]] StrLiteral(Span span, std::string value) noexcept
+    : Expr{span}, value{std::move(value)} {}
+
+    std::string value;
+};
+
 struct BoolLiteral : detail::Expr<BoolLiteral> {
     [[nodiscard]] BoolLiteral(Span span, bool value) noexcept
     : Expr{span}, value{value} {}
