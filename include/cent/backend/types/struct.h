@@ -16,6 +16,8 @@ struct Struct : detail::Type<Struct> {
         std::vector<std::shared_ptr<backend::Type>> fields) noexcept
     : type{type}, fields{std::move(fields)} {}
 
+    bool is_struct() noexcept override { return true; };
+
     llvm::StructType* type;
     std::vector<std::shared_ptr<backend::Type>> fields;
 };

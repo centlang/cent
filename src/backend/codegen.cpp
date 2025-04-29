@@ -22,6 +22,7 @@
 #include "cent/ast/optional.h"
 #include "cent/ast/pointer.h"
 #include "cent/ast/return_stmt.h"
+#include "cent/ast/scope_resolution.h"
 #include "cent/ast/unary_expr.h"
 #include "cent/ast/var_decl.h"
 #include "cent/ast/while_loop.h"
@@ -38,7 +39,7 @@
 namespace cent::backend {
 
 std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
-    m_types = {
+    m_primitive_types = {
         {"i8", std::make_shared<types::I8>()},
         {"i16", std::make_shared<types::I16>()},
         {"i32", std::make_shared<types::I32>()},
@@ -138,17 +139,7 @@ std::optional<Value> Codegen::cast(
 }
 
 std::shared_ptr<Type> Codegen::generate(ast::NamedType& type) noexcept {
-    auto iterator = m_types.find(type.value);
-
-    if (iterator == m_types.end()) {
-        error(
-            type.span.begin, m_filename,
-            fmt::format("undeclared type: '{}'", type.value));
-
-        return nullptr;
-    }
-
-    return iterator->second;
+    return get_type(type.span, type.value);
 }
 
 std::shared_ptr<Type> Codegen::generate(ast::Pointer& type) noexcept {
@@ -169,6 +160,17 @@ std::shared_ptr<Type> Codegen::generate(ast::Optional& type) noexcept {
     }
 
     return std::make_shared<types::Optional>(contained);
+}
+
+std::shared_ptr<Type>
+Codegen::generate(ast::ScopeResolutionType& type) noexcept {
+    auto* scope = m_current_scope;
+    m_current_scope = get_module(type.name.span, type.name.value);
+
+    auto value = type.value->codegen(*this);
+    m_current_scope = scope;
+
+    return value;
 }
 
 llvm::Type* Codegen::generate([[maybe_unused]] types::I8& type) noexcept {
@@ -238,8 +240,8 @@ llvm::Type* Codegen::generate(types::Optional& type) noexcept {
     return llvm::StructType::create(fields);
 }
 
-llvm::Type* Codegen::generate(types::Function& type) noexcept {
-    return type.function;
+llvm::Type* Codegen::generate([[maybe_unused]] types::Function& type) noexcept {
+    return nullptr;
 }
 
 std::optional<Value>
@@ -325,13 +327,13 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
 }
 
 std::optional<Value> Codegen::generate(ast::BlockStmt& stmt) noexcept {
-    auto locals = m_locals;
+    auto scope = m_scope;
 
     for (auto& statement : stmt.body) {
         statement->codegen(*this);
     }
 
-    m_locals = std::move(locals);
+    m_scope = std::move(scope);
 
     return std::nullopt;
 }
@@ -419,7 +421,7 @@ std::optional<Value> Codegen::generate(ast::ReturnStmt& stmt) noexcept {
         return std::nullopt;
     }
 
-    if (auto val = cast(m_functions[function]->return_type, *value)) {
+    if (auto val = cast(m_current_function->return_type, *value)) {
         m_builder.CreateRet(val->value);
     } else {
         error(stmt.value->span.begin, m_filename, "type mismatch");
@@ -585,7 +587,7 @@ std::optional<Value> Codegen::generate(ast::IntLiteral& expr) noexcept {
             return std::nullopt;
         }
 
-        auto& type = m_types[suffix];
+        auto& type = m_primitive_types[suffix];
         auto* llvm_type = type->codegen(*this);
 
         return Value{type, llvm::ConstantInt::get(llvm_type, value, is_signed)};
@@ -667,7 +669,7 @@ std::optional<Value> Codegen::generate(ast::IntLiteral& expr) noexcept {
     }
 
     return Value{
-        m_types["i32"],
+        m_primitive_types["i32"],
         llvm::ConstantInt::getSigned(llvm::Type::getInt32Ty(m_context), value)};
 }
 
@@ -696,7 +698,7 @@ std::optional<Value> Codegen::generate(ast::FloatLiteral& expr) noexcept {
             return std::nullopt;
         }
 
-        auto& type = m_types[suffix];
+        auto& type = m_primitive_types[suffix];
         auto* llvm_type = type->codegen(*this);
 
         return Value{type, llvm::ConstantFP::get(llvm_type, value)};
@@ -730,21 +732,20 @@ std::optional<Value> Codegen::generate(ast::FloatLiteral& expr) noexcept {
     }
 
     return Value{
-        m_types["f32"],
+        m_primitive_types["f32"],
         llvm::ConstantFP::get(llvm::Type::getFloatTy(m_context), value)};
 }
 
 std::optional<Value> Codegen::generate(ast::BoolLiteral& expr) noexcept {
     return Value{
-        m_types["bool"],
+        m_primitive_types["bool"],
         llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), expr.value)};
 }
 
 std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
-    auto* llvm_type =
-        llvm::StructType::getTypeByName(m_context, expr.name.value);
+    auto type = get_type(expr.name.span, expr.name.value);
 
-    if (!llvm_type) {
+    if (!type) {
         error(
             expr.name.span.begin, m_filename,
             fmt::format("undeclared structure: '{}'", expr.name.value));
@@ -752,12 +753,18 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
         return std::nullopt;
     }
 
-    auto* variable = m_builder.CreateAlloca(llvm_type);
+    if (!type->is_struct()) {
+        error(
+            expr.name.span.begin, m_filename,
+            fmt::format("'{}' is not a structure", expr.name.value));
+    }
 
-    auto& members = m_members[llvm_type];
-    auto& type = m_structs[llvm_type];
+    auto& struct_type = static_cast<types::Struct&>(*type);
+    auto& members = m_members[struct_type.type];
 
-    if (expr.fields.size() != type->fields.size()) {
+    auto* variable = m_builder.CreateAlloca(struct_type.type);
+
+    if (expr.fields.size() != struct_type.fields.size()) {
         error(
             expr.name.span.begin, m_filename,
             "incorrect number of fields initialized");
@@ -784,7 +791,7 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
 
         auto index = iterator->second;
 
-        auto val = cast(type->fields[index], *value);
+        auto val = cast(struct_type.fields[index], *value);
 
         if (!val) {
             error(
@@ -794,7 +801,8 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
             return std::nullopt;
         }
 
-        auto* pointer = m_builder.CreateStructGEP(llvm_type, variable, index);
+        auto* pointer =
+            m_builder.CreateStructGEP(struct_type.type, variable, index);
 
         m_builder.CreateStore(value->value, pointer);
     }
@@ -803,36 +811,30 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
 }
 
 std::optional<Value> Codegen::generate(ast::Identifier& expr) noexcept {
-    auto iterator = m_locals.find(expr.value);
-
-    if (iterator == m_locals.end()) {
-        error(
-            expr.span.begin, m_filename,
-            fmt::format("undeclared variable: '{}'", expr.value));
-
-        return std::nullopt;
-    }
-
-    return iterator->second;
+    return get_name(expr.span, expr.value);
 }
 
 std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
-    auto* llvm_callee = m_module->getFunction(expr.identifier.value);
-    auto& callee = m_functions[llvm_callee];
+    auto value = expr.identifier->codegen(*this);
 
-    if (!llvm_callee) {
-        error(
-            expr.identifier.span.begin, m_filename,
-            fmt::format("undeclared function: '{}'", expr.identifier.value));
+    if (!value) {
+        return std::nullopt;
+    }
+
+    if (!value->type->is_function()) {
+        error(expr.identifier->span.begin, m_filename, "not a function");
 
         return std::nullopt;
     }
 
-    auto arg_size = llvm_callee->arg_size();
+    auto& type = static_cast<types::Function&>(*value->type);
+    auto* function = static_cast<llvm::Function*>(value->value);
+
+    auto arg_size = function->arg_size();
 
     if (arg_size != expr.arguments.size()) {
         error(
-            expr.identifier.span.begin, m_filename,
+            expr.identifier->span.begin, m_filename,
             "incorrect number of arguments passed");
 
         return std::nullopt;
@@ -848,7 +850,7 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
             return std::nullopt;
         }
 
-        if (auto val = cast(callee->param_types[i], *value)) {
+        if (auto val = cast(type.param_types[i], *value)) {
             arguments.push_back(val->value);
         } else {
             error(expr.arguments[i]->span.begin, m_filename, "type mismatch");
@@ -857,8 +859,7 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
         }
     }
 
-    return Value{
-        callee->return_type, m_builder.CreateCall(llvm_callee, arguments)};
+    return Value{type.return_type, m_builder.CreateCall(function, arguments)};
 }
 
 std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
@@ -868,17 +869,36 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
         return std::nullopt;
     }
 
+    auto not_a_struct = [&] {
+        error(
+            expr.member.span.begin, m_filename,
+            "member access of a non-structure type");
+    };
+
     bool is_mutable = false;
-    llvm::Type* type = nullptr;
+
+    types::Struct* type = nullptr;
 
     if (parent->type->is_pointer()) {
         auto& pointer = static_cast<types::Pointer&>(*parent->type);
 
+        if (!pointer.type->is_struct()) {
+            not_a_struct();
+
+            return std::nullopt;
+        }
+
         is_mutable = pointer.is_mutable;
-        type = pointer.type->codegen(*this);
+        type = static_cast<types::Struct*>(pointer.type.get());
     } else {
+        if (!parent->type->is_struct()) {
+            not_a_struct();
+
+            return std::nullopt;
+        }
+
         is_mutable = parent->is_mutable;
-        type = parent->type->codegen(*this);
+        type = static_cast<types::Struct*>(parent->type.get());
     }
 
     auto* value = parent->value;
@@ -889,19 +909,9 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
         }
     }
 
-    auto* struct_type = llvm::dyn_cast<llvm::StructType>(type);
+    auto iterator = m_members[type->type].find(expr.member.value);
 
-    if (!struct_type) {
-        error(
-            expr.member.span.begin, m_filename,
-            "member access of a non-structure type");
-
-        return std::nullopt;
-    }
-
-    auto iterator = m_members[struct_type].find(expr.member.value);
-
-    if (iterator == m_members[struct_type].end()) {
+    if (iterator == m_members[type->type].end()) {
         error(
             expr.member.span.begin, m_filename,
             fmt::format("no such member: '{}'", expr.member.value));
@@ -910,8 +920,8 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
     }
 
     return Value{
-        m_structs[struct_type]->fields[iterator->second],
-        m_builder.CreateStructGEP(struct_type, value, iterator->second),
+        type->fields[iterator->second],
+        m_builder.CreateStructGEP(type->type, value, iterator->second),
         is_mutable};
 }
 
@@ -937,21 +947,36 @@ std::optional<Value> Codegen::generate(ast::AsExpr& expr) noexcept {
     return cast(type, *value, false);
 }
 
+std::optional<Value>
+Codegen::generate(ast::ScopeResolutionExpr& expr) noexcept {
+    auto* scope = m_current_scope;
+    m_current_scope = get_module(expr.name.span, expr.name.value);
+
+    auto value = expr.value->codegen(*this);
+    m_current_scope = scope;
+
+    return value;
+}
+
 std::optional<Value> Codegen::generate(ast::FnDecl& decl) noexcept {
-    auto* function = m_module->getFunction(decl.proto.name.value);
+    auto iterator = m_scope.names.find(decl.proto.name.value);
+    auto* function = static_cast<llvm::Function*>(iterator->second.value);
+
     auto* entry = llvm::BasicBlock::Create(m_context, "", function);
 
     m_builder.SetInsertPoint(entry);
 
-    m_locals.clear();
+    m_current_function =
+        static_cast<types::Function*>(iterator->second.type.get());
 
     for (std::size_t i = 0; i < decl.proto.params.size(); ++i) {
         auto* value = function->getArg(i);
         auto* variable = m_builder.CreateAlloca(value->getType());
 
         m_builder.CreateStore(value, variable);
-        m_locals[decl.proto.params[i].name.value] = {
-            m_functions[function]->param_types[i], variable};
+
+        m_scope.names[decl.proto.params[i].name.value] = {
+            m_current_function->param_types[i], variable};
     }
 
     decl.block->codegen(*this);
@@ -1010,10 +1035,8 @@ std::optional<Value> Codegen::generate(ast::Struct& decl) noexcept {
 
     struct_type->setBody(llvm_fields);
 
-    auto type = std::make_shared<types::Struct>(struct_type, std::move(fields));
-
-    m_types[decl.name.value] = type;
-    m_structs[struct_type] = type;
+    m_current_scope->types[decl.name.value] =
+        std::make_shared<types::Struct>(struct_type, std::move(fields));
 
     return std::nullopt;
 }
@@ -1072,35 +1095,41 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
             llvm::Constant::getNullValue(llvm_type), variable);
     }
 
-    m_locals[decl.name.value] = {type, variable, decl.is_mutable};
+    m_scope.names[decl.name.value] = {type, variable, decl.is_mutable};
 
     return std::nullopt;
 }
 
-void Codegen::generate(ast::Module& module, bool is_submodule) noexcept {
+void Codegen::generate(
+    ast::Module& module, std::optional<std::string_view> name) noexcept {
+    auto* scope = m_current_scope;
+
     for (auto& submodule : module.submodules) {
-        generate(*submodule, true);
+        m_current_scope = &m_modules[submodule.first];
+        generate(*submodule.second, submodule.first);
     }
 
+    m_current_scope = scope;
+
     for (auto& struct_decl : module.structs) {
-        if (!is_submodule || struct_decl->is_public) {
+        if (!name || struct_decl->is_public) {
             llvm::StructType::create(m_context, struct_decl->name.value);
         }
     }
 
     for (auto& struct_decl : module.structs) {
-        if (!is_submodule || struct_decl->is_public) {
+        if (!name || struct_decl->is_public) {
             struct_decl->codegen(*this);
         }
     }
 
     for (auto& function : module.functions) {
-        if (!is_submodule || function->is_public) {
+        if (!name || function->is_public) {
             generate_fn_proto(*function);
         }
     }
 
-    if (is_submodule) {
+    if (name) {
         return;
     }
 
@@ -1200,40 +1229,41 @@ std::optional<Value> Codegen::generate_bin_expr(
                 : m_builder.CreateUDiv(lhs.value.value, right->value)};
     case AndAnd:
         return Value{
-            m_types["bool"],
+            m_primitive_types["bool"],
             m_builder.CreateAnd(lhs.value.value, right->value)};
     case OrOr:
         return Value{
-            m_types["bool"], m_builder.CreateOr(lhs.value.value, right->value)};
+            m_primitive_types["bool"],
+            m_builder.CreateOr(lhs.value.value, right->value)};
     case Less:
         return Value{
-            m_types["bool"],
+            m_primitive_types["bool"],
             lhs.value.type->is_signed_int()
                 ? m_builder.CreateICmpSLT(lhs.value.value, right->value)
                 : m_builder.CreateICmpULT(lhs.value.value, right->value)};
     case Greater:
         return Value{
-            m_types["bool"],
+            m_primitive_types["bool"],
             lhs.value.type->is_signed_int()
                 ? m_builder.CreateICmpSGT(lhs.value.value, right->value)
                 : m_builder.CreateICmpUGT(lhs.value.value, right->value)};
     case EqualEqual:
         return Value{
-            m_types["bool"],
+            m_primitive_types["bool"],
             m_builder.CreateICmpEQ(lhs.value.value, right->value)};
     case BangEqual:
         return Value{
-            m_types["bool"],
+            m_primitive_types["bool"],
             m_builder.CreateICmpNE(lhs.value.value, right->value)};
     case GreaterEqual:
         return Value{
-            m_types["bool"],
+            m_primitive_types["bool"],
             lhs.value.type->is_signed_int()
                 ? m_builder.CreateICmpSGE(lhs.value.value, right->value)
                 : m_builder.CreateICmpUGE(lhs.value.value, right->value)};
     case LessEqual:
         return Value{
-            m_types["bool"],
+            m_primitive_types["bool"],
             lhs.value.type->is_signed_int()
                 ? m_builder.CreateICmpSLE(lhs.value.value, right->value)
                 : m_builder.CreateICmpULE(lhs.value.value, right->value)};
@@ -1274,10 +1304,58 @@ Value Codegen::load_value(Value& value) noexcept {
     return value;
 }
 
+std::shared_ptr<Type>
+Codegen::get_type(Span span, std::string_view name) noexcept {
+    auto primitive = m_primitive_types.find(name);
+
+    if (primitive != m_primitive_types.end()) {
+        return primitive->second;
+    }
+
+    auto user = m_current_scope->types.find(name);
+
+    if (user == m_current_scope->types.end()) {
+        error(
+            span.begin, m_filename, fmt::format("undeclared type: '{}'", name));
+
+        return nullptr;
+    }
+
+    return user->second;
+}
+
+std::optional<Value>
+Codegen::get_name(Span span, std::string_view name) noexcept {
+    auto iterator = m_current_scope->names.find(name);
+
+    if (iterator == m_current_scope->names.end()) {
+        error(
+            span.begin, m_filename,
+            fmt::format("undeclared identifier: '{}'", name));
+
+        return std::nullopt;
+    }
+
+    return iterator->second;
+}
+
+Scope* Codegen::get_module(Span span, std::string_view name) noexcept {
+    auto iterator = m_modules.find(name);
+
+    if (iterator == m_modules.end()) {
+        error(
+            span.begin, m_filename, fmt::format("no module named '{}'", name));
+
+        return nullptr;
+    }
+
+    return &iterator->second;
+}
+
 void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
     auto return_type = decl.proto.return_type
                            ? decl.proto.return_type->codegen(*this)
-                           : m_types["void"];
+                           : m_primitive_types["void"];
 
     if (!return_type) {
         return;
@@ -1322,8 +1400,9 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
                        : llvm::Function::PrivateLinkage,
         decl.proto.name.value, *m_module);
 
-    m_functions[function] = std::make_shared<types::Function>(
-        type, return_type, std::move(param_types));
+    m_current_scope->names[decl.proto.name.value] = Value{
+        std::make_shared<types::Function>(return_type, std::move(param_types)),
+        function};
 }
 
 } // namespace cent::backend

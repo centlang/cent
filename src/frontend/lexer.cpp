@@ -27,7 +27,7 @@ void Lexer::next_token() noexcept {
         return;
     }
 
-    auto logical_op = [&](Token::Type single, Token::Type type) {
+    auto twice = [&](Token::Type single, Token::Type type) {
         auto begin = m_position;
         char oper = get();
 
@@ -73,7 +73,7 @@ void Lexer::next_token() noexcept {
         single_char(Dot);
         break;
     case ':':
-        single_char(Colon);
+        twice(Colon, ColonColon);
         break;
     case ';':
         single_char(Semicolon);
@@ -130,10 +130,10 @@ void Lexer::next_token() noexcept {
         with_equal(Less, LessEqual);
         break;
     case '&':
-        logical_op(And, AndAnd);
+        twice(And, AndAnd);
         break;
     case '|':
-        logical_op(Or, OrOr);
+        twice(Or, OrOr);
         break;
     default:
         m_token = {Invalid, std::string{get()}, Span::from(m_position)};

@@ -100,6 +100,8 @@ private:
     [[nodiscard]] std::unique_ptr<ast::Expression>
     expect_member_expr() noexcept;
 
+    [[nodiscard]] std::unique_ptr<ast::Expression> expect_call_expr() noexcept;
+
     [[nodiscard]] std::unique_ptr<ast::Expression> expect_as_expr() noexcept;
 
     [[nodiscard]] std::unique_ptr<ast::BinaryExpr>
@@ -121,8 +123,8 @@ private:
     void parse_return(ast::BlockStmt& block) noexcept;
 
     void parse_assignment(
-        ast::BlockStmt& block, std::unique_ptr<ast::Expression> variable,
-        Token oper) noexcept;
+        ast::BlockStmt& block,
+        std::unique_ptr<ast::Expression> variable) noexcept;
 
     [[nodiscard]] std::vector<ast::FnDecl::Param> parse_params() noexcept;
     [[nodiscard]] std::vector<ast::Struct::Field> parse_fields() noexcept;

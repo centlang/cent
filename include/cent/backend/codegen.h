@@ -15,11 +15,14 @@
 #include "cent/ast/span_value.h"
 #include "cent/frontend/token.h"
 
+#include "cent/backend/scope.h"
+
 namespace cent::ast {
 
 struct NamedType;
 struct Pointer;
 struct Optional;
+struct ScopeResolutionType;
 
 struct Module;
 
@@ -39,6 +42,7 @@ struct Identifier;
 struct CallExpr;
 struct MemberExpr;
 struct AsExpr;
+struct ScopeResolutionExpr;
 
 struct FnDecl;
 struct Struct;
@@ -100,6 +104,7 @@ public:
     std::shared_ptr<Type> generate(ast::NamedType& type) noexcept;
     std::shared_ptr<Type> generate(ast::Pointer& type) noexcept;
     std::shared_ptr<Type> generate(ast::Optional& type) noexcept;
+    std::shared_ptr<Type> generate(ast::ScopeResolutionType& type) noexcept;
 
     llvm::Type* generate(types::I8& type) noexcept;
     llvm::Type* generate(types::I16& type) noexcept;
@@ -139,6 +144,7 @@ public:
     std::optional<Value> generate(ast::CallExpr& expr) noexcept;
     std::optional<Value> generate(ast::MemberExpr& expr) noexcept;
     std::optional<Value> generate(ast::AsExpr& expr) noexcept;
+    std::optional<Value> generate(ast::ScopeResolutionExpr& expr) noexcept;
 
     std::optional<Value> generate(ast::FnDecl& decl) noexcept;
     std::optional<Value> generate(ast::Struct& decl) noexcept;
@@ -146,7 +152,9 @@ public:
     std::optional<Value> generate(ast::VarDecl& decl) noexcept;
 
 private:
-    void generate(ast::Module& module, bool is_submodule = false) noexcept;
+    void generate(
+        ast::Module& module,
+        std::optional<std::string_view> name = std::nullopt) noexcept;
 
     std::optional<Value> generate(ast::Expression& expr) noexcept;
 
@@ -155,6 +163,10 @@ private:
         ast::SpanValue<frontend::Token::Type> oper) noexcept;
 
     Value load_value(Value& value) noexcept;
+
+    std::shared_ptr<Type> get_type(Span span, std::string_view name) noexcept;
+    std::optional<Value> get_name(Span span, std::string_view name) noexcept;
+    Scope* get_module(Span span, std::string_view name) noexcept;
 
     void generate_fn_proto(ast::FnDecl& decl) noexcept;
 
@@ -165,11 +177,13 @@ private:
     std::unique_ptr<llvm::Module> m_module;
     llvm::IRBuilder<> m_builder;
 
-    std::map<std::string_view, std::shared_ptr<Type>> m_types;
-    std::map<std::string_view, Value> m_locals;
+    Scope m_scope;
+    std::map<std::string_view, Scope> m_modules;
 
-    std::map<llvm::Function*, std::shared_ptr<types::Function>> m_functions;
-    std::map<llvm::StructType*, std::shared_ptr<types::Struct>> m_structs;
+    std::map<std::string_view, std::shared_ptr<Type>> m_primitive_types;
+
+    Scope* m_current_scope{&m_scope};
+    types::Function* m_current_function{nullptr};
 
     std::map<llvm::StructType*, std::map<std::string_view, std::size_t>>
         m_members;

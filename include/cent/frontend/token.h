@@ -21,6 +21,7 @@ struct Token {
         Dot,
         Colon,
         Semicolon,
+        ColonColon,
 
         Plus,
         Minus,

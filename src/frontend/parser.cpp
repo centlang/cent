@@ -10,6 +10,7 @@
 #include "cent/ast/optional.h"
 #include "cent/ast/pointer.h"
 #include "cent/ast/return_stmt.h"
+#include "cent/ast/scope_resolution.h"
 #include "cent/ast/unary_expr.h"
 #include "cent/ast/var_decl.h"
 #include "cent/ast/while_loop.h"
@@ -120,7 +121,7 @@ void Parser::expect_stmt(ast::BlockStmt& block) noexcept {
             break;
         }
 
-        parse_assignment(block, std::move(value), peek());
+        parse_assignment(block, std::move(value));
 
         break;
     }
@@ -206,28 +207,33 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
                 ast::SpanValue{token->value, token->span}, std::move(fields));
         }
 
-        if (!match(LeftParen)) {
+        if (!match(ColonColon)) {
             return std::make_unique<ast::Identifier>(token->span, token->value);
         }
 
         next();
 
-        auto args = parse_args();
-        auto end = peek().span.end;
+        if (!match(Identifier)) {
+            error(peek().span.begin, m_filename, "expected name");
 
-        if (!expect("',' or ')'", RightParen)) {
             return nullptr;
         }
 
-        return std::make_unique<ast::CallExpr>(
-            Span{token->span.begin, end},
-            ast::SpanValue{token->value, token->span}, std::move(args));
+        auto value = expect_prefix();
+
+        if (!value) {
+            return nullptr;
+        }
+
+        return std::make_unique<ast::ScopeResolutionExpr>(
+            Span{token->span.begin, value->span.end},
+            ast::SpanValue{token->value, token->span}, std::move(value));
     }
     case Minus:
     case Bang:
     case Star:
     case And:
-        if (auto value = expect_member_expr()) {
+        if (auto value = expect_call_expr()) {
             return std::make_unique<ast::UnaryExpr>(
                 Span{token->span.begin, value->span.end},
                 ast::SpanValue{token->type, token->span}, std::move(value));
@@ -272,9 +278,30 @@ Parser::expect_member_expr() noexcept {
     return expression;
 }
 
+std::unique_ptr<ast::Expression> Parser::expect_call_expr() noexcept {
+    auto expression = expect_member_expr();
+
+    if (!match(Token::Type::LeftParen)) {
+        return expression;
+    }
+
+    next();
+
+    auto args = parse_args();
+    auto end = peek().span.end;
+
+    if (!expect("',' or ')'", Token::Type::RightParen)) {
+        return nullptr;
+    }
+
+    return std::make_unique<ast::CallExpr>(
+        Span{expression->span.begin, end}, std::move(expression),
+        std::move(args));
+}
+
 [[nodiscard]] std::unique_ptr<ast::Expression>
 Parser::expect_as_expr() noexcept {
-    auto expression = expect_member_expr();
+    auto expression = expect_call_expr();
 
     if (!match(Token::Type::As)) {
         return expression;
@@ -416,14 +443,16 @@ std::unique_ptr<ast::Type> Parser::expect_var_type() noexcept {
 }
 
 std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
+    using enum Token::Type;
+
     auto begin = peek().span.begin;
 
-    if (match(Token::Type::Star)) {
+    if (match(Star)) {
         next();
 
         bool is_mutable = false;
 
-        if (match(Token::Type::Mut)) {
+        if (match(Mut)) {
             is_mutable = true;
             next();
         }
@@ -438,7 +467,7 @@ std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
             Span{begin, type->span.end}, std::move(type), is_mutable);
     }
 
-    if (match(Token::Type::QuestionMark)) {
+    if (match(QuestionMark)) {
         next();
 
         auto type = expect_type();
@@ -451,13 +480,33 @@ std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
             Span{begin, type->span.end}, std::move(type));
     }
 
-    auto type = expect("type", Token::Type::Identifier);
+    auto name = expect("type", Identifier);
 
-    if (!type) {
+    if (!name) {
         return nullptr;
     }
 
-    return std::make_unique<ast::NamedType>(Span{type->span}, type->value);
+    if (match(ColonColon)) {
+        next();
+
+        if (!match(Identifier)) {
+            error(peek().span.begin, m_filename, "expected name");
+
+            return nullptr;
+        }
+
+        auto type = expect_type();
+
+        if (!type) {
+            return nullptr;
+        }
+
+        return std::make_unique<ast::ScopeResolutionType>(
+            Span{name->span.begin, type->span.end},
+            ast::SpanValue{name->value, name->span}, std::move(type));
+    }
+
+    return std::make_unique<ast::NamedType>(name->span, name->value);
 }
 
 void Parser::parse_var(ast::BlockStmt& block) noexcept {
@@ -542,10 +591,8 @@ void Parser::parse_return(ast::BlockStmt& block) noexcept {
 }
 
 void Parser::parse_assignment(
-    ast::BlockStmt& block, std::unique_ptr<ast::Expression> variable,
-    Token oper) noexcept {
-    next();
-
+    ast::BlockStmt& block, std::unique_ptr<ast::Expression> variable) noexcept {
+    auto oper = get();
     auto value = expect_expr();
 
     if (!value) {
@@ -716,7 +763,7 @@ bool Parser::parse_with(ast::Module& module) noexcept {
         return false;
     }
 
-    module.submodules.push_back(std::move(submodule));
+    module.submodules[name->value] = std::move(submodule);
 
     return true;
 }

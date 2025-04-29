@@ -1,6 +1,7 @@
 #ifndef CENT_AST_MODULE_H
 #define CENT_AST_MODULE_H
 
+#include <map>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -18,7 +19,7 @@ struct Module : Node {
     std::vector<std::unique_ptr<FnDecl>> functions;
     std::vector<std::unique_ptr<Struct>> structs;
 
-    std::vector<std::unique_ptr<Module>> submodules;
+    std::map<std::string, std::unique_ptr<Module>> submodules;
 };
 
 } // namespace cent::ast
