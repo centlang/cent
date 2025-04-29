@@ -129,8 +129,9 @@ private:
     [[nodiscard]] std::vector<ast::FnDecl::Param> parse_params() noexcept;
     [[nodiscard]] std::vector<ast::Struct::Field> parse_fields() noexcept;
 
-    [[nodiscard]] bool
-    parse_fn(ast::Module& module, bool is_public = false) noexcept;
+    [[nodiscard]] bool parse_fn(
+        ast::Module& module, bool is_public = false,
+        bool is_extern = false) noexcept;
 
     [[nodiscard]] bool
     parse_struct(ast::Module& module, bool is_public = false) noexcept;

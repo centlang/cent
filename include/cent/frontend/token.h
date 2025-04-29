@@ -61,6 +61,7 @@ struct Token {
         False,
 
         Pub,
+        Extern,
 
         Fn,
         Struct,

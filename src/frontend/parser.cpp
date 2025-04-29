@@ -61,20 +61,27 @@ std::unique_ptr<ast::Module> Parser::parse() noexcept {
             is_public = true;
         }
 
-        if (match(Fn)) {
+        if (match(Struct)) {
             next();
 
-            if (!parse_fn(*result, is_public)) {
+            if (!parse_struct(*result, is_public)) {
                 skip_until_decl();
             }
 
             continue;
         }
 
-        if (match(Struct)) {
+        bool is_extern = false;
+
+        if (match(Extern)) {
+            next();
+            is_extern = true;
+        }
+
+        if (match(Fn)) {
             next();
 
-            if (!parse_struct(*result, is_public)) {
+            if (!parse_fn(*result, is_public, is_extern)) {
                 skip_until_decl();
             }
 
@@ -657,7 +664,8 @@ std::vector<ast::Struct::Field> Parser::parse_fields() noexcept {
     return result;
 }
 
-bool Parser::parse_fn(ast::Module& module, bool is_public) noexcept {
+bool Parser::parse_fn(
+    ast::Module& module, bool is_public, bool is_extern) noexcept {
     auto name = expect("function name", Token::Type::Identifier);
 
     if (!name) {
@@ -702,7 +710,7 @@ bool Parser::parse_fn(ast::Module& module, bool is_public) noexcept {
             {name->value, name->span},
             std::move(params),
             std::move(return_type)},
-        std::move(body), is_public));
+        std::move(body), is_public, is_extern));
 
     return true;
 }

@@ -29,11 +29,14 @@ struct FnDecl : detail::Decl<FnDecl> {
 
     [[nodiscard]] FnDecl(
         Span span, Proto proto, std::unique_ptr<BlockStmt> block,
-        bool is_public = false) noexcept
-    : Decl{span, is_public}, proto{std::move(proto)}, block{std::move(block)} {}
+        bool is_public = false, bool is_extern = false) noexcept
+    : Decl{span, is_public}, proto{std::move(proto)}, block{std::move(block)},
+      is_extern{is_extern} {}
 
     Proto proto;
     std::unique_ptr<BlockStmt> block;
+
+    bool is_extern;
 };
 
 } // namespace cent::ast

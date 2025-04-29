@@ -1353,6 +1353,14 @@ Scope* Codegen::get_module(Span span, std::string_view name) noexcept {
 }
 
 void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
+    if (!decl.is_extern && !decl.block) {
+        error(
+            decl.proto.name.span.begin, m_filename,
+            fmt::format("'{}' has no body", decl.proto.name.value));
+
+        return;
+    }
+
     auto return_type = decl.proto.return_type
                            ? decl.proto.return_type->codegen(*this)
                            : m_primitive_types["void"];
@@ -1396,8 +1404,8 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
 
     auto* function = llvm::Function::Create(
         type,
-        decl.is_public ? llvm::Function::ExternalLinkage
-                       : llvm::Function::PrivateLinkage,
+        (decl.is_public || decl.is_extern) ? llvm::Function::ExternalLinkage
+                                           : llvm::Function::PrivateLinkage,
         decl.proto.name.value, *m_module);
 
     m_current_scope->names[decl.proto.name.value] = Value{
