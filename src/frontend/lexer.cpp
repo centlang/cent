@@ -206,8 +206,43 @@ void Lexer::string() noexcept {
             return;
         }
 
-        m_token.value += get();
-        m_token.span.end = m_position;
+        if (peek() != '\\') {
+            m_token.value += get();
+            m_token.span.end = m_position;
+
+            continue;
+        }
+
+        get();
+
+        if (eof()) {
+            m_token.type = Token::Type::Invalid;
+            return;
+        }
+
+        switch (get()) {
+        case '\\':
+            m_token.value += '\\';
+            break;
+        case 'n':
+            m_token.value += '\n';
+            break;
+        case 'r':
+            m_token.value += '\r';
+            break;
+        case 't':
+            m_token.value += '\t';
+            break;
+        case '\'':
+            m_token.value += '\'';
+            break;
+        case '"':
+            m_token.value += '"';
+            break;
+        default:
+            m_token.type = Token::Type::Invalid;
+            return;
+        }
     }
 }
 
