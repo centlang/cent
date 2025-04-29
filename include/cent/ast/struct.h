@@ -17,9 +17,9 @@ struct Struct : detail::Decl<Struct> {
     };
 
     [[nodiscard]] Struct(
-        Span span, SpanValue<std::string> name,
-        std::vector<Field> fields) noexcept
-    : Decl{span}, name{std::move(name)}, fields{std::move(fields)} {}
+        Span span, SpanValue<std::string> name, std::vector<Field> fields,
+        bool is_public = false) noexcept
+    : Decl{span, is_public}, name{std::move(name)}, fields{std::move(fields)} {}
 
     SpanValue<std::string> name;
     std::vector<Field> fields;

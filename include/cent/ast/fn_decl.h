@@ -28,8 +28,9 @@ struct FnDecl : detail::Decl<FnDecl> {
     };
 
     [[nodiscard]] FnDecl(
-        Span span, Proto proto, std::unique_ptr<BlockStmt> block) noexcept
-    : Decl{span}, proto{std::move(proto)}, block{std::move(block)} {}
+        Span span, Proto proto, std::unique_ptr<BlockStmt> block,
+        bool is_public = false) noexcept
+    : Decl{span, is_public}, proto{std::move(proto)}, block{std::move(block)} {}
 
     Proto proto;
     std::unique_ptr<BlockStmt> block;

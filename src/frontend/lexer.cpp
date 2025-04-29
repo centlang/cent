@@ -213,6 +213,11 @@ void Lexer::ident() noexcept {
         return;
     }
 
+    if (m_token.value == "pub") {
+        keyword(Pub);
+        return;
+    }
+
     if (m_token.value == "fn") {
         keyword(Fn);
         return;

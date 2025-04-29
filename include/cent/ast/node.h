@@ -46,7 +46,10 @@ struct Expression : Statement {
 };
 
 struct Declaration : Statement {
-    using Statement::Statement;
+    [[nodiscard]] Declaration(Span span, bool is_public = false) noexcept
+    : Statement{span}, is_public{is_public} {}
+
+    bool is_public;
 };
 
 namespace detail {

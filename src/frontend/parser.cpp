@@ -41,10 +41,29 @@ std::unique_ptr<ast::Module> Parser::parse() noexcept {
             continue;
         }
 
+        if (match(With)) {
+            next();
+
+            if (!parse_with(*result)) {
+                skip_until_decl();
+            }
+
+            expect("';'", Token::Type::Semicolon);
+
+            continue;
+        }
+
+        bool is_public = false;
+
+        if (match(Pub)) {
+            next();
+            is_public = true;
+        }
+
         if (match(Fn)) {
             next();
 
-            if (!parse_fn(*result)) {
+            if (!parse_fn(*result, is_public)) {
                 skip_until_decl();
             }
 
@@ -54,21 +73,9 @@ std::unique_ptr<ast::Module> Parser::parse() noexcept {
         if (match(Struct)) {
             next();
 
-            if (!parse_struct(*result)) {
+            if (!parse_struct(*result, is_public)) {
                 skip_until_decl();
             }
-
-            continue;
-        }
-
-        if (match(With)) {
-            next();
-
-            if (!parse_with(*result)) {
-                skip_until_decl();
-            }
-
-            expect("';'", Token::Type::Semicolon);
 
             continue;
         }
@@ -603,7 +610,7 @@ std::vector<ast::Struct::Field> Parser::parse_fields() noexcept {
     return result;
 }
 
-bool Parser::parse_fn(ast::Module& module) noexcept {
+bool Parser::parse_fn(ast::Module& module, bool is_public) noexcept {
     auto name = expect("function name", Token::Type::Identifier);
 
     if (!name) {
@@ -648,12 +655,12 @@ bool Parser::parse_fn(ast::Module& module) noexcept {
             {name->value, name->span},
             std::move(params),
             std::move(return_type)},
-        std::move(body)));
+        std::move(body), is_public));
 
     return true;
 }
 
-bool Parser::parse_struct(ast::Module& module) noexcept {
+bool Parser::parse_struct(ast::Module& module, bool is_public) noexcept {
     auto name = expect("struct name", Token::Type::Identifier);
 
     if (!name) {
@@ -674,7 +681,7 @@ bool Parser::parse_struct(ast::Module& module) noexcept {
 
     module.structs.push_back(std::make_unique<ast::Struct>(
         Span{name->span.begin, end}, ast::SpanValue{name->value, name->span},
-        std::move(fields)));
+        std::move(fields), is_public));
 
     return true;
 }

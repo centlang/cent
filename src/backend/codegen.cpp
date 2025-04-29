@@ -1077,24 +1077,30 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
     return std::nullopt;
 }
 
-void Codegen::generate(ast::Module& module, bool generate_impl) noexcept {
+void Codegen::generate(ast::Module& module, bool is_submodule) noexcept {
     for (auto& submodule : module.submodules) {
-        generate(*submodule, false);
+        generate(*submodule, true);
     }
 
     for (auto& struct_decl : module.structs) {
-        llvm::StructType::create(m_context, struct_decl->name.value);
+        if (!is_submodule || struct_decl->is_public) {
+            llvm::StructType::create(m_context, struct_decl->name.value);
+        }
     }
 
     for (auto& struct_decl : module.structs) {
-        struct_decl->codegen(*this);
+        if (!is_submodule || struct_decl->is_public) {
+            struct_decl->codegen(*this);
+        }
     }
 
     for (auto& function : module.functions) {
-        generate_fn_proto(*function);
+        if (!is_submodule || function->is_public) {
+            generate_fn_proto(*function);
+        }
     }
 
-    if (!generate_impl) {
+    if (is_submodule) {
         return;
     }
 
@@ -1311,8 +1317,10 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
         llvm::FunctionType::get(llvm_return_type, llvm_param_types, false);
 
     auto* function = llvm::Function::Create(
-        type, llvm::Function::ExternalLinkage, decl.proto.name.value,
-        *m_module);
+        type,
+        decl.is_public ? llvm::Function::ExternalLinkage
+                       : llvm::Function::PrivateLinkage,
+        decl.proto.name.value, *m_module);
 
     m_functions[function] = std::make_shared<types::Function>(
         type, return_type, std::move(param_types));

@@ -59,6 +59,8 @@ struct Token {
         True,
         False,
 
+        Pub,
+
         Fn,
         Struct,
         With,

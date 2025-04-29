@@ -127,8 +127,12 @@ private:
     [[nodiscard]] std::vector<ast::FnDecl::Param> parse_params() noexcept;
     [[nodiscard]] std::vector<ast::Struct::Field> parse_fields() noexcept;
 
-    [[nodiscard]] bool parse_fn(ast::Module& module) noexcept;
-    [[nodiscard]] bool parse_struct(ast::Module& module) noexcept;
+    [[nodiscard]] bool
+    parse_fn(ast::Module& module, bool is_public = false) noexcept;
+
+    [[nodiscard]] bool
+    parse_struct(ast::Module& module, bool is_public = false) noexcept;
+
     [[nodiscard]] bool parse_with(ast::Module& module) noexcept;
 
     [[nodiscard]] static std::uint8_t precedence_of(Token::Type type) noexcept {

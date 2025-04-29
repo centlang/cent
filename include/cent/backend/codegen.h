@@ -146,7 +146,7 @@ public:
     std::optional<Value> generate(ast::VarDecl& decl) noexcept;
 
 private:
-    void generate(ast::Module& module, bool generate_impl = true) noexcept;
+    void generate(ast::Module& module, bool is_submodule = false) noexcept;
 
     std::optional<Value> generate(ast::Expression& expr) noexcept;
 
