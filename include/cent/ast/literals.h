@@ -1,11 +1,13 @@
 #ifndef CENT_AST_LITERALS_H
 #define CENT_AST_LITERALS_H
 
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "cent/span.h"
 
+#include "cent/ast/named_type.h"
 #include "cent/ast/node.h"
 #include "cent/ast/span_value.h"
 
@@ -46,11 +48,11 @@ struct StructLiteral : detail::Expr<StructLiteral> {
     };
 
     [[nodiscard]] StructLiteral(
-        Span span, SpanValue<std::string> name,
+        Span span, std::unique_ptr<NamedType> type,
         std::vector<Field> fields) noexcept
-    : Expr{span}, name{std::move(name)}, fields{std::move(fields)} {}
+    : Expr{span}, type{std::move(type)}, fields{std::move(fields)} {}
 
-    SpanValue<std::string> name;
+    std::unique_ptr<NamedType> type;
     std::vector<Field> fields;
 };
 

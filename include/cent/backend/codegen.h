@@ -22,7 +22,6 @@ namespace cent::ast {
 struct NamedType;
 struct Pointer;
 struct Optional;
-struct ScopeResolutionType;
 
 struct Module;
 
@@ -43,7 +42,6 @@ struct Identifier;
 struct CallExpr;
 struct MemberExpr;
 struct AsExpr;
-struct ScopeResolutionExpr;
 
 struct FnDecl;
 struct Struct;
@@ -107,7 +105,6 @@ public:
     std::shared_ptr<Type> generate(ast::NamedType& type) noexcept;
     std::shared_ptr<Type> generate(ast::Pointer& type) noexcept;
     std::shared_ptr<Type> generate(ast::Optional& type) noexcept;
-    std::shared_ptr<Type> generate(ast::ScopeResolutionType& type) noexcept;
 
     llvm::Type* generate(types::I8& type) noexcept;
     llvm::Type* generate(types::I16& type) noexcept;
@@ -150,7 +147,6 @@ public:
     std::optional<Value> generate(ast::CallExpr& expr) noexcept;
     std::optional<Value> generate(ast::MemberExpr& expr) noexcept;
     std::optional<Value> generate(ast::AsExpr& expr) noexcept;
-    std::optional<Value> generate(ast::ScopeResolutionExpr& expr) noexcept;
 
     std::optional<Value> generate(ast::FnDecl& decl) noexcept;
     std::optional<Value> generate(ast::Struct& decl) noexcept;
@@ -170,9 +166,13 @@ private:
 
     Value load_value(Value& value) noexcept;
 
-    std::shared_ptr<Type> get_type(Span span, std::string_view name) noexcept;
-    std::optional<Value> get_name(Span span, std::string_view name) noexcept;
-    Scope* get_module(Span span, std::string_view name) noexcept;
+    std::shared_ptr<Type>
+    get_type(Span span, std::string_view name, Scope& parent) noexcept;
+
+    std::optional<Value>
+    get_name(Span span, std::string_view name, Scope& parent) noexcept;
+
+    Scope* get_scope(Span span, std::string_view name, Scope& parent) noexcept;
 
     void generate_fn_proto(ast::FnDecl& decl) noexcept;
 
@@ -184,7 +184,6 @@ private:
     llvm::IRBuilder<> m_builder;
 
     Scope m_scope;
-    std::map<std::string_view, Scope> m_modules;
 
     std::map<std::string_view, std::shared_ptr<Type>> m_primitive_types;
 

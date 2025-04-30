@@ -22,7 +22,6 @@
 #include "cent/ast/optional.h"
 #include "cent/ast/pointer.h"
 #include "cent/ast/return_stmt.h"
-#include "cent/ast/scope_resolution.h"
 #include "cent/ast/unary_expr.h"
 #include "cent/ast/var_decl.h"
 #include "cent/ast/while_loop.h"
@@ -140,7 +139,19 @@ std::optional<Value> Codegen::cast(
 }
 
 std::shared_ptr<Type> Codegen::generate(ast::NamedType& type) noexcept {
-    return get_type(type.span, type.value);
+    auto* scope = m_current_scope;
+    std::size_t last_index = type.value.size() - 1;
+
+    for (std::size_t i = 0; i < last_index; ++i) {
+        scope = get_scope(type.value[i].span, type.value[i].value, *scope);
+
+        if (!scope) {
+            return nullptr;
+        }
+    }
+
+    return get_type(
+        type.value[last_index].span, type.value[last_index].value, *scope);
 }
 
 std::shared_ptr<Type> Codegen::generate(ast::Pointer& type) noexcept {
@@ -161,17 +172,6 @@ std::shared_ptr<Type> Codegen::generate(ast::Optional& type) noexcept {
     }
 
     return std::make_shared<types::Optional>(contained);
-}
-
-std::shared_ptr<Type>
-Codegen::generate(ast::ScopeResolutionType& type) noexcept {
-    auto* scope = m_current_scope;
-    m_current_scope = get_module(type.name.span, type.name.value);
-
-    auto value = type.value->codegen(*this);
-    m_current_scope = scope;
-
-    return value;
 }
 
 llvm::Type* Codegen::generate([[maybe_unused]] types::I8& type) noexcept {
@@ -753,20 +753,18 @@ std::optional<Value> Codegen::generate(ast::BoolLiteral& expr) noexcept {
 }
 
 std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
-    auto type = get_type(expr.name.span, expr.name.value);
+    auto type = expr.type->codegen(*this);
 
     if (!type) {
-        error(
-            expr.name.span.begin, m_filename,
-            fmt::format("undeclared structure: '{}'", expr.name.value));
+        error(expr.type->span.begin, m_filename, "undeclared structure");
 
         return std::nullopt;
     }
 
     if (!type->is_struct()) {
-        error(
-            expr.name.span.begin, m_filename,
-            fmt::format("'{}' is not a structure", expr.name.value));
+        error(expr.type->span.begin, m_filename, "not a structure");
+
+        return std::nullopt;
     }
 
     auto& struct_type = static_cast<types::Struct&>(*type);
@@ -776,7 +774,7 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
 
     if (expr.fields.size() != struct_type.fields.size()) {
         error(
-            expr.name.span.begin, m_filename,
+            expr.type->span.begin, m_filename,
             "incorrect number of fields initialized");
 
         return std::nullopt;
@@ -821,7 +819,19 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
 }
 
 std::optional<Value> Codegen::generate(ast::Identifier& expr) noexcept {
-    return get_name(expr.span, expr.value);
+    auto* scope = m_current_scope;
+    std::size_t last_index = expr.value.size() - 1;
+
+    for (std::size_t i = 0; i < last_index; ++i) {
+        scope = get_scope(expr.value[i].span, expr.value[i].value, *scope);
+
+        if (!scope) {
+            return std::nullopt;
+        }
+    }
+
+    return get_name(
+        expr.value[last_index].span, expr.value[last_index].value, *scope);
 }
 
 std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
@@ -955,17 +965,6 @@ std::optional<Value> Codegen::generate(ast::AsExpr& expr) noexcept {
     }
 
     return cast(type, *value, false);
-}
-
-std::optional<Value>
-Codegen::generate(ast::ScopeResolutionExpr& expr) noexcept {
-    auto* scope = m_current_scope;
-    m_current_scope = get_module(expr.name.span, expr.name.value);
-
-    auto value = expr.value->codegen(*this);
-    m_current_scope = scope;
-
-    return value;
 }
 
 std::optional<Value> Codegen::generate(ast::FnDecl& decl) noexcept {
@@ -1115,7 +1114,7 @@ void Codegen::generate(
     auto* scope = m_current_scope;
 
     for (auto& submodule : module.submodules) {
-        m_current_scope = &m_modules[submodule.first];
+        m_current_scope = &m_scope.scopes[submodule.first];
         generate(*submodule.second, submodule.first);
     }
 
@@ -1315,16 +1314,16 @@ Value Codegen::load_value(Value& value) noexcept {
 }
 
 std::shared_ptr<Type>
-Codegen::get_type(Span span, std::string_view name) noexcept {
+Codegen::get_type(Span span, std::string_view name, Scope& parent) noexcept {
     auto primitive = m_primitive_types.find(name);
 
     if (primitive != m_primitive_types.end()) {
         return primitive->second;
     }
 
-    auto user = m_current_scope->types.find(name);
+    auto user = parent.types.find(name);
 
-    if (user == m_current_scope->types.end()) {
+    if (user == parent.types.end()) {
         error(
             span.begin, m_filename, fmt::format("undeclared type: '{}'", name));
 
@@ -1335,8 +1334,8 @@ Codegen::get_type(Span span, std::string_view name) noexcept {
 }
 
 std::optional<Value>
-Codegen::get_name(Span span, std::string_view name) noexcept {
-    auto iterator = m_current_scope->names.find(name);
+Codegen::get_name(Span span, std::string_view name, Scope& parent) noexcept {
+    auto iterator = parent.names.find(name);
 
     if (iterator == m_current_scope->names.end()) {
         error(
@@ -1349,12 +1348,12 @@ Codegen::get_name(Span span, std::string_view name) noexcept {
     return iterator->second;
 }
 
-Scope* Codegen::get_module(Span span, std::string_view name) noexcept {
-    auto iterator = m_modules.find(name);
+Scope*
+Codegen::get_scope(Span span, std::string_view name, Scope& parent) noexcept {
+    auto iterator = parent.scopes.find(name);
 
-    if (iterator == m_modules.end()) {
-        error(
-            span.begin, m_filename, fmt::format("no module named '{}'", name));
+    if (iterator == parent.scopes.end()) {
+        error(span.begin, m_filename, fmt::format("could not find '{}'", name));
 
         return nullptr;
     }

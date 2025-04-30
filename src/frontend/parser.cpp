@@ -10,7 +10,6 @@
 #include "cent/ast/optional.h"
 #include "cent/ast/pointer.h"
 #include "cent/ast/return_stmt.h"
-#include "cent/ast/scope_resolution.h"
 #include "cent/ast/unary_expr.h"
 #include "cent/ast/var_decl.h"
 #include "cent/ast/while_loop.h"
@@ -201,6 +200,22 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
     case False:
         return std::make_unique<ast::BoolLiteral>(token->span, false);
     case Identifier: {
+        std::vector<ast::SpanValue<std::string>> value;
+        value.push_back(ast::SpanValue{token->value, token->span});
+
+        while (match(ColonColon)) {
+            next();
+            auto name = expect("name", Identifier);
+
+            if (!name) {
+                return nullptr;
+            }
+
+            value.push_back(ast::SpanValue{name->value, name->span});
+        }
+
+        auto type_end = peek().span.end;
+
         if (match(LeftBrace)) {
             next();
 
@@ -213,30 +228,13 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
 
             return std::make_unique<ast::StructLiteral>(
                 Span{token->span.begin, end},
-                ast::SpanValue{token->value, token->span}, std::move(fields));
+                std::make_unique<ast::NamedType>(
+                    Span{token->span.begin, type_end}, std::move(value)),
+                std::move(fields));
         }
 
-        if (!match(ColonColon)) {
-            return std::make_unique<ast::Identifier>(token->span, token->value);
-        }
-
-        next();
-
-        if (!match(Identifier)) {
-            error(peek().span.begin, m_filename, "expected name");
-
-            return nullptr;
-        }
-
-        auto value = expect_prefix();
-
-        if (!value) {
-            return nullptr;
-        }
-
-        return std::make_unique<ast::ScopeResolutionExpr>(
-            Span{token->span.begin, value->span.end},
-            ast::SpanValue{token->value, token->span}, std::move(value));
+        return std::make_unique<ast::Identifier>(
+            Span{token->span.begin, type_end}, std::move(value));
     }
     case Minus:
     case Bang:
@@ -489,33 +487,30 @@ std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
             Span{begin, type->span.end}, std::move(type));
     }
 
-    auto name = expect("type", Identifier);
+    std::vector<ast::SpanValue<std::string>> value;
+    auto token = expect("name", Identifier);
 
-    if (!name) {
+    if (!token) {
         return nullptr;
     }
 
-    if (match(ColonColon)) {
+    auto end = token->span.end;
+
+    value.push_back(ast::SpanValue{token->value, token->span});
+
+    while (match(ColonColon)) {
         next();
+        auto name = expect("name", Identifier);
 
-        if (!match(Identifier)) {
-            error(peek().span.begin, m_filename, "expected name");
-
+        if (!name) {
             return nullptr;
         }
 
-        auto type = expect_type();
-
-        if (!type) {
-            return nullptr;
-        }
-
-        return std::make_unique<ast::ScopeResolutionType>(
-            Span{name->span.begin, type->span.end},
-            ast::SpanValue{name->value, name->span}, std::move(type));
+        end = name->span.end;
+        value.push_back(ast::SpanValue{name->value, name->span});
     }
 
-    return std::make_unique<ast::NamedType>(name->span, name->value);
+    return std::make_unique<ast::NamedType>(Span{begin, end}, std::move(value));
 }
 
 void Parser::parse_var(ast::BlockStmt& block) noexcept {
