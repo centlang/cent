@@ -266,6 +266,13 @@ Parser::expect_member_expr() noexcept {
         return nullptr;
     }
 
+    if (!match(Token::Type::Dot)) {
+        return expression;
+    }
+
+    std::vector<ast::SpanValue<std::string>> path;
+    auto end = peek().span.end;
+
     while (match(Token::Type::Dot)) {
         next();
 
@@ -275,14 +282,13 @@ Parser::expect_member_expr() noexcept {
             return nullptr;
         }
 
-        Span span{expression->span.begin, member->span.end};
-
-        expression = std::make_unique<ast::MemberExpr>(
-            span, std::move(expression),
-            ast::SpanValue{member->value, member->span});
+        path.push_back(ast::SpanValue{member->value, member->span});
+        end = member->span.end;
     }
 
-    return expression;
+    return std::make_unique<ast::MemberExpr>(
+        Span{expression->span.begin, end}, std::move(expression),
+        std::move(path));
 }
 
 std::unique_ptr<ast::Expression> Parser::expect_call_expr() noexcept {
