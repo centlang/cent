@@ -149,7 +149,16 @@ void Lexer::number() noexcept {
     m_token = {Token::Type::IntLiteral, {}, {m_position, {}}};
 
     auto get_int = [&] {
-        while (!eof() && std::isdigit(peek())) {
+        while (!eof()) {
+            if (peek() == '_') {
+                get();
+                continue;
+            }
+
+            if (!std::isdigit(peek())) {
+                break;
+            }
+
             m_token.value += get();
         }
     };
