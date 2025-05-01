@@ -21,6 +21,7 @@ struct FnDecl : detail::Decl<FnDecl> {
     };
 
     struct Proto {
+        std::optional<SpanValue<std::string>> type;
         SpanValue<std::string> name;
 
         std::vector<Param> params;

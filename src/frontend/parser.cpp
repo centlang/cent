@@ -6,6 +6,7 @@
 #include "cent/ast/identifier.h"
 #include "cent/ast/literals.h"
 #include "cent/ast/member_expr.h"
+#include "cent/ast/method_expr.h"
 #include "cent/ast/named_type.h"
 #include "cent/ast/optional.h"
 #include "cent/ast/pointer.h"
@@ -240,7 +241,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
     case Bang:
     case Star:
     case And:
-        if (auto value = expect_call_expr()) {
+        if (auto value = expect_member_expr()) {
             return std::make_unique<ast::UnaryExpr>(
                 Span{token->span.begin, value->span.end},
                 ast::SpanValue{token->type, token->span}, std::move(value));
@@ -267,11 +268,41 @@ Parser::expect_member_expr() noexcept {
     }
 
     if (!match(Token::Type::Dot)) {
-        return expression;
+        if (!match(Token::Type::LeftParen)) {
+            return expression;
+        }
+
+        next();
+
+        auto args = parse_args();
+        auto end = peek().span.end;
+
+        if (!expect("',' or ')'", Token::Type::RightParen)) {
+            return nullptr;
+        }
+
+        return std::make_unique<ast::CallExpr>(
+            Span{expression->span.begin, end}, std::move(expression),
+            std::move(args));
     }
 
     std::vector<ast::SpanValue<std::string>> path;
+    ast::SpanValue<std::string> name;
+
     auto end = peek().span.end;
+
+    if (match(Token::Type::Dot)) {
+        next();
+
+        auto token = expect("member name", Token::Type::Identifier);
+
+        if (!token) {
+            return nullptr;
+        }
+
+        name = {token->value, token->span};
+        end = token->span.end;
+    }
 
     while (match(Token::Type::Dot)) {
         next();
@@ -282,39 +313,41 @@ Parser::expect_member_expr() noexcept {
             return nullptr;
         }
 
-        path.push_back(ast::SpanValue{member->value, member->span});
+        path.push_back(std::move(name));
+        name = {member->value, member->span};
+
         end = member->span.end;
     }
 
-    return std::make_unique<ast::MemberExpr>(
-        Span{expression->span.begin, end}, std::move(expression),
-        std::move(path));
-}
-
-std::unique_ptr<ast::Expression> Parser::expect_call_expr() noexcept {
-    auto expression = expect_member_expr();
-
     if (!match(Token::Type::LeftParen)) {
-        return expression;
+        path.push_back(std::move(name));
+
+        return std::make_unique<ast::MemberExpr>(
+            Span{expression->span.begin, end}, std::move(expression),
+            std::move(path));
     }
 
     next();
 
+    expression = std::make_unique<ast::MemberExpr>(
+        Span{expression->span.begin, end}, std::move(expression),
+        std::move(path));
+
     auto args = parse_args();
-    auto end = peek().span.end;
+    end = peek().span.end;
 
     if (!expect("',' or ')'", Token::Type::RightParen)) {
         return nullptr;
     }
 
-    return std::make_unique<ast::CallExpr>(
+    return std::make_unique<ast::MethodExpr>(
         Span{expression->span.begin, end}, std::move(expression),
-        std::move(args));
+        std::move(name), std::move(args));
 }
 
 [[nodiscard]] std::unique_ptr<ast::Expression>
 Parser::expect_as_expr() noexcept {
-    auto expression = expect_call_expr();
+    auto expression = expect_member_expr();
 
     if (!match(Token::Type::As)) {
         return expression;
@@ -670,9 +703,21 @@ std::vector<ast::Struct::Field> Parser::parse_fields() noexcept {
 bool Parser::parse_fn(
     ast::Module& module, bool is_public, bool is_extern) noexcept {
     auto name = expect("function name", Token::Type::Identifier);
+    std::optional<ast::SpanValue<std::string>> type = std::nullopt;
 
     if (!name) {
         return false;
+    }
+
+    if (match(Token::Type::ColonColon)) {
+        next();
+
+        type = {name->value, name->span};
+        name = expect("function name", Token::Type::Identifier);
+
+        if (!name) {
+            return false;
+        }
     }
 
     if (!expect("'('", Token::Type::LeftParen)) {
@@ -710,6 +755,7 @@ bool Parser::parse_fn(
     module.functions.push_back(std::make_unique<ast::FnDecl>(
         name->span,
         ast::FnDecl::Proto{
+            std::move(type),
             {name->value, name->span},
             std::move(params),
             std::move(return_type)},

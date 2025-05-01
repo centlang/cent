@@ -17,6 +17,7 @@
 #include "cent/ast/if_else.h"
 #include "cent/ast/literals.h"
 #include "cent/ast/member_expr.h"
+#include "cent/ast/method_expr.h"
 #include "cent/ast/module.h"
 #include "cent/ast/named_type.h"
 #include "cent/ast/optional.h"
@@ -882,6 +883,59 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
     return Value{type.return_type, m_builder.CreateCall(function, arguments)};
 }
 
+std::optional<Value> Codegen::generate(ast::MethodExpr& expr) noexcept {
+    auto value = expr.value->codegen(*this);
+
+    if (!value) {
+        return std::nullopt;
+    }
+
+    auto iterator = m_methods[value->type].find(expr.name.value);
+
+    if (iterator == m_methods[value->type].end()) {
+        error(
+            expr.name.span.begin, m_filename,
+            fmt::format("no such method: '{}'", expr.name.value));
+
+        return std::nullopt;
+    }
+
+    auto arg_size = iterator->second.function->arg_size();
+
+    if (arg_size - 1 != expr.arguments.size()) {
+        error(
+            expr.name.span.begin, m_filename,
+            "incorrect number of arguments passed");
+
+        return std::nullopt;
+    }
+
+    std::vector<llvm::Value*> arguments;
+    arguments.reserve(arg_size);
+
+    arguments.push_back(value->value);
+
+    for (std::size_t i = 0; i < expr.arguments.size(); ++i) {
+        auto value = generate(*expr.arguments[i]);
+
+        if (!value) {
+            return std::nullopt;
+        }
+
+        if (auto val = cast(iterator->second.type->param_types[i], *value)) {
+            arguments.push_back(val->value);
+        } else {
+            error(expr.arguments[i]->span.begin, m_filename, "type mismatch");
+
+            return std::nullopt;
+        }
+    }
+
+    return Value{
+        iterator->second.type->return_type,
+        m_builder.CreateCall(iterator->second.function, arguments)};
+}
+
 std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
     auto value = expr.value->codegen(*this);
 
@@ -973,15 +1027,26 @@ std::optional<Value> Codegen::generate(ast::AsExpr& expr) noexcept {
 }
 
 std::optional<Value> Codegen::generate(ast::FnDecl& decl) noexcept {
-    auto iterator = m_scope.names.find(decl.proto.name.value);
-    auto* function = static_cast<llvm::Function*>(iterator->second.value);
+    auto type = decl.proto.type ? get_type(
+                                      decl.proto.type->span,
+                                      decl.proto.type->value, *m_current_scope)
+                                : nullptr;
 
-    auto* entry = llvm::BasicBlock::Create(m_context, "", function);
+    auto function_type = decl.proto.type
+                             ? m_methods[type][decl.proto.name.value].type
+                             : m_scope.names[decl.proto.name.value].type;
+
+    auto* function = decl.proto.type
+                         ? m_methods[type][decl.proto.name.value].function
+                         : static_cast<llvm::Function*>(
+                               m_scope.names[decl.proto.name.value].value);
+
+    auto* entry = llvm::BasicBlock::Create(
+        m_context, "", static_cast<llvm::Function*>(function));
 
     m_builder.SetInsertPoint(entry);
 
-    m_current_function =
-        static_cast<types::Function*>(iterator->second.type.get());
+    m_current_function = static_cast<types::Function*>(function_type.get());
 
     for (std::size_t i = 0; i < decl.proto.params.size(); ++i) {
         auto* value = function->getArg(i);
@@ -1342,7 +1407,7 @@ std::optional<Value>
 Codegen::get_name(Span span, std::string_view name, Scope& parent) noexcept {
     auto iterator = parent.names.find(name);
 
-    if (iterator == m_current_scope->names.end()) {
+    if (iterator == parent.names.end()) {
         error(
             span.begin, m_filename,
             fmt::format("undeclared identifier: '{}'", name));
@@ -1413,14 +1478,26 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
         param_types.push_back(type);
     }
 
-    auto* type =
+    auto* function_type =
         llvm::FunctionType::get(llvm_return_type, llvm_param_types, false);
 
     auto* function = llvm::Function::Create(
-        type,
+        function_type,
         (decl.is_public || decl.is_extern) ? llvm::Function::ExternalLinkage
                                            : llvm::Function::PrivateLinkage,
         decl.proto.name.value, *m_module);
+
+    if (decl.proto.type) {
+        auto type = get_type(
+            decl.proto.type->span, decl.proto.type->value, *m_current_scope);
+
+        m_methods[type][decl.proto.name.value] = Method{
+            std::make_shared<types::Function>(
+                return_type, std::move(param_types)),
+            function};
+
+        return;
+    }
 
     m_current_scope->names[decl.proto.name.value] = Value{
         std::make_shared<types::Function>(return_type, std::move(param_types)),

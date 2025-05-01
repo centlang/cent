@@ -40,6 +40,7 @@ struct BoolLiteral;
 struct StructLiteral;
 struct Identifier;
 struct CallExpr;
+struct MethodExpr;
 struct MemberExpr;
 struct AsExpr;
 
@@ -145,6 +146,7 @@ public:
     std::optional<Value> generate(ast::StructLiteral& expr) noexcept;
     std::optional<Value> generate(ast::Identifier& expr) noexcept;
     std::optional<Value> generate(ast::CallExpr& expr) noexcept;
+    std::optional<Value> generate(ast::MethodExpr& expr) noexcept;
     std::optional<Value> generate(ast::MemberExpr& expr) noexcept;
     std::optional<Value> generate(ast::AsExpr& expr) noexcept;
 
@@ -192,6 +194,14 @@ private:
 
     std::map<llvm::StructType*, std::map<std::string_view, std::size_t>>
         m_members;
+
+    struct Method {
+        std::shared_ptr<types::Function> type;
+        llvm::Function* function;
+    };
+
+    std::map<std::shared_ptr<Type>, std::map<std::string_view, Method>>
+        m_methods;
 
     std::unique_ptr<ast::Module> m_program;
 

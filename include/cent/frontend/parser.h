@@ -100,8 +100,6 @@ private:
     [[nodiscard]] std::unique_ptr<ast::Expression>
     expect_member_expr() noexcept;
 
-    [[nodiscard]] std::unique_ptr<ast::Expression> expect_call_expr() noexcept;
-
     [[nodiscard]] std::unique_ptr<ast::Expression> expect_as_expr() noexcept;
 
     [[nodiscard]] std::unique_ptr<ast::BinaryExpr>
