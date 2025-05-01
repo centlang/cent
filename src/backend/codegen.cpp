@@ -1032,14 +1032,42 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) noexcept {
                                       decl.proto.type->value, *m_current_scope)
                                 : nullptr;
 
-    auto function_type = decl.proto.type
-                             ? m_methods[type][decl.proto.name.value].type
-                             : m_scope.names[decl.proto.name.value].type;
+    auto get_fn_type = [&]() -> std::shared_ptr<Type> {
+        if (!decl.proto.type) {
+            return m_scope.names[decl.proto.name.value].type;
+        }
 
-    auto* function = decl.proto.type
-                         ? m_methods[type][decl.proto.name.value].function
-                         : static_cast<llvm::Function*>(
-                               m_scope.names[decl.proto.name.value].value);
+        auto method = m_methods[type].find(decl.proto.name.value);
+
+        if (method != m_methods[type].end()) {
+            return method->second.type;
+        }
+
+        return m_scope.scopes[decl.proto.type->value]
+            .names[decl.proto.name.value]
+            .type;
+    };
+
+    auto get_llvm_fn = [&]() {
+        if (!decl.proto.type) {
+            return static_cast<llvm::Function*>(
+                m_scope.names[decl.proto.name.value].value);
+        }
+
+        auto method = m_methods[type].find(decl.proto.name.value);
+
+        if (method != m_methods[type].end()) {
+            return method->second.function;
+        }
+
+        return static_cast<llvm::Function*>(
+            m_scope.scopes[decl.proto.type->value]
+                .names[decl.proto.name.value]
+                .value);
+    };
+
+    auto function_type = get_fn_type();
+    auto* function = get_llvm_fn();
 
     auto* entry = llvm::BasicBlock::Create(
         m_context, "", static_cast<llvm::Function*>(function));
@@ -1487,11 +1515,8 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
                                            : llvm::Function::PrivateLinkage,
         decl.proto.name.value, *m_module);
 
-    if (decl.proto.type) {
-        auto type = get_type(
-            decl.proto.type->span, decl.proto.type->value, *m_current_scope);
-
-        m_methods[type][decl.proto.name.value] = Method{
+    if (!decl.proto.type) {
+        m_current_scope->names[decl.proto.name.value] = Value{
             std::make_shared<types::Function>(
                 return_type, std::move(param_types)),
             function};
@@ -1499,9 +1524,24 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
         return;
     }
 
-    m_current_scope->names[decl.proto.name.value] = Value{
-        std::make_shared<types::Function>(return_type, std::move(param_types)),
-        function};
+    auto type = get_type(
+        decl.proto.type->span, decl.proto.type->value, *m_current_scope);
+
+    auto func_type =
+        std::make_shared<types::Function>(return_type, std::move(param_types));
+
+    m_current_scope->scopes[decl.proto.type->value]
+        .names[decl.proto.name.value] = {func_type, function};
+
+    if (!decl.proto.params.empty()) {
+        auto param_type = decl.proto.params[0].type->codegen(*this);
+
+        if (param_type->is_pointer() &&
+            types_equal(
+                *static_cast<types::Pointer&>(*param_type).type, *type)) {
+            m_methods[type][decl.proto.name.value] = {func_type, function};
+        }
+    }
 }
 
 } // namespace cent::backend
