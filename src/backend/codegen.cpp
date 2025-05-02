@@ -1208,6 +1208,15 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
 }
 
 void Codegen::generate(ast::Module& module, bool is_submodule) noexcept {
+    if (module.path.file) {
+        auto iterator = m_generated_modules.find(*module.path.file);
+
+        if (iterator != m_generated_modules.end()) {
+            *m_current_scope = iterator->second;
+            return;
+        }
+    }
+
     auto* scope = m_current_scope;
 
     for (auto& submodule : module.submodules) {
@@ -1233,6 +1242,10 @@ void Codegen::generate(ast::Module& module, bool is_submodule) noexcept {
         if (function->block && !is_submodule) {
             function->codegen(*this);
         }
+    }
+
+    if (module.path.file) {
+        m_generated_modules[*module.path.file] = *m_current_scope;
     }
 }
 

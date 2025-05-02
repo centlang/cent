@@ -1,6 +1,7 @@
 #ifndef CENT_BACKEND_CODEGEN_H
 #define CENT_BACKEND_CODEGEN_H
 
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <optional>
@@ -200,6 +201,8 @@ private:
 
     std::map<std::shared_ptr<Type>, std::map<std::string_view, Method>>
         m_methods;
+
+    std::map<std::filesystem::path, Scope> m_generated_modules;
 
     std::unique_ptr<ast::Module> m_program;
 

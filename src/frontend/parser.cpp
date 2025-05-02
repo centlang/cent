@@ -30,7 +30,7 @@ std::unique_ptr<ast::Module> Parser::parse() noexcept {
         }
     };
 
-    auto result = std::make_unique<ast::Module>();
+    auto result = std::make_unique<ast::Module>(ModulePath{.file = m_filename});
 
     while (true) {
         if (match(Eof)) {
@@ -831,19 +831,25 @@ bool Parser::parse_submodule_dir(
          std::filesystem::recursive_directory_iterator{path}) {
         auto name = entry.path().stem().string();
 
-        if (!module.submodules[name]) {
-            module.submodules[name] = std::make_unique<ast::Module>();
+        auto& submodule = module.submodules[name];
+
+        if (!submodule) {
+            submodule = std::make_unique<ast::Module>(ModulePath{});
         }
 
         if (entry.is_directory()) {
-            if (!parse_submodule_dir(*module.submodules[name], entry)) {
+            submodule->path.directory = entry;
+
+            if (!parse_submodule_dir(*submodule, entry)) {
                 return false;
             }
 
             continue;
         }
 
-        if (!parse_submodule(*module.submodules[name], entry)) {
+        submodule->path.file = entry;
+
+        if (!parse_submodule(*submodule, entry)) {
             return false;
         }
     }
@@ -884,7 +890,8 @@ bool Parser::parse_with(ast::Module& module) noexcept {
     }
 
     if (!module.submodules[path.back()]) {
-        module.submodules[path.back()] = std::make_unique<ast::Module>();
+        module.submodules[path.back()] =
+            std::make_unique<ast::Module>(module_path);
     }
 
     auto& submodule = module.submodules[path.back()];

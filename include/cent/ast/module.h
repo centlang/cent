@@ -6,20 +6,21 @@
 #include <utility>
 #include <vector>
 
+#include "cent/modules.h"
+
 #include "cent/ast/fn_decl.h"
 #include "cent/ast/struct.h"
 
 namespace cent::ast {
 
 struct Module : Node {
-    [[nodiscard]] Module(
-        std::vector<std::unique_ptr<FnDecl>> functions = {}) noexcept
-    : functions{std::move(functions)} {}
+    [[nodiscard]] Module(ModulePath path) noexcept : path{std::move(path)} {};
 
     std::vector<std::unique_ptr<FnDecl>> functions;
     std::vector<std::unique_ptr<Struct>> structs;
-
     std::map<std::string, std::unique_ptr<Module>> submodules;
+
+    ModulePath path;
 };
 
 } // namespace cent::ast
