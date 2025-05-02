@@ -4,6 +4,7 @@
 #include <array>
 #include <concepts>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <string_view>
@@ -133,6 +134,12 @@ private:
 
     [[nodiscard]] bool
     parse_struct(ast::Module& module, bool is_public = false) noexcept;
+
+    [[nodiscard]] bool parse_submodule(
+        ast::Module& module, const std::filesystem::path& path) noexcept;
+
+    [[nodiscard]] bool parse_submodule_dir(
+        ast::Module& module, const std::filesystem::path& path) noexcept;
 
     [[nodiscard]] bool parse_with(ast::Module& module) noexcept;
 

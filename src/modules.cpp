@@ -2,17 +2,27 @@
 
 namespace cent {
 
-std::optional<std::filesystem::path>
-find_module(std::string_view name) noexcept {
-    auto filename = std::string{name} + ".cn";
+ModulePath find_module(std::span<std::string> path) noexcept {
+    std::filesystem::path fs_path = ".";
 
-    for (const auto& entry : std::filesystem::directory_iterator{"."}) {
-        if (entry.path().filename() == filename) {
-            return entry;
-        }
+    for (auto& name : path) {
+        fs_path /= name;
     }
 
-    return std::nullopt;
+    ModulePath result;
+
+    auto file = fs_path;
+    file.replace_extension("cn");
+
+    if (std::filesystem::exists(file)) {
+        result.file = std::move(file);
+    }
+
+    if (std::filesystem::is_directory(fs_path)) {
+        result.directory = fs_path;
+    }
+
+    return result;
 }
 
 } // namespace cent

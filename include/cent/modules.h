@@ -3,12 +3,18 @@
 
 #include <filesystem>
 #include <optional>
+#include <span>
+#include <string>
 
 namespace cent {
 
-[[nodiscard]] std::optional<std::filesystem::path>
-find_module(std::string_view name) noexcept;
+struct ModulePath {
+    std::optional<std::filesystem::path> directory;
+    std::optional<std::filesystem::path> file;
+};
 
-}
+[[nodiscard]] ModulePath find_module(std::span<std::string> path) noexcept;
+
+} // namespace cent
 
 #endif

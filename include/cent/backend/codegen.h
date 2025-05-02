@@ -156,9 +156,7 @@ public:
     std::optional<Value> generate(ast::VarDecl& decl) noexcept;
 
 private:
-    void generate(
-        ast::Module& module,
-        std::optional<std::string_view> name = std::nullopt) noexcept;
+    void generate(ast::Module& module, bool is_submodule = false) noexcept;
 
     std::optional<Value> generate(ast::Expression& expr) noexcept;
 

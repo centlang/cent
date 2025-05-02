@@ -1207,41 +1207,30 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
     return std::nullopt;
 }
 
-void Codegen::generate(
-    ast::Module& module, std::optional<std::string_view> name) noexcept {
+void Codegen::generate(ast::Module& module, bool is_submodule) noexcept {
     auto* scope = m_current_scope;
 
     for (auto& submodule : module.submodules) {
-        m_current_scope = &m_scope.scopes[submodule.first];
-        generate(*submodule.second, submodule.first);
+        m_current_scope = &scope->scopes[submodule.first];
+        generate(*submodule.second, true);
     }
 
     m_current_scope = scope;
 
     for (auto& struct_decl : module.structs) {
-        if (!name || struct_decl->is_public) {
-            llvm::StructType::create(m_context, struct_decl->name.value);
-        }
+        llvm::StructType::create(m_context, struct_decl->name.value);
     }
 
     for (auto& struct_decl : module.structs) {
-        if (!name || struct_decl->is_public) {
-            struct_decl->codegen(*this);
-        }
+        struct_decl->codegen(*this);
     }
 
     for (auto& function : module.functions) {
-        if (!name || function->is_public) {
-            generate_fn_proto(*function);
-        }
-    }
-
-    if (name) {
-        return;
+        generate_fn_proto(*function);
     }
 
     for (auto& function : module.functions) {
-        if (function->block) {
+        if (function->block && !is_submodule) {
             function->codegen(*this);
         }
     }

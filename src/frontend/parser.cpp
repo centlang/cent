@@ -790,6 +790,67 @@ bool Parser::parse_struct(ast::Module& module, bool is_public) noexcept {
     return true;
 }
 
+bool Parser::parse_submodule(
+    ast::Module& module, const std::filesystem::path& path) noexcept {
+    auto code = cent::read_file(path);
+
+    if (!code) {
+        return false;
+    }
+
+    Parser parser{*code, path.relative_path().string()};
+    auto submodule = parser.parse();
+
+    if (!submodule) {
+        return false;
+    }
+
+    module.functions.reserve(
+        module.functions.size() + submodule->functions.size());
+
+    module.structs.reserve(module.structs.size() + submodule->structs.size());
+
+    for (auto& function : submodule->functions) {
+        module.functions.push_back(std::move(function));
+    }
+
+    for (auto& struct_decl : submodule->structs) {
+        module.structs.push_back(std::move(struct_decl));
+    }
+
+    for (auto& submodule : submodule->submodules) {
+        module.submodules.insert(std::move(submodule));
+    }
+
+    return true;
+}
+
+bool Parser::parse_submodule_dir(
+    ast::Module& module, const std::filesystem::path& path) noexcept {
+    for (const auto& entry :
+         std::filesystem::recursive_directory_iterator{path}) {
+        auto name = entry.path().stem().string();
+
+        if (!module.submodules[name]) {
+            module.submodules[name] = std::make_unique<ast::Module>();
+        }
+
+        if (entry.is_directory()) {
+            if (!parse_submodule_dir(*module.submodules[name], entry)) {
+                return false;
+            }
+
+            continue;
+        }
+
+        if (!parse_submodule(*module.submodules[name], entry)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool Parser::parse_with(ast::Module& module) noexcept {
     auto name = expect("module name", Token::Type::Identifier);
 
@@ -797,9 +858,24 @@ bool Parser::parse_with(ast::Module& module) noexcept {
         return false;
     }
 
-    auto file = cent::find_module(name->value);
+    std::vector<std::string> path;
+    path.push_back(name->value);
 
-    if (!file) {
+    while (match(Token::Type::ColonColon)) {
+        next();
+
+        name = expect("module name", Token::Type::Identifier);
+
+        if (!name) {
+            return false;
+        }
+
+        path.push_back(name->value);
+    }
+
+    auto module_path = cent::find_module(path);
+
+    if (!module_path.directory && !module_path.file) {
         error(
             name->span.begin, m_filename,
             fmt::format("could not find module '{}'", name->value));
@@ -807,22 +883,23 @@ bool Parser::parse_with(ast::Module& module) noexcept {
         return false;
     }
 
-    auto code = cent::read_file(*file);
-
-    if (!code) {
-        return false;
+    if (!module.submodules[path.back()]) {
+        module.submodules[path.back()] = std::make_unique<ast::Module>();
     }
 
-    Parser parser{*code, file->relative_path().string()};
-    auto submodule = parser.parse();
+    auto& submodule = module.submodules[path.back()];
 
-    if (!submodule) {
-        return false;
+    if (module_path.file) {
+        if (!parse_submodule(*submodule, *module_path.file)) {
+            return false;
+        }
     }
 
-    module.submodules[name->value] = std::move(submodule);
+    if (!module_path.directory) {
+        return true;
+    }
 
-    return true;
+    return parse_submodule_dir(*submodule, *module_path.directory);
 }
 
 } // namespace cent::frontend
