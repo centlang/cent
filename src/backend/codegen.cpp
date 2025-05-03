@@ -72,6 +72,13 @@ bool Codegen::types_equal(Type& lhs, Type& rhs) noexcept {
                types_equal(*lhs_pointer.type, *rhs_pointer.type);
     }
 
+    if (lhs.is_optional() && rhs.is_optional()) {
+        auto& lhs_optional = static_cast<types::Optional&>(lhs);
+        auto& rhs_optional = static_cast<types::Optional&>(rhs);
+
+        return types_equal(*lhs_optional.type, *rhs_optional.type);
+    }
+
     return false;
 }
 
@@ -240,10 +247,20 @@ llvm::Type* Codegen::generate(types::Struct& type) noexcept {
 llvm::Type* Codegen::generate(types::Optional& type) noexcept {
     auto* contained = type.type->codegen(*this);
 
+    auto iterator = m_optional_types.find(contained);
+
+    if (iterator != m_optional_types.end()) {
+        return iterator->second;
+    }
+
     std::array<llvm::Type*, 2> fields = {
         contained, llvm::Type::getInt1Ty(m_context)};
 
-    return llvm::StructType::create(fields);
+    auto* llvm_type = llvm::StructType::create(fields);
+
+    m_optional_types[contained] = llvm_type;
+
+    return llvm_type;
 }
 
 llvm::Type* Codegen::generate([[maybe_unused]] types::Function& type) noexcept {

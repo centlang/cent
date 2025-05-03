@@ -204,6 +204,8 @@ private:
 
     std::map<std::filesystem::path, Scope> m_generated_modules;
 
+    std::map<llvm::Type*, llvm::StructType*> m_optional_types;
+
     std::unique_ptr<ast::Module> m_program;
 
     std::string_view m_filename;
