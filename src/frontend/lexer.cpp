@@ -1,3 +1,5 @@
+#include <cstdint>
+
 #include "cent/frontend/lexer.h"
 
 namespace cent::frontend {
@@ -148,6 +150,28 @@ void Lexer::next_token() noexcept {
 void Lexer::number() noexcept {
     m_token = {Token::Type::IntLiteral, {}, {m_position, {}}};
 
+    static constexpr auto hex = 16;
+    static constexpr auto oct = 8;
+    static constexpr auto bin = 2;
+    static constexpr auto dec = 10;
+
+    std::uint8_t base = dec;
+
+    auto is_digit = [&](char character) -> bool {
+        switch (base) {
+        case hex:
+            return std::isxdigit(character);
+        case oct:
+            return character >= '0' && character < '8';
+        case bin:
+            return character == '0' || character == '1';
+        case dec:
+            return std::isdigit(character);
+        default:
+            return false;
+        }
+    };
+
     auto get_int = [&] {
         while (!eof()) {
             if (peek() == '_') {
@@ -155,7 +179,7 @@ void Lexer::number() noexcept {
                 continue;
             }
 
-            if (!std::isdigit(peek())) {
+            if (!is_digit(peek())) {
                 break;
             }
 
@@ -166,7 +190,19 @@ void Lexer::number() noexcept {
     if (peek() == '0') {
         m_token.value += get();
 
-        if (!eof() && (peek() == 'x' || peek() == 'o' || peek() == 'b')) {
+        if (eof()) {
+            m_token.span.end = m_position;
+            return;
+        }
+
+        if (peek() == 'x') {
+            base = hex;
+            m_token.value += get();
+        } else if (peek() == 'o') {
+            base = oct;
+            m_token.value += get();
+        } else if (peek() == 'b') {
+            base = bin;
             m_token.value += get();
         }
     }
