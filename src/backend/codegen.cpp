@@ -1244,6 +1244,16 @@ void Codegen::generate(ast::Module& module, bool is_submodule) noexcept {
     m_current_scope = scope;
 
     for (auto& struct_decl : module.structs) {
+        if (llvm::StructType::getTypeByName(
+                m_context, struct_decl->name.value)) {
+            error(
+                struct_decl->name.span.begin, m_filename,
+                fmt::format(
+                    "'{}' is already defined", struct_decl->name.value));
+
+            continue;
+        }
+
         llvm::StructType::create(m_context, struct_decl->name.value);
     }
 
@@ -1487,6 +1497,18 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
         return;
     }
 
+    auto& scope = decl.proto.type
+                      ? m_current_scope->scopes[decl.proto.type->value]
+                      : *m_current_scope;
+
+    if (scope.names.contains(decl.proto.name.value)) {
+        error(
+            decl.proto.name.span.begin, m_filename,
+            fmt::format("'{}' is already defined", decl.proto.name.value));
+
+        return;
+    }
+
     auto return_type = decl.proto.return_type
                            ? decl.proto.return_type->codegen(*this)
                            : m_primitive_types["void"];
@@ -1535,7 +1557,7 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
         decl.proto.name.value, *m_module);
 
     if (!decl.proto.type) {
-        m_current_scope->names[decl.proto.name.value] = Value{
+        scope.names[decl.proto.name.value] = Value{
             std::make_shared<types::Function>(
                 return_type, std::move(param_types)),
             function};
@@ -1549,8 +1571,7 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
     auto func_type =
         std::make_shared<types::Function>(return_type, std::move(param_types));
 
-    m_current_scope->scopes[decl.proto.type->value]
-        .names[decl.proto.name.value] = {func_type, function};
+    scope.names[decl.proto.name.value] = {func_type, function};
 
     if (!decl.proto.params.empty()) {
         auto param_type = decl.proto.params[0].type->codegen(*this);
