@@ -335,16 +335,19 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
         return std::nullopt;
     }
 
-    auto* variable = llvm::dyn_cast<llvm::GetElementPtrInst>(var->value);
-
-    if (!variable) {
-        error(
-            stmt.variable->span.begin, m_filename, "cannot assign to a value");
+    if (auto* variable = llvm::dyn_cast<llvm::GetElementPtrInst>(var->value)) {
+        m_builder.CreateStore(val->value, variable);
 
         return std::nullopt;
     }
 
-    m_builder.CreateStore(val->value, variable);
+    if (var->value->getType()->isPointerTy()) {
+        m_builder.CreateStore(val->value, var->value);
+
+        return std::nullopt;
+    }
+
+    error(stmt.variable->span.begin, m_filename, "cannot assign to a value");
 
     return std::nullopt;
 }
