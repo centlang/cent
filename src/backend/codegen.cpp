@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/Instruction.h>
 #include <llvm/IR/Instructions.h>
 
 #include "cent/log.h"
@@ -119,28 +120,58 @@ std::optional<Value> Codegen::cast(
     std::size_t from_size = value.value->getType()->getPrimitiveSizeInBits();
     std::size_t to_size = llvm_type->getPrimitiveSizeInBits();
 
+    bool value_is_float = value.type->is_float();
+    bool value_is_sint = value.type->is_signed_int();
+    bool value_is_uint = value.type->is_unsigned_int();
+
+    if (!value_is_float && !value_is_sint && !value_is_uint) {
+        return std::nullopt;
+    }
+
+    bool type_is_float = type->is_float();
+    bool type_is_sint = type->is_signed_int();
+    bool type_is_uint = type->is_unsigned_int();
+
     llvm::Instruction::CastOps cast_op = CastOpsEnd;
 
-    if (!implicit && value.type->is_float() && type->is_signed_int()) {
-        cast_op = FPToSI;
-    } else if (!implicit && value.type->is_float() && type->is_unsigned_int()) {
-        cast_op = FPToUI;
-    } else if (value.type->is_signed_int() && type->is_float()) {
-        cast_op = SIToFP;
-    } else if (value.type->is_unsigned_int() && type->is_float()) {
-        cast_op = UIToFP;
-    } else if (to_size > from_size) {
-        if (value.type->is_float() && type->is_float()) {
-            cast_op = FPExt;
-        } else {
-            cast_op = value.type->is_unsigned_int() && type->is_signed_int()
-                          ? ZExt
-                          : SExt;
+    if (value_is_float) {
+        if (type_is_float) {
+            if (to_size > from_size) {
+                cast_op = FPExt;
+            } else if (!implicit) {
+                cast_op = FPTrunc;
+            }
+        } else if (!implicit) {
+            if (type_is_sint) {
+                cast_op = FPToSI;
+            } else if (type_is_uint) {
+                cast_op = FPToUI;
+            }
         }
-    } else if (!implicit && to_size < from_size) {
-        cast_op = value.type->is_float() && type->is_float() ? FPTrunc : Trunc;
-    } else {
-        return value;
+    } else if (value_is_sint) {
+        if (type_is_float) {
+            cast_op = SIToFP;
+        } else if (type_is_sint || type_is_uint) {
+            if (to_size > from_size) {
+                cast_op = SExt;
+            } else if (!implicit) {
+                cast_op = Trunc;
+            }
+        }
+    } else if (value_is_uint) {
+        if (type_is_float) {
+            cast_op = UIToFP;
+        } else if (type_is_sint || type_is_uint) {
+            if (to_size > from_size) {
+                cast_op = ZExt;
+            } else if (!implicit) {
+                cast_op = Trunc;
+            }
+        }
+    }
+
+    if (cast_op == CastOpsEnd) {
+        return std::nullopt;
     }
 
     return Value{type, m_builder.CreateCast(cast_op, value.value, llvm_type)};
@@ -942,7 +973,8 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) noexcept {
             return std::nullopt;
         }
 
-        if (auto val = cast(iterator->second.type->param_types[i], *value)) {
+        if (auto val =
+                cast(iterator->second.type->param_types[i + 1], *value)) {
             arguments.push_back(val->value);
         } else {
             error(expr.arguments[i]->span.begin, m_filename, "type mismatch");
