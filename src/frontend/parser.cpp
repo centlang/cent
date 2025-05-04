@@ -116,7 +116,7 @@ void Parser::expect_stmt(ast::BlockStmt& block) noexcept {
         parse_return(block);
         break;
     default:
-        auto value = expect_expr();
+        auto value = expect_expr(false);
 
         if (!value) {
             next();
@@ -140,11 +140,11 @@ std::vector<std::unique_ptr<ast::Expression>> Parser::parse_args() noexcept {
     std::vector<std::unique_ptr<ast::Expression>> result;
 
     if (!match(Token::Type::RightParen)) {
-        result.push_back(expect_expr());
+        result.push_back(expect_expr(false));
 
         while (match(Token::Type::Comma)) {
             next();
-            result.push_back(expect_expr());
+            result.push_back(expect_expr(false));
         }
     }
 
@@ -159,7 +159,7 @@ std::vector<ast::StructLiteral::Field> Parser::parse_field_values() noexcept {
 
         expect("':'", Token::Type::Colon);
 
-        if (auto value = expect_expr()) {
+        if (auto value = expect_expr(false)) {
             result.emplace_back(
                 ast::SpanValue{name.value, name.span}, std::move(value));
         }
@@ -178,7 +178,8 @@ std::vector<ast::StructLiteral::Field> Parser::parse_field_values() noexcept {
     return result;
 }
 
-std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
+std::unique_ptr<ast::Expression>
+Parser::expect_prefix(bool is_condition) noexcept {
     using enum Token::Type;
 
     auto token = expect(
@@ -217,7 +218,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
 
         auto type_end = peek().span.end;
 
-        if (match(LeftBrace)) {
+        if (!is_condition && match(LeftBrace)) {
             next();
 
             auto fields = parse_field_values();
@@ -241,7 +242,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
     case Bang:
     case Star:
     case And:
-        if (auto value = expect_member_expr()) {
+        if (auto value = expect_member_expr(is_condition)) {
             return std::make_unique<ast::UnaryExpr>(
                 Span{token->span.begin, value->span.end},
                 ast::SpanValue{token->type, token->span}, std::move(value));
@@ -249,7 +250,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
 
         return nullptr;
     case LeftParen: {
-        auto value = expect_expr();
+        auto value = expect_expr(false);
         expect("')'", RightParen);
 
         return value;
@@ -260,8 +261,8 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix() noexcept {
 }
 
 [[nodiscard]] std::unique_ptr<ast::Expression>
-Parser::expect_member_expr() noexcept {
-    auto expression = expect_prefix();
+Parser::expect_member_expr(bool is_condition) noexcept {
+    auto expression = expect_prefix(is_condition);
 
     if (!expression) {
         return nullptr;
@@ -346,8 +347,8 @@ Parser::expect_member_expr() noexcept {
 }
 
 [[nodiscard]] std::unique_ptr<ast::Expression>
-Parser::expect_as_expr() noexcept {
-    auto expression = expect_member_expr();
+Parser::expect_as_expr(bool is_condition) noexcept {
+    auto expression = expect_member_expr(is_condition);
 
     if (!match(Token::Type::As)) {
         return expression;
@@ -366,10 +367,10 @@ Parser::expect_as_expr() noexcept {
         std::move(type));
 }
 
-std::unique_ptr<ast::BinaryExpr>
-Parser::expect_infix(std::unique_ptr<ast::Expression> lhs) noexcept {
+std::unique_ptr<ast::BinaryExpr> Parser::expect_infix(
+    std::unique_ptr<ast::Expression> lhs, bool is_condition) noexcept {
     auto oper = get();
-    auto rhs = expect_bin_expr(precedence_of(oper.type) + 1);
+    auto rhs = expect_bin_expr(is_condition, precedence_of(oper.type) + 1);
 
     if (!rhs) {
         return nullptr;
@@ -383,8 +384,8 @@ Parser::expect_infix(std::unique_ptr<ast::Expression> lhs) noexcept {
 }
 
 std::unique_ptr<ast::Expression>
-Parser::expect_bin_expr(std::uint8_t precedence) noexcept {
-    auto expression = expect_as_expr();
+Parser::expect_bin_expr(bool is_condition, std::uint8_t precedence) noexcept {
+    auto expression = expect_as_expr(is_condition);
 
     while (precedence_of(peek().type) >= precedence) {
         if (!expression) {
@@ -392,14 +393,15 @@ Parser::expect_bin_expr(std::uint8_t precedence) noexcept {
             return nullptr;
         }
 
-        expression = expect_infix(std::move(expression));
+        expression = expect_infix(std::move(expression), is_condition);
     }
 
     return expression;
 }
 
-std::unique_ptr<ast::Expression> Parser::expect_expr() noexcept {
-    return expect_bin_expr();
+std::unique_ptr<ast::Expression>
+Parser::expect_expr(bool is_condition) noexcept {
+    return expect_bin_expr(is_condition);
 }
 
 std::unique_ptr<ast::BlockStmt> Parser::expect_block() noexcept {
@@ -437,7 +439,7 @@ std::unique_ptr<ast::BlockStmt> Parser::expect_block() noexcept {
 std::unique_ptr<ast::IfElse> Parser::parse_if_else() noexcept {
     auto begin = get().span.begin;
 
-    auto condition = expect_expr();
+    auto condition = expect_expr(true);
 
     if (!condition) {
         return nullptr;
@@ -588,7 +590,7 @@ void Parser::parse_var(ast::BlockStmt& block) noexcept {
 
     next();
 
-    auto value = expect_expr();
+    auto value = expect_expr(false);
 
     if (!value) {
         return;
@@ -603,7 +605,7 @@ void Parser::parse_var(ast::BlockStmt& block) noexcept {
 void Parser::parse_while(ast::BlockStmt& block) noexcept {
     auto begin = get().span.begin;
 
-    auto condition = expect_expr();
+    auto condition = expect_expr(true);
 
     if (!condition) {
         return;
@@ -625,7 +627,7 @@ void Parser::parse_return(ast::BlockStmt& block) noexcept {
     std::unique_ptr<ast::Expression> value = nullptr;
 
     if (!match(Token::Type::Semicolon)) {
-        value = expect_expr();
+        value = expect_expr(false);
     }
 
     block.body.push_back(std::make_unique<ast::ReturnStmt>(
@@ -636,7 +638,7 @@ void Parser::parse_return(ast::BlockStmt& block) noexcept {
 void Parser::parse_assignment(
     ast::BlockStmt& block, std::unique_ptr<ast::Expression> variable) noexcept {
     auto oper = get();
-    auto value = expect_expr();
+    auto value = expect_expr(false);
 
     if (!value) {
         return;

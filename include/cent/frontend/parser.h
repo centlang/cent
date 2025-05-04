@@ -96,20 +96,23 @@ private:
     [[nodiscard]] std::vector<ast::StructLiteral::Field>
     parse_field_values() noexcept;
 
-    [[nodiscard]] std::unique_ptr<ast::Expression> expect_prefix() noexcept;
+    [[nodiscard]] std::unique_ptr<ast::Expression>
+    expect_prefix(bool is_condition) noexcept;
 
     [[nodiscard]] std::unique_ptr<ast::Expression>
-    expect_member_expr() noexcept;
-
-    [[nodiscard]] std::unique_ptr<ast::Expression> expect_as_expr() noexcept;
-
-    [[nodiscard]] std::unique_ptr<ast::BinaryExpr>
-    expect_infix(std::unique_ptr<ast::Expression> lhs) noexcept;
+    expect_member_expr(bool is_condition) noexcept;
 
     [[nodiscard]] std::unique_ptr<ast::Expression>
-    expect_bin_expr(std::uint8_t precedence = 1) noexcept;
+    expect_as_expr(bool is_condition) noexcept;
 
-    [[nodiscard]] std::unique_ptr<ast::Expression> expect_expr() noexcept;
+    [[nodiscard]] std::unique_ptr<ast::BinaryExpr> expect_infix(
+        std::unique_ptr<ast::Expression> lhs, bool is_condition) noexcept;
+
+    [[nodiscard]] std::unique_ptr<ast::Expression>
+    expect_bin_expr(bool is_condition, std::uint8_t precedence = 1) noexcept;
+
+    [[nodiscard]] std::unique_ptr<ast::Expression>
+    expect_expr(bool is_condition) noexcept;
 
     [[nodiscard]] std::unique_ptr<ast::Type> expect_var_type() noexcept;
 
