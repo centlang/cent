@@ -849,6 +849,10 @@ bool Parser::parse_submodule_dir(
             continue;
         }
 
+        if (entry.path().extension() != ".cn") {
+            continue;
+        }
+
         submodule->path.file = entry;
 
         if (!parse_submodule(*submodule, entry)) {
