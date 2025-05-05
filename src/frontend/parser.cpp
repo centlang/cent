@@ -251,7 +251,7 @@ Parser::expect_prefix(bool is_condition) noexcept {
     case Bang:
     case Star:
     case And:
-        if (auto value = expect_member_expr(is_condition)) {
+        if (auto value = expect_member_or_call_expr(is_condition)) {
             return std::make_unique<ast::UnaryExpr>(
                 Span{token->span.begin, value->span.end},
                 ast::SpanValue{token->type, token->span}, std::move(value));
@@ -270,14 +270,35 @@ Parser::expect_prefix(bool is_condition) noexcept {
 }
 
 [[nodiscard]] std::unique_ptr<ast::Expression>
-Parser::expect_member_expr(bool is_condition) noexcept {
+Parser::expect_member_or_call_expr(bool is_condition) noexcept {
     auto expression = expect_prefix(is_condition);
 
     if (!expression) {
         return nullptr;
     }
 
-    while (match(Token::Type::Dot)) {
+    while (true) {
+        if (match(Token::Type::LeftParen)) {
+            next();
+
+            auto args = parse_args();
+            auto end = peek().span.end;
+
+            if (!expect("')'", Token::Type::RightParen)) {
+                return nullptr;
+            }
+
+            expression = std::make_unique<ast::CallExpr>(
+                Span{expression->span.begin, end}, std::move(expression),
+                std::move(args));
+
+            continue;
+        }
+
+        if (!match(Token::Type::Dot)) {
+            return expression;
+        }
+
         next();
 
         auto member = expect("member name", Token::Type::Identifier);
@@ -286,19 +307,32 @@ Parser::expect_member_expr(bool is_condition) noexcept {
             return nullptr;
         }
 
-        Span span{expression->span.begin, member->span.end};
+        if (match(Token::Type::LeftParen)) {
+            next();
+
+            auto args = parse_args();
+            auto end = peek().span.end;
+
+            if (!expect("')'", Token::Type::RightParen)) {
+                return nullptr;
+            }
+
+            expression = std::make_unique<ast::MethodExpr>(
+                Span{expression->span.begin, end}, std::move(expression),
+                ast::SpanValue{member->value, member->span}, std::move(args));
+
+            continue;
+        }
 
         expression = std::make_unique<ast::MemberExpr>(
-            span, std::move(expression),
-            ast::SpanValue{member->value, member->span});
+            Span{expression->span.begin, member->span.end},
+            std::move(expression), ast::SpanValue{member->value, member->span});
     }
-
-    return expression;
 }
 
 [[nodiscard]] std::unique_ptr<ast::Expression>
 Parser::expect_as_expr(bool is_condition) noexcept {
-    auto expression = expect_member_expr(is_condition);
+    auto expression = expect_member_or_call_expr(is_condition);
 
     if (!match(Token::Type::As)) {
         return expression;
