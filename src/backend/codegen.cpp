@@ -123,14 +123,16 @@ std::optional<Value> Codegen::cast(
     bool value_is_float = value.type->is_float();
     bool value_is_sint = value.type->is_signed_int();
     bool value_is_uint = value.type->is_unsigned_int();
+    bool value_is_ptr = value.type->is_pointer();
 
-    if (!value_is_float && !value_is_sint && !value_is_uint) {
+    if (!value_is_float && !value_is_sint && !value_is_uint && !value_is_ptr) {
         return std::nullopt;
     }
 
     bool type_is_float = type->is_float();
     bool type_is_sint = type->is_signed_int();
     bool type_is_uint = type->is_unsigned_int();
+    bool type_is_ptr = type->is_pointer();
 
     llvm::Instruction::CastOps cast_op = CastOpsEnd;
 
@@ -157,6 +159,8 @@ std::optional<Value> Codegen::cast(
             } else if (!implicit) {
                 cast_op = Trunc;
             }
+        } else if (!implicit && type_is_ptr) {
+            cast_op = IntToPtr;
         }
     } else if (value_is_uint) {
         if (type_is_float) {
@@ -167,6 +171,14 @@ std::optional<Value> Codegen::cast(
             } else if (!implicit) {
                 cast_op = Trunc;
             }
+        } else if (!implicit && type_is_ptr) {
+            cast_op = IntToPtr;
+        }
+    } else if (!implicit && value_is_ptr) {
+        if (type_is_sint || type_is_uint) {
+            cast_op = PtrToInt;
+        } else if (type_is_ptr) {
+            return value;
         }
     }
 
