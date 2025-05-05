@@ -45,10 +45,12 @@ std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
         {"i16", std::make_shared<types::I16>()},
         {"i32", std::make_shared<types::I32>()},
         {"i64", std::make_shared<types::I64>()},
+        {"isize", std::make_shared<types::ISize>()},
         {"u8", std::make_shared<types::U8>()},
         {"u16", std::make_shared<types::U16>()},
         {"u32", std::make_shared<types::U32>()},
         {"u64", std::make_shared<types::U64>()},
+        {"usize", std::make_shared<types::USize>()},
         {"f32", std::make_shared<types::F32>()},
         {"f64", std::make_shared<types::F64>()},
         {"str", std::make_shared<types::Str>()},
@@ -241,6 +243,10 @@ llvm::Type* Codegen::generate([[maybe_unused]] types::I64& type) noexcept {
     return llvm::Type::getInt64Ty(m_context);
 }
 
+llvm::Type* Codegen::generate([[maybe_unused]] types::ISize& type) noexcept {
+    return m_module->getDataLayout().getIntPtrType(m_context);
+}
+
 llvm::Type* Codegen::generate([[maybe_unused]] types::U8& type) noexcept {
     return llvm::Type::getInt8Ty(m_context);
 }
@@ -255,6 +261,10 @@ llvm::Type* Codegen::generate([[maybe_unused]] types::U32& type) noexcept {
 
 llvm::Type* Codegen::generate([[maybe_unused]] types::U64& type) noexcept {
     return llvm::Type::getInt64Ty(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::USize& type) noexcept {
+    return m_module->getDataLayout().getIntPtrType(m_context);
 }
 
 llvm::Type* Codegen::generate([[maybe_unused]] types::F32& type) noexcept {

@@ -26,6 +26,10 @@ struct I64 : detail::Type<I64> {
     bool is_signed_int() noexcept override { return true; };
 };
 
+struct ISize : detail::Type<ISize> {
+    bool is_signed_int() noexcept override { return true; };
+};
+
 struct U8 : detail::Type<U8> {
     bool is_unsigned_int() noexcept override { return true; };
 };
@@ -39,6 +43,10 @@ struct U32 : detail::Type<U32> {
 };
 
 struct U64 : detail::Type<U64> {
+    bool is_unsigned_int() noexcept override { return true; };
+};
+
+struct USize : detail::Type<USize> {
     bool is_unsigned_int() noexcept override { return true; };
 };
 

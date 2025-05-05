@@ -62,11 +62,13 @@ struct I8;
 struct I16;
 struct I32;
 struct I64;
+struct ISize;
 
 struct U8;
 struct U16;
 struct U32;
 struct U64;
+struct USize;
 
 struct F32;
 struct F64;
@@ -90,11 +92,14 @@ struct Type;
 class Codegen {
 public:
     [[nodiscard]] Codegen(
-        std::unique_ptr<ast::Module> program,
-        std::string_view filename) noexcept
+        std::unique_ptr<ast::Module> program, std::string_view filename,
+        const llvm::DataLayout& layout, const std::string& triple) noexcept
     : m_module{std::make_unique<llvm::Module>("", m_context)},
       m_builder{m_context}, m_program{std::move(program)},
-      m_filename{filename} {}
+      m_filename{filename} {
+        m_module->setDataLayout(layout);
+        m_module->setTargetTriple(triple);
+    }
 
     [[nodiscard]] std::unique_ptr<llvm::Module> generate() noexcept;
 
@@ -112,11 +117,13 @@ public:
     llvm::Type* generate(types::I16& type) noexcept;
     llvm::Type* generate(types::I32& type) noexcept;
     llvm::Type* generate(types::I64& type) noexcept;
+    llvm::Type* generate(types::ISize& type) noexcept;
 
     llvm::Type* generate(types::U8& type) noexcept;
     llvm::Type* generate(types::U16& type) noexcept;
     llvm::Type* generate(types::U32& type) noexcept;
     llvm::Type* generate(types::U64& type) noexcept;
+    llvm::Type* generate(types::USize& type) noexcept;
 
     llvm::Type* generate(types::F32& type) noexcept;
     llvm::Type* generate(types::F64& type) noexcept;

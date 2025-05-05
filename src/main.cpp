@@ -65,15 +65,14 @@ int main(int argc, char** argv) {
             return 1;
         }
 
-        cent::backend::Codegen codegen{std::move(program), arg};
+        cent::backend::Codegen codegen{
+            std::move(program), arg, machine->createDataLayout(), triple};
+
         auto module = codegen.generate();
 
         if (!module) {
             return 1;
         }
-
-        module->setDataLayout(machine->createDataLayout());
-        module->setTargetTriple(triple);
 
         cent::backend::optimize_module(*module, llvm::OptimizationLevel::O3);
 
