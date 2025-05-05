@@ -71,6 +71,12 @@ void Lexer::next_token() noexcept {
     case '}':
         single_char(RightBrace);
         break;
+    case '[':
+        single_char(LeftBracket);
+        break;
+    case ']':
+        single_char(RightBracket);
+        break;
     case ',':
         single_char(Comma);
         break;

@@ -1,8 +1,7 @@
 #ifndef CENT_BACKEND_TYPES_PRIMITIVE_H
 #define CENT_BACKEND_TYPES_PRIMITIVE_H
 
-#include <llvm/IR/DerivedTypes.h>
-
+#include <cstddef>
 #include <memory>
 #include <utility>
 
@@ -84,6 +83,15 @@ struct Optional : detail::Type<Optional> {
     bool is_optional() noexcept override { return true; };
 
     std::shared_ptr<backend::Type> type;
+};
+
+struct Array : detail::Type<Array> {
+    [[nodiscard]] Array(
+        std::shared_ptr<backend::Type> type, std::size_t size) noexcept
+    : type{std::move(type)}, size{size} {}
+
+    std::shared_ptr<backend::Type> type;
+    std::size_t size;
 };
 
 } // namespace cent::backend::types

@@ -8,6 +8,7 @@
 
 #include "cent/log.h"
 
+#include "cent/ast/array_type.h"
 #include "cent/ast/as_expr.h"
 #include "cent/ast/assignment.h"
 #include "cent/ast/binary_expr.h"
@@ -229,6 +230,30 @@ std::shared_ptr<Type> Codegen::generate(ast::Optional& type) noexcept {
     return std::make_shared<types::Optional>(contained);
 }
 
+std::shared_ptr<Type> Codegen::generate(ast::ArrayType& type) noexcept {
+    auto contained = type.type->codegen(*this);
+
+    if (!contained) {
+        return nullptr;
+    }
+
+    auto size = type.size->codegen(*this);
+
+    if (!size) {
+        return nullptr;
+    }
+
+    auto value = cast(m_primitive_types["usize"], *size);
+
+    if (!value) {
+        return nullptr;
+    }
+
+    auto* constant = static_cast<llvm::ConstantInt*>(value->value);
+
+    return std::make_shared<types::Array>(contained, constant->getZExtValue());
+}
+
 llvm::Type* Codegen::generate([[maybe_unused]] types::I8& type) noexcept {
     return llvm::Type::getInt8Ty(m_context);
 }
@@ -316,6 +341,16 @@ llvm::Type* Codegen::generate(types::Optional& type) noexcept {
     m_optional_types[contained] = llvm_type;
 
     return llvm_type;
+}
+
+llvm::Type* Codegen::generate(types::Array& type) noexcept {
+    auto* llvm_type = type.type->codegen(*this);
+
+    if (!llvm_type) {
+        return nullptr;
+    }
+
+    return llvm::ArrayType::get(llvm_type, type.size);
 }
 
 llvm::Type* Codegen::generate([[maybe_unused]] types::Function& type) noexcept {

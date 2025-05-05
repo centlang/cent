@@ -16,6 +16,9 @@ struct Token {
         LeftBrace,
         RightBrace,
 
+        LeftBracket,
+        RightBracket,
+
         Equal,
         Comma,
         Dot,

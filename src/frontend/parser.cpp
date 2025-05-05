@@ -1,5 +1,6 @@
 #include "cent/util.h"
 
+#include "cent/ast/array_type.h"
 #include "cent/ast/as_expr.h"
 #include "cent/ast/assignment.h"
 #include "cent/ast/break_stmt.h"
@@ -534,6 +535,36 @@ std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
 
         return std::make_unique<ast::Optional>(
             Span{begin, type->span.end}, std::move(type));
+    }
+
+    if (match(LeftBracket)) {
+        next();
+
+        auto type = expect_type();
+
+        if (!type) {
+            return nullptr;
+        }
+
+        if (!expect("','", Comma)) {
+            return nullptr;
+        }
+
+        auto size = expect("array size", IntLiteral);
+
+        if (!size) {
+            return nullptr;
+        }
+
+        auto end = peek().span.end;
+
+        if (!expect("']'", RightBracket)) {
+            return nullptr;
+        }
+
+        return std::make_unique<ast::ArrayType>(
+            Span{begin, end}, std::move(type),
+            std::make_unique<ast::IntLiteral>(size->span, size->value));
     }
 
     std::vector<ast::SpanValue<std::string>> value;
