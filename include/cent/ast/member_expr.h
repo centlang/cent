@@ -3,7 +3,6 @@
 
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "cent/span.h"
 
@@ -14,12 +13,12 @@ namespace cent::ast {
 
 struct MemberExpr : detail::Expr<MemberExpr> {
     [[nodiscard]] MemberExpr(
-        Span span, std::unique_ptr<Expression> value,
-        std::vector<SpanValue<std::string>> path) noexcept
-    : Expr{span}, value{std::move(value)}, path{std::move(path)} {}
+        Span span, std::unique_ptr<Expression> parent,
+        SpanValue<std::string> member) noexcept
+    : Expr{span}, parent{std::move(parent)}, member{std::move(member)} {}
 
-    std::unique_ptr<Expression> value;
-    std::vector<SpanValue<std::string>> path;
+    std::unique_ptr<Expression> parent;
+    SpanValue<std::string> member;
 };
 
 } // namespace cent::ast

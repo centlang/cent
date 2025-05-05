@@ -277,43 +277,6 @@ Parser::expect_member_expr(bool is_condition) noexcept {
         return nullptr;
     }
 
-    if (!match(Token::Type::Dot)) {
-        if (!match(Token::Type::LeftParen)) {
-            return expression;
-        }
-
-        next();
-
-        auto args = parse_args();
-        auto end = peek().span.end;
-
-        if (!expect("',' or ')'", Token::Type::RightParen)) {
-            return nullptr;
-        }
-
-        return std::make_unique<ast::CallExpr>(
-            Span{expression->span.begin, end}, std::move(expression),
-            std::move(args));
-    }
-
-    std::vector<ast::SpanValue<std::string>> path;
-    ast::SpanValue<std::string> name;
-
-    auto end = peek().span.end;
-
-    if (match(Token::Type::Dot)) {
-        next();
-
-        auto token = expect("member name", Token::Type::Identifier);
-
-        if (!token) {
-            return nullptr;
-        }
-
-        name = {token->value, token->span};
-        end = token->span.end;
-    }
-
     while (match(Token::Type::Dot)) {
         next();
 
@@ -323,36 +286,14 @@ Parser::expect_member_expr(bool is_condition) noexcept {
             return nullptr;
         }
 
-        path.push_back(std::move(name));
-        name = {member->value, member->span};
+        Span span{expression->span.begin, member->span.end};
 
-        end = member->span.end;
+        expression = std::make_unique<ast::MemberExpr>(
+            span, std::move(expression),
+            ast::SpanValue{member->value, member->span});
     }
 
-    if (!match(Token::Type::LeftParen)) {
-        path.push_back(std::move(name));
-
-        return std::make_unique<ast::MemberExpr>(
-            Span{expression->span.begin, end}, std::move(expression),
-            std::move(path));
-    }
-
-    next();
-
-    expression = std::make_unique<ast::MemberExpr>(
-        Span{expression->span.begin, end}, std::move(expression),
-        std::move(path));
-
-    auto args = parse_args();
-    end = peek().span.end;
-
-    if (!expect("',' or ')'", Token::Type::RightParen)) {
-        return nullptr;
-    }
-
-    return std::make_unique<ast::MethodExpr>(
-        Span{expression->span.begin, end}, std::move(expression),
-        std::move(name), std::move(args));
+    return expression;
 }
 
 [[nodiscard]] std::unique_ptr<ast::Expression>

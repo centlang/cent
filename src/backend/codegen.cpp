@@ -1075,71 +1075,66 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) noexcept {
 }
 
 std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
-    auto value = expr.value->codegen(*this);
+    auto parent = expr.parent->codegen(*this);
 
-    if (!value) {
+    if (!parent) {
         return std::nullopt;
     }
 
-    for (auto& member : expr.path) {
-        auto not_a_struct = [&] {
-            error(
-                member.span.begin, m_filename,
-                "member access of a non-structure type");
-        };
+    auto not_a_struct = [&] {
+        error(
+            expr.member.span.begin, m_filename,
+            "member access of a non-structure type");
+    };
 
-        bool is_mutable = false;
+    bool is_mutable = false;
 
-        types::Struct* type = nullptr;
+    types::Struct* type = nullptr;
 
-        if (value->type->is_pointer()) {
-            auto& pointer = static_cast<types::Pointer&>(*value->type);
+    if (parent->type->is_pointer()) {
+        auto& pointer = static_cast<types::Pointer&>(*parent->type);
 
-            if (!pointer.type->is_struct()) {
-                not_a_struct();
-
-                return std::nullopt;
-            }
-
-            is_mutable = pointer.is_mutable;
-            type = static_cast<types::Struct*>(pointer.type.get());
-        } else {
-            if (!value->type->is_struct()) {
-                not_a_struct();
-
-                return std::nullopt;
-            }
-
-            is_mutable = value->is_mutable;
-            type = static_cast<types::Struct*>(value->type.get());
-        }
-
-        auto* llvm_value = value->value;
-
-        if (value->type->is_pointer()) {
-            if (auto* variable = llvm::dyn_cast<llvm::AllocaInst>(llvm_value)) {
-                llvm_value = m_builder.CreateLoad(
-                    variable->getAllocatedType(), llvm_value);
-            }
-        }
-
-        auto iterator = m_members[type->type].find(member.value);
-
-        if (iterator == m_members[type->type].end()) {
-            error(
-                member.span.begin, m_filename,
-                fmt::format("no such member: '{}'", member.value));
+        if (!pointer.type->is_struct()) {
+            not_a_struct();
 
             return std::nullopt;
         }
 
-        value = {
-            type->fields[iterator->second],
-            m_builder.CreateStructGEP(type->type, llvm_value, iterator->second),
-            is_mutable};
+        is_mutable = pointer.is_mutable;
+        type = static_cast<types::Struct*>(pointer.type.get());
+    } else {
+        if (!parent->type->is_struct()) {
+            not_a_struct();
+
+            return std::nullopt;
+        }
+
+        is_mutable = parent->is_mutable;
+        type = static_cast<types::Struct*>(parent->type.get());
     }
 
-    return value;
+    auto* value = parent->value;
+
+    if (parent->type->is_pointer()) {
+        if (auto* variable = llvm::dyn_cast<llvm::AllocaInst>(value)) {
+            value = m_builder.CreateLoad(variable->getAllocatedType(), value);
+        }
+    }
+
+    auto iterator = m_members[type->type].find(expr.member.value);
+
+    if (iterator == m_members[type->type].end()) {
+        error(
+            expr.member.span.begin, m_filename,
+            fmt::format("no such member: '{}'", expr.member.value));
+
+        return std::nullopt;
+    }
+
+    return Value{
+        type->fields[iterator->second],
+        m_builder.CreateStructGEP(type->type, value, iterator->second),
+        is_mutable};
 }
 
 std::optional<Value> Codegen::generate(ast::AsExpr& expr) noexcept {
