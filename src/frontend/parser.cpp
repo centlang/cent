@@ -2,7 +2,9 @@
 
 #include "cent/ast/as_expr.h"
 #include "cent/ast/assignment.h"
+#include "cent/ast/break_stmt.h"
 #include "cent/ast/call_expr.h"
+#include "cent/ast/continue_stmt.h"
 #include "cent/ast/identifier.h"
 #include "cent/ast/literals.h"
 #include "cent/ast/member_expr.h"
@@ -114,6 +116,12 @@ void Parser::expect_stmt(ast::BlockStmt& block) noexcept {
         break;
     case Return:
         parse_return(block);
+        break;
+    case Break:
+        block.body.push_back(std::make_unique<ast::BreakStmt>(get().span));
+        break;
+    case Continue:
+        block.body.push_back(std::make_unique<ast::ContinueStmt>(get().span));
         break;
     default:
         auto value = expect_expr(false);

@@ -31,6 +31,8 @@ struct BlockStmt;
 struct IfElse;
 struct ReturnStmt;
 struct WhileLoop;
+struct BreakStmt;
+struct ContinueStmt;
 
 struct BinaryExpr;
 struct UnaryExpr;
@@ -144,6 +146,8 @@ public:
     std::optional<Value> generate(ast::IfElse& stmt) noexcept;
     std::optional<Value> generate(ast::ReturnStmt& stmt) noexcept;
     std::optional<Value> generate(ast::WhileLoop& stmt) noexcept;
+    std::optional<Value> generate(ast::BreakStmt& stmt) noexcept;
+    std::optional<Value> generate(ast::ContinueStmt& stmt) noexcept;
 
     std::optional<Value> generate(ast::BinaryExpr& expr) noexcept;
     std::optional<Value> generate(ast::UnaryExpr& expr) noexcept;
@@ -197,6 +201,9 @@ private:
 
     Scope* m_current_scope{&m_scope};
     types::Function* m_current_function{nullptr};
+
+    llvm::BasicBlock* m_loop_body{nullptr};
+    llvm::BasicBlock* m_loop_end{nullptr};
 
     std::map<llvm::StructType*, std::map<std::string_view, std::size_t>>
         m_members;

@@ -12,7 +12,9 @@
 #include "cent/ast/assignment.h"
 #include "cent/ast/binary_expr.h"
 #include "cent/ast/block_stmt.h"
+#include "cent/ast/break_stmt.h"
 #include "cent/ast/call_expr.h"
+#include "cent/ast/continue_stmt.h"
 #include "cent/ast/fn_decl.h"
 #include "cent/ast/identifier.h"
 #include "cent/ast/if_else.h"
@@ -518,18 +520,45 @@ std::optional<Value> Codegen::generate(ast::WhileLoop& stmt) noexcept {
 
     auto* function = m_builder.GetInsertBlock()->getParent();
 
-    auto* body = llvm::BasicBlock::Create(m_context, "", function);
-    auto* end = llvm::BasicBlock::Create(m_context, "", function);
+    m_loop_body = llvm::BasicBlock::Create(m_context, "", function);
+    m_loop_end = llvm::BasicBlock::Create(m_context, "", function);
 
-    m_builder.CreateCondBr(condition->value, body, end);
+    m_builder.CreateCondBr(condition->value, m_loop_body, m_loop_end);
 
-    m_builder.SetInsertPoint(body);
+    m_builder.SetInsertPoint(m_loop_body);
     stmt.body->codegen(*this);
 
     condition = generate(*stmt.condition);
-    m_builder.CreateCondBr(condition->value, body, end);
+    m_builder.CreateCondBr(condition->value, m_loop_body, m_loop_end);
 
-    m_builder.SetInsertPoint(end);
+    m_builder.SetInsertPoint(m_loop_end);
+
+    m_loop_body = nullptr;
+    m_loop_end = nullptr;
+
+    return std::nullopt;
+}
+
+std::optional<Value> Codegen::generate(ast::BreakStmt& stmt) noexcept {
+    if (!m_loop_end) {
+        error(stmt.span.begin, m_filename, "'break' not in loop");
+
+        return std::nullopt;
+    }
+
+    m_builder.CreateBr(m_loop_end);
+
+    return std::nullopt;
+}
+
+std::optional<Value> Codegen::generate(ast::ContinueStmt& stmt) noexcept {
+    if (!m_loop_body) {
+        error(stmt.span.begin, m_filename, "'continue' not in loop");
+
+        return std::nullopt;
+    }
+
+    m_builder.CreateBr(m_loop_body);
 
     return std::nullopt;
 }

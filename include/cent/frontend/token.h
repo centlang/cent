@@ -80,6 +80,9 @@ struct Token {
 
         Return,
 
+        Break,
+        Continue,
+
         Identifier
     };
 

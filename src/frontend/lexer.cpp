@@ -376,6 +376,16 @@ void Lexer::ident() noexcept {
         keyword(Return);
         return;
     }
+
+    if (m_token.value == "break") {
+        keyword(Break);
+        return;
+    }
+
+    if (m_token.value == "continue") {
+        keyword(Continue);
+        return;
+    }
 }
 
 } // namespace cent::frontend
