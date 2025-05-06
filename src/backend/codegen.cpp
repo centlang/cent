@@ -19,6 +19,7 @@
 #include "cent/ast/fn_decl.h"
 #include "cent/ast/identifier.h"
 #include "cent/ast/if_else.h"
+#include "cent/ast/index_expr.h"
 #include "cent/ast/literals.h"
 #include "cent/ast/member_expr.h"
 #include "cent/ast/method_expr.h"
@@ -1135,6 +1136,36 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
         type->fields[iterator->second],
         m_builder.CreateStructGEP(type->type, value, iterator->second),
         is_mutable};
+}
+
+std::optional<Value> Codegen::generate(ast::IndexExpr& expr) noexcept {
+    auto value = expr.value->codegen(*this);
+
+    if (!value) {
+        return std::nullopt;
+    }
+
+    if (!value->type->is_array()) {
+        error(
+            expr.value->span.begin, m_filename,
+            "index access of a non-array type");
+
+        return std::nullopt;
+    }
+
+    auto index = expr.index->codegen(*this);
+
+    if (!index) {
+        return std::nullopt;
+    }
+
+    auto* type = static_cast<types::Array*>(value->type.get());
+
+    return Value{
+        type->type,
+        m_builder.CreateGEP(
+            value->value->getType(), value->value, index->value),
+        value->is_mutable};
 }
 
 std::optional<Value> Codegen::generate(ast::AsExpr& expr) noexcept {

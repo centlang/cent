@@ -100,7 +100,7 @@ private:
     expect_prefix(bool is_condition) noexcept;
 
     [[nodiscard]] std::unique_ptr<ast::Expression>
-    expect_member_or_call_expr(bool is_condition) noexcept;
+    expect_access_or_call_expr(bool is_condition) noexcept;
 
     [[nodiscard]] std::unique_ptr<ast::Expression>
     expect_as_expr(bool is_condition) noexcept;

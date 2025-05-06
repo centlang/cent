@@ -7,6 +7,7 @@
 #include "cent/ast/call_expr.h"
 #include "cent/ast/continue_stmt.h"
 #include "cent/ast/identifier.h"
+#include "cent/ast/index_expr.h"
 #include "cent/ast/literals.h"
 #include "cent/ast/member_expr.h"
 #include "cent/ast/method_expr.h"
@@ -251,7 +252,7 @@ Parser::expect_prefix(bool is_condition) noexcept {
     case Bang:
     case Star:
     case And:
-        if (auto value = expect_member_or_call_expr(is_condition)) {
+        if (auto value = expect_access_or_call_expr(is_condition)) {
             return std::make_unique<ast::UnaryExpr>(
                 Span{token->span.begin, value->span.end},
                 ast::SpanValue{token->type, token->span}, std::move(value));
@@ -270,7 +271,7 @@ Parser::expect_prefix(bool is_condition) noexcept {
 }
 
 [[nodiscard]] std::unique_ptr<ast::Expression>
-Parser::expect_member_or_call_expr(bool is_condition) noexcept {
+Parser::expect_access_or_call_expr(bool is_condition) noexcept {
     auto expression = expect_prefix(is_condition);
 
     if (!expression) {
@@ -293,6 +294,26 @@ Parser::expect_member_or_call_expr(bool is_condition) noexcept {
                 std::move(args));
 
             continue;
+        }
+
+        if (match(Token::Type::LeftBracket)) {
+            next();
+
+            auto index = expect_expr(false);
+
+            if (!index) {
+                return nullptr;
+            }
+
+            auto end = peek().span.end;
+
+            if (!expect("']'", Token::Type::RightBracket)) {
+                return nullptr;
+            }
+
+            expression = std::make_unique<ast::IndexExpr>(
+                Span{expression->span.begin, end}, std::move(expression),
+                std::move(index));
         }
 
         if (!match(Token::Type::Dot)) {
@@ -332,7 +353,7 @@ Parser::expect_member_or_call_expr(bool is_condition) noexcept {
 
 [[nodiscard]] std::unique_ptr<ast::Expression>
 Parser::expect_as_expr(bool is_condition) noexcept {
-    auto expression = expect_member_or_call_expr(is_condition);
+    auto expression = expect_access_or_call_expr(is_condition);
 
     if (!match(Token::Type::As)) {
         return expression;

@@ -90,6 +90,8 @@ struct Array : detail::Type<Array> {
         std::shared_ptr<backend::Type> type, std::size_t size) noexcept
     : type{std::move(type)}, size{size} {}
 
+    bool is_array() noexcept override { return true; };
+
     std::shared_ptr<backend::Type> type;
     std::size_t size;
 };

@@ -46,6 +46,7 @@ struct Identifier;
 struct CallExpr;
 struct MethodExpr;
 struct MemberExpr;
+struct IndexExpr;
 struct AsExpr;
 
 struct FnDecl;
@@ -166,6 +167,7 @@ public:
     std::optional<Value> generate(ast::CallExpr& expr) noexcept;
     std::optional<Value> generate(ast::MethodExpr& expr) noexcept;
     std::optional<Value> generate(ast::MemberExpr& expr) noexcept;
+    std::optional<Value> generate(ast::IndexExpr& expr) noexcept;
     std::optional<Value> generate(ast::AsExpr& expr) noexcept;
 
     std::optional<Value> generate(ast::FnDecl& decl) noexcept;
