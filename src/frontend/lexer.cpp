@@ -323,6 +323,11 @@ void Lexer::ident() noexcept {
         return;
     }
 
+    if (m_token.value == "null") {
+        keyword(Null);
+        return;
+    }
+
     if (m_token.value == "pub") {
         keyword(Pub);
         return;

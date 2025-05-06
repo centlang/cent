@@ -63,6 +63,10 @@ struct Bool : detail::Type<Bool> {
     bool is_bool() noexcept override { return true; };
 };
 
+struct Null : detail::Type<Null> {
+    bool is_null() noexcept override { return true; };
+};
+
 struct Void : detail::Type<Void> {};
 
 struct Pointer : detail::Type<Pointer> {

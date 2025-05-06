@@ -41,6 +41,10 @@ struct BoolLiteral : detail::Expr<BoolLiteral> {
     bool value;
 };
 
+struct NullLiteral : detail::Expr<NullLiteral> {
+    using Expr::Expr;
+};
+
 struct StructLiteral : detail::Expr<StructLiteral> {
     struct Field {
         SpanValue<std::string> name;

@@ -41,6 +41,7 @@ struct IntLiteral;
 struct FloatLiteral;
 struct StrLiteral;
 struct BoolLiteral;
+struct NullLiteral;
 struct StructLiteral;
 struct Identifier;
 struct CallExpr;
@@ -80,6 +81,7 @@ struct F64;
 struct Str;
 
 struct Bool;
+struct Null;
 struct Void;
 
 struct Pointer;
@@ -138,6 +140,7 @@ public:
     llvm::Type* generate(types::Str& type) noexcept;
 
     llvm::Type* generate(types::Bool& type) noexcept;
+    llvm::Type* generate(types::Null& type) noexcept;
     llvm::Type* generate(types::Void& type) noexcept;
 
     llvm::Type* generate(types::Pointer& type) noexcept;
@@ -162,6 +165,7 @@ public:
     std::optional<Value> generate(ast::FloatLiteral& expr) noexcept;
     std::optional<Value> generate(ast::StrLiteral& expr) noexcept;
     std::optional<Value> generate(ast::BoolLiteral& expr) noexcept;
+    std::optional<Value> generate(ast::NullLiteral& expr) noexcept;
     std::optional<Value> generate(ast::StructLiteral& expr) noexcept;
     std::optional<Value> generate(ast::Identifier& expr) noexcept;
     std::optional<Value> generate(ast::CallExpr& expr) noexcept;
@@ -225,6 +229,8 @@ private:
         m_methods;
 
     std::map<std::filesystem::path, Scope> m_generated_modules;
+
+    std::shared_ptr<types::Null> m_null_type;
 
     std::map<llvm::Type*, llvm::StructType*> m_optional_types;
 

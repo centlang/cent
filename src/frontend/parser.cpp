@@ -193,7 +193,7 @@ Parser::expect_prefix(bool is_condition) noexcept {
     using enum Token::Type;
 
     auto token = expect(
-        "expression", IntLiteral, FloatLiteral, StrLiteral, True, False,
+        "expression", IntLiteral, FloatLiteral, StrLiteral, True, False, Null,
         Identifier, Minus, Bang, Star, And, LeftParen);
 
     if (!token) {
@@ -211,6 +211,8 @@ Parser::expect_prefix(bool is_condition) noexcept {
         return std::make_unique<ast::BoolLiteral>(token->span, true);
     case False:
         return std::make_unique<ast::BoolLiteral>(token->span, false);
+    case Null:
+        return std::make_unique<ast::NullLiteral>(token->span);
     case Identifier: {
         std::vector<ast::SpanValue<std::string>> value;
         value.push_back(ast::SpanValue{token->value, token->span});

@@ -20,6 +20,7 @@ struct Type {
     virtual llvm::Type* codegen(backend::Codegen& codegen) noexcept = 0;
 
     virtual bool is_bool() noexcept { return false; }
+    virtual bool is_null() noexcept { return false; }
     virtual bool is_signed_int() noexcept { return false; };
     virtual bool is_unsigned_int() noexcept { return false; };
     virtual bool is_float() noexcept { return false; };

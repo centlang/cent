@@ -64,6 +64,8 @@ struct Token {
         True,
         False,
 
+        Null,
+
         Pub,
         Extern,
 
