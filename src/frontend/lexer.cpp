@@ -42,6 +42,33 @@ void Lexer::next_token() noexcept {
         m_token = {type, {}, {begin, m_position}};
     };
 
+    auto twice_or_with_equal = [&](Token::Type single, Token::Type twice,
+                                   Token::Type with_eq) {
+        auto begin = m_position;
+        char oper = get();
+
+        if (eof()) {
+            m_token = {single, {}, {begin, m_position}};
+            return;
+        }
+
+        if (peek() == '=') {
+            get();
+            m_token = {with_eq, {}, {begin, m_position}};
+
+            return;
+        }
+
+        if (peek() == oper) {
+            get();
+            m_token = {twice, {}, {begin, m_position}};
+
+            return;
+        }
+
+        m_token = {single, {}, {begin, m_position}};
+    };
+
     auto with_equal = [&](Token::Type oper, Token::Type with_eq) {
         auto begin = m_position;
         get();
@@ -88,6 +115,9 @@ void Lexer::next_token() noexcept {
         break;
     case ';':
         single_char(Semicolon);
+        break;
+    case '~':
+        single_char(Not);
         break;
     case '+':
         with_equal(Plus, PlusEqual);
@@ -141,10 +171,13 @@ void Lexer::next_token() noexcept {
         with_equal(Less, LessEqual);
         break;
     case '&':
-        twice(And, AndAnd);
+        twice_or_with_equal(And, AndAnd, AndEqual);
         break;
     case '|':
-        twice(Or, OrOr);
+        twice_or_with_equal(Or, OrOr, OrEqual);
+        break;
+    case '^':
+        with_equal(Xor, XorEqual);
         break;
     default:
         m_token = {Invalid, std::string{get()}, Span::from(m_position)};

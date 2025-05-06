@@ -42,6 +42,14 @@ struct Token {
         And,
         Or,
 
+        AndEqual,
+        OrEqual,
+
+        Xor,
+        Not,
+
+        XorEqual,
+
         AndAnd,
         OrOr,
 

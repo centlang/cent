@@ -151,7 +151,10 @@ private:
 
         enum Precedence {
             None = 0,
+            LogicalOr,
+            LogicalAnd,
             Or,
+            Xor,
             And,
             Comparison,
             Additive,
@@ -160,8 +163,14 @@ private:
 
         switch (type) {
         case OrOr:
-            return Precedence::Or;
+            return LogicalOr;
         case AndAnd:
+            return LogicalAnd;
+        case Token::Type::Or:
+            return Precedence::Or;
+        case Token::Type::Xor:
+            return Precedence::Xor;
+        case Token::Type::And:
             return Precedence::And;
         case Less:
         case Greater:

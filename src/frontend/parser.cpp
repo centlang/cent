@@ -133,7 +133,9 @@ void Parser::expect_stmt(ast::BlockStmt& block) noexcept {
             return;
         }
 
-        if (!match(Equal, PlusEqual, MinusEqual, StarEqual, SlashEqual)) {
+        if (!match(
+                Equal, PlusEqual, MinusEqual, StarEqual, SlashEqual, AndEqual,
+                OrEqual, XorEqual)) {
             block.body.push_back(std::move(value));
             break;
         }
@@ -194,7 +196,7 @@ Parser::expect_prefix(bool is_condition) noexcept {
 
     auto token = expect(
         "expression", IntLiteral, FloatLiteral, StrLiteral, True, False, Null,
-        Identifier, Minus, Bang, Star, And, LeftParen);
+        Identifier, Minus, Bang, Star, And, Not, LeftParen);
 
     if (!token) {
         return nullptr;
@@ -254,6 +256,7 @@ Parser::expect_prefix(bool is_condition) noexcept {
     case Bang:
     case Star:
     case And:
+    case Not:
         if (auto value = expect_access_or_call_expr(is_condition)) {
             return std::make_unique<ast::UnaryExpr>(
                 Span{token->span.begin, value->span.end},

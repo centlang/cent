@@ -394,6 +394,12 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
             return Star;
         case SlashEqual:
             return Slash;
+        case AndEqual:
+            return And;
+        case OrEqual:
+            return Or;
+        case XorEqual:
+            return Xor;
         default:
             return Eof;
         }
@@ -689,6 +695,16 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
         return Value{
             std::make_shared<types::Pointer>(value->type, value->is_mutable),
             value->value, false, true};
+    case Not:
+        if (!value->type->is_signed_int() && !value->type->is_unsigned_int()) {
+            error(
+                expr.span.begin, m_filename,
+                "cannot apply '~' to a non-integer type");
+
+            return std::nullopt;
+        }
+
+        return Value{value->type, m_builder.CreateNot(value->value)};
     default:
         return std::nullopt;
     }
@@ -1516,6 +1532,15 @@ std::optional<Value> Codegen::generate_bin_expr(
 
         break;
     }
+    case And:
+    case Or:
+    case Xor:
+        if (!lhs_value.type->is_signed_int() &&
+            !lhs_value.type->is_unsigned_int()) {
+            error(lhs.span.begin, m_filename, "type mismatch");
+        }
+
+        break;
     case AndAnd:
     case OrOr:
         if (!lhs_value.type->is_bool()) {
@@ -1560,6 +1585,15 @@ std::optional<Value> Codegen::generate_bin_expr(
             lhs_value.type->is_signed_int()
                 ? m_builder.CreateSDiv(lhs_value.value, right->value)
                 : m_builder.CreateUDiv(lhs_value.value, right->value)};
+    case And:
+        return Value{
+            lhs_value.type, m_builder.CreateAnd(lhs_value.value, right->value)};
+    case Or:
+        return Value{
+            lhs_value.type, m_builder.CreateOr(lhs_value.value, right->value)};
+    case Xor:
+        return Value{
+            lhs_value.type, m_builder.CreateXor(lhs_value.value, right->value)};
     case AndAnd:
         return Value{
             m_primitive_types["bool"],
