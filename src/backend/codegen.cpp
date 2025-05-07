@@ -992,6 +992,51 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
     return Value{type, variable};
 }
 
+std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) noexcept {
+    auto type = expr.type->codegen(*this);
+
+    if (!type) {
+        return std::nullopt;
+    }
+
+    auto& array_type = static_cast<types::Array&>(*type);
+    auto* llvm_type = type->codegen(*this);
+
+    auto* variable = m_builder.CreateAlloca(llvm_type);
+
+    if (expr.elements.size() != array_type.size) {
+        error(
+            expr.type->span.begin, m_filename, "incorrect number of elements");
+
+        return std::nullopt;
+    }
+
+    for (std::size_t i = 0; i < expr.elements.size(); ++i) {
+        auto value = generate(*expr.elements[i]);
+
+        if (!value) {
+            return std::nullopt;
+        }
+
+        auto val = cast(array_type.type, *value);
+
+        if (!val) {
+            error(expr.elements[i]->span.begin, m_filename, "type mismatch");
+
+            return std::nullopt;
+        }
+
+        auto* pointer = m_builder.CreateGEP(
+            llvm_type, variable,
+            llvm::ConstantInt::get(
+                m_module->getDataLayout().getIntPtrType(m_context), i));
+
+        m_builder.CreateStore(value->value, pointer);
+    }
+
+    return Value{type, variable};
+}
+
 std::optional<Value> Codegen::generate(ast::Identifier& expr) noexcept {
     auto* scope = m_current_scope;
     std::size_t last_index = expr.value.size() - 1;

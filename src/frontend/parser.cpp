@@ -194,6 +194,36 @@ std::unique_ptr<ast::Expression>
 Parser::expect_prefix(bool is_condition) noexcept {
     using enum Token::Type;
 
+    if (match(LeftBracket)) {
+        auto begin = peek().span.begin;
+        auto type = parse_array_type();
+
+        if (!type) {
+            return nullptr;
+        }
+
+        std::vector<std::unique_ptr<ast::Expression>> elements;
+
+        if (!expect("'{'", LeftBrace)) {
+            return nullptr;
+        }
+
+        while (true) {
+            if (auto value = expect_expr(false)) {
+                elements.push_back(std::move(value));
+            }
+
+            if (match(RightBrace)) {
+                auto end = get().span.end;
+
+                return std::make_unique<ast::ArrayLiteral>(
+                    Span{begin, end}, std::move(type), std::move(elements));
+            }
+
+            expect("','", Token::Type::Comma);
+        }
+    }
+
     auto token = expect(
         "expression", IntLiteral, FloatLiteral, StrLiteral, True, False, Null,
         Identifier, Minus, Bang, Star, And, Not, LeftParen);
@@ -500,6 +530,35 @@ std::unique_ptr<ast::Type> Parser::expect_var_type() noexcept {
     return expect_type();
 }
 
+std::unique_ptr<ast::ArrayType> Parser::parse_array_type() noexcept {
+    auto begin = get().span.begin;
+    auto type = expect_type();
+
+    if (!type) {
+        return nullptr;
+    }
+
+    if (!expect("','", Token::Type::Comma)) {
+        return nullptr;
+    }
+
+    auto size = expect("array size", Token::Type::IntLiteral);
+
+    if (!size) {
+        return nullptr;
+    }
+
+    auto end = peek().span.end;
+
+    if (!expect("']'", Token::Type::RightBracket)) {
+        return nullptr;
+    }
+
+    return std::make_unique<ast::ArrayType>(
+        Span{begin, end}, std::move(type),
+        std::make_unique<ast::IntLiteral>(size->span, size->value));
+}
+
 std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
     using enum Token::Type;
 
@@ -539,33 +598,7 @@ std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
     }
 
     if (match(LeftBracket)) {
-        next();
-
-        auto type = expect_type();
-
-        if (!type) {
-            return nullptr;
-        }
-
-        if (!expect("','", Comma)) {
-            return nullptr;
-        }
-
-        auto size = expect("array size", IntLiteral);
-
-        if (!size) {
-            return nullptr;
-        }
-
-        auto end = peek().span.end;
-
-        if (!expect("']'", RightBracket)) {
-            return nullptr;
-        }
-
-        return std::make_unique<ast::ArrayType>(
-            Span{begin, end}, std::move(type),
-            std::make_unique<ast::IntLiteral>(size->span, size->value));
+        return parse_array_type();
     }
 
     std::vector<ast::SpanValue<std::string>> value;

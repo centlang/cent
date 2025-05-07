@@ -43,6 +43,7 @@ struct StrLiteral;
 struct BoolLiteral;
 struct NullLiteral;
 struct StructLiteral;
+struct ArrayLiteral;
 struct Identifier;
 struct CallExpr;
 struct MethodExpr;
@@ -167,6 +168,7 @@ public:
     std::optional<Value> generate(ast::BoolLiteral& expr) noexcept;
     std::optional<Value> generate(ast::NullLiteral& expr) noexcept;
     std::optional<Value> generate(ast::StructLiteral& expr) noexcept;
+    std::optional<Value> generate(ast::ArrayLiteral& expr) noexcept;
     std::optional<Value> generate(ast::Identifier& expr) noexcept;
     std::optional<Value> generate(ast::CallExpr& expr) noexcept;
     std::optional<Value> generate(ast::MethodExpr& expr) noexcept;

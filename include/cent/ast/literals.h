@@ -7,6 +7,7 @@
 
 #include "cent/span.h"
 
+#include "cent/ast/array_type.h"
 #include "cent/ast/named_type.h"
 #include "cent/ast/node.h"
 #include "cent/ast/span_value.h"
@@ -58,6 +59,16 @@ struct StructLiteral : detail::Expr<StructLiteral> {
 
     std::unique_ptr<NamedType> type;
     std::vector<Field> fields;
+};
+
+struct ArrayLiteral : detail::Expr<ArrayLiteral> {
+    [[nodiscard]] ArrayLiteral(
+        Span span, std::unique_ptr<ArrayType> type,
+        std::vector<std::unique_ptr<Expression>> elements) noexcept
+    : Expr{span}, type{std::move(type)}, elements{std::move(elements)} {}
+
+    std::unique_ptr<ArrayType> type;
+    std::vector<std::unique_ptr<Expression>> elements;
 };
 
 } // namespace cent::ast
