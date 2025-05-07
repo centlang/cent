@@ -128,6 +128,9 @@ void Lexer::next_token() noexcept {
     case '*':
         with_equal(Star, StarEqual);
         break;
+    case '%':
+        with_equal(Percent, PercentEqual);
+        break;
     case '?':
         single_char(QuestionMark);
         break;

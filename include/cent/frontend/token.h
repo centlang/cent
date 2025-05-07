@@ -30,11 +30,13 @@ struct Token {
         Minus,
         Star,
         Slash,
+        Percent,
 
         PlusEqual,
         MinusEqual,
         StarEqual,
         SlashEqual,
+        PercentEqual,
 
         Bang,
         QuestionMark,

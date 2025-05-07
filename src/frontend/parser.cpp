@@ -134,8 +134,8 @@ void Parser::expect_stmt(ast::BlockStmt& block) noexcept {
         }
 
         if (!match(
-                Equal, PlusEqual, MinusEqual, StarEqual, SlashEqual, AndEqual,
-                OrEqual, XorEqual)) {
+                Equal, PlusEqual, MinusEqual, StarEqual, SlashEqual,
+                PercentEqual, AndEqual, OrEqual, XorEqual)) {
             block.body.push_back(std::move(value));
             break;
         }

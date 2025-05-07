@@ -394,6 +394,8 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
             return Star;
         case SlashEqual:
             return Slash;
+        case PercentEqual:
+            return Percent;
         case AndEqual:
             return And;
         case OrEqual:
@@ -1581,6 +1583,7 @@ std::optional<Value> Codegen::generate_bin_expr(
 
         break;
     }
+    case Percent:
     case And:
     case Or:
     case Xor:
@@ -1634,6 +1637,12 @@ std::optional<Value> Codegen::generate_bin_expr(
             lhs_value.type->is_signed_int()
                 ? m_builder.CreateSDiv(lhs_value.value, right->value)
                 : m_builder.CreateUDiv(lhs_value.value, right->value)};
+    case Percent:
+        return Value{
+            lhs_value.type,
+            lhs_value.type->is_signed_int()
+                ? m_builder.CreateSRem(lhs_value.value, right->value)
+                : m_builder.CreateURem(lhs_value.value, right->value)};
     case And:
         return Value{
             lhs_value.type, m_builder.CreateAnd(lhs_value.value, right->value)};

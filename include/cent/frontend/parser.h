@@ -186,6 +186,7 @@ private:
             return Additive;
         case Star:
         case Slash:
+        case Percent:
             return Multiplicative;
         default:
             return None;
