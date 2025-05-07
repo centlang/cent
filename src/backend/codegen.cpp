@@ -547,7 +547,9 @@ std::optional<Value> Codegen::generate(ast::ReturnStmt& stmt) noexcept {
             return std::nullopt;
         }
 
-        m_builder.CreateRetVoid();
+        if (!m_builder.GetInsertBlock()->getTerminator()) {
+            m_builder.CreateRetVoid();
+        }
 
         return std::nullopt;
     }
@@ -559,7 +561,9 @@ std::optional<Value> Codegen::generate(ast::ReturnStmt& stmt) noexcept {
     }
 
     if (auto val = cast(m_current_function->return_type, *value)) {
-        m_builder.CreateRet(val->value);
+        if (!m_builder.GetInsertBlock()->getTerminator()) {
+            m_builder.CreateRet(val->value);
+        }
     } else {
         error(stmt.value->span.begin, m_filename, "type mismatch");
     }
