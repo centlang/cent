@@ -1655,11 +1655,11 @@ std::optional<Value> Codegen::generate_bin_expr(
     case AndAnd:
         return Value{
             m_primitive_types["bool"],
-            m_builder.CreateAnd(lhs_value.value, right->value)};
+            m_builder.CreateLogicalAnd(lhs_value.value, right->value)};
     case OrOr:
         return Value{
             m_primitive_types["bool"],
-            m_builder.CreateOr(lhs_value.value, right->value)};
+            m_builder.CreateLogicalOr(lhs_value.value, right->value)};
     case Less:
         return Value{
             m_primitive_types["bool"],
