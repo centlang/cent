@@ -71,6 +71,14 @@ struct ArrayLiteral : detail::Expr<ArrayLiteral> {
     std::vector<std::unique_ptr<Expression>> elements;
 };
 
+struct TupleLiteral : detail::Expr<TupleLiteral> {
+    [[nodiscard]] TupleLiteral(
+        Span span, std::vector<std::unique_ptr<Expression>> elements) noexcept
+    : Expr{span}, elements{std::move(elements)} {}
+
+    std::vector<std::unique_ptr<Expression>> elements;
+};
+
 } // namespace cent::ast
 
 #endif

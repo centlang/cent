@@ -1071,6 +1071,48 @@ std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) noexcept {
     return Value{type, variable};
 }
 
+std::optional<Value> Codegen::generate(ast::TupleLiteral& expr) noexcept {
+    std::vector<Value> values;
+    values.reserve(expr.elements.size());
+
+    for (auto& element : expr.elements) {
+        auto value = generate(*element);
+
+        if (!value) {
+            return std::nullopt;
+        }
+
+        values.push_back(*value);
+    }
+
+    std::vector<std::shared_ptr<backend::Type>> types;
+    std::vector<llvm::Type*> llvm_types;
+
+    types.reserve(expr.elements.size());
+    llvm_types.reserve(expr.elements.size());
+
+    for (auto& value : values) {
+        types.push_back(value.type);
+    }
+
+    for (auto& value : values) {
+        llvm_types.push_back(value.type->codegen(*this));
+    }
+
+    auto* struct_type = llvm::StructType::create(llvm_types);
+    auto* variable = m_builder.CreateAlloca(struct_type);
+
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        auto* pointer = m_builder.CreateStructGEP(struct_type, variable, i);
+
+        m_builder.CreateStore(values[i].value, pointer);
+    }
+
+    return Value{
+        std::make_shared<types::Tuple>(struct_type, std::move(types)),
+        variable};
+}
+
 std::optional<Value> Codegen::generate(ast::Identifier& expr) noexcept {
     auto* scope = m_current_scope;
     std::size_t last_index = expr.value.size() - 1;

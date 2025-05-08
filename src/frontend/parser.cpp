@@ -297,9 +297,33 @@ Parser::expect_prefix(bool is_condition) noexcept {
         return nullptr;
     case LeftParen: {
         auto value = expect_expr(false);
-        expect("')'", RightParen);
 
-        return value;
+        if (match(RightParen)) {
+            next();
+            return value;
+        }
+
+        if (!expect("')' or ','", Comma)) {
+            return nullptr;
+        }
+
+        std::vector<std::unique_ptr<ast::Expression>> elements;
+        elements.push_back(std::move(value));
+
+        while (true) {
+            if (auto value = expect_expr(false)) {
+                elements.push_back(std::move(value));
+            }
+
+            if (match(RightParen)) {
+                auto end = get().span.end;
+
+                return std::make_unique<ast::TupleLiteral>(
+                    Span{token->span.begin, end}, std::move(elements));
+            }
+
+            expect("','", Token::Type::Comma);
+        }
     }
     default:
         return nullptr;
