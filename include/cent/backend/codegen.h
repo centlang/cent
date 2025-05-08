@@ -24,6 +24,7 @@ struct NamedType;
 struct Pointer;
 struct Optional;
 struct ArrayType;
+struct TupleType;
 
 struct Module;
 
@@ -89,6 +90,7 @@ struct Pointer;
 struct Optional;
 
 struct Array;
+struct Tuple;
 
 struct Struct;
 struct Function;
@@ -122,6 +124,7 @@ public:
     std::shared_ptr<Type> generate(ast::Pointer& type) noexcept;
     std::shared_ptr<Type> generate(ast::Optional& type) noexcept;
     std::shared_ptr<Type> generate(ast::ArrayType& type) noexcept;
+    std::shared_ptr<Type> generate(ast::TupleType& type) noexcept;
 
     llvm::Type* generate(types::I8& type) noexcept;
     llvm::Type* generate(types::I16& type) noexcept;
@@ -148,6 +151,7 @@ public:
     llvm::Type* generate(types::Optional& type) noexcept;
 
     llvm::Type* generate(types::Array& type) noexcept;
+    llvm::Type* generate(types::Tuple& type) noexcept;
 
     llvm::Type* generate(types::Struct& type) noexcept;
     llvm::Type* generate(types::Function& type) noexcept;

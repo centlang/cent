@@ -28,6 +28,7 @@
 #include "cent/ast/optional.h"
 #include "cent/ast/pointer.h"
 #include "cent/ast/return_stmt.h"
+#include "cent/ast/tuple_type.h"
 #include "cent/ast/unary_expr.h"
 #include "cent/ast/var_decl.h"
 #include "cent/ast/while_loop.h"
@@ -265,6 +266,22 @@ std::shared_ptr<Type> Codegen::generate(ast::ArrayType& type) noexcept {
     return std::make_shared<types::Array>(contained, constant->getZExtValue());
 }
 
+std::shared_ptr<Type> Codegen::generate(ast::TupleType& type) noexcept {
+    std::vector<std::shared_ptr<backend::Type>> types;
+
+    for (auto& element_type : type.types) {
+        auto el_type = element_type->codegen(*this);
+
+        if (!el_type) {
+            return nullptr;
+        }
+
+        types.push_back(std::move(el_type));
+    }
+
+    return std::make_shared<types::Tuple>(std::move(types));
+}
+
 llvm::Type* Codegen::generate([[maybe_unused]] types::I8& type) noexcept {
     return llvm::Type::getInt8Ty(m_context);
 }
@@ -366,6 +383,17 @@ llvm::Type* Codegen::generate(types::Array& type) noexcept {
     }
 
     return llvm::ArrayType::get(llvm_type, type.size);
+}
+
+llvm::Type* Codegen::generate(types::Tuple& type) noexcept {
+    std::vector<llvm::Type*> types;
+    types.reserve(type.types.size());
+
+    for (auto& element_type : type.types) {
+        types.push_back(element_type->codegen(*this));
+    }
+
+    return llvm::StructType::create(types);
 }
 
 llvm::Type* Codegen::generate([[maybe_unused]] types::Function& type) noexcept {

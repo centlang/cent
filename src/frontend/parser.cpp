@@ -15,6 +15,7 @@
 #include "cent/ast/optional.h"
 #include "cent/ast/pointer.h"
 #include "cent/ast/return_stmt.h"
+#include "cent/ast/tuple_type.h"
 #include "cent/ast/unary_expr.h"
 #include "cent/ast/var_decl.h"
 #include "cent/ast/while_loop.h"
@@ -595,6 +596,45 @@ std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
 
         return std::make_unique<ast::Optional>(
             Span{begin, type->span.end}, std::move(type));
+    }
+
+    if (match(LeftParen)) {
+        next();
+
+        std::vector<std::unique_ptr<ast::Type>> types;
+
+        auto parse_type = [&] {
+            auto type = expect_type();
+
+            if (!type) {
+                return false;
+            }
+
+            types.push_back(std::move(type));
+
+            return true;
+        };
+
+        if (!parse_type()) {
+            return nullptr;
+        }
+
+        while (match(Comma)) {
+            next();
+
+            if (!parse_type()) {
+                return nullptr;
+            }
+        }
+
+        auto end = peek().span.end;
+
+        if (!expect("')'", RightParen)) {
+            return nullptr;
+        }
+
+        return std::make_unique<ast::TupleType>(
+            Span{begin, end}, std::move(types));
     }
 
     if (match(LeftBracket)) {

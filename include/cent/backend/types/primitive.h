@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include "cent/backend/type.h"
 
@@ -98,6 +99,14 @@ struct Array : detail::Type<Array> {
 
     std::shared_ptr<backend::Type> type;
     std::size_t size;
+};
+
+struct Tuple : detail::Type<Tuple> {
+    [[nodiscard]] Tuple(
+        std::vector<std::shared_ptr<backend::Type>> types) noexcept
+    : types{std::move(types)} {}
+
+    std::vector<std::shared_ptr<backend::Type>> types;
 };
 
 } // namespace cent::backend::types
