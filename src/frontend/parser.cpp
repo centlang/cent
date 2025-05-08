@@ -308,6 +308,8 @@ Parser::expect_prefix(bool is_condition) noexcept {
 
 [[nodiscard]] std::unique_ptr<ast::Expression>
 Parser::expect_access_or_call_expr(bool is_condition) noexcept {
+    using enum Token::Type;
+
     auto expression = expect_prefix(is_condition);
 
     if (!expression) {
@@ -315,13 +317,13 @@ Parser::expect_access_or_call_expr(bool is_condition) noexcept {
     }
 
     while (true) {
-        if (match(Token::Type::LeftParen)) {
+        if (match(LeftParen)) {
             next();
 
             auto args = parse_args();
             auto end = peek().span.end;
 
-            if (!expect("')'", Token::Type::RightParen)) {
+            if (!expect("')'", RightParen)) {
                 return nullptr;
             }
 
@@ -332,7 +334,7 @@ Parser::expect_access_or_call_expr(bool is_condition) noexcept {
             continue;
         }
 
-        if (match(Token::Type::LeftBracket)) {
+        if (match(LeftBracket)) {
             next();
 
             auto index = expect_expr(false);
@@ -343,7 +345,7 @@ Parser::expect_access_or_call_expr(bool is_condition) noexcept {
 
             auto end = peek().span.end;
 
-            if (!expect("']'", Token::Type::RightBracket)) {
+            if (!expect("']'", RightBracket)) {
                 return nullptr;
             }
 
@@ -352,25 +354,25 @@ Parser::expect_access_or_call_expr(bool is_condition) noexcept {
                 std::move(index));
         }
 
-        if (!match(Token::Type::Dot)) {
+        if (!match(Dot)) {
             return expression;
         }
 
         next();
 
-        auto member = expect("member name", Token::Type::Identifier);
+        auto member = expect("member name", Identifier, IntLiteral);
 
         if (!member) {
             return nullptr;
         }
 
-        if (match(Token::Type::LeftParen)) {
+        if (match(LeftParen)) {
             next();
 
             auto args = parse_args();
             auto end = peek().span.end;
 
-            if (!expect("')'", Token::Type::RightParen)) {
+            if (!expect("')'", RightParen)) {
                 return nullptr;
             }
 
@@ -383,7 +385,7 @@ Parser::expect_access_or_call_expr(bool is_condition) noexcept {
 
         expression = std::make_unique<ast::MemberExpr>(
             Span{expression->span.begin, member->span.end},
-            std::move(expression), ast::SpanValue{member->value, member->span});
+            std::move(expression), *member);
     }
 }
 

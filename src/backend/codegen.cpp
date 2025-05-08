@@ -268,6 +268,10 @@ std::shared_ptr<Type> Codegen::generate(ast::ArrayType& type) noexcept {
 
 std::shared_ptr<Type> Codegen::generate(ast::TupleType& type) noexcept {
     std::vector<std::shared_ptr<backend::Type>> types;
+    std::vector<llvm::Type*> llvm_types;
+
+    types.reserve(type.types.size());
+    llvm_types.reserve(type.types.size());
 
     for (auto& element_type : type.types) {
         auto el_type = element_type->codegen(*this);
@@ -279,7 +283,12 @@ std::shared_ptr<Type> Codegen::generate(ast::TupleType& type) noexcept {
         types.push_back(std::move(el_type));
     }
 
-    return std::make_shared<types::Tuple>(std::move(types));
+    for (auto& element_type : types) {
+        llvm_types.push_back(element_type->codegen(*this));
+    }
+
+    return std::make_shared<types::Tuple>(
+        llvm::StructType::create(llvm_types), std::move(types));
 }
 
 llvm::Type* Codegen::generate([[maybe_unused]] types::I8& type) noexcept {
@@ -385,16 +394,7 @@ llvm::Type* Codegen::generate(types::Array& type) noexcept {
     return llvm::ArrayType::get(llvm_type, type.size);
 }
 
-llvm::Type* Codegen::generate(types::Tuple& type) noexcept {
-    std::vector<llvm::Type*> types;
-    types.reserve(type.types.size());
-
-    for (auto& element_type : type.types) {
-        types.push_back(element_type->codegen(*this));
-    }
-
-    return llvm::StructType::create(types);
-}
+llvm::Type* Codegen::generate(types::Tuple& type) noexcept { return type.type; }
 
 llvm::Type* Codegen::generate([[maybe_unused]] types::Function& type) noexcept {
     return nullptr;
@@ -1194,6 +1194,38 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
 
     if (!parent) {
         return std::nullopt;
+    }
+
+    auto no_such_member = [&] {
+        error(
+            expr.member.span.begin, m_filename,
+            fmt::format("no such member: '{}'", expr.member.value));
+    };
+
+    if (parent->type->is_tuple()) {
+        if (expr.member.type != frontend::Token::Type::IntLiteral) {
+            no_such_member();
+
+            return std::nullopt;
+        }
+
+        std::size_t value{};
+        std::string_view literal = expr.member.value;
+
+        std::from_chars(literal.cbegin(), literal.cend(), value);
+
+        auto& type = static_cast<types::Tuple&>(*parent->type);
+
+        if (value >= type.types.size()) {
+            no_such_member();
+
+            return std::nullopt;
+        }
+
+        return Value{
+            type.types[value],
+            m_builder.CreateStructGEP(type.type, parent->value, value),
+            parent->is_mutable};
     }
 
     auto not_a_struct = [&] {

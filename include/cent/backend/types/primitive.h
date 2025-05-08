@@ -103,9 +103,13 @@ struct Array : detail::Type<Array> {
 
 struct Tuple : detail::Type<Tuple> {
     [[nodiscard]] Tuple(
+        llvm::StructType* type,
         std::vector<std::shared_ptr<backend::Type>> types) noexcept
-    : types{std::move(types)} {}
+    : type{type}, types{std::move(types)} {}
 
+    bool is_tuple() noexcept override { return true; };
+
+    llvm::StructType* type;
     std::vector<std::shared_ptr<backend::Type>> types;
 };
 

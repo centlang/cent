@@ -27,6 +27,7 @@ struct Type {
     virtual bool is_pointer() noexcept { return false; }
     virtual bool is_optional() noexcept { return false; }
     virtual bool is_array() noexcept { return false; }
+    virtual bool is_tuple() noexcept { return false; }
 
     virtual bool is_function() noexcept { return false; }
     virtual bool is_struct() noexcept { return false; }
