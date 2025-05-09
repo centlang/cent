@@ -1207,6 +1207,19 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) noexcept {
     std::vector<llvm::Value*> arguments;
     arguments.reserve(arg_size);
 
+    auto& self_type =
+        static_cast<types::Pointer&>(*iterator->second.type->param_types[0]);
+
+    if (!value->is_mutable && self_type.is_mutable) {
+        error(
+            expr.name.span.begin, m_filename,
+            fmt::format(
+                "cannot call method '{}' on an immutable value",
+                expr.name.value));
+
+        return std::nullopt;
+    }
+
     arguments.push_back(value->value);
 
     for (std::size_t i = 0; i < expr.arguments.size(); ++i) {
