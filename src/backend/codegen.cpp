@@ -1207,20 +1207,30 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) noexcept {
     std::vector<llvm::Value*> arguments;
     arguments.reserve(arg_size);
 
-    auto& self_type =
-        static_cast<types::Pointer&>(*iterator->second.type->param_types[0]);
+    if (iterator->second.type->param_types[0]->is_pointer()) {
+        auto& self_type = static_cast<types::Pointer&>(
+            *iterator->second.type->param_types[0]);
 
-    if (!value->is_mutable && self_type.is_mutable) {
-        error(
-            expr.name.span.begin, m_filename,
-            fmt::format(
-                "cannot call method '{}' on an immutable value",
-                expr.name.value));
+        if (!value->is_mutable && self_type.is_mutable) {
+            error(
+                expr.name.span.begin, m_filename,
+                fmt::format(
+                    "cannot call method '{}' on an immutable value",
+                    expr.name.value));
 
-        return std::nullopt;
+            return std::nullopt;
+        }
+
+        if (!value->value->getType()->isPointerTy()) {
+            error(expr.value->span.begin, m_filename, "type mismatch");
+
+            return std::nullopt;
+        }
+
+        arguments.push_back(value->value);
+    } else {
+        arguments.push_back(load_value(*value).value);
     }
-
-    arguments.push_back(value->value);
 
     for (std::size_t i = 0; i < expr.arguments.size(); ++i) {
         auto value = generate(*expr.arguments[i]);
@@ -1979,6 +1989,12 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
 
     if (!decl.proto.params.empty()) {
         auto param_type = decl.proto.params[0].type->codegen(*this);
+
+        if (types_equal(*param_type, *type)) {
+            m_methods[type][decl.proto.name.value] = {func_type, function};
+
+            return;
+        }
 
         if (param_type->is_pointer() &&
             types_equal(
