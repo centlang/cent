@@ -103,8 +103,22 @@ std::optional<Value> Codegen::cast(
     auto* llvm_type = type->codegen(*this);
 
     if (type->is_optional()) {
-        auto* variable = m_builder.CreateAlloca(llvm_type);
+        auto& contained = static_cast<types::Optional&>(*type).type;
 
+        if (contained->is_pointer()) {
+            if (!value.type->is_null()) {
+                return Value{type, value.value};
+            }
+
+            auto* variable = m_builder.CreateAlloca(llvm_type);
+
+            m_builder.CreateStore(
+                llvm::Constant::getNullValue(llvm_type), variable);
+
+            return Value{type, variable};
+        }
+
+        auto* variable = m_builder.CreateAlloca(llvm_type);
         auto* bool_ptr = m_builder.CreateStructGEP(
             llvm_type, variable, optional_member_bool);
 
@@ -115,8 +129,6 @@ std::optional<Value> Codegen::cast(
 
             return Value{type, variable};
         }
-
-        auto& contained = static_cast<types::Optional&>(*type).type;
 
         if (!types_equal(*contained, *value.type)) {
             return std::nullopt;
@@ -367,6 +379,10 @@ llvm::Type* Codegen::generate(types::Struct& type) noexcept {
 
 llvm::Type* Codegen::generate(types::Optional& type) noexcept {
     auto* contained = type.type->codegen(*this);
+
+    if (type.type->is_pointer()) {
+        return contained;
+    }
 
     auto iterator = m_optional_types.find(contained);
 
@@ -1651,20 +1667,32 @@ std::optional<Value> Codegen::generate_bin_expr(
     using enum frontend::Token::Type;
 
     if (oper.value == EqualEqual || oper.value == BangEqual) {
-        llvm::Type* type = nullptr;
-        llvm::Value* value = nullptr;
+        std::optional<Value> value = std::nullopt;
 
         if (lhs.value.type->is_optional() && rhs.value.type->is_null()) {
-            type = lhs.value.type->codegen(*this);
-            value = lhs.value.value;
+            value = lhs.value;
         } else if (rhs.value.type->is_optional() && lhs.value.type->is_null()) {
-            type = rhs.value.type->codegen(*this);
-            value = rhs.value.value;
+            value = rhs.value;
         }
 
-        if (type) {
-            auto* bool_ptr =
-                m_builder.CreateStructGEP(type, value, optional_member_bool);
+        if (value) {
+            auto& type = static_cast<types::Optional&>(*value->type);
+
+            if (type.type->is_pointer()) {
+                auto* null =
+                    llvm::Constant::getNullValue(value->value->getType());
+
+                auto* llvm_value = load_value(*value).value;
+
+                auto* val = oper.value == EqualEqual
+                                ? m_builder.CreateICmpEQ(llvm_value, null)
+                                : m_builder.CreateICmpNE(llvm_value, null);
+
+                return Value{m_primitive_types["bool"], val};
+            }
+
+            auto* bool_ptr = m_builder.CreateStructGEP(
+                value->value->getType(), value->value, optional_member_bool);
 
             llvm::Value* val = m_builder.CreateLoad(
                 llvm::Type::getInt1Ty(m_context), bool_ptr);
