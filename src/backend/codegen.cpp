@@ -980,8 +980,6 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
     auto type = expr.type->codegen(*this);
 
     if (!type) {
-        error(expr.type->span.begin, m_filename, "undeclared structure");
-
         return std::nullopt;
     }
 
