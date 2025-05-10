@@ -17,6 +17,20 @@ struct Function : detail::Type<Function> {
     : return_type{std::move(return_type)}, param_types{std::move(param_types)} {
     }
 
+    std::string to_string() noexcept override {
+        std::string result = "fn(";
+
+        for (std::size_t i = 0; i < param_types.size(); ++i) {
+            result += param_types[i]->to_string();
+
+            if (i + 1 != param_types.size()) {
+                result += ", ";
+            }
+        }
+
+        return result + ") " + return_type->to_string();
+    }
+
     bool is_function() noexcept override { return true; };
 
     std::shared_ptr<backend::Type> return_type;

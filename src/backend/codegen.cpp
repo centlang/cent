@@ -465,7 +465,7 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
     auto val = cast(var->type, *value);
 
     if (!val) {
-        error(stmt.value->span.begin, m_filename, "type mismatch");
+        type_mismatch(stmt.value->span, *var->type, *value->type);
 
         return std::nullopt;
     }
@@ -611,7 +611,8 @@ std::optional<Value> Codegen::generate(ast::ReturnStmt& stmt) noexcept {
             m_builder.CreateRet(val->value);
         }
     } else {
-        error(stmt.value->span.begin, m_filename, "type mismatch");
+        type_mismatch(
+            stmt.span, *m_current_function->return_type, *value->type);
     }
 
     return std::nullopt;
@@ -1024,9 +1025,9 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
         auto val = cast(struct_type.fields[index], *value);
 
         if (!val) {
-            error(
-                expr.fields[index].value->span.begin, m_filename,
-                "type mismatch");
+            type_mismatch(
+                expr.fields[index].value->span, *struct_type.fields[index],
+                *value->type);
 
             return std::nullopt;
         }
@@ -1069,7 +1070,8 @@ std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) noexcept {
         auto val = cast(array_type.type, *value);
 
         if (!val) {
-            error(expr.elements[i]->span.begin, m_filename, "type mismatch");
+            type_mismatch(
+                expr.elements[i]->span, *array_type.type, *value->type);
 
             return std::nullopt;
         }
@@ -1182,7 +1184,8 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
         if (auto val = cast(type.param_types[i], *value)) {
             arguments.push_back(val->value);
         } else {
-            error(expr.arguments[i]->span.begin, m_filename, "type mismatch");
+            type_mismatch(
+                expr.arguments[i]->span, *type.param_types[i], *value->type);
 
             return std::nullopt;
         }
@@ -1257,7 +1260,9 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) noexcept {
                 cast(iterator->second.type->param_types[i + 1], *value)) {
             arguments.push_back(val->value);
         } else {
-            error(expr.arguments[i]->span.begin, m_filename, "type mismatch");
+            type_mismatch(
+                expr.arguments[i]->span,
+                *iterator->second.type->param_types[i + 1], *value->type);
 
             return std::nullopt;
         }
@@ -1567,7 +1572,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
             value = cast(type, *value);
 
             if (!value) {
-                error(decl.value->span.begin, m_filename, "type mismatch");
+                type_mismatch(decl.value->span, *type, *value->type);
 
                 return std::nullopt;
             }
@@ -1709,7 +1714,7 @@ std::optional<Value> Codegen::generate_bin_expr(
     auto right = cast(lhs_value.type, rhs_value);
 
     if (!right) {
-        error(lhs.span.begin, m_filename, "type mismatch");
+        type_mismatch(lhs.span, *lhs_value.type, *rhs_value.type);
 
         return std::nullopt;
     }
@@ -2028,6 +2033,14 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
             m_methods[type][decl.proto.name.value] = {func_type, function};
         }
     }
+}
+
+void Codegen::type_mismatch(Span span, Type& expected, Type& got) noexcept {
+    error(
+        span.begin, m_filename,
+        fmt::format(
+            "expected '{}' but got '{}'", expected.to_string(),
+            got.to_string()));
 }
 
 } // namespace cent::backend

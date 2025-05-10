@@ -1,6 +1,8 @@
 #ifndef CENT_BACKEND_TYPE_H
 #define CENT_BACKEND_TYPE_H
 
+#include <string>
+
 #include <llvm/IR/Type.h>
 
 #include "cent/backend/codegen.h"
@@ -18,6 +20,7 @@ struct Type {
     auto operator=(Type&&) = delete;
 
     virtual llvm::Type* codegen(backend::Codegen& codegen) noexcept = 0;
+    virtual std::string to_string() noexcept = 0;
 
     virtual bool is_bool() noexcept { return false; }
     virtual bool is_null() noexcept { return false; }

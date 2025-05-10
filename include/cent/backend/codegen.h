@@ -208,6 +208,8 @@ private:
 
     void generate_fn_proto(ast::FnDecl& decl) noexcept;
 
+    void type_mismatch(Span span, Type& expected, Type& got) noexcept;
+
     static constexpr auto optional_member_value = 0;
     static constexpr auto optional_member_bool = 1;
 
