@@ -69,155 +69,6 @@ std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
     return std::move(m_module);
 }
 
-bool Codegen::types_equal(Type& lhs, Type& rhs) noexcept {
-    if (&lhs == &rhs) {
-        return true;
-    }
-
-    if (lhs.is_pointer() && rhs.is_pointer()) {
-        auto& lhs_pointer = static_cast<types::Pointer&>(lhs);
-        auto& rhs_pointer = static_cast<types::Pointer&>(rhs);
-
-        return lhs_pointer.is_mutable == rhs_pointer.is_mutable &&
-               types_equal(*lhs_pointer.type, *rhs_pointer.type);
-    }
-
-    if (lhs.is_optional() && rhs.is_optional()) {
-        auto& lhs_optional = static_cast<types::Optional&>(lhs);
-        auto& rhs_optional = static_cast<types::Optional&>(rhs);
-
-        return types_equal(*lhs_optional.type, *rhs_optional.type);
-    }
-
-    return false;
-}
-
-std::optional<Value> Codegen::cast(
-    std::shared_ptr<Type>& type, Value& value, bool implicit) noexcept {
-    using enum llvm::Instruction::CastOps;
-
-    if (types_equal(*type, *value.type)) {
-        return value;
-    }
-
-    auto* llvm_type = type->codegen(*this);
-
-    if (type->is_optional()) {
-        auto& contained = static_cast<types::Optional&>(*type).type;
-
-        if (contained->is_pointer()) {
-            if (!value.type->is_null()) {
-                return Value{type, value.value};
-            }
-
-            auto* variable = m_builder.CreateAlloca(llvm_type);
-
-            m_builder.CreateStore(
-                llvm::Constant::getNullValue(llvm_type), variable);
-
-            return Value{type, variable};
-        }
-
-        auto* variable = m_builder.CreateAlloca(llvm_type);
-        auto* bool_ptr = m_builder.CreateStructGEP(
-            llvm_type, variable, optional_member_bool);
-
-        if (value.type->is_null()) {
-            m_builder.CreateStore(
-                llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), false),
-                bool_ptr);
-
-            return Value{type, variable};
-        }
-
-        if (!types_equal(*contained, *value.type)) {
-            return std::nullopt;
-        }
-
-        auto* value_ptr = m_builder.CreateStructGEP(
-            llvm_type, variable, optional_member_value);
-
-        m_builder.CreateStore(value.value, value_ptr);
-
-        m_builder.CreateStore(
-            llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), true),
-            bool_ptr);
-
-        return Value{type, variable};
-    }
-
-    std::size_t from_size = value.value->getType()->getPrimitiveSizeInBits();
-    std::size_t to_size = llvm_type->getPrimitiveSizeInBits();
-
-    bool value_is_float = value.type->is_float();
-    bool value_is_sint = value.type->is_signed_int();
-    bool value_is_uint = value.type->is_unsigned_int();
-    bool value_is_ptr = value.type->is_pointer();
-
-    if (!value_is_float && !value_is_sint && !value_is_uint && !value_is_ptr) {
-        return std::nullopt;
-    }
-
-    bool type_is_float = type->is_float();
-    bool type_is_sint = type->is_signed_int();
-    bool type_is_uint = type->is_unsigned_int();
-    bool type_is_ptr = type->is_pointer();
-
-    llvm::Instruction::CastOps cast_op = CastOpsEnd;
-
-    if (value_is_float) {
-        if (type_is_float) {
-            if (to_size > from_size) {
-                cast_op = FPExt;
-            } else if (!implicit) {
-                cast_op = FPTrunc;
-            }
-        } else if (!implicit) {
-            if (type_is_sint) {
-                cast_op = FPToSI;
-            } else if (type_is_uint) {
-                cast_op = FPToUI;
-            }
-        }
-    } else if (value_is_sint) {
-        if (type_is_float) {
-            cast_op = SIToFP;
-        } else if (type_is_sint || type_is_uint) {
-            if (to_size > from_size) {
-                cast_op = SExt;
-            } else if (!implicit) {
-                cast_op = Trunc;
-            }
-        } else if (!implicit && type_is_ptr) {
-            cast_op = IntToPtr;
-        }
-    } else if (value_is_uint) {
-        if (type_is_float) {
-            cast_op = UIToFP;
-        } else if (type_is_sint || type_is_uint) {
-            if (to_size > from_size) {
-                cast_op = ZExt;
-            } else if (!implicit) {
-                cast_op = Trunc;
-            }
-        } else if (!implicit && type_is_ptr) {
-            cast_op = IntToPtr;
-        }
-    } else if (!implicit && value_is_ptr) {
-        if (type_is_sint || type_is_uint) {
-            cast_op = PtrToInt;
-        } else if (type_is_ptr) {
-            return value;
-        }
-    }
-
-    if (cast_op == CastOpsEnd) {
-        return std::nullopt;
-    }
-
-    return Value{type, m_builder.CreateCast(cast_op, value.value, llvm_type)};
-}
-
 std::shared_ptr<Type> Codegen::generate(ast::NamedType& type) noexcept {
     auto* scope = m_current_scope;
     std::size_t last_index = type.value.size() - 1;
@@ -424,7 +275,7 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
         return std::nullopt;
     }
 
-    auto value = generate(*stmt.value);
+    auto value = stmt.value->codegen(*this);
 
     auto without_equal = [](frontend::Token::Type type) {
         using enum frontend::Token::Type;
@@ -462,14 +313,6 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
         return std::nullopt;
     }
 
-    auto val = cast(var->type, *value);
-
-    if (!val) {
-        type_mismatch(stmt.value->span, *var->type, *value->type);
-
-        return std::nullopt;
-    }
-
     if (!var->is_mutable) {
         error(
             stmt.value->span.begin, m_filename,
@@ -478,33 +321,22 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
         return std::nullopt;
     }
 
-    val = load_value(*val);
-
-    if (auto* variable = llvm::dyn_cast<llvm::AllocaInst>(var->value)) {
-        m_builder.CreateStore(val->value, variable);
-
-        return std::nullopt;
-    }
-
-    if (auto* variable = llvm::dyn_cast<llvm::LoadInst>(var->value)) {
-        m_builder.CreateStore(val->value, variable);
+    if (!llvm::isa<llvm::AllocaInst>(var->value) &&
+        !llvm::isa<llvm::LoadInst>(var->value) &&
+        !llvm::isa<llvm::GetElementPtrInst>(var->value)) {
+        error(
+            stmt.variable->span.begin, m_filename, "cannot assign to a value");
 
         return std::nullopt;
     }
 
-    if (auto* variable = llvm::dyn_cast<llvm::GetElementPtrInst>(var->value)) {
-        m_builder.CreateStore(val->value, variable);
+    m_current_result = var->value;
 
-        return std::nullopt;
+    if (!cast_to_result(var->type, *value)) {
+        type_mismatch(stmt.value->span, *var->type, *value->type);
     }
 
-    if (var->value->getType()->isPointerTy()) {
-        m_builder.CreateStore(val->value, var->value);
-
-        return std::nullopt;
-    }
-
-    error(stmt.variable->span.begin, m_filename, "cannot assign to a value");
+    m_current_result = nullptr;
 
     return std::nullopt;
 }
@@ -522,7 +354,7 @@ std::optional<Value> Codegen::generate(ast::BlockStmt& stmt) noexcept {
 }
 
 std::optional<Value> Codegen::generate(ast::IfElse& stmt) noexcept {
-    auto condition = generate(*stmt.condition);
+    auto condition = stmt.condition->codegen(*this);
 
     if (!condition) {
         return std::nullopt;
@@ -535,7 +367,7 @@ std::optional<Value> Codegen::generate(ast::IfElse& stmt) noexcept {
     if (!stmt.else_block) {
         auto* end = llvm::BasicBlock::Create(m_context, "", function);
 
-        m_builder.CreateCondBr(condition->value, if_block, end);
+        m_builder.CreateCondBr(load_value(*condition).value, if_block, end);
 
         m_builder.SetInsertPoint(if_block);
         stmt.if_block->codegen(*this);
@@ -550,7 +382,7 @@ std::optional<Value> Codegen::generate(ast::IfElse& stmt) noexcept {
     }
 
     auto* else_block = llvm::BasicBlock::Create(m_context, "", function);
-    m_builder.CreateCondBr(condition->value, if_block, else_block);
+    m_builder.CreateCondBr(load_value(*condition).value, if_block, else_block);
 
     m_builder.SetInsertPoint(if_block);
     stmt.if_block->codegen(*this);
@@ -600,7 +432,7 @@ std::optional<Value> Codegen::generate(ast::ReturnStmt& stmt) noexcept {
         return std::nullopt;
     }
 
-    auto value = generate(*stmt.value);
+    auto value = stmt.value->codegen(*this);
 
     if (!value) {
         return std::nullopt;
@@ -608,7 +440,7 @@ std::optional<Value> Codegen::generate(ast::ReturnStmt& stmt) noexcept {
 
     if (auto val = cast(m_current_function->return_type, *value)) {
         if (!m_builder.GetInsertBlock()->getTerminator()) {
-            m_builder.CreateRet(val->value);
+            m_builder.CreateRet(load_value(*val).value);
         }
     } else {
         type_mismatch(
@@ -619,7 +451,7 @@ std::optional<Value> Codegen::generate(ast::ReturnStmt& stmt) noexcept {
 }
 
 std::optional<Value> Codegen::generate(ast::WhileLoop& stmt) noexcept {
-    auto condition = generate(*stmt.condition);
+    auto condition = stmt.condition->codegen(*this);
 
     if (!condition) {
         return std::nullopt;
@@ -630,13 +462,16 @@ std::optional<Value> Codegen::generate(ast::WhileLoop& stmt) noexcept {
     m_loop_body = llvm::BasicBlock::Create(m_context, "", function);
     m_loop_end = llvm::BasicBlock::Create(m_context, "", function);
 
-    m_builder.CreateCondBr(condition->value, m_loop_body, m_loop_end);
+    m_builder.CreateCondBr(
+        load_value(*condition).value, m_loop_body, m_loop_end);
 
     m_builder.SetInsertPoint(m_loop_body);
     stmt.body->codegen(*this);
 
-    condition = generate(*stmt.condition);
-    m_builder.CreateCondBr(condition->value, m_loop_body, m_loop_end);
+    condition = stmt.condition->codegen(*this);
+
+    m_builder.CreateCondBr(
+        load_value(*condition).value, m_loop_body, m_loop_end);
 
     m_builder.SetInsertPoint(m_loop_end);
 
@@ -688,8 +523,7 @@ std::optional<Value> Codegen::generate(ast::BinaryExpr& expr) noexcept {
 std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
     using enum frontend::Token::Type;
 
-    auto value = expr.oper.value == And ? expr.value->codegen(*this)
-                                        : generate(*expr.value);
+    auto value = expr.value->codegen(*this);
 
     if (!value) {
         return std::nullopt;
@@ -698,7 +532,8 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
     switch (expr.oper.value) {
     case Minus:
         if (value->type->is_float()) {
-            return Value{value->type, m_builder.CreateFNeg(value->value)};
+            return Value{
+                value->type, m_builder.CreateFNeg(load_value(*value).value)};
         }
 
         if (!value->type->is_signed_int() && !value->type->is_unsigned_int()) {
@@ -709,7 +544,8 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
             return std::nullopt;
         }
 
-        return Value{value->type, m_builder.CreateNeg(value->value)};
+        return Value{
+            value->type, m_builder.CreateNeg(load_value(*value).value)};
     case Bang:
         if (!value->type->is_bool()) {
             error(
@@ -719,7 +555,8 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
             return std::nullopt;
         }
 
-        return Value{value->type, m_builder.CreateNot(value->value)};
+        return Value{
+            value->type, m_builder.CreateNot(load_value(*value).value)};
     case Star: {
         if (!value->type->is_pointer()) {
             error(
@@ -755,7 +592,8 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
             return std::nullopt;
         }
 
-        return Value{value->type, m_builder.CreateNot(value->value)};
+        return Value{
+            value->type, m_builder.CreateNot(load_value(*value).value)};
     default:
         return std::nullopt;
     }
@@ -993,7 +831,9 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
     auto& struct_type = static_cast<types::Struct&>(*type);
     auto& members = m_members[struct_type.type];
 
-    auto* variable = m_builder.CreateAlloca(struct_type.type);
+    auto* variable = m_current_result
+                         ? m_current_result
+                         : m_builder.CreateAlloca(struct_type.type);
 
     if (expr.fields.size() != struct_type.fields.size()) {
         error(
@@ -1004,7 +844,7 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
     }
 
     for (auto& field : expr.fields) {
-        auto value = generate(*field.value);
+        auto value = field.value->codegen(*this);
 
         if (!value) {
             return std::nullopt;
@@ -1022,20 +862,20 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
 
         auto index = iterator->second;
 
-        auto val = cast(struct_type.fields[index], *value);
+        m_current_result =
+            m_builder.CreateStructGEP(struct_type.type, variable, index);
 
-        if (!val) {
+        if (!cast_to_result(struct_type.fields[index], *value)) {
             type_mismatch(
                 expr.fields[index].value->span, *struct_type.fields[index],
                 *value->type);
 
+            m_current_result = nullptr;
+
             return std::nullopt;
         }
 
-        auto* pointer =
-            m_builder.CreateStructGEP(struct_type.type, variable, index);
-
-        m_builder.CreateStore(value->value, pointer);
+        m_current_result = nullptr;
     }
 
     return Value{type, variable};
@@ -1051,7 +891,8 @@ std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) noexcept {
     auto& array_type = static_cast<types::Array&>(*type);
     auto* llvm_type = type->codegen(*this);
 
-    auto* variable = m_builder.CreateAlloca(llvm_type);
+    auto* variable =
+        m_current_result ? m_current_result : m_builder.CreateAlloca(llvm_type);
 
     if (expr.elements.size() != array_type.size) {
         error(
@@ -1061,27 +902,27 @@ std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) noexcept {
     }
 
     for (std::size_t i = 0; i < expr.elements.size(); ++i) {
-        auto value = generate(*expr.elements[i]);
+        auto value = expr.elements[i]->codegen(*this);
 
         if (!value) {
             return std::nullopt;
         }
 
-        auto val = cast(array_type.type, *value);
-
-        if (!val) {
-            type_mismatch(
-                expr.elements[i]->span, *array_type.type, *value->type);
-
-            return std::nullopt;
-        }
-
-        auto* pointer = m_builder.CreateGEP(
+        m_current_result = m_builder.CreateGEP(
             llvm_type, variable,
             llvm::ConstantInt::get(
                 m_module->getDataLayout().getIntPtrType(m_context), i));
 
-        m_builder.CreateStore(value->value, pointer);
+        if (!cast_to_result(array_type.type, *value)) {
+            type_mismatch(
+                expr.elements[i]->span, *array_type.type, *value->type);
+
+            m_current_result = nullptr;
+
+            return std::nullopt;
+        }
+
+        m_current_result = nullptr;
     }
 
     return Value{type, variable};
@@ -1092,7 +933,7 @@ std::optional<Value> Codegen::generate(ast::TupleLiteral& expr) noexcept {
     values.reserve(expr.elements.size());
 
     for (auto& element : expr.elements) {
-        auto value = generate(*element);
+        auto value = element->codegen(*this);
 
         if (!value) {
             return std::nullopt;
@@ -1116,12 +957,14 @@ std::optional<Value> Codegen::generate(ast::TupleLiteral& expr) noexcept {
     }
 
     auto* struct_type = llvm::StructType::create(llvm_types);
-    auto* variable = m_builder.CreateAlloca(struct_type);
+
+    auto* variable = m_current_result ? m_current_result
+                                      : m_builder.CreateAlloca(struct_type);
 
     for (std::size_t i = 0; i < values.size(); ++i) {
         auto* pointer = m_builder.CreateStructGEP(struct_type, variable, i);
 
-        m_builder.CreateStore(values[i].value, pointer);
+        m_builder.CreateStore(load_value(values[i]).value, pointer);
     }
 
     return Value{
@@ -1175,14 +1018,14 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
     arguments.reserve(arg_size);
 
     for (std::size_t i = 0; i < arg_size; ++i) {
-        auto value = generate(*expr.arguments[i]);
+        auto value = expr.arguments[i]->codegen(*this);
 
         if (!value) {
             return std::nullopt;
         }
 
         if (auto val = cast(type.param_types[i], *value)) {
-            arguments.push_back(val->value);
+            arguments.push_back(load_value(*val).value);
         } else {
             type_mismatch(
                 expr.arguments[i]->span, *type.param_types[i], *value->type);
@@ -1250,7 +1093,7 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) noexcept {
     }
 
     for (std::size_t i = 0; i < expr.arguments.size(); ++i) {
-        auto value = generate(*expr.arguments[i]);
+        auto value = expr.arguments[i]->codegen(*this);
 
         if (!value) {
             return std::nullopt;
@@ -1258,7 +1101,7 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) noexcept {
 
         if (auto val =
                 cast(iterator->second.type->param_types[i + 1], *value)) {
-            arguments.push_back(val->value);
+            arguments.push_back(load_value(*val).value);
         } else {
             type_mismatch(
                 expr.arguments[i]->span,
@@ -1401,7 +1244,7 @@ std::optional<Value> Codegen::generate(ast::IndexExpr& expr) noexcept {
 std::optional<Value> Codegen::generate(ast::AsExpr& expr) noexcept {
     using enum llvm::Instruction::CastOps;
 
-    auto value = generate(*expr.value);
+    auto value = expr.value->codegen(*this);
 
     if (!value) {
         return std::nullopt;
@@ -1556,10 +1399,18 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
         }
 
         llvm_type = type->codegen(*this);
+
+        if (llvm_type->isVoidTy()) {
+            error(
+                decl.name.span.begin, m_filename,
+                fmt::format("'{}' cannot be of type 'void'", decl.name.value));
+
+            return std::nullopt;
+        }
     }
 
     if (decl.value) {
-        value = generate(*decl.value);
+        value = decl.value->codegen(*this);
 
         if (!value) {
             return std::nullopt;
@@ -1568,36 +1419,27 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
         if (!type) {
             type = value->type;
             llvm_type = value->type->codegen(*this);
+
+            m_current_result = m_builder.CreateAlloca(llvm_type);
         } else {
-            value = cast(type, *value);
+            m_current_result = m_builder.CreateAlloca(llvm_type);
 
-            if (!value) {
+            if (!cast_to_result(type, *value)) {
                 type_mismatch(decl.value->span, *type, *value->type);
-
-                return std::nullopt;
+            } else {
+                m_scope.names[decl.name.value] = {
+                    type, m_current_result, decl.is_mutable};
             }
+
+            m_current_result = nullptr;
+
+            return std::nullopt;
         }
     }
 
-    if (llvm_type->isVoidTy()) {
-        error(
-            decl.name.span.begin, m_filename,
-            fmt::format("'{}' cannot be of type 'void'", decl.name.value));
+    m_scope.names[decl.name.value] = {type, m_current_result, decl.is_mutable};
 
-        return std::nullopt;
-    }
-
-    auto* variable = m_builder.CreateAlloca(llvm_type);
-
-    if (value) {
-        value = load_value(*value);
-        m_builder.CreateStore(value->value, variable);
-    } else {
-        m_builder.CreateStore(
-            llvm::Constant::getNullValue(llvm_type), variable);
-    }
-
-    m_scope.names[decl.name.value] = {type, variable, decl.is_mutable};
+    m_current_result = nullptr;
 
     return std::nullopt;
 }
@@ -1654,14 +1496,288 @@ void Codegen::generate(ast::Module& module, bool is_submodule) noexcept {
     }
 }
 
-std::optional<Value> Codegen::generate(ast::Expression& expr) noexcept {
-    auto result = expr.codegen(*this);
+bool Codegen::types_equal(Type& lhs, Type& rhs) noexcept {
+    if (&lhs == &rhs) {
+        return true;
+    }
 
-    if (!result) {
+    if (lhs.is_pointer() && rhs.is_pointer()) {
+        auto& lhs_pointer = static_cast<types::Pointer&>(lhs);
+        auto& rhs_pointer = static_cast<types::Pointer&>(rhs);
+
+        return lhs_pointer.is_mutable == rhs_pointer.is_mutable &&
+               types_equal(*lhs_pointer.type, *rhs_pointer.type);
+    }
+
+    if (lhs.is_optional() && rhs.is_optional()) {
+        auto& lhs_optional = static_cast<types::Optional&>(lhs);
+        auto& rhs_optional = static_cast<types::Optional&>(rhs);
+
+        return types_equal(*lhs_optional.type, *rhs_optional.type);
+    }
+
+    return false;
+}
+
+std::optional<Value> Codegen::cast(
+    std::shared_ptr<Type>& type, Value& value, bool implicit) noexcept {
+    using enum llvm::Instruction::CastOps;
+
+    if (types_equal(*type, *value.type)) {
+        return value;
+    }
+
+    auto* llvm_type = type->codegen(*this);
+
+    if (type->is_optional()) {
+        auto& contained = static_cast<types::Optional&>(*type).type;
+
+        if (contained->is_pointer()) {
+            if (!value.type->is_null()) {
+                return Value{type, value.value};
+            }
+
+            auto* variable = m_builder.CreateAlloca(llvm_type);
+
+            m_builder.CreateStore(
+                llvm::Constant::getNullValue(llvm_type), variable);
+
+            return Value{type, variable};
+        }
+
+        auto* variable = m_builder.CreateAlloca(llvm_type);
+        auto* bool_ptr = m_builder.CreateStructGEP(
+            llvm_type, variable, optional_member_bool);
+
+        if (value.type->is_null()) {
+            m_builder.CreateStore(
+                llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), false),
+                bool_ptr);
+
+            return Value{type, variable};
+        }
+
+        if (!types_equal(*contained, *value.type)) {
+            return std::nullopt;
+        }
+
+        auto* value_ptr = m_builder.CreateStructGEP(
+            llvm_type, variable, optional_member_value);
+
+        m_builder.CreateStore(load_value(value).value, value_ptr);
+
+        m_builder.CreateStore(
+            llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), true),
+            bool_ptr);
+
+        return Value{type, variable};
+    }
+
+    std::size_t from_size = value.value->getType()->getPrimitiveSizeInBits();
+    std::size_t to_size = llvm_type->getPrimitiveSizeInBits();
+
+    bool value_is_float = value.type->is_float();
+    bool value_is_sint = value.type->is_signed_int();
+    bool value_is_uint = value.type->is_unsigned_int();
+    bool value_is_ptr = value.type->is_pointer();
+
+    if (!value_is_float && !value_is_sint && !value_is_uint && !value_is_ptr) {
         return std::nullopt;
     }
 
-    return load_value(*result);
+    bool type_is_float = type->is_float();
+    bool type_is_sint = type->is_signed_int();
+    bool type_is_uint = type->is_unsigned_int();
+    bool type_is_ptr = type->is_pointer();
+
+    llvm::Instruction::CastOps cast_op = CastOpsEnd;
+
+    if (value_is_float) {
+        if (type_is_float) {
+            if (to_size > from_size) {
+                cast_op = FPExt;
+            } else if (!implicit) {
+                cast_op = FPTrunc;
+            }
+        } else if (!implicit) {
+            if (type_is_sint) {
+                cast_op = FPToSI;
+            } else if (type_is_uint) {
+                cast_op = FPToUI;
+            }
+        }
+    } else if (value_is_sint) {
+        if (type_is_float) {
+            cast_op = SIToFP;
+        } else if (type_is_sint || type_is_uint) {
+            if (to_size > from_size) {
+                cast_op = SExt;
+            } else if (!implicit) {
+                cast_op = Trunc;
+            }
+        } else if (!implicit && type_is_ptr) {
+            cast_op = IntToPtr;
+        }
+    } else if (value_is_uint) {
+        if (type_is_float) {
+            cast_op = UIToFP;
+        } else if (type_is_sint || type_is_uint) {
+            if (to_size > from_size) {
+                cast_op = ZExt;
+            } else if (!implicit) {
+                cast_op = Trunc;
+            }
+        } else if (!implicit && type_is_ptr) {
+            cast_op = IntToPtr;
+        }
+    } else if (!implicit && value_is_ptr) {
+        if (type_is_sint || type_is_uint) {
+            cast_op = PtrToInt;
+        } else if (type_is_ptr) {
+            return value;
+        }
+    }
+
+    if (cast_op == CastOpsEnd) {
+        return std::nullopt;
+    }
+
+    return Value{
+        type,
+        m_builder.CreateCast(cast_op, load_value(value).value, llvm_type)};
+}
+
+bool Codegen::cast_to_result(
+    std::shared_ptr<Type>& type, Value& value, bool implicit) noexcept {
+    using enum llvm::Instruction::CastOps;
+
+    if (types_equal(*type, *value.type)) {
+        m_builder.CreateStore(value.value, m_current_result);
+
+        return true;
+    }
+
+    auto* llvm_type = type->codegen(*this);
+
+    if (type->is_optional()) {
+        auto& contained = static_cast<types::Optional&>(*type).type;
+
+        if (contained->is_pointer()) {
+            if (!value.type->is_null()) {
+                m_builder.CreateStore(value.value, m_current_result);
+
+                return true;
+            }
+
+            m_builder.CreateStore(
+                llvm::Constant::getNullValue(llvm_type), m_current_result);
+
+            return true;
+        }
+
+        auto* bool_ptr = m_builder.CreateStructGEP(
+            llvm_type, m_current_result, optional_member_bool);
+
+        if (value.type->is_null()) {
+            m_builder.CreateStore(
+                llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), false),
+                bool_ptr);
+
+            return true;
+        }
+
+        if (!types_equal(*contained, *value.type)) {
+            return false;
+        }
+
+        auto* value_ptr = m_builder.CreateStructGEP(
+            llvm_type, m_current_result, optional_member_value);
+
+        m_builder.CreateStore(load_value(value).value, value_ptr);
+
+        m_builder.CreateStore(
+            llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), true),
+            bool_ptr);
+
+        return true;
+    }
+
+    std::size_t from_size = value.value->getType()->getPrimitiveSizeInBits();
+    std::size_t to_size = llvm_type->getPrimitiveSizeInBits();
+
+    bool value_is_float = value.type->is_float();
+    bool value_is_sint = value.type->is_signed_int();
+    bool value_is_uint = value.type->is_unsigned_int();
+    bool value_is_ptr = value.type->is_pointer();
+
+    if (!value_is_float && !value_is_sint && !value_is_uint && !value_is_ptr) {
+        return false;
+    }
+
+    bool type_is_float = type->is_float();
+    bool type_is_sint = type->is_signed_int();
+    bool type_is_uint = type->is_unsigned_int();
+    bool type_is_ptr = type->is_pointer();
+
+    llvm::Instruction::CastOps cast_op = CastOpsEnd;
+
+    if (value_is_float) {
+        if (type_is_float) {
+            if (to_size > from_size) {
+                cast_op = FPExt;
+            } else if (!implicit) {
+                cast_op = FPTrunc;
+            }
+        } else if (!implicit) {
+            if (type_is_sint) {
+                cast_op = FPToSI;
+            } else if (type_is_uint) {
+                cast_op = FPToUI;
+            }
+        }
+    } else if (value_is_sint) {
+        if (type_is_float) {
+            cast_op = SIToFP;
+        } else if (type_is_sint || type_is_uint) {
+            if (to_size > from_size) {
+                cast_op = SExt;
+            } else if (!implicit) {
+                cast_op = Trunc;
+            }
+        } else if (!implicit && type_is_ptr) {
+            cast_op = IntToPtr;
+        }
+    } else if (value_is_uint) {
+        if (type_is_float) {
+            cast_op = UIToFP;
+        } else if (type_is_sint || type_is_uint) {
+            if (to_size > from_size) {
+                cast_op = ZExt;
+            } else if (!implicit) {
+                cast_op = Trunc;
+            }
+        } else if (!implicit && type_is_ptr) {
+            cast_op = IntToPtr;
+        }
+    } else if (!implicit && value_is_ptr) {
+        if (type_is_sint || type_is_uint) {
+            cast_op = PtrToInt;
+        } else if (type_is_ptr) {
+            m_builder.CreateStore(value.value, m_current_result);
+
+            return true;
+        }
+    }
+
+    if (cast_op == CastOpsEnd) {
+        return false;
+    }
+
+    m_builder.CreateStore(
+        m_builder.CreateCast(cast_op, load_value(value).value, llvm_type),
+        m_current_result);
+
+    return true;
 }
 
 std::optional<Value> Codegen::generate_bin_expr(

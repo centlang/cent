@@ -115,12 +115,6 @@ public:
 
     [[nodiscard]] std::unique_ptr<llvm::Module> generate() noexcept;
 
-    [[nodiscard]] bool types_equal(Type& lhs, Type& rhs) noexcept;
-
-    [[nodiscard]] std::optional<Value> cast(
-        std::shared_ptr<Type>& type, Value& value,
-        bool implicit = true) noexcept;
-
     std::shared_ptr<Type> generate(ast::NamedType& type) noexcept;
     std::shared_ptr<Type> generate(ast::Pointer& type) noexcept;
     std::shared_ptr<Type> generate(ast::Optional& type) noexcept;
@@ -190,7 +184,15 @@ public:
 private:
     void generate(ast::Module& module, bool is_submodule = false) noexcept;
 
-    std::optional<Value> generate(ast::Expression& expr) noexcept;
+    [[nodiscard]] bool types_equal(Type& lhs, Type& rhs) noexcept;
+
+    [[nodiscard]] std::optional<Value> cast(
+        std::shared_ptr<Type>& type, Value& value,
+        bool implicit = true) noexcept;
+
+    bool cast_to_result(
+        std::shared_ptr<Type>& type, Value& value,
+        bool implicit = true) noexcept;
 
     std::optional<Value> generate_bin_expr(
         ast::SpanValue<Value&> lhs, ast::SpanValue<Value&> rhs,
@@ -223,6 +225,7 @@ private:
 
     Scope* m_current_scope{&m_scope};
     types::Function* m_current_function{nullptr};
+    llvm::Value* m_current_result{nullptr};
 
     llvm::BasicBlock* m_loop_body{nullptr};
     llvm::BasicBlock* m_loop_end{nullptr};
