@@ -908,10 +908,12 @@ std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) noexcept {
             return std::nullopt;
         }
 
+        auto* intptr = m_module->getDataLayout().getIntPtrType(m_context);
+
         m_current_result = m_builder.CreateGEP(
             llvm_type, variable,
-            llvm::ConstantInt::get(
-                m_module->getDataLayout().getIntPtrType(m_context), i));
+            {llvm::ConstantInt::get(intptr, 0),
+             llvm::ConstantInt::get(intptr, i)});
 
         if (!cast_to_result(array_type.type, *value)) {
             type_mismatch(
@@ -1236,7 +1238,11 @@ std::optional<Value> Codegen::generate(ast::IndexExpr& expr) noexcept {
 
     return Value{
         type->type,
-        m_builder.CreateGEP(type->codegen(*this), value->value, index->value),
+        m_builder.CreateGEP(
+            type->codegen(*this), value->value,
+            {llvm::ConstantInt::get(
+                 m_module->getDataLayout().getIntPtrType(m_context), 0),
+             index->value}),
         value->is_mutable};
 }
 
