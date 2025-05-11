@@ -1572,8 +1572,10 @@ std::optional<Value> Codegen::cast(
         return Value{type, variable};
     }
 
-    std::size_t from_size = value.value->getType()->getPrimitiveSizeInBits();
-    std::size_t to_size = llvm_type->getPrimitiveSizeInBits();
+    auto layout = m_module->getDataLayout();
+
+    std::size_t from_size = layout.getTypeAllocSize(value.value->getType());
+    std::size_t to_size = layout.getTypeAllocSize(llvm_type);
 
     bool value_is_float = value.type->is_float();
     bool value_is_sint = value.type->is_signed_int();
@@ -1701,8 +1703,10 @@ bool Codegen::cast_to_result(
         return true;
     }
 
-    std::size_t from_size = value.value->getType()->getPrimitiveSizeInBits();
-    std::size_t to_size = llvm_type->getPrimitiveSizeInBits();
+    auto layout = m_module->getDataLayout();
+
+    std::size_t from_size = layout.getTypeAllocSize(value.value->getType());
+    std::size_t to_size = layout.getTypeAllocSize(llvm_type);
 
     bool value_is_float = value.type->is_float();
     bool value_is_sint = value.type->is_signed_int();
