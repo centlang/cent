@@ -15,6 +15,7 @@ struct Value {
 
     bool is_mutable = false;
     bool is_ref = false;
+    bool is_deref = false;
 };
 
 } // namespace cent::backend

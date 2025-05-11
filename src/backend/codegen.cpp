@@ -311,16 +311,16 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
         return std::nullopt;
     }
 
-    if (!var->is_mutable) {
-        error(stmt.value->offset, "cannot assign to an immutable value");
+    if (!var->is_deref && !llvm::isa<llvm::AllocaInst>(var->value) &&
+        !llvm::isa<llvm::LoadInst>(var->value) &&
+        !llvm::isa<llvm::GetElementPtrInst>(var->value)) {
+        error(stmt.variable->offset, "cannot assign to a value");
 
         return std::nullopt;
     }
 
-    if (!llvm::isa<llvm::AllocaInst>(var->value) &&
-        !llvm::isa<llvm::LoadInst>(var->value) &&
-        !llvm::isa<llvm::GetElementPtrInst>(var->value)) {
-        error(stmt.variable->offset, "cannot assign to a value");
+    if (!var->is_mutable) {
+        error(stmt.value->offset, "cannot assign to an immutable value");
 
         return std::nullopt;
     }
@@ -557,7 +557,8 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
 
         auto& pointer = static_cast<types::Pointer&>(*value->type);
 
-        return Value{pointer.type, value->value, pointer.is_mutable};
+        return Value{
+            pointer.type, value->value, pointer.is_mutable, false, true};
     }
     case And:
         if (!llvm::isa<llvm::AllocaInst>(value->value) &&
