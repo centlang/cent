@@ -8,8 +8,6 @@
 #include "cent/backend/type.h"
 #include "cent/backend/value.h"
 
-#include "cent/span.h"
-
 namespace cent::ast {
 
 struct Node {
@@ -24,21 +22,21 @@ struct Node {
 };
 
 struct Type : Node {
-    [[nodiscard]] Type(Span span) noexcept : span{span} {}
+    [[nodiscard]] Type(std::size_t offset) noexcept : offset{offset} {}
 
     virtual std::shared_ptr<backend::Type>
     codegen(backend::Codegen& codegen) noexcept = 0;
 
-    Span span;
+    std::size_t offset;
 };
 
 struct Statement : Node {
-    [[nodiscard]] Statement(Span span) noexcept : span{span} {}
+    [[nodiscard]] Statement(std::size_t offset) noexcept : offset{offset} {}
 
     virtual std::optional<backend::Value>
     codegen(backend::Codegen& codegen) noexcept = 0;
 
-    Span span;
+    std::size_t offset;
 };
 
 struct Expression : Statement {
@@ -46,8 +44,9 @@ struct Expression : Statement {
 };
 
 struct Declaration : Statement {
-    [[nodiscard]] Declaration(Span span, bool is_public = false) noexcept
-    : Statement{span}, is_public{is_public} {}
+    [[nodiscard]] Declaration(
+        std::size_t offset, bool is_public = false) noexcept
+    : Statement{offset}, is_public{is_public} {}
 
     bool is_public;
 };

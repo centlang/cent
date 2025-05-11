@@ -10,12 +10,12 @@ void Lexer::next_token() noexcept {
     skip_whitespaces();
 
     auto single_char = [&](Token::Type type) {
-        m_token = {type, {}, Span::from(m_position)};
+        m_token = {type, {}, m_offset};
         get();
     };
 
     if (eof()) {
-        m_token = {Eof, {}, Span::from(m_position)};
+        m_token = {Eof, {}, m_offset};
         return;
     }
 
@@ -30,56 +30,62 @@ void Lexer::next_token() noexcept {
     }
 
     auto twice = [&](Token::Type single, Token::Type type) {
-        auto begin = m_position;
+        m_token.offset = m_offset;
+        m_token.value = {};
+
         char oper = get();
 
         if (eof() || peek() != oper) {
-            m_token = {single, {}, {begin, m_position}};
+            m_token.type = single;
             return;
         }
 
         get();
-        m_token = {type, {}, {begin, m_position}};
+        m_token.type = type;
     };
 
     auto twice_or_with_equal = [&](Token::Type single, Token::Type twice,
                                    Token::Type with_eq) {
-        auto begin = m_position;
+        m_token.offset = m_offset;
+        m_token.value = {};
+
         char oper = get();
 
         if (eof()) {
-            m_token = {single, {}, {begin, m_position}};
+            m_token.type = single;
             return;
         }
 
         if (peek() == '=') {
             get();
-            m_token = {with_eq, {}, {begin, m_position}};
 
+            m_token.type = with_eq;
             return;
         }
 
         if (peek() == oper) {
             get();
-            m_token = {twice, {}, {begin, m_position}};
 
+            m_token.type = twice;
             return;
         }
 
-        m_token = {single, {}, {begin, m_position}};
+        m_token.type = single;
     };
 
     auto with_equal = [&](Token::Type oper, Token::Type with_eq) {
-        auto begin = m_position;
+        m_token.offset = m_offset;
+        m_token.value = {};
+
         get();
 
         if (eof() || peek() != '=') {
-            m_token = {oper, {}, {begin, m_position}};
+            m_token.type = oper;
             return;
         }
 
         get();
-        m_token = {with_eq, {}, {begin, m_position}};
+        m_token.type = with_eq;
     };
 
     switch (peek()) {
@@ -135,22 +141,23 @@ void Lexer::next_token() noexcept {
         single_char(QuestionMark);
         break;
     case '/': {
-        auto begin = m_position;
+        m_token.offset = m_offset;
+        m_token.value = {};
 
         if (eof()) {
-            m_token = {Slash, {}, {begin, m_position}};
+            m_token.type = Slash;
             return;
         }
 
         if (peek() == '=') {
             get();
-            m_token = {SlashEqual, {}, {begin, m_position}};
 
+            m_token.type = SlashEqual;
             return;
         }
 
         if (peek() != '/') {
-            m_token = {Slash, {}, {begin, m_position}};
+            m_token.type = Slash;
             return;
         }
 
@@ -183,14 +190,13 @@ void Lexer::next_token() noexcept {
         with_equal(Xor, XorEqual);
         break;
     default:
-        m_token = {Invalid, std::string{get()}, Span::from(m_position)};
-
+        m_token = {Invalid, std::string{get()}, m_offset};
         break;
     }
 }
 
 void Lexer::number() noexcept {
-    m_token = {Token::Type::IntLiteral, {}, {m_position, {}}};
+    m_token = {Token::Type::IntLiteral, {}, m_offset};
 
     static constexpr auto hex = 16;
     static constexpr auto oct = 8;
@@ -233,7 +239,6 @@ void Lexer::number() noexcept {
         m_token.value += get();
 
         if (eof()) {
-            m_token.span.end = m_position;
             return;
         }
 
@@ -255,12 +260,10 @@ void Lexer::number() noexcept {
         m_token.value += get();
         get_int();
 
-        m_token.span.end = m_position;
         return;
     }
 
     if (eof() || peek() != '.') {
-        m_token.span.end = m_position;
         return;
     }
 
@@ -273,14 +276,11 @@ void Lexer::number() noexcept {
         m_token.value += get();
         get_int();
     }
-
-    m_token.span.end = m_position;
 }
 
 void Lexer::string() noexcept {
     get();
-
-    m_token = {Token::Type::StrLiteral, {}, {m_position, {}}};
+    m_token = {Token::Type::StrLiteral, {}, m_offset};
 
     while (true) {
         if (eof()) {
@@ -295,8 +295,6 @@ void Lexer::string() noexcept {
 
         if (peek() != '\\') {
             m_token.value += get();
-            m_token.span.end = m_position;
-
             continue;
         }
 
@@ -336,13 +334,11 @@ void Lexer::string() noexcept {
 void Lexer::ident() noexcept {
     using enum Token::Type;
 
-    m_token = {Identifier, {}, {m_position, {}}};
+    m_token = {Identifier, {}, m_offset};
 
     while (!eof() && is_ident(peek())) {
         m_token.value += get();
     }
-
-    m_token.span.end = m_position;
 
     auto keyword = [&](Token::Type type) {
         m_token.type = type;

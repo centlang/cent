@@ -11,9 +11,9 @@ namespace cent::ast {
 
 struct CallExpr : detail::Expr<CallExpr> {
     [[nodiscard]] CallExpr(
-        Span span, std::unique_ptr<Expression> identifier,
+        std::size_t offset, std::unique_ptr<Expression> identifier,
         std::vector<std::unique_ptr<Expression>> arguments) noexcept
-    : Expr{span}, identifier{std::move(identifier)},
+    : Expr{offset}, identifier{std::move(identifier)},
       arguments{std::move(arguments)} {}
 
     std::unique_ptr<Expression> identifier;

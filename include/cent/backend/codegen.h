@@ -13,8 +13,9 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 
-#include "cent/ast/span_value.h"
 #include "cent/frontend/token.h"
+#include "cent/offset_value.h"
+#include "cent/util.h"
 
 #include "cent/backend/scope.h"
 
@@ -104,10 +105,11 @@ struct Type;
 class Codegen {
 public:
     [[nodiscard]] Codegen(
-        std::unique_ptr<ast::Module> program, std::string_view filename,
-        const llvm::DataLayout& layout, const std::string& triple) noexcept
+        std::unique_ptr<ast::Module> program, std::string_view source,
+        std::string_view filename, const llvm::DataLayout& layout,
+        const std::string& triple) noexcept
     : m_module{std::make_unique<llvm::Module>("", m_context)},
-      m_builder{m_context}, m_program{std::move(program)},
+      m_builder{m_context}, m_program{std::move(program)}, m_source{source},
       m_filename{filename} {
         m_module->setDataLayout(layout);
         m_module->setTargetTriple(triple);
@@ -195,22 +197,28 @@ private:
         bool implicit = true) noexcept;
 
     std::optional<Value> generate_bin_expr(
-        ast::SpanValue<Value&> lhs, ast::SpanValue<Value&> rhs,
-        ast::SpanValue<frontend::Token::Type> oper) noexcept;
+        ast::OffsetValue<Value&> lhs, ast::OffsetValue<Value&> rhs,
+        ast::OffsetValue<frontend::Token::Type> oper) noexcept;
 
     Value load_value(Value& value) noexcept;
 
     std::shared_ptr<Type>
-    get_type(Span span, std::string_view name, Scope& parent) noexcept;
+    get_type(std::size_t offset, std::string_view name, Scope& parent) noexcept;
 
     std::optional<Value>
-    get_name(Span span, std::string_view name, Scope& parent) noexcept;
+    get_name(std::size_t offset, std::string_view name, Scope& parent) noexcept;
 
-    Scope* get_scope(Span span, std::string_view name, Scope& parent) noexcept;
+    Scope* get_scope(
+        std::size_t offset, std::string_view name, Scope& parent) noexcept;
 
     void generate_fn_proto(ast::FnDecl& decl) noexcept;
 
-    void type_mismatch(Span span, Type& expected, Type& got) noexcept;
+    void type_mismatch(std::size_t offset, Type& expected, Type& got) noexcept;
+
+    void error(std::size_t offset, std::string_view message) {
+        auto [line, column] = cent::offset_to_pos(m_source, offset);
+        log::error(line, column, m_filename, message);
+    }
 
     static constexpr auto optional_member_value = 0;
     static constexpr auto optional_member_bool = 1;
@@ -249,6 +257,7 @@ private:
 
     std::unique_ptr<ast::Module> m_program;
 
+    std::string_view m_source;
     std::string_view m_filename;
 };
 

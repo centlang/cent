@@ -1,5 +1,3 @@
-#include "cent/util.h"
-
 #include "cent/ast/array_type.h"
 #include "cent/ast/as_expr.h"
 #include "cent/ast/assignment.h"
@@ -93,7 +91,9 @@ std::unique_ptr<ast::Module> Parser::parse() noexcept {
             continue;
         }
 
-        error(get().span.begin, m_filename, "expected declaration");
+        error("expected declaration");
+        next();
+
         skip_until_decl();
     }
 
@@ -121,10 +121,10 @@ void Parser::expect_stmt(ast::BlockStmt& block) noexcept {
         parse_return(block);
         break;
     case Break:
-        block.body.push_back(std::make_unique<ast::BreakStmt>(get().span));
+        block.body.push_back(std::make_unique<ast::BreakStmt>(get().offset));
         break;
     case Continue:
-        block.body.push_back(std::make_unique<ast::ContinueStmt>(get().span));
+        block.body.push_back(std::make_unique<ast::ContinueStmt>(get().offset));
         break;
     default:
         auto value = expect_expr(false);
@@ -174,7 +174,7 @@ std::vector<ast::StructLiteral::Field> Parser::parse_field_values() noexcept {
 
         if (auto value = expect_expr(false)) {
             result.emplace_back(
-                ast::SpanValue{name.value, name.span}, std::move(value));
+                ast::OffsetValue{name.value, name.offset}, std::move(value));
         }
     };
 
@@ -196,7 +196,7 @@ Parser::expect_prefix(bool is_condition) noexcept {
     using enum Token::Type;
 
     if (match(LeftBracket)) {
-        auto begin = peek().span.begin;
+        auto offset = peek().offset;
         auto type = parse_array_type();
 
         if (!type) {
@@ -215,10 +215,10 @@ Parser::expect_prefix(bool is_condition) noexcept {
             }
 
             if (match(RightBrace)) {
-                auto end = get().span.end;
+                next();
 
                 return std::make_unique<ast::ArrayLiteral>(
-                    Span{begin, end}, std::move(type), std::move(elements));
+                    offset, std::move(type), std::move(elements));
             }
 
             expect("','", Token::Type::Comma);
@@ -235,20 +235,20 @@ Parser::expect_prefix(bool is_condition) noexcept {
 
     switch (token->type) {
     case IntLiteral:
-        return std::make_unique<ast::IntLiteral>(token->span, token->value);
+        return std::make_unique<ast::IntLiteral>(token->offset, token->value);
     case FloatLiteral:
-        return std::make_unique<ast::FloatLiteral>(token->span, token->value);
+        return std::make_unique<ast::FloatLiteral>(token->offset, token->value);
     case StrLiteral:
-        return std::make_unique<ast::StrLiteral>(token->span, token->value);
+        return std::make_unique<ast::StrLiteral>(token->offset, token->value);
     case True:
-        return std::make_unique<ast::BoolLiteral>(token->span, true);
+        return std::make_unique<ast::BoolLiteral>(token->offset, true);
     case False:
-        return std::make_unique<ast::BoolLiteral>(token->span, false);
+        return std::make_unique<ast::BoolLiteral>(token->offset, false);
     case Null:
-        return std::make_unique<ast::NullLiteral>(token->span);
+        return std::make_unique<ast::NullLiteral>(token->offset);
     case Identifier: {
-        std::vector<ast::SpanValue<std::string>> value;
-        value.push_back(ast::SpanValue{token->value, token->span});
+        std::vector<ast::OffsetValue<std::string>> value;
+        value.push_back(ast::OffsetValue{token->value, token->offset});
 
         while (match(ColonColon)) {
             next();
@@ -258,30 +258,27 @@ Parser::expect_prefix(bool is_condition) noexcept {
                 return nullptr;
             }
 
-            value.push_back(ast::SpanValue{name->value, name->span});
+            value.push_back(ast::OffsetValue{name->value, name->offset});
         }
-
-        auto type_end = peek().span.end;
 
         if (!is_condition && match(LeftBrace)) {
             next();
 
             auto fields = parse_field_values();
-            auto end = peek().span.end;
 
             if (!expect("',' or '}'", RightBrace)) {
                 return nullptr;
             }
 
             return std::make_unique<ast::StructLiteral>(
-                Span{token->span.begin, end},
+                token->offset,
                 std::make_unique<ast::NamedType>(
-                    Span{token->span.begin, type_end}, std::move(value)),
+                    token->offset, std::move(value)),
                 std::move(fields));
         }
 
         return std::make_unique<ast::Identifier>(
-            Span{token->span.begin, type_end}, std::move(value));
+            token->offset, std::move(value));
     }
     case Minus:
     case Bang:
@@ -290,8 +287,8 @@ Parser::expect_prefix(bool is_condition) noexcept {
     case Not:
         if (auto value = expect_access_or_call_expr(is_condition)) {
             return std::make_unique<ast::UnaryExpr>(
-                Span{token->span.begin, value->span.end},
-                ast::SpanValue{token->type, token->span}, std::move(value));
+                token->offset, ast::OffsetValue{token->type, token->offset},
+                std::move(value));
         }
 
         return nullptr;
@@ -316,10 +313,10 @@ Parser::expect_prefix(bool is_condition) noexcept {
             }
 
             if (match(RightParen)) {
-                auto end = get().span.end;
+                next();
 
                 return std::make_unique<ast::TupleLiteral>(
-                    Span{token->span.begin, end}, std::move(elements));
+                    token->offset, std::move(elements));
             }
 
             expect("','", Token::Type::Comma);
@@ -345,15 +342,13 @@ Parser::expect_access_or_call_expr(bool is_condition) noexcept {
             next();
 
             auto args = parse_args();
-            auto end = peek().span.end;
 
             if (!expect("')'", RightParen)) {
                 return nullptr;
             }
 
             expression = std::make_unique<ast::CallExpr>(
-                Span{expression->span.begin, end}, std::move(expression),
-                std::move(args));
+                expression->offset, std::move(expression), std::move(args));
 
             continue;
         }
@@ -367,15 +362,12 @@ Parser::expect_access_or_call_expr(bool is_condition) noexcept {
                 return nullptr;
             }
 
-            auto end = peek().span.end;
-
             if (!expect("']'", RightBracket)) {
                 return nullptr;
             }
 
             expression = std::make_unique<ast::IndexExpr>(
-                Span{expression->span.begin, end}, std::move(expression),
-                std::move(index));
+                expression->offset, std::move(expression), std::move(index));
         }
 
         if (!match(Dot)) {
@@ -394,22 +386,21 @@ Parser::expect_access_or_call_expr(bool is_condition) noexcept {
             next();
 
             auto args = parse_args();
-            auto end = peek().span.end;
 
             if (!expect("')'", RightParen)) {
                 return nullptr;
             }
 
             expression = std::make_unique<ast::MethodExpr>(
-                Span{expression->span.begin, end}, std::move(expression),
-                ast::SpanValue{member->value, member->span}, std::move(args));
+                expression->offset, std::move(expression),
+                ast::OffsetValue{member->value, member->offset},
+                std::move(args));
 
             continue;
         }
 
         expression = std::make_unique<ast::MemberExpr>(
-            Span{expression->span.begin, member->span.end},
-            std::move(expression), *member);
+            expression->offset, std::move(expression), *member);
     }
 }
 
@@ -430,8 +421,7 @@ Parser::expect_as_expr(bool is_condition) noexcept {
     }
 
     return std::make_unique<ast::AsExpr>(
-        Span{expression->span.begin, type->span.end}, std::move(expression),
-        std::move(type));
+        expression->offset, std::move(expression), std::move(type));
 }
 
 std::unique_ptr<ast::BinaryExpr> Parser::expect_infix(
@@ -443,10 +433,8 @@ std::unique_ptr<ast::BinaryExpr> Parser::expect_infix(
         return nullptr;
     }
 
-    Span span{lhs->span.begin, rhs->span.end};
-
     return std::make_unique<ast::BinaryExpr>(
-        span, ast::SpanValue{oper.type, oper.span}, std::move(lhs),
+        lhs->offset, ast::OffsetValue{oper.type, oper.offset}, std::move(lhs),
         std::move(rhs));
 }
 
@@ -472,7 +460,7 @@ Parser::expect_expr(bool is_condition) noexcept {
 }
 
 std::unique_ptr<ast::BlockStmt> Parser::expect_block() noexcept {
-    auto result = std::make_unique<ast::BlockStmt>(Span{peek().span.begin, {}});
+    auto result = std::make_unique<ast::BlockStmt>(peek().offset);
 
     if (!expect("'{'", Token::Type::LeftBrace)) {
         return nullptr;
@@ -480,9 +468,7 @@ std::unique_ptr<ast::BlockStmt> Parser::expect_block() noexcept {
 
     while (true) {
         if (match(Token::Type::Eof)) {
-            result->span.end = peek().span.end;
-            error(peek().span.begin, m_filename, "expected '}'");
-
+            error("expected '}'");
             return result;
         }
 
@@ -499,12 +485,11 @@ std::unique_ptr<ast::BlockStmt> Parser::expect_block() noexcept {
         expect_stmt(*result);
     }
 
-    result->span.end = peek().span.end;
     return result;
 }
 
 std::unique_ptr<ast::IfElse> Parser::parse_if_else() noexcept {
-    auto begin = get().span.begin;
+    auto offset = get().offset;
 
     auto condition = expect_expr(true);
 
@@ -520,8 +505,7 @@ std::unique_ptr<ast::IfElse> Parser::parse_if_else() noexcept {
 
     if (!match(Token::Type::Else)) {
         return std::make_unique<ast::IfElse>(
-            Span{condition->span.begin, if_block->span.end},
-            std::move(condition), std::move(if_block));
+            condition->offset, std::move(condition), std::move(if_block));
     }
 
     next();
@@ -534,8 +518,8 @@ std::unique_ptr<ast::IfElse> Parser::parse_if_else() noexcept {
         }
 
         return std::make_unique<ast::IfElse>(
-            Span{condition->span.begin, else_block->span.end},
-            std::move(condition), std::move(if_block), std::move(else_block));
+            condition->offset, std::move(condition), std::move(if_block),
+            std::move(else_block));
     }
 
     auto else_block = expect_block();
@@ -545,8 +529,8 @@ std::unique_ptr<ast::IfElse> Parser::parse_if_else() noexcept {
     }
 
     return std::make_unique<ast::IfElse>(
-        Span{begin, else_block->span.end}, std::move(condition),
-        std::move(if_block), std::move(else_block));
+        offset, std::move(condition), std::move(if_block),
+        std::move(else_block));
 }
 
 std::unique_ptr<ast::Type> Parser::expect_var_type() noexcept {
@@ -558,7 +542,7 @@ std::unique_ptr<ast::Type> Parser::expect_var_type() noexcept {
 }
 
 std::unique_ptr<ast::ArrayType> Parser::parse_array_type() noexcept {
-    auto begin = get().span.begin;
+    auto offset = get().offset;
     auto type = expect_type();
 
     if (!type) {
@@ -575,21 +559,19 @@ std::unique_ptr<ast::ArrayType> Parser::parse_array_type() noexcept {
         return nullptr;
     }
 
-    auto end = peek().span.end;
-
     if (!expect("']'", Token::Type::RightBracket)) {
         return nullptr;
     }
 
     return std::make_unique<ast::ArrayType>(
-        Span{begin, end}, std::move(type),
-        std::make_unique<ast::IntLiteral>(size->span, size->value));
+        offset, std::move(type),
+        std::make_unique<ast::IntLiteral>(size->offset, size->value));
 }
 
 std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
     using enum Token::Type;
 
-    auto begin = peek().span.begin;
+    auto offset = peek().offset;
 
     if (match(Star)) {
         next();
@@ -608,7 +590,7 @@ std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
         }
 
         return std::make_unique<ast::Pointer>(
-            Span{begin, type->span.end}, std::move(type), is_mutable);
+            offset, std::move(type), is_mutable);
     }
 
     if (match(QuestionMark)) {
@@ -620,8 +602,7 @@ std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
             return nullptr;
         }
 
-        return std::make_unique<ast::Optional>(
-            Span{begin, type->span.end}, std::move(type));
+        return std::make_unique<ast::Optional>(offset, std::move(type));
     }
 
     if (match(LeftParen)) {
@@ -653,30 +634,25 @@ std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
             }
         }
 
-        auto end = peek().span.end;
-
         if (!expect("')'", RightParen)) {
             return nullptr;
         }
 
-        return std::make_unique<ast::TupleType>(
-            Span{begin, end}, std::move(types));
+        return std::make_unique<ast::TupleType>(offset, std::move(types));
     }
 
     if (match(LeftBracket)) {
         return parse_array_type();
     }
 
-    std::vector<ast::SpanValue<std::string>> value;
+    std::vector<ast::OffsetValue<std::string>> value;
     auto token = expect("name", Identifier);
 
     if (!token) {
         return nullptr;
     }
 
-    auto end = token->span.end;
-
-    value.push_back(ast::SpanValue{token->value, token->span});
+    value.push_back(ast::OffsetValue{token->value, token->offset});
 
     while (match(ColonColon)) {
         next();
@@ -686,15 +662,14 @@ std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
             return nullptr;
         }
 
-        end = name->span.end;
-        value.push_back(ast::SpanValue{name->value, name->span});
+        value.push_back(ast::OffsetValue{name->value, name->offset});
     }
 
-    return std::make_unique<ast::NamedType>(Span{begin, end}, std::move(value));
+    return std::make_unique<ast::NamedType>(offset, std::move(value));
 }
 
 void Parser::parse_var(ast::BlockStmt& block) noexcept {
-    auto begin = peek().span.begin;
+    auto offset = peek().offset;
     auto is_mutable = get().type == Token::Type::Mut;
 
     auto name = expect("variable name", Token::Type::Identifier);
@@ -715,14 +690,14 @@ void Parser::parse_var(ast::BlockStmt& block) noexcept {
 
     if (!match(Token::Type::Equal)) {
         if (!type) {
-            error(peek().span.begin, m_filename, "expected '=' or ':'");
+            error("expected '=' or ':'");
 
             return;
         }
 
         block.body.push_back(std::make_unique<ast::VarDecl>(
-            Span{begin, type->span.end}, is_mutable,
-            ast::SpanValue{name->value, name->span}, std::move(type), nullptr));
+            offset, is_mutable, ast::OffsetValue{name->value, name->offset},
+            std::move(type), nullptr));
 
         return;
     }
@@ -736,14 +711,12 @@ void Parser::parse_var(ast::BlockStmt& block) noexcept {
     }
 
     block.body.push_back(std::make_unique<ast::VarDecl>(
-        Span{begin, value->span.end}, is_mutable,
-        ast::SpanValue{name->value, name->span}, std::move(type),
-        std::move(value)));
+        offset, is_mutable, ast::OffsetValue{name->value, name->offset},
+        std::move(type), std::move(value)));
 }
 
 void Parser::parse_while(ast::BlockStmt& block) noexcept {
-    auto begin = get().span.begin;
-
+    auto offset = get().offset;
     auto condition = expect_expr(true);
 
     if (!condition) {
@@ -757,11 +730,11 @@ void Parser::parse_while(ast::BlockStmt& block) noexcept {
     }
 
     block.body.push_back(std::make_unique<ast::WhileLoop>(
-        Span{begin, body->span.end}, std::move(condition), std::move(body)));
+        offset, std::move(condition), std::move(body)));
 }
 
 void Parser::parse_return(ast::BlockStmt& block) noexcept {
-    auto span = get().span;
+    auto offset = get().offset;
 
     std::unique_ptr<ast::Expression> value = nullptr;
 
@@ -769,9 +742,8 @@ void Parser::parse_return(ast::BlockStmt& block) noexcept {
         value = expect_expr(false);
     }
 
-    block.body.push_back(std::make_unique<ast::ReturnStmt>(
-        Span{span.begin, value ? value->span.end : span.end},
-        std::move(value)));
+    block.body.push_back(
+        std::make_unique<ast::ReturnStmt>(offset, std::move(value)));
 }
 
 void Parser::parse_assignment(
@@ -784,8 +756,8 @@ void Parser::parse_assignment(
     }
 
     block.body.push_back(std::make_unique<ast::Assignment>(
-        Span{variable->span.begin, value->span.end}, std::move(variable),
-        std::move(value), ast::SpanValue{oper.type, oper.span}));
+        variable->offset, std::move(variable), std::move(value),
+        ast::OffsetValue{oper.type, oper.offset}));
 }
 
 std::vector<ast::FnDecl::Param> Parser::parse_params() noexcept {
@@ -800,7 +772,7 @@ std::vector<ast::FnDecl::Param> Parser::parse_params() noexcept {
 
         if (auto type = expect_var_type()) {
             result.emplace_back(
-                ast::SpanValue{name->value, name->span}, std::move(type));
+                ast::OffsetValue{name->value, name->offset}, std::move(type));
         }
     };
 
@@ -824,7 +796,7 @@ std::vector<ast::Struct::Field> Parser::parse_fields() noexcept {
 
         if (auto type = expect_var_type()) {
             result.emplace_back(
-                ast::SpanValue{name.value, name.span}, std::move(type));
+                ast::OffsetValue{name.value, name.offset}, std::move(type));
         }
     };
 
@@ -844,7 +816,7 @@ std::vector<ast::Struct::Field> Parser::parse_fields() noexcept {
 bool Parser::parse_fn(
     ast::Module& module, bool is_public, bool is_extern) noexcept {
     auto name = expect("function name", Token::Type::Identifier);
-    std::optional<ast::SpanValue<std::string>> type = std::nullopt;
+    std::optional<ast::OffsetValue<std::string>> type = std::nullopt;
 
     if (!name) {
         return false;
@@ -853,7 +825,7 @@ bool Parser::parse_fn(
     if (match(Token::Type::ColonColon)) {
         next();
 
-        type = {name->value, name->span};
+        type = {name->value, name->offset};
         name = expect("function name", Token::Type::Identifier);
 
         if (!name) {
@@ -888,16 +860,16 @@ bool Parser::parse_fn(
     } else if (match(Token::Type::Semicolon)) {
         next();
     } else {
-        error(peek().span.begin, m_filename, "expected '{' or ';'");
+        error("expected '{' or ';'");
 
         return false;
     }
 
     module.functions.push_back(std::make_unique<ast::FnDecl>(
-        name->span,
+        name->offset,
         ast::FnDecl::Proto{
             std::move(type),
-            {name->value, name->span},
+            {name->value, name->offset},
             std::move(params),
             std::move(return_type)},
         std::move(body), is_public, is_extern));
@@ -918,14 +890,12 @@ bool Parser::parse_struct(ast::Module& module, bool is_public) noexcept {
 
     auto fields = parse_fields();
 
-    auto end = peek().span.end;
-
     if (!expect("'}'", Token::Type::RightBrace)) {
         return false;
     }
 
     module.structs.push_back(std::make_unique<ast::Struct>(
-        Span{name->span.begin, end}, ast::SpanValue{name->value, name->span},
+        name->offset, ast::OffsetValue{name->value, name->offset},
         std::move(fields), is_public));
 
     return true;
@@ -1028,7 +998,7 @@ bool Parser::parse_with(ast::Module& module) noexcept {
 
     if (!module_path.directory && !module_path.file) {
         error(
-            name->span.begin, m_filename,
+            name->offset,
             fmt::format("could not find module '{}'", name->value));
 
         return false;

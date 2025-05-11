@@ -11,14 +11,14 @@ namespace cent::ast {
 
 struct MethodExpr : detail::Expr<MethodExpr> {
     [[nodiscard]] MethodExpr(
-        Span span, std::unique_ptr<Expression> value,
-        SpanValue<std::string> name,
+        std::size_t offset, std::unique_ptr<Expression> value,
+        OffsetValue<std::string> name,
         std::vector<std::unique_ptr<Expression>> arguments) noexcept
-    : Expr{span}, value{std::move(value)}, name{std::move(name)},
+    : Expr{offset}, value{std::move(value)}, name{std::move(name)},
       arguments{std::move(arguments)} {}
 
     std::unique_ptr<Expression> value;
-    SpanValue<std::string> name;
+    OffsetValue<std::string> name;
 
     std::vector<std::unique_ptr<Expression>> arguments;
 };

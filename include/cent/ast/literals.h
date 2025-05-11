@@ -5,39 +5,38 @@
 #include <string>
 #include <vector>
 
-#include "cent/span.h"
+#include "cent/offset_value.h"
 
 #include "cent/ast/array_type.h"
 #include "cent/ast/named_type.h"
 #include "cent/ast/node.h"
-#include "cent/ast/span_value.h"
 
 namespace cent::ast {
 
 struct IntLiteral : detail::Expr<IntLiteral> {
-    [[nodiscard]] IntLiteral(Span span, std::string value) noexcept
-    : Expr{span}, value{std::move(value)} {}
+    [[nodiscard]] IntLiteral(std::size_t offset, std::string value) noexcept
+    : Expr{offset}, value{std::move(value)} {}
 
     std::string value;
 };
 
 struct FloatLiteral : detail::Expr<FloatLiteral> {
-    [[nodiscard]] FloatLiteral(Span span, std::string value) noexcept
-    : Expr{span}, value{std::move(value)} {}
+    [[nodiscard]] FloatLiteral(std::size_t offset, std::string value) noexcept
+    : Expr{offset}, value{std::move(value)} {}
 
     std::string value;
 };
 
 struct StrLiteral : detail::Expr<StrLiteral> {
-    [[nodiscard]] StrLiteral(Span span, std::string value) noexcept
-    : Expr{span}, value{std::move(value)} {}
+    [[nodiscard]] StrLiteral(std::size_t offset, std::string value) noexcept
+    : Expr{offset}, value{std::move(value)} {}
 
     std::string value;
 };
 
 struct BoolLiteral : detail::Expr<BoolLiteral> {
-    [[nodiscard]] BoolLiteral(Span span, bool value) noexcept
-    : Expr{span}, value{value} {}
+    [[nodiscard]] BoolLiteral(std::size_t offset, bool value) noexcept
+    : Expr{offset}, value{value} {}
 
     bool value;
 };
@@ -48,14 +47,14 @@ struct NullLiteral : detail::Expr<NullLiteral> {
 
 struct StructLiteral : detail::Expr<StructLiteral> {
     struct Field {
-        SpanValue<std::string> name;
+        OffsetValue<std::string> name;
         std::unique_ptr<Expression> value;
     };
 
     [[nodiscard]] StructLiteral(
-        Span span, std::unique_ptr<NamedType> type,
+        std::size_t offset, std::unique_ptr<NamedType> type,
         std::vector<Field> fields) noexcept
-    : Expr{span}, type{std::move(type)}, fields{std::move(fields)} {}
+    : Expr{offset}, type{std::move(type)}, fields{std::move(fields)} {}
 
     std::unique_ptr<NamedType> type;
     std::vector<Field> fields;
@@ -63,9 +62,9 @@ struct StructLiteral : detail::Expr<StructLiteral> {
 
 struct ArrayLiteral : detail::Expr<ArrayLiteral> {
     [[nodiscard]] ArrayLiteral(
-        Span span, std::unique_ptr<ArrayType> type,
+        std::size_t offset, std::unique_ptr<ArrayType> type,
         std::vector<std::unique_ptr<Expression>> elements) noexcept
-    : Expr{span}, type{std::move(type)}, elements{std::move(elements)} {}
+    : Expr{offset}, type{std::move(type)}, elements{std::move(elements)} {}
 
     std::unique_ptr<ArrayType> type;
     std::vector<std::unique_ptr<Expression>> elements;
@@ -73,8 +72,9 @@ struct ArrayLiteral : detail::Expr<ArrayLiteral> {
 
 struct TupleLiteral : detail::Expr<TupleLiteral> {
     [[nodiscard]] TupleLiteral(
-        Span span, std::vector<std::unique_ptr<Expression>> elements) noexcept
-    : Expr{span}, elements{std::move(elements)} {}
+        std::size_t offset,
+        std::vector<std::unique_ptr<Expression>> elements) noexcept
+    : Expr{offset}, elements{std::move(elements)} {}
 
     std::vector<std::unique_ptr<Expression>> elements;
 };

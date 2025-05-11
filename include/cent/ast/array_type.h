@@ -6,15 +6,14 @@
 
 #include "cent/ast/literals.h"
 #include "cent/ast/node.h"
-#include "cent/span.h"
 
 namespace cent::ast {
 
 struct ArrayType : detail::Type<ArrayType> {
     [[nodiscard]] ArrayType(
-        Span span, std::unique_ptr<ast::Type> type,
+        std::size_t offset, std::unique_ptr<ast::Type> type,
         std::unique_ptr<IntLiteral> size) noexcept
-    : Type{span}, type{std::move(type)}, size{std::move(size)} {}
+    : Type{offset}, type{std::move(type)}, size{std::move(size)} {}
 
     std::unique_ptr<ast::Type> type;
     std::unique_ptr<IntLiteral> size;

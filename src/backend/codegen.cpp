@@ -6,8 +6,6 @@
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Instructions.h>
 
-#include "cent/log.h"
-
 #include "cent/ast/array_type.h"
 #include "cent/ast/as_expr.h"
 #include "cent/ast/assignment.h"
@@ -74,7 +72,7 @@ std::shared_ptr<Type> Codegen::generate(ast::NamedType& type) noexcept {
     std::size_t last_index = type.value.size() - 1;
 
     for (std::size_t i = 0; i < last_index; ++i) {
-        scope = get_scope(type.value[i].span, type.value[i].value, *scope);
+        scope = get_scope(type.value[i].offset, type.value[i].value, *scope);
 
         if (!scope) {
             return nullptr;
@@ -82,7 +80,7 @@ std::shared_ptr<Type> Codegen::generate(ast::NamedType& type) noexcept {
     }
 
     return get_type(
-        type.value[last_index].span, type.value[last_index].value, *scope);
+        type.value[last_index].offset, type.value[last_index].value, *scope);
 }
 
 std::shared_ptr<Type> Codegen::generate(ast::Pointer& type) noexcept {
@@ -304,9 +302,9 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
 
     if (stmt.oper.value != frontend::Token::Type::Equal) {
         value = generate_bin_expr(
-            ast::SpanValue<Value&>{*var, stmt.variable->span},
-            ast::SpanValue<Value&>{*value, stmt.value->span},
-            ast::SpanValue{without_equal(stmt.oper.value), stmt.oper.span});
+            ast::OffsetValue<Value&>{*var, stmt.variable->offset},
+            ast::OffsetValue<Value&>{*value, stmt.value->offset},
+            ast::OffsetValue{without_equal(stmt.oper.value), stmt.oper.offset});
     }
 
     if (!value) {
@@ -314,9 +312,7 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
     }
 
     if (!var->is_mutable) {
-        error(
-            stmt.value->span.begin, m_filename,
-            "cannot assign to an immutable value");
+        error(stmt.value->offset, "cannot assign to an immutable value");
 
         return std::nullopt;
     }
@@ -324,8 +320,7 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
     if (!llvm::isa<llvm::AllocaInst>(var->value) &&
         !llvm::isa<llvm::LoadInst>(var->value) &&
         !llvm::isa<llvm::GetElementPtrInst>(var->value)) {
-        error(
-            stmt.variable->span.begin, m_filename, "cannot assign to a value");
+        error(stmt.variable->offset, "cannot assign to a value");
 
         return std::nullopt;
     }
@@ -333,7 +328,7 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
     m_current_result = var->value;
 
     if (!cast_to_result(var->type, *value)) {
-        type_mismatch(stmt.value->span, *var->type, *value->type);
+        type_mismatch(stmt.value->offset, *var->type, *value->type);
     }
 
     m_current_result = nullptr;
@@ -420,7 +415,7 @@ std::optional<Value> Codegen::generate(ast::ReturnStmt& stmt) noexcept {
 
     if (!stmt.value) {
         if (!function->getReturnType()->isVoidTy()) {
-            error(stmt.span.begin, m_filename, "type mismatch");
+            error(stmt.offset, "type mismatch");
 
             return std::nullopt;
         }
@@ -444,7 +439,7 @@ std::optional<Value> Codegen::generate(ast::ReturnStmt& stmt) noexcept {
         }
     } else {
         type_mismatch(
-            stmt.span, *m_current_function->return_type, *value->type);
+            stmt.offset, *m_current_function->return_type, *value->type);
     }
 
     return std::nullopt;
@@ -483,7 +478,7 @@ std::optional<Value> Codegen::generate(ast::WhileLoop& stmt) noexcept {
 
 std::optional<Value> Codegen::generate(ast::BreakStmt& stmt) noexcept {
     if (!m_loop_end) {
-        error(stmt.span.begin, m_filename, "'break' not in loop");
+        error(stmt.offset, "'break' not in loop");
 
         return std::nullopt;
     }
@@ -495,7 +490,7 @@ std::optional<Value> Codegen::generate(ast::BreakStmt& stmt) noexcept {
 
 std::optional<Value> Codegen::generate(ast::ContinueStmt& stmt) noexcept {
     if (!m_loop_body) {
-        error(stmt.span.begin, m_filename, "'continue' not in loop");
+        error(stmt.offset, "'continue' not in loop");
 
         return std::nullopt;
     }
@@ -516,8 +511,8 @@ std::optional<Value> Codegen::generate(ast::BinaryExpr& expr) noexcept {
     }
 
     return generate_bin_expr(
-        ast::SpanValue<Value&>{*lhs, expr.lhs->span},
-        ast::SpanValue<Value&>{*rhs, expr.rhs->span}, expr.oper);
+        ast::OffsetValue<Value&>{*lhs, expr.lhs->offset},
+        ast::OffsetValue<Value&>{*rhs, expr.rhs->offset}, expr.oper);
 }
 
 std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
@@ -537,9 +532,7 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
         }
 
         if (!value->type->is_signed_int() && !value->type->is_unsigned_int()) {
-            error(
-                expr.span.begin, m_filename,
-                "cannot apply '-' to a non-number type");
+            error(expr.offset, "cannot apply '-' to a non-number type");
 
             return std::nullopt;
         }
@@ -548,9 +541,7 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
             value->type, m_builder.CreateNeg(load_value(*value).value)};
     case Bang:
         if (!value->type->is_bool()) {
-            error(
-                expr.span.begin, m_filename,
-                "cannot apply '!' to a non-boolean type");
+            error(expr.offset, "cannot apply '!' to a non-boolean type");
 
             return std::nullopt;
         }
@@ -559,9 +550,7 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
             value->type, m_builder.CreateNot(load_value(*value).value)};
     case Star: {
         if (!value->type->is_pointer()) {
-            error(
-                expr.span.begin, m_filename,
-                "dereference of a non-pointer type");
+            error(expr.offset, "dereference of a non-pointer type");
 
             return std::nullopt;
         }
@@ -573,9 +562,7 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
     case And:
         if (!llvm::isa<llvm::AllocaInst>(value->value) &&
             !llvm::isa<llvm::GetElementPtrInst>(value->value)) {
-            error(
-                expr.span.begin, m_filename,
-                "taking the reference of a non-variable value");
+            error(expr.offset, "taking the reference of a non-variable value");
 
             return std::nullopt;
         }
@@ -585,9 +572,7 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
             value->value, false, true};
     case Not:
         if (!value->type->is_signed_int() && !value->type->is_unsigned_int()) {
-            error(
-                expr.span.begin, m_filename,
-                "cannot apply '~' to a non-integer type");
+            error(expr.offset, "cannot apply '~' to a non-integer type");
 
             return std::nullopt;
         }
@@ -644,7 +629,7 @@ std::optional<Value> Codegen::generate(ast::IntLiteral& expr) noexcept {
             std::from_chars(literal.cbegin(), literal.cend(), value, base);
 
         if (result == std::errc::result_out_of_range) {
-            error(expr.span.begin, m_filename, "integer out of range");
+            error(expr.offset, "integer out of range");
 
             failed = true;
             return std::nullopt;
@@ -726,7 +711,7 @@ std::optional<Value> Codegen::generate(ast::IntLiteral& expr) noexcept {
         std::from_chars(literal.cbegin(), literal.cend(), value, base);
 
     if (result == std::errc::result_out_of_range) {
-        error(expr.span.begin, m_filename, "integer out of range");
+        error(expr.offset, "integer out of range");
 
         return std::nullopt;
     }
@@ -755,7 +740,7 @@ std::optional<Value> Codegen::generate(ast::FloatLiteral& expr) noexcept {
             std::from_chars(literal.cbegin(), literal.cend(), value);
 
         if (result == std::errc::result_out_of_range) {
-            error(expr.span.begin, m_filename, "float out of range");
+            error(expr.offset, "float out of range");
 
             failed = true;
             return std::nullopt;
@@ -789,7 +774,7 @@ std::optional<Value> Codegen::generate(ast::FloatLiteral& expr) noexcept {
         std::from_chars(literal.cbegin(), literal.cend(), value);
 
     if (result == std::errc::result_out_of_range) {
-        error(expr.span.begin, m_filename, "float out of range");
+        error(expr.offset, "float out of range");
 
         return std::nullopt;
     }
@@ -823,7 +808,7 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
     }
 
     if (!type->is_struct()) {
-        error(expr.type->span.begin, m_filename, "not a structure");
+        error(expr.type->offset, "not a structure");
 
         return std::nullopt;
     }
@@ -836,9 +821,7 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
                          : m_builder.CreateAlloca(struct_type.type);
 
     if (expr.fields.size() != struct_type.fields.size()) {
-        error(
-            expr.type->span.begin, m_filename,
-            "incorrect number of fields initialized");
+        error(expr.type->offset, "incorrect number of fields initialized");
 
         return std::nullopt;
     }
@@ -854,7 +837,7 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
 
         if (iterator == members.end()) {
             error(
-                field.name.span.begin, m_filename,
+                field.name.offset,
                 fmt::format("no such member: '{}'", field.name.value));
 
             return std::nullopt;
@@ -867,7 +850,7 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
 
         if (!cast_to_result(struct_type.fields[index], *value)) {
             type_mismatch(
-                expr.fields[index].value->span, *struct_type.fields[index],
+                expr.fields[index].value->offset, *struct_type.fields[index],
                 *value->type);
 
             m_current_result = nullptr;
@@ -895,8 +878,7 @@ std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) noexcept {
         m_current_result ? m_current_result : m_builder.CreateAlloca(llvm_type);
 
     if (expr.elements.size() != array_type.size) {
-        error(
-            expr.type->span.begin, m_filename, "incorrect number of elements");
+        error(expr.type->offset, "incorrect number of elements");
 
         return std::nullopt;
     }
@@ -917,7 +899,7 @@ std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) noexcept {
 
         if (!cast_to_result(array_type.type, *value)) {
             type_mismatch(
-                expr.elements[i]->span, *array_type.type, *value->type);
+                expr.elements[i]->offset, *array_type.type, *value->type);
 
             m_current_result = nullptr;
 
@@ -979,7 +961,7 @@ std::optional<Value> Codegen::generate(ast::Identifier& expr) noexcept {
     std::size_t last_index = expr.value.size() - 1;
 
     for (std::size_t i = 0; i < last_index; ++i) {
-        scope = get_scope(expr.value[i].span, expr.value[i].value, *scope);
+        scope = get_scope(expr.value[i].offset, expr.value[i].value, *scope);
 
         if (!scope) {
             return std::nullopt;
@@ -987,7 +969,7 @@ std::optional<Value> Codegen::generate(ast::Identifier& expr) noexcept {
     }
 
     return get_name(
-        expr.value[last_index].span, expr.value[last_index].value, *scope);
+        expr.value[last_index].offset, expr.value[last_index].value, *scope);
 }
 
 std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
@@ -998,7 +980,7 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
     }
 
     if (!value->type->is_function()) {
-        error(expr.identifier->span.begin, m_filename, "not a function");
+        error(expr.identifier->offset, "not a function");
 
         return std::nullopt;
     }
@@ -1009,9 +991,7 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
     auto arg_size = function->arg_size();
 
     if (arg_size != expr.arguments.size()) {
-        error(
-            expr.identifier->span.begin, m_filename,
-            "incorrect number of arguments passed");
+        error(expr.identifier->offset, "incorrect number of arguments passed");
 
         return std::nullopt;
     }
@@ -1030,7 +1010,7 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
             arguments.push_back(load_value(*val).value);
         } else {
             type_mismatch(
-                expr.arguments[i]->span, *type.param_types[i], *value->type);
+                expr.arguments[i]->offset, *type.param_types[i], *value->type);
 
             return std::nullopt;
         }
@@ -1050,7 +1030,7 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) noexcept {
 
     if (iterator == m_methods[value->type].end()) {
         error(
-            expr.name.span.begin, m_filename,
+            expr.name.offset,
             fmt::format("no such method: '{}'", expr.name.value));
 
         return std::nullopt;
@@ -1059,9 +1039,7 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) noexcept {
     auto arg_size = iterator->second.function->arg_size();
 
     if (arg_size - 1 != expr.arguments.size()) {
-        error(
-            expr.name.span.begin, m_filename,
-            "incorrect number of arguments passed");
+        error(expr.name.offset, "incorrect number of arguments passed");
 
         return std::nullopt;
     }
@@ -1075,7 +1053,7 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) noexcept {
 
         if (!value->is_mutable && self_type.is_mutable) {
             error(
-                expr.name.span.begin, m_filename,
+                expr.name.offset,
                 fmt::format(
                     "cannot call method '{}' on an immutable value",
                     expr.name.value));
@@ -1084,7 +1062,7 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) noexcept {
         }
 
         if (!value->value->getType()->isPointerTy()) {
-            error(expr.value->span.begin, m_filename, "type mismatch");
+            error(expr.value->offset, "type mismatch");
 
             return std::nullopt;
         }
@@ -1106,7 +1084,7 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) noexcept {
             arguments.push_back(load_value(*val).value);
         } else {
             type_mismatch(
-                expr.arguments[i]->span,
+                expr.arguments[i]->offset,
                 *iterator->second.type->param_types[i + 1], *value->type);
 
             return std::nullopt;
@@ -1127,7 +1105,7 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
 
     auto no_such_member = [&] {
         error(
-            expr.member.span.begin, m_filename,
+            expr.member.offset,
             fmt::format("no such member: '{}'", expr.member.value));
     };
 
@@ -1158,9 +1136,7 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
     }
 
     auto not_a_struct = [&] {
-        error(
-            expr.member.span.begin, m_filename,
-            "member access of a non-structure type");
+        error(expr.member.offset, "member access of a non-structure type");
     };
 
     bool is_mutable = false;
@@ -1201,7 +1177,7 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
 
     if (iterator == m_members[type->type].end()) {
         error(
-            expr.member.span.begin, m_filename,
+            expr.member.offset,
             fmt::format("no such member: '{}'", expr.member.value));
 
         return std::nullopt;
@@ -1221,9 +1197,7 @@ std::optional<Value> Codegen::generate(ast::IndexExpr& expr) noexcept {
     }
 
     if (!value->type->is_array()) {
-        error(
-            expr.value->span.begin, m_filename,
-            "index access of a non-array type");
+        error(expr.value->offset, "index access of a non-array type");
 
         return std::nullopt;
     }
@@ -1270,7 +1244,7 @@ std::optional<Value> Codegen::generate(ast::AsExpr& expr) noexcept {
 
 std::optional<Value> Codegen::generate(ast::FnDecl& decl) noexcept {
     auto type = decl.proto.type ? get_type(
-                                      decl.proto.type->span,
+                                      decl.proto.type->offset,
                                       decl.proto.type->value, *m_current_scope)
                                 : nullptr;
 
@@ -1336,7 +1310,7 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) noexcept {
 
     if (!function->getReturnType()->isVoidTy()) {
         error(
-            decl.proto.name.span.begin, m_filename,
+            decl.proto.name.offset,
             "non-void function does not return a value");
 
         return std::nullopt;
@@ -1370,7 +1344,7 @@ std::optional<Value> Codegen::generate(ast::Struct& decl) noexcept {
 
         if (llvm_type->isVoidTy()) {
             error(
-                field.name.span.begin, m_filename,
+                field.name.offset,
                 fmt::format("'{}' cannot be of type 'void'", field.name.value));
 
             return std::nullopt;
@@ -1407,7 +1381,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
 
         if (llvm_type->isVoidTy()) {
             error(
-                decl.name.span.begin, m_filename,
+                decl.name.offset,
                 fmt::format("'{}' cannot be of type 'void'", decl.name.value));
 
             return std::nullopt;
@@ -1430,7 +1404,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
             m_current_result = m_builder.CreateAlloca(llvm_type);
 
             if (!cast_to_result(type, *value)) {
-                type_mismatch(decl.value->span, *type, *value->type);
+                type_mismatch(decl.value->offset, *type, *value->type);
             } else {
                 m_scope.names[decl.name.value] = {
                     type, m_current_result, decl.is_mutable};
@@ -1472,7 +1446,7 @@ void Codegen::generate(ast::Module& module, bool is_submodule) noexcept {
         if (llvm::StructType::getTypeByName(
                 m_context, struct_decl->name.value)) {
             error(
-                struct_decl->name.span.begin, m_filename,
+                struct_decl->name.offset,
                 fmt::format(
                     "'{}' is already defined", struct_decl->name.value));
 
@@ -1790,8 +1764,8 @@ bool Codegen::cast_to_result(
 }
 
 std::optional<Value> Codegen::generate_bin_expr(
-    ast::SpanValue<Value&> lhs, ast::SpanValue<Value&> rhs,
-    ast::SpanValue<frontend::Token::Type> oper) noexcept {
+    ast::OffsetValue<Value&> lhs, ast::OffsetValue<Value&> rhs,
+    ast::OffsetValue<frontend::Token::Type> oper) noexcept {
     using enum frontend::Token::Type;
 
     if (oper.value == EqualEqual || oper.value == BangEqual) {
@@ -1839,7 +1813,7 @@ std::optional<Value> Codegen::generate_bin_expr(
     auto right = cast(lhs_value.type, rhs_value);
 
     if (!right) {
-        type_mismatch(lhs.span, *lhs_value.type, *rhs_value.type);
+        type_mismatch(lhs.offset, *lhs_value.type, *rhs_value.type);
 
         return std::nullopt;
     }
@@ -1857,7 +1831,7 @@ std::optional<Value> Codegen::generate_bin_expr(
 
         if (!type->is_signed_int() && !type->is_unsigned_int() &&
             !type->is_float()) {
-            error(lhs.span.begin, m_filename, "type mismatch");
+            error(lhs.offset, "type mismatch");
 
             return std::nullopt;
         }
@@ -1870,14 +1844,14 @@ std::optional<Value> Codegen::generate_bin_expr(
     case Xor:
         if (!lhs_value.type->is_signed_int() &&
             !lhs_value.type->is_unsigned_int()) {
-            error(lhs.span.begin, m_filename, "type mismatch");
+            error(lhs.offset, "type mismatch");
         }
 
         break;
     case AndAnd:
     case OrOr:
         if (!lhs_value.type->is_bool()) {
-            error(lhs.span.begin, m_filename, "type mismatch");
+            error(lhs.offset, "type mismatch");
 
             return std::nullopt;
         }
@@ -2010,8 +1984,8 @@ Value Codegen::load_value(Value& value) noexcept {
     return value;
 }
 
-std::shared_ptr<Type>
-Codegen::get_type(Span span, std::string_view name, Scope& parent) noexcept {
+std::shared_ptr<Type> Codegen::get_type(
+    std::size_t offset, std::string_view name, Scope& parent) noexcept {
     auto primitive = m_primitive_types.find(name);
 
     if (primitive != m_primitive_types.end()) {
@@ -2021,8 +1995,7 @@ Codegen::get_type(Span span, std::string_view name, Scope& parent) noexcept {
     auto user = parent.types.find(name);
 
     if (user == parent.types.end()) {
-        error(
-            span.begin, m_filename, fmt::format("undeclared type: '{}'", name));
+        error(offset, fmt::format("undeclared type: '{}'", name));
 
         return nullptr;
     }
@@ -2030,14 +2003,12 @@ Codegen::get_type(Span span, std::string_view name, Scope& parent) noexcept {
     return user->second;
 }
 
-std::optional<Value>
-Codegen::get_name(Span span, std::string_view name, Scope& parent) noexcept {
+std::optional<Value> Codegen::get_name(
+    std::size_t offset, std::string_view name, Scope& parent) noexcept {
     auto iterator = parent.names.find(name);
 
     if (iterator == parent.names.end()) {
-        error(
-            span.begin, m_filename,
-            fmt::format("undeclared identifier: '{}'", name));
+        error(offset, fmt::format("undeclared identifier: '{}'", name));
 
         return std::nullopt;
     }
@@ -2045,12 +2016,12 @@ Codegen::get_name(Span span, std::string_view name, Scope& parent) noexcept {
     return iterator->second;
 }
 
-Scope*
-Codegen::get_scope(Span span, std::string_view name, Scope& parent) noexcept {
+Scope* Codegen::get_scope(
+    std::size_t offset, std::string_view name, Scope& parent) noexcept {
     auto iterator = parent.scopes.find(name);
 
     if (iterator == parent.scopes.end()) {
-        error(span.begin, m_filename, fmt::format("could not find '{}'", name));
+        error(offset, fmt::format("could not find '{}'", name));
 
         return nullptr;
     }
@@ -2061,7 +2032,7 @@ Codegen::get_scope(Span span, std::string_view name, Scope& parent) noexcept {
 void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
     if (!decl.is_extern && !decl.block) {
         error(
-            decl.proto.name.span.begin, m_filename,
+            decl.proto.name.offset,
             fmt::format("'{}' has no body", decl.proto.name.value));
 
         return;
@@ -2073,7 +2044,7 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
 
     if (scope.names.contains(decl.proto.name.value)) {
         error(
-            decl.proto.name.span.begin, m_filename,
+            decl.proto.name.offset,
             fmt::format("'{}' is already defined", decl.proto.name.value));
 
         return;
@@ -2106,7 +2077,7 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
 
         if (llvm_type->isVoidTy()) {
             error(
-                parameter.name.span.begin, m_filename,
+                parameter.name.offset,
                 fmt::format(
                     "'{}' cannot be of type 'void'", parameter.name.value));
 
@@ -2136,7 +2107,7 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
     }
 
     auto type = get_type(
-        decl.proto.type->span, decl.proto.type->value, *m_current_scope);
+        decl.proto.type->offset, decl.proto.type->value, *m_current_scope);
 
     auto func_type =
         std::make_shared<types::Function>(return_type, std::move(param_types));
@@ -2160,12 +2131,12 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
     }
 }
 
-void Codegen::type_mismatch(Span span, Type& expected, Type& got) noexcept {
+void Codegen::type_mismatch(
+    std::size_t offset, Type& expected, Type& got) noexcept {
     error(
-        span.begin, m_filename,
-        fmt::format(
-            "expected '{}' but got '{}'", expected.to_string(),
-            got.to_string()));
+        offset, fmt::format(
+                    "expected '{}' but got '{}'", expected.to_string(),
+                    got.to_string()));
 }
 
 } // namespace cent::backend

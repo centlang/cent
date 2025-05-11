@@ -5,21 +5,20 @@
 #include <utility>
 
 #include "cent/frontend/token.h"
-#include "cent/span.h"
+#include "cent/offset_value.h"
 
 #include "cent/ast/node.h"
-#include "cent/ast/span_value.h"
 
 namespace cent::ast {
 
 struct BinaryExpr : detail::Expr<BinaryExpr> {
     [[nodiscard]] BinaryExpr(
-        Span span, SpanValue<frontend::Token::Type> oper,
+        std::size_t offset, OffsetValue<frontend::Token::Type> oper,
         std::unique_ptr<Expression> lhs,
         std::unique_ptr<Expression> rhs) noexcept
-    : Expr{span}, oper{oper}, lhs{std::move(lhs)}, rhs{std::move(rhs)} {}
+    : Expr{offset}, oper{oper}, lhs{std::move(lhs)}, rhs{std::move(rhs)} {}
 
-    SpanValue<frontend::Token::Type> oper;
+    OffsetValue<frontend::Token::Type> oper;
 
     std::unique_ptr<Expression> lhs;
     std::unique_ptr<Expression> rhs;

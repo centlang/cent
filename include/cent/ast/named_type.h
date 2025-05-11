@@ -3,19 +3,18 @@
 
 #include <string>
 
-#include "cent/span.h"
-
 #include "cent/ast/node.h"
-#include "cent/ast/span_value.h"
+#include "cent/offset_value.h"
 
 namespace cent::ast {
 
 struct NamedType : detail::Type<NamedType> {
     [[nodiscard]] NamedType(
-        Span span, std::vector<SpanValue<std::string>> value) noexcept
-    : Type{span}, value{std::move(value)} {}
+        std::size_t offset,
+        std::vector<OffsetValue<std::string>> value) noexcept
+    : Type{offset}, value{std::move(value)} {}
 
-    std::vector<SpanValue<std::string>> value;
+    std::vector<OffsetValue<std::string>> value;
 };
 
 } // namespace cent::ast

@@ -6,22 +6,23 @@
 #include <vector>
 
 #include "cent/ast/node.h"
-#include "cent/ast/span_value.h"
+#include "cent/offset_value.h"
 
 namespace cent::ast {
 
 struct Struct : detail::Decl<Struct> {
     struct Field {
-        SpanValue<std::string> name;
+        OffsetValue<std::string> name;
         std::unique_ptr<Type> type;
     };
 
     [[nodiscard]] Struct(
-        Span span, SpanValue<std::string> name, std::vector<Field> fields,
-        bool is_public = false) noexcept
-    : Decl{span, is_public}, name{std::move(name)}, fields{std::move(fields)} {}
+        std::size_t offset, OffsetValue<std::string> name,
+        std::vector<Field> fields, bool is_public = false) noexcept
+    : Decl{offset, is_public}, name{std::move(name)},
+      fields{std::move(fields)} {}
 
-    SpanValue<std::string> name;
+    OffsetValue<std::string> name;
     std::vector<Field> fields;
 };
 

@@ -6,14 +6,14 @@
 #include <vector>
 
 #include "cent/ast/node.h"
-#include "cent/span.h"
 
 namespace cent::ast {
 
 struct TupleType : detail::Type<TupleType> {
     [[nodiscard]] TupleType(
-        Span span, std::vector<std::unique_ptr<ast::Type>> types) noexcept
-    : Type{span}, types{std::move(types)} {}
+        std::size_t offset,
+        std::vector<std::unique_ptr<ast::Type>> types) noexcept
+    : Type{offset}, types{std::move(types)} {}
 
     std::vector<std::unique_ptr<ast::Type>> types;
 };

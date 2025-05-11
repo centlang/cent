@@ -5,14 +5,12 @@
 #include <string_view>
 
 #include "cent/frontend/token.h"
-#include "cent/position.h"
 
 namespace cent::frontend {
 
 class Lexer {
 public:
-    [[nodiscard]] Lexer(std::string_view source) noexcept
-    : m_at{source.cbegin()}, m_end{source.cend()} {
+    [[nodiscard]] Lexer(std::string_view source) noexcept : m_source{source} {
         next_token();
     }
 
@@ -21,25 +19,17 @@ public:
     void next_token() noexcept;
 
 private:
-    [[nodiscard]] char peek() const noexcept { return *m_at; }
+    [[nodiscard]] char peek() const noexcept { return m_source[m_offset]; }
 
-    char get() noexcept {
-        ++m_position.column;
-        return *m_at++;
+    char get() noexcept { return m_source[m_offset++]; }
+
+    [[nodiscard]] bool eof() const noexcept {
+        return m_offset == m_source.size();
     }
-
-    [[nodiscard]] bool eof() const noexcept { return m_at == m_end; }
 
     void skip_whitespaces() noexcept {
         while (!eof() && std::isspace(peek())) {
-            if (peek() == '\n') {
-                ++m_position.line;
-                m_position.column = 1;
-
-                ++m_at;
-            } else {
-                get();
-            }
+            get();
         }
     }
 
@@ -51,11 +41,10 @@ private:
         return std::isalnum(character) || character == '_';
     }
 
-    Position m_position;
-    Token m_token;
+    std::string_view m_source;
+    std::size_t m_offset{0};
 
-    std::string_view::const_iterator m_at;
-    std::string_view::const_iterator m_end;
+    Token m_token;
 };
 
 } // namespace cent::frontend

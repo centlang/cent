@@ -5,23 +5,21 @@
 #include <string>
 #include <utility>
 
-#include "cent/span.h"
-
 #include "cent/ast/node.h"
-#include "cent/ast/span_value.h"
+#include "cent/offset_value.h"
 
 namespace cent::ast {
 
 struct VarDecl : detail::Decl<VarDecl> {
     [[nodiscard]] VarDecl(
-        Span span, bool is_mutable, SpanValue<std::string> name,
+        std::size_t offset, bool is_mutable, OffsetValue<std::string> name,
         std::unique_ptr<Type> type, std::unique_ptr<Expression> value) noexcept
-    : Decl{span}, is_mutable{is_mutable}, name{std::move(name)},
+    : Decl{offset}, is_mutable{is_mutable}, name{std::move(name)},
       type{std::move(type)}, value{std::move(value)} {}
 
     bool is_mutable;
 
-    SpanValue<std::string> name;
+    OffsetValue<std::string> name;
     std::unique_ptr<Type> type;
 
     std::unique_ptr<Expression> value;

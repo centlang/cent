@@ -41,7 +41,7 @@ bool emit_obj(
     llvm::raw_fd_ostream file{path.string(), code, llvm::sys::fs::OF_None};
 
     if (code) {
-        error(fmt::format("could not open file: {}", code.message()));
+        log::error(fmt::format("could not open file: {}", code.message()));
 
         return false;
     }

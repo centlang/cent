@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
     const auto* target = llvm::TargetRegistry::lookupTarget(triple, message);
 
     if (!target) {
-        cent::error(message);
+        cent::log::error(message);
 
         return 1;
     }
@@ -66,7 +66,8 @@ int main(int argc, char** argv) {
         }
 
         cent::backend::Codegen codegen{
-            std::move(program), arg, machine->createDataLayout(), triple};
+            std::move(program), *code, arg, machine->createDataLayout(),
+            triple};
 
         auto module = codegen.generate();
 

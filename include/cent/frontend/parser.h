@@ -14,6 +14,7 @@
 
 #include "cent/frontend/lexer.h"
 #include "cent/log.h"
+#include "cent/util.h"
 
 #include "cent/ast/binary_expr.h"
 #include "cent/ast/block_stmt.h"
@@ -30,7 +31,7 @@ class Parser {
 public:
     [[nodiscard]] Parser(
         std::string_view source, std::string_view filename) noexcept
-    : m_lexer{source}, m_filename{filename} {
+    : m_lexer{source}, m_source{source}, m_filename{filename} {
         for (auto& token : m_buffer) {
             token = m_lexer.token();
             m_lexer.next_token();
@@ -74,10 +75,7 @@ private:
     std::optional<Token>
     expect(std::string_view expected, auto... types) noexcept {
         if (!match(types...)) {
-            error(
-                peek().span.begin, m_filename,
-                fmt::format("expected {}", expected));
-
+            error(fmt::format("expected {}", expected));
             return std::nullopt;
         }
 
@@ -193,6 +191,16 @@ private:
         }
     }
 
+    void error(std::string_view message) {
+        auto [line, column] = cent::offset_to_pos(m_source, peek().offset);
+        log::error(line, column, m_filename, message);
+    }
+
+    void error(std::size_t offset, std::string_view message) {
+        auto [line, column] = cent::offset_to_pos(m_source, offset);
+        log::error(line, column, m_filename, message);
+    }
+
     static constexpr auto buffer_size = 2;
 
     Lexer m_lexer;
@@ -200,6 +208,7 @@ private:
     std::array<Token, buffer_size> m_buffer;
     std::uint8_t m_buffer_index = 0;
 
+    std::string_view m_source;
     std::string_view m_filename;
 };
 

@@ -6,32 +6,31 @@
 #include <utility>
 #include <vector>
 
-#include "cent/span.h"
+#include "cent/offset_value.h"
 
 #include "cent/ast/block_stmt.h"
 #include "cent/ast/node.h"
-#include "cent/ast/span_value.h"
 
 namespace cent::ast {
 
 struct FnDecl : detail::Decl<FnDecl> {
     struct Param {
-        SpanValue<std::string> name;
+        OffsetValue<std::string> name;
         std::unique_ptr<Type> type;
     };
 
     struct Proto {
-        std::optional<SpanValue<std::string>> type;
-        SpanValue<std::string> name;
+        std::optional<OffsetValue<std::string>> type;
+        OffsetValue<std::string> name;
 
         std::vector<Param> params;
         std::unique_ptr<Type> return_type;
     };
 
     [[nodiscard]] FnDecl(
-        Span span, Proto proto, std::unique_ptr<BlockStmt> block,
+        std::size_t offset, Proto proto, std::unique_ptr<BlockStmt> block,
         bool is_public = false, bool is_extern = false) noexcept
-    : Decl{span, is_public}, proto{std::move(proto)}, block{std::move(block)},
+    : Decl{offset, is_public}, proto{std::move(proto)}, block{std::move(block)},
       is_extern{is_extern} {}
 
     Proto proto;

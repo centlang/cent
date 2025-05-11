@@ -4,8 +4,6 @@
 #include <cstdint>
 #include <string>
 
-#include "cent/span.h"
-
 namespace cent::frontend {
 
 struct Token {
@@ -104,7 +102,7 @@ struct Token {
     Type type = Type::Invalid;
     std::string value;
 
-    Span span;
+    std::size_t offset;
 };
 
 } // namespace cent::frontend

@@ -4,8 +4,6 @@
 #include <memory>
 #include <utility>
 
-#include "cent/span.h"
-
 #include "cent/ast/block_stmt.h"
 #include "cent/ast/node.h"
 
@@ -13,9 +11,9 @@ namespace cent::ast {
 
 struct WhileLoop : detail::Stmt<WhileLoop> {
     [[nodiscard]] WhileLoop(
-        Span span, std::unique_ptr<Expression> condition,
+        std::size_t offset, std::unique_ptr<Expression> condition,
         std::unique_ptr<BlockStmt> body) noexcept
-    : Stmt{span}, condition{std::move(condition)}, body{std::move(body)} {}
+    : Stmt{offset}, condition{std::move(condition)}, body{std::move(body)} {}
 
     std::unique_ptr<Expression> condition;
     std::unique_ptr<BlockStmt> body;
