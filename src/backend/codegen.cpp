@@ -1236,8 +1236,7 @@ std::optional<Value> Codegen::generate(ast::IndexExpr& expr) noexcept {
 
     return Value{
         type->type,
-        m_builder.CreateGEP(
-            value->value->getType(), value->value, index->value),
+        m_builder.CreateGEP(type->codegen(*this), value->value, index->value),
         value->is_mutable};
 }
 
