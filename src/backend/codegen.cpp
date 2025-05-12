@@ -1240,7 +1240,13 @@ std::optional<Value> Codegen::generate(ast::AsExpr& expr) noexcept {
         return Value{type, value->value};
     }
 
-    return cast(type, *value, false);
+    if (auto val = cast(type, *value, false)) {
+        return val;
+    }
+
+    type_mismatch(expr.type->offset, *type, *value->type);
+
+    return std::nullopt;
 }
 
 std::optional<Value> Codegen::generate(ast::FnDecl& decl) noexcept {
