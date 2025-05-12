@@ -1365,8 +1365,9 @@ std::optional<Value> Codegen::generate(ast::Struct& decl) noexcept {
 
     struct_type->setBody(llvm_fields);
 
-    m_current_scope->types[decl.name.value] =
-        std::make_shared<types::Struct>(struct_type, std::move(fields));
+    m_current_scope->types[decl.name.value] = std::make_shared<types::Struct>(
+        m_current_scope_prefix + decl.name.value, struct_type,
+        std::move(fields));
 
     return std::nullopt;
 }
@@ -1441,13 +1442,17 @@ void Codegen::generate(ast::Module& module, bool is_submodule) noexcept {
     }
 
     auto* scope = m_current_scope;
+    auto scope_prefix = m_current_scope_prefix;
 
     for (auto& submodule : module.submodules) {
         m_current_scope = &scope->scopes[submodule.first];
+        m_current_scope_prefix += submodule.first + "::";
+
         generate(*submodule.second, true);
     }
 
     m_current_scope = scope;
+    m_current_scope_prefix = scope_prefix;
 
     for (auto& struct_decl : module.structs) {
         if (llvm::StructType::getTypeByName(

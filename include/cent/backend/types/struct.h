@@ -12,25 +12,15 @@ namespace cent::backend::types {
 
 struct Struct : detail::Type<Struct> {
     [[nodiscard]] Struct(
-        llvm::StructType* type,
+        std::string name, llvm::StructType* type,
         std::vector<std::shared_ptr<backend::Type>> fields) noexcept
-    : type{type}, fields{std::move(fields)} {}
+    : name{std::move(name)}, type{type}, fields{std::move(fields)} {}
 
-    std::string to_string() noexcept override {
-        std::string result = "struct {";
-
-        for (std::size_t i = 0; i < fields.size(); ++i) {
-            result += " " + fields[i]->to_string();
-
-            if (i + 1 != fields.size()) {
-                result += ",";
-            }
-        }
-
-        return result + " }";
-    }
+    std::string to_string() noexcept override { return name; }
 
     bool is_struct() noexcept override { return true; };
+
+    std::string name;
 
     llvm::StructType* type;
     std::vector<std::shared_ptr<backend::Type>> fields;
