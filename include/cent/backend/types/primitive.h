@@ -110,7 +110,7 @@ struct Pointer : detail::Type<Pointer> {
     : type{std::move(type)}, is_mutable{is_mutable} {}
 
     std::string to_string() noexcept override {
-        return is_mutable ? "*mut " : "*" + type->to_string();
+        return (is_mutable ? "*mut " : "*") + type->to_string();
     }
 
     bool is_pointer() noexcept override { return true; };
