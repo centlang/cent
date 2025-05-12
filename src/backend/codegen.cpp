@@ -1652,7 +1652,7 @@ bool Codegen::cast_to_result(
     using enum llvm::Instruction::CastOps;
 
     if (types_equal(*type, *value.type)) {
-        m_builder.CreateStore(value.value, m_current_result);
+        m_builder.CreateStore(load_value(value).value, m_current_result);
 
         return true;
     }
