@@ -1406,8 +1406,6 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
         if (!type) {
             type = value->type;
             llvm_type = value->type->codegen(*this);
-
-            m_current_result = m_builder.CreateAlloca(llvm_type);
         } else {
             m_current_result = m_builder.CreateAlloca(llvm_type);
 
@@ -1422,6 +1420,15 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
 
             return std::nullopt;
         }
+    }
+
+    m_current_result = m_builder.CreateAlloca(llvm_type);
+
+    if (value) {
+        m_builder.CreateStore(load_value(*value).value, m_current_result);
+    } else {
+        m_builder.CreateStore(
+            llvm::Constant::getNullValue(llvm_type), m_current_result);
     }
 
     m_scope.names[decl.name.value] = {type, m_current_result, decl.is_mutable};
