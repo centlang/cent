@@ -994,7 +994,10 @@ bool Parser::parse_with(ast::Module& module) noexcept {
         path.push_back(name->value);
     }
 
-    auto module_path = cent::find_module(path);
+    std::array<std::filesystem::path, 1> search_paths = {
+        std::filesystem::path{m_filename}.parent_path()};
+
+    auto module_path = cent::find_module(path, search_paths);
 
     if (!module_path.directory && !module_path.file) {
         error(
