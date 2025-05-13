@@ -1537,6 +1537,14 @@ bool Codegen::types_equal(Type& lhs, Type& rhs) noexcept {
         return types_equal(*lhs_optional.type, *rhs_optional.type);
     }
 
+    if (lhs.is_array() && rhs.is_array()) {
+        auto& lhs_array = static_cast<types::Array&>(lhs);
+        auto& rhs_array = static_cast<types::Array&>(rhs);
+
+        return lhs_array.size == rhs_array.size &&
+               types_equal(*lhs_array.type, *rhs_array.type);
+    }
+
     return false;
 }
 
