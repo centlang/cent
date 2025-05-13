@@ -1219,6 +1219,15 @@ std::optional<Value> Codegen::generate(ast::IndexExpr& expr) noexcept {
         return std::nullopt;
     }
 
+    auto index_val = cast(m_primitive_types["usize"], *index);
+
+    if (!index_val) {
+        type_mismatch(
+            expr.index->offset, *m_primitive_types["usize"], *index->type);
+
+        return std::nullopt;
+    }
+
     auto* type = static_cast<types::Array*>(value->type.get());
 
     return Value{
@@ -1227,7 +1236,7 @@ std::optional<Value> Codegen::generate(ast::IndexExpr& expr) noexcept {
             type->codegen(*this), value->value,
             {llvm::ConstantInt::get(
                  m_module->getDataLayout().getIntPtrType(m_context), 0),
-             index->value}),
+             index_val->value}),
         value->is_mutable};
 }
 
