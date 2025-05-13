@@ -79,6 +79,7 @@ struct Token {
 
         Fn,
         Struct,
+        Enum,
         With,
 
         As,

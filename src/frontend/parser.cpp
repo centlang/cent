@@ -74,6 +74,16 @@ std::unique_ptr<ast::Module> Parser::parse() noexcept {
             continue;
         }
 
+        if (match(Enum)) {
+            next();
+
+            if (!parse_enum(*result, is_public)) {
+                skip_until_decl();
+            }
+
+            continue;
+        }
+
         bool is_extern = false;
 
         if (match(Extern)) {
@@ -813,6 +823,24 @@ std::vector<ast::Struct::Field> Parser::parse_fields() noexcept {
     return result;
 }
 
+std::vector<ast::OffsetValue<std::string>>
+Parser::parse_enum_fields() noexcept {
+    std::vector<ast::OffsetValue<std::string>> result;
+
+    while (match(Token::Type::Identifier)) {
+        auto name = get();
+        result.emplace_back(ast::OffsetValue{name.value, name.offset});
+
+        if (match(Token::Type::RightBrace)) {
+            break;
+        }
+
+        expect("','", Token::Type::Comma);
+    }
+
+    return result;
+}
+
 bool Parser::parse_fn(
     ast::Module& module, bool is_public, bool is_extern) noexcept {
     auto name = expect("function name", Token::Type::Identifier);
@@ -895,6 +923,30 @@ bool Parser::parse_struct(ast::Module& module, bool is_public) noexcept {
     }
 
     module.structs.push_back(std::make_unique<ast::Struct>(
+        name->offset, ast::OffsetValue{name->value, name->offset},
+        std::move(fields), is_public));
+
+    return true;
+}
+
+bool Parser::parse_enum(ast::Module& module, bool is_public) noexcept {
+    auto name = expect("enum name", Token::Type::Identifier);
+
+    if (!name) {
+        return false;
+    }
+
+    if (!expect("'{'", Token::Type::LeftBrace)) {
+        return false;
+    }
+
+    auto fields = parse_enum_fields();
+
+    if (!expect("'}'", Token::Type::RightBrace)) {
+        return false;
+    }
+
+    module.enums.push_back(std::make_unique<ast::EnumDecl>(
         name->offset, ast::OffsetValue{name->value, name->offset},
         std::move(fields), is_public));
 

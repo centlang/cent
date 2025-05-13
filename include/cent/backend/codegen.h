@@ -56,6 +56,7 @@ struct AsExpr;
 
 struct FnDecl;
 struct Struct;
+struct EnumDecl;
 
 struct VarDecl;
 
@@ -95,6 +96,7 @@ struct Array;
 struct Tuple;
 
 struct Struct;
+struct Enum;
 struct Function;
 
 } // namespace types
@@ -151,6 +153,7 @@ public:
     llvm::Type* generate(types::Tuple& type) noexcept;
 
     llvm::Type* generate(types::Struct& type) noexcept;
+    llvm::Type* generate(types::Enum& type) noexcept;
     llvm::Type* generate(types::Function& type) noexcept;
 
     std::optional<Value> generate(ast::Assignment& stmt) noexcept;
@@ -180,6 +183,7 @@ public:
 
     std::optional<Value> generate(ast::FnDecl& decl) noexcept;
     std::optional<Value> generate(ast::Struct& decl) noexcept;
+    std::optional<Value> generate(ast::EnumDecl& decl) noexcept;
 
     std::optional<Value> generate(ast::VarDecl& decl) noexcept;
 

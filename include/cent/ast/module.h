@@ -8,6 +8,7 @@
 
 #include "cent/modules.h"
 
+#include "cent/ast/enum_decl.h"
 #include "cent/ast/fn_decl.h"
 #include "cent/ast/struct.h"
 
@@ -18,6 +19,7 @@ struct Module : Node {
 
     std::vector<std::unique_ptr<FnDecl>> functions;
     std::vector<std::unique_ptr<Struct>> structs;
+    std::vector<std::unique_ptr<EnumDecl>> enums;
     std::map<std::string, std::unique_ptr<Module>> submodules;
 
     ModulePath path;

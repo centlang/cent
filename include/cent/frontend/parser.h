@@ -18,6 +18,7 @@
 
 #include "cent/ast/binary_expr.h"
 #include "cent/ast/block_stmt.h"
+#include "cent/ast/enum_decl.h"
 #include "cent/ast/fn_decl.h"
 #include "cent/ast/if_else.h"
 #include "cent/ast/literals.h"
@@ -129,7 +130,11 @@ private:
         std::unique_ptr<ast::Expression> variable) noexcept;
 
     [[nodiscard]] std::vector<ast::FnDecl::Param> parse_params() noexcept;
+
     [[nodiscard]] std::vector<ast::Struct::Field> parse_fields() noexcept;
+
+    [[nodiscard]] std::vector<ast::OffsetValue<std::string>>
+    parse_enum_fields() noexcept;
 
     [[nodiscard]] bool parse_fn(
         ast::Module& module, bool is_public = false,
@@ -137,6 +142,9 @@ private:
 
     [[nodiscard]] bool
     parse_struct(ast::Module& module, bool is_public = false) noexcept;
+
+    [[nodiscard]] bool
+    parse_enum(ast::Module& module, bool is_public = false) noexcept;
 
     [[nodiscard]] bool parse_submodule(
         ast::Module& module, const std::filesystem::path& path) noexcept;

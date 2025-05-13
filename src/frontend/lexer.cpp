@@ -380,6 +380,11 @@ void Lexer::ident() noexcept {
         return;
     }
 
+    if (m_token.value == "enum") {
+        keyword(Enum);
+        return;
+    }
+
     if (m_token.value == "with") {
         keyword(With);
         return;

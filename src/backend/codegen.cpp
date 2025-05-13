@@ -34,6 +34,7 @@
 #include "cent/backend/type.h"
 #include "cent/backend/value.h"
 
+#include "cent/backend/types/enum.h"
 #include "cent/backend/types/function.h"
 #include "cent/backend/types/primitive.h"
 #include "cent/backend/types/struct.h"
@@ -224,6 +225,10 @@ llvm::Type* Codegen::generate(types::Pointer& type) noexcept {
 
 llvm::Type* Codegen::generate(types::Struct& type) noexcept {
     return type.type;
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::Enum& type) noexcept {
+    return llvm::Type::getInt32Ty(m_context);
 }
 
 llvm::Type* Codegen::generate(types::Optional& type) noexcept {
@@ -1391,6 +1396,20 @@ std::optional<Value> Codegen::generate(ast::Struct& decl) noexcept {
     return std::nullopt;
 }
 
+std::optional<Value> Codegen::generate(ast::EnumDecl& decl) noexcept {
+    for (std::size_t i = 0; i < decl.fields.size(); ++i) {
+        auto& field = decl.fields[i];
+
+        m_current_scope->scopes[decl.name.value].names[field.value] = Value{
+            m_current_scope->types[decl.name.value],
+            llvm::ConstantInt::getSigned(
+                llvm::Type::getInt32Ty(m_context),
+                static_cast<std::int32_t>(i))};
+    }
+
+    return std::nullopt;
+}
+
 std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
     std::optional<Value> value = std::nullopt;
     std::shared_ptr<Type> type = nullptr;
@@ -1493,6 +1512,20 @@ void Codegen::generate(ast::Module& module, bool is_submodule) noexcept {
     m_current_scope = scope;
     m_current_scope_prefix = scope_prefix;
 
+    for (auto& enum_decl : module.enums) {
+        if (m_current_scope->types.contains(enum_decl->name.value)) {
+            error(
+                enum_decl->name.offset,
+                fmt::format("'{}' is already defined", enum_decl->name.value));
+
+            continue;
+        }
+
+        m_current_scope->types[enum_decl->name.value] =
+            std::make_shared<types::Enum>(
+                m_current_scope_prefix + enum_decl->name.value);
+    }
+
     for (auto& struct_decl : module.structs) {
         if (llvm::StructType::getTypeByName(
                 m_context, struct_decl->name.value)) {
@@ -1505,6 +1538,10 @@ void Codegen::generate(ast::Module& module, bool is_submodule) noexcept {
         }
 
         llvm::StructType::create(m_context, struct_decl->name.value);
+    }
+
+    for (auto& enum_decl : module.enums) {
+        enum_decl->codegen(*this);
     }
 
     for (auto& struct_decl : module.structs) {
