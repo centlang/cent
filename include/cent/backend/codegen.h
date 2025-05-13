@@ -192,6 +192,10 @@ private:
         std::shared_ptr<Type>& type, Value& value,
         bool implicit = true) noexcept;
 
+    [[nodiscard]] std::optional<Value> primitive_cast(
+        std::shared_ptr<Type>& type, llvm::Type* llvm_type, Value& value,
+        bool implicit = true) noexcept;
+
     bool cast_to_result(
         std::shared_ptr<Type>& type, Value& value,
         bool implicit = true) noexcept;

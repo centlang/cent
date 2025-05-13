@@ -1519,8 +1519,6 @@ bool Codegen::types_equal(Type& lhs, Type& rhs) noexcept {
 
 std::optional<Value> Codegen::cast(
     std::shared_ptr<Type>& type, Value& value, bool implicit) noexcept {
-    using enum llvm::Instruction::CastOps;
-
     if (types_equal(*type, *value.type)) {
         return value;
     }
@@ -1571,9 +1569,17 @@ std::optional<Value> Codegen::cast(
         return Value{type, variable};
     }
 
+    return primitive_cast(type, llvm_type, value, implicit);
+}
+
+std::optional<Value> Codegen::primitive_cast(
+    std::shared_ptr<Type>& type, llvm::Type* llvm_type, Value& value,
+    bool implicit) noexcept {
+    using enum llvm::Instruction::CastOps;
+
     auto layout = m_module->getDataLayout();
 
-    std::size_t from_size = layout.getTypeAllocSize(value.value->getType());
+    std::size_t from_size = layout.getTypeAllocSize(value.type->codegen(*this));
     std::size_t to_size = layout.getTypeAllocSize(llvm_type);
 
     bool value_is_float = value.type->is_float();
@@ -1649,8 +1655,6 @@ std::optional<Value> Codegen::cast(
 
 bool Codegen::cast_to_result(
     std::shared_ptr<Type>& type, Value& value, bool implicit) noexcept {
-    using enum llvm::Instruction::CastOps;
-
     if (types_equal(*type, *value.type)) {
         m_builder.CreateStore(load_value(value).value, m_current_result);
 
@@ -1702,84 +1706,12 @@ bool Codegen::cast_to_result(
         return true;
     }
 
-    auto layout = m_module->getDataLayout();
-
-    std::size_t from_size = layout.getTypeAllocSize(value.value->getType());
-    std::size_t to_size = layout.getTypeAllocSize(llvm_type);
-
-    bool value_is_float = value.type->is_float();
-    bool value_is_sint = value.type->is_signed_int();
-    bool value_is_uint = value.type->is_unsigned_int();
-    bool value_is_ptr = value.type->is_pointer();
-
-    if (!value_is_float && !value_is_sint && !value_is_uint && !value_is_ptr) {
-        return false;
+    if (auto val = primitive_cast(type, llvm_type, value, implicit)) {
+        m_builder.CreateStore(val->value, m_current_result);
+        return true;
     }
 
-    bool type_is_float = type->is_float();
-    bool type_is_sint = type->is_signed_int();
-    bool type_is_uint = type->is_unsigned_int();
-    bool type_is_ptr = type->is_pointer();
-
-    llvm::Instruction::CastOps cast_op = CastOpsEnd;
-
-    if (value_is_float) {
-        if (type_is_float) {
-            if (to_size > from_size) {
-                cast_op = FPExt;
-            } else if (!implicit) {
-                cast_op = FPTrunc;
-            }
-        } else if (!implicit) {
-            if (type_is_sint) {
-                cast_op = FPToSI;
-            } else if (type_is_uint) {
-                cast_op = FPToUI;
-            }
-        }
-    } else if (value_is_sint) {
-        if (type_is_float) {
-            cast_op = SIToFP;
-        } else if (type_is_sint || type_is_uint) {
-            if (to_size > from_size) {
-                cast_op = SExt;
-            } else if (!implicit) {
-                cast_op = Trunc;
-            }
-        } else if (!implicit && type_is_ptr) {
-            cast_op = IntToPtr;
-        }
-    } else if (value_is_uint) {
-        if (type_is_float) {
-            cast_op = UIToFP;
-        } else if (type_is_sint || type_is_uint) {
-            if (to_size > from_size) {
-                cast_op = ZExt;
-            } else if (!implicit) {
-                cast_op = Trunc;
-            }
-        } else if (!implicit && type_is_ptr) {
-            cast_op = IntToPtr;
-        }
-    } else if (!implicit && value_is_ptr) {
-        if (type_is_sint || type_is_uint) {
-            cast_op = PtrToInt;
-        } else if (type_is_ptr) {
-            m_builder.CreateStore(value.value, m_current_result);
-
-            return true;
-        }
-    }
-
-    if (cast_op == CastOpsEnd) {
-        return false;
-    }
-
-    m_builder.CreateStore(
-        m_builder.CreateCast(cast_op, load_value(value).value, llvm_type),
-        m_current_result);
-
-    return true;
+    return false;
 }
 
 std::optional<Value> Codegen::generate_bin_expr(
