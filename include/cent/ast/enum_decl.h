@@ -1,6 +1,7 @@
 #ifndef CENT_AST_ENUM_DECL_H
 #define CENT_AST_ENUM_DECL_H
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -12,12 +13,15 @@ namespace cent::ast {
 struct EnumDecl : detail::Decl<EnumDecl> {
     [[nodiscard]] EnumDecl(
         std::size_t offset, OffsetValue<std::string> name,
+        std::unique_ptr<Type> type,
         std::vector<OffsetValue<std::string>> fields,
         bool is_public = false) noexcept
-    : Decl{offset, is_public}, name{std::move(name)},
+    : Decl{offset, is_public}, name{std::move(name)}, type{std::move(type)},
       fields{std::move(fields)} {}
 
     OffsetValue<std::string> name;
+    std::unique_ptr<Type> type;
+
     std::vector<OffsetValue<std::string>> fields;
 };
 

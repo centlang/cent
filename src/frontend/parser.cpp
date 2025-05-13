@@ -936,6 +936,16 @@ bool Parser::parse_enum(ast::Module& module, bool is_public) noexcept {
         return false;
     }
 
+    std::unique_ptr<ast::Type> type = nullptr;
+
+    if (!match(Token::Type::LeftBrace)) {
+        type = expect_type();
+
+        if (!type) {
+            return false;
+        }
+    }
+
     if (!expect("'{'", Token::Type::LeftBrace)) {
         return false;
     }
@@ -948,7 +958,7 @@ bool Parser::parse_enum(ast::Module& module, bool is_public) noexcept {
 
     module.enums.push_back(std::make_unique<ast::EnumDecl>(
         name->offset, ast::OffsetValue{name->value, name->offset},
-        std::move(fields), is_public));
+        std::move(type), std::move(fields), is_public));
 
     return true;
 }

@@ -6,11 +6,14 @@
 namespace cent::backend::types {
 
 struct Enum : detail::Type<Enum> {
-    [[nodiscard]] Enum(std::string name) noexcept : name{std::move(name)} {}
+    [[nodiscard]] Enum(
+        std::string name, std::shared_ptr<backend::Type> type) noexcept
+    : name{std::move(name)}, type{std::move(type)} {}
 
     std::string to_string() noexcept override { return name; }
 
     std::string name;
+    std::shared_ptr<backend::Type> type;
 };
 
 } // namespace cent::backend::types

@@ -227,8 +227,8 @@ llvm::Type* Codegen::generate(types::Struct& type) noexcept {
     return type.type;
 }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::Enum& type) noexcept {
-    return llvm::Type::getInt32Ty(m_context);
+llvm::Type* Codegen::generate(types::Enum& type) noexcept {
+    return type.type->codegen(*this);
 }
 
 llvm::Type* Codegen::generate(types::Optional& type) noexcept {
@@ -1397,14 +1397,16 @@ std::optional<Value> Codegen::generate(ast::Struct& decl) noexcept {
 }
 
 std::optional<Value> Codegen::generate(ast::EnumDecl& decl) noexcept {
+    auto& type = m_current_scope->types[decl.name.value];
+    auto& enum_type = static_cast<types::Enum&>(*type);
+
+    auto* llvm_type = enum_type.type->codegen(*this);
+
     for (std::size_t i = 0; i < decl.fields.size(); ++i) {
         auto& field = decl.fields[i];
 
         m_current_scope->scopes[decl.name.value].names[field.value] = Value{
-            m_current_scope->types[decl.name.value],
-            llvm::ConstantInt::getSigned(
-                llvm::Type::getInt32Ty(m_context),
-                static_cast<std::int32_t>(i))};
+            type, llvm::ConstantInt::get(llvm_type, i, type->is_signed_int())};
     }
 
     return std::nullopt;
@@ -1521,9 +1523,18 @@ void Codegen::generate(ast::Module& module, bool is_submodule) noexcept {
             continue;
         }
 
+        auto type = enum_decl->type ? enum_decl->type->codegen(*this)
+                                    : m_primitive_types["i32"];
+
+        if (!type->is_signed_int() && !type->is_unsigned_int() &&
+            !type->is_bool()) {
+            error(enum_decl->type->offset, "type mismatch");
+            continue;
+        }
+
         m_current_scope->types[enum_decl->name.value] =
             std::make_shared<types::Enum>(
-                m_current_scope_prefix + enum_decl->name.value);
+                m_current_scope_prefix + enum_decl->name.value, type);
     }
 
     for (auto& struct_decl : module.structs) {
