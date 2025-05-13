@@ -821,6 +821,8 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
                          ? m_current_result
                          : m_builder.CreateAlloca(struct_type.type);
 
+    bool stack_allocated = m_current_result == nullptr;
+
     if (expr.fields.size() != struct_type.fields.size()) {
         error(expr.type->offset, "incorrect number of fields initialized");
 
@@ -862,7 +864,7 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
         m_current_result = nullptr;
     }
 
-    return Value{type, variable};
+    return Value{type, variable, false, false, false, stack_allocated};
 }
 
 std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) noexcept {
@@ -877,6 +879,8 @@ std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) noexcept {
 
     auto* variable =
         m_current_result ? m_current_result : m_builder.CreateAlloca(llvm_type);
+
+    bool stack_allocated = m_current_result == nullptr;
 
     if (expr.elements.size() != array_type.size) {
         error(expr.type->offset, "incorrect number of elements");
@@ -910,7 +914,7 @@ std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) noexcept {
         m_current_result = nullptr;
     }
 
-    return Value{type, variable};
+    return Value{type, variable, false, false, false, stack_allocated};
 }
 
 std::optional<Value> Codegen::generate(ast::TupleLiteral& expr) noexcept {
@@ -946,6 +950,8 @@ std::optional<Value> Codegen::generate(ast::TupleLiteral& expr) noexcept {
     auto* variable = m_current_result ? m_current_result
                                       : m_builder.CreateAlloca(struct_type);
 
+    bool stack_allocated = m_current_result == nullptr;
+
     for (std::size_t i = 0; i < values.size(); ++i) {
         auto* pointer = m_builder.CreateStructGEP(struct_type, variable, i);
 
@@ -954,7 +960,11 @@ std::optional<Value> Codegen::generate(ast::TupleLiteral& expr) noexcept {
 
     return Value{
         std::make_shared<types::Tuple>(struct_type, std::move(types)),
-        variable};
+        variable,
+        false,
+        false,
+        false,
+        stack_allocated};
 }
 
 std::optional<Value> Codegen::generate(ast::Identifier& expr) noexcept {
@@ -1422,16 +1432,29 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
         }
     }
 
-    m_current_result = m_builder.CreateAlloca(llvm_type);
-
     if (value) {
+        if (value->stack_allocated) {
+            m_scope.names[decl.name.value] = {
+                type, value->value, decl.is_mutable};
+
+            return std::nullopt;
+        }
+
+        m_current_result = m_builder.CreateAlloca(llvm_type);
+
         m_builder.CreateStore(load_value(*value).value, m_current_result);
+
+        m_scope.names[decl.name.value] = {
+            type, m_current_result, decl.is_mutable};
     } else {
+        m_current_result = m_builder.CreateAlloca(llvm_type);
+
         m_builder.CreateStore(
             llvm::Constant::getNullValue(llvm_type), m_current_result);
-    }
 
-    m_scope.names[decl.name.value] = {type, m_current_result, decl.is_mutable};
+        m_scope.names[decl.name.value] = {
+            type, m_current_result, decl.is_mutable};
+    }
 
     m_current_result = nullptr;
 
@@ -1538,7 +1561,7 @@ std::optional<Value> Codegen::cast(
             m_builder.CreateStore(
                 llvm::Constant::getNullValue(llvm_type), variable);
 
-            return Value{type, variable};
+            return Value{type, variable, false, false, false, true};
         }
 
         auto* variable = m_builder.CreateAlloca(llvm_type);
@@ -1550,7 +1573,7 @@ std::optional<Value> Codegen::cast(
                 llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), false),
                 bool_ptr);
 
-            return Value{type, variable};
+            return Value{type, variable, false, false, false, true};
         }
 
         if (!types_equal(*contained, *value.type)) {
@@ -1566,7 +1589,7 @@ std::optional<Value> Codegen::cast(
             llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), true),
             bool_ptr);
 
-        return Value{type, variable};
+        return Value{type, variable, false, false, false, true};
     }
 
     return primitive_cast(type, llvm_type, value, implicit);
