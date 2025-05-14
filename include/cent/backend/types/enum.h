@@ -12,6 +12,8 @@ struct Enum : detail::Type<Enum> {
 
     std::string to_string() noexcept override { return name; }
 
+    bool is_enum() noexcept override { return true; };
+
     std::string name;
     std::shared_ptr<backend::Type> type;
 };

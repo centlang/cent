@@ -34,6 +34,7 @@ struct Type {
 
     virtual bool is_function() noexcept { return false; }
     virtual bool is_struct() noexcept { return false; }
+    virtual bool is_enum() noexcept { return false; }
 };
 
 namespace detail {

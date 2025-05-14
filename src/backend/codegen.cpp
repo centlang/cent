@@ -1674,8 +1674,10 @@ std::optional<Value> Codegen::primitive_cast(
     bool value_is_sint = value.type->is_signed_int();
     bool value_is_uint = value.type->is_unsigned_int();
     bool value_is_ptr = value.type->is_pointer();
+    bool value_is_enum = value.type->is_enum();
 
-    if (!value_is_float && !value_is_sint && !value_is_uint && !value_is_ptr) {
+    if (!value_is_float && !value_is_sint && !value_is_uint && !value_is_ptr &&
+        !value_is_enum) {
         return std::nullopt;
     }
 
@@ -1683,6 +1685,7 @@ std::optional<Value> Codegen::primitive_cast(
     bool type_is_sint = type->is_signed_int();
     bool type_is_uint = type->is_unsigned_int();
     bool type_is_ptr = type->is_pointer();
+    bool type_is_enum = type->is_enum();
 
     llvm::Instruction::CastOps cast_op = CastOpsEnd;
 
@@ -1700,10 +1703,13 @@ std::optional<Value> Codegen::primitive_cast(
                 cast_op = FPToUI;
             }
         }
-    } else if (value_is_sint) {
+    } else if (
+        value_is_sint ||
+        (!implicit && value_is_enum &&
+         static_cast<types::Enum&>(*value.type).type->is_signed_int())) {
         if (type_is_float) {
             cast_op = SIToFP;
-        } else if (type_is_sint || type_is_uint) {
+        } else if (type_is_sint || type_is_uint || type_is_enum) {
             if (to_size > from_size) {
                 cast_op = SExt;
             } else if (!implicit) {
@@ -1712,10 +1718,13 @@ std::optional<Value> Codegen::primitive_cast(
         } else if (!implicit && type_is_ptr) {
             cast_op = IntToPtr;
         }
-    } else if (value_is_uint) {
+    } else if (
+        value_is_uint ||
+        (!implicit && value_is_enum &&
+         static_cast<types::Enum&>(*value.type).type->is_unsigned_int())) {
         if (type_is_float) {
             cast_op = UIToFP;
-        } else if (type_is_sint || type_is_uint) {
+        } else if (type_is_sint || type_is_uint || type_is_enum) {
             if (to_size > from_size) {
                 cast_op = ZExt;
             } else if (!implicit) {
