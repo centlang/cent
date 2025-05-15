@@ -1737,7 +1737,7 @@ std::optional<Value> Codegen::primitive_cast(
         if (type_is_sint || type_is_uint) {
             cast_op = PtrToInt;
         } else if (type_is_ptr) {
-            return value;
+            return Value{type, value.value};
         }
     }
 
