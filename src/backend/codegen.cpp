@@ -822,11 +822,9 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
     auto& struct_type = static_cast<types::Struct&>(*type);
     auto& members = m_members[struct_type.type];
 
-    auto* variable = m_current_result
-                         ? m_current_result
-                         : m_builder.CreateAlloca(struct_type.type);
-
     bool stack_allocated = m_current_result == nullptr;
+
+    bool is_const = true;
 
     if (expr.fields.size() != struct_type.fields.size()) {
         error(expr.type->offset, "incorrect number of fields initialized");
@@ -834,12 +832,42 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
         return std::nullopt;
     }
 
+    std::vector<Value> values;
+    values.reserve(expr.fields.size());
+
     for (auto& field : expr.fields) {
         auto value = field.value->codegen(*this);
 
         if (!value) {
             return std::nullopt;
         }
+
+        if (!llvm::isa<llvm::Constant>(value->value)) {
+            is_const = false;
+        }
+
+        values.push_back(std::move(*value));
+    }
+
+    if (is_const) {
+        std::vector<llvm::Constant*> llvm_values;
+        llvm_values.reserve(expr.fields.size());
+
+        for (auto& value : values) {
+            llvm_values.push_back(static_cast<llvm::Constant*>(value.value));
+        }
+
+        return Value{
+            type, llvm::ConstantStruct::get(struct_type.type, llvm_values)};
+    }
+
+    auto* variable = m_current_result
+                         ? m_current_result
+                         : m_builder.CreateAlloca(struct_type.type);
+
+    for (std::size_t i = 0; i < expr.fields.size(); ++i) {
+        auto& field = expr.fields[i];
+        auto& value = values[i];
 
         auto iterator = members.find(field.name.value);
 
@@ -856,10 +884,10 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
         m_current_result =
             m_builder.CreateStructGEP(struct_type.type, variable, index);
 
-        if (!cast_to_result(struct_type.fields[index], *value)) {
+        if (!cast_to_result(struct_type.fields[index], value)) {
             type_mismatch(
                 expr.fields[index].value->offset, *struct_type.fields[index],
-                *value->type);
+                *value.type);
 
             m_current_result = nullptr;
 
