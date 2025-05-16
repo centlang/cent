@@ -908,12 +908,11 @@ std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) noexcept {
     }
 
     auto& array_type = static_cast<types::Array&>(*type);
-    auto* llvm_type = type->codegen(*this);
-
-    auto* variable =
-        m_current_result ? m_current_result : m_builder.CreateAlloca(llvm_type);
+    auto* llvm_type = static_cast<llvm::ArrayType*>(type->codegen(*this));
 
     bool stack_allocated = m_current_result == nullptr;
+
+    bool is_const = true;
 
     if (expr.elements.size() != array_type.size) {
         error(expr.type->offset, "incorrect number of elements");
@@ -921,12 +920,39 @@ std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) noexcept {
         return std::nullopt;
     }
 
-    for (std::size_t i = 0; i < expr.elements.size(); ++i) {
-        auto value = expr.elements[i]->codegen(*this);
+    std::vector<Value> values;
+    values.reserve(expr.elements.size());
+
+    for (auto& element : expr.elements) {
+        auto value = element->codegen(*this);
 
         if (!value) {
             return std::nullopt;
         }
+
+        if (!llvm::isa<llvm::Constant>(value->value)) {
+            is_const = false;
+        }
+
+        values.push_back(std::move(*value));
+    }
+
+    if (is_const) {
+        std::vector<llvm::Constant*> llvm_values;
+        llvm_values.reserve(expr.elements.size());
+
+        for (auto& value : values) {
+            llvm_values.push_back(static_cast<llvm::Constant*>(value.value));
+        }
+
+        return Value{type, llvm::ConstantArray::get(llvm_type, llvm_values)};
+    }
+
+    auto* variable =
+        m_current_result ? m_current_result : m_builder.CreateAlloca(llvm_type);
+
+    for (std::size_t i = 0; i < expr.elements.size(); ++i) {
+        auto& value = values[i];
 
         auto* intptr = m_module->getDataLayout().getIntPtrType(m_context);
 
@@ -935,9 +961,9 @@ std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) noexcept {
             {llvm::ConstantInt::get(intptr, 0),
              llvm::ConstantInt::get(intptr, i)});
 
-        if (!cast_to_result(array_type.type, *value)) {
+        if (!cast_to_result(array_type.type, value)) {
             type_mismatch(
-                expr.elements[i]->offset, *array_type.type, *value->type);
+                expr.elements[i]->offset, *array_type.type, *value.type);
 
             m_current_result = nullptr;
 
