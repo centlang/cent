@@ -977,6 +977,8 @@ std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) noexcept {
 }
 
 std::optional<Value> Codegen::generate(ast::TupleLiteral& expr) noexcept {
+    bool is_const = true;
+
     std::vector<Value> values;
     values.reserve(expr.elements.size());
 
@@ -985,6 +987,10 @@ std::optional<Value> Codegen::generate(ast::TupleLiteral& expr) noexcept {
 
         if (!value) {
             return std::nullopt;
+        }
+
+        if (!llvm::isa<llvm::Constant>(value->value)) {
+            is_const = false;
         }
 
         values.push_back(*value);
@@ -1006,10 +1012,23 @@ std::optional<Value> Codegen::generate(ast::TupleLiteral& expr) noexcept {
 
     auto* struct_type = llvm::StructType::create(llvm_types);
 
+    bool stack_allocated = m_current_result == nullptr;
+
+    if (is_const) {
+        std::vector<llvm::Constant*> llvm_values;
+        llvm_values.reserve(expr.elements.size());
+
+        for (auto& value : values) {
+            llvm_values.push_back(static_cast<llvm::Constant*>(value.value));
+        }
+
+        return Value{
+            std::make_shared<types::Tuple>(struct_type, std::move(types)),
+            llvm::ConstantStruct::get(struct_type, llvm_values)};
+    }
+
     auto* variable = m_current_result ? m_current_result
                                       : m_builder.CreateAlloca(struct_type);
-
-    bool stack_allocated = m_current_result == nullptr;
 
     for (std::size_t i = 0; i < values.size(); ++i) {
         auto* pointer = m_builder.CreateStructGEP(struct_type, variable, i);
