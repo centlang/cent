@@ -1473,13 +1473,48 @@ std::optional<Value> Codegen::generate(ast::EnumDecl& decl) noexcept {
     auto& type = m_current_scope->types[decl.name.value];
     auto& enum_type = static_cast<types::Enum&>(*type);
 
-    auto* llvm_type = enum_type.type->codegen(*this);
+    auto* llvm_type = type->codegen(*this);
+
+    std::uint64_t number = 0;
 
     for (std::size_t i = 0; i < decl.fields.size(); ++i) {
         auto& field = decl.fields[i];
 
-        m_current_scope->scopes[decl.name.value].names[field.value] = Value{
-            type, llvm::ConstantInt::get(llvm_type, i, type->is_signed_int())};
+        if (!field.value) {
+            m_current_scope->scopes[decl.name.value].names[field.name.value] =
+                Value{
+                    type, llvm::ConstantInt::get(
+                              llvm_type, number++, type->is_signed_int())};
+
+            continue;
+        }
+
+        auto value = field.value->codegen(*this);
+
+        if (!value) {
+            return std::nullopt;
+        }
+
+        if (auto val = cast(enum_type.type, *value)) {
+            m_current_scope->scopes[decl.name.value].names[field.name.value] =
+                *val;
+
+            if (auto* constant =
+                    llvm::dyn_cast<llvm::ConstantInt>(val->value)) {
+                number = enum_type.is_signed_int() ? constant->getSExtValue()
+                                                   : constant->getZExtValue();
+            } else {
+                error(field.value->offset, "not a constant");
+
+                return std::nullopt;
+            }
+        } else {
+            type_mismatch(field.value->offset, *enum_type.type, *value->type);
+
+            return std::nullopt;
+        }
+
+        ++number;
     }
 
     return std::nullopt;

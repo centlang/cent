@@ -133,7 +133,7 @@ private:
 
     [[nodiscard]] std::vector<ast::Struct::Field> parse_fields() noexcept;
 
-    [[nodiscard]] std::vector<ast::OffsetValue<std::string>>
+    [[nodiscard]] std::vector<ast::EnumDecl::Field>
     parse_enum_fields() noexcept;
 
     [[nodiscard]] bool parse_fn(

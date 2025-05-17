@@ -823,13 +823,25 @@ std::vector<ast::Struct::Field> Parser::parse_fields() noexcept {
     return result;
 }
 
-std::vector<ast::OffsetValue<std::string>>
-Parser::parse_enum_fields() noexcept {
-    std::vector<ast::OffsetValue<std::string>> result;
+std::vector<ast::EnumDecl::Field> Parser::parse_enum_fields() noexcept {
+    std::vector<ast::EnumDecl::Field> result;
+
+    auto parse_field = [&] {
+        auto name = get();
+
+        if (match(Token::Type::Equal)) {
+            next();
+            auto value = expect_expr(false);
+
+            result.emplace_back(
+                ast::OffsetValue{name.value, name.offset}, std::move(value));
+        } else {
+            result.emplace_back(ast::OffsetValue{name.value, name.offset});
+        }
+    };
 
     while (match(Token::Type::Identifier)) {
-        auto name = get();
-        result.emplace_back(ast::OffsetValue{name.value, name.offset});
+        parse_field();
 
         if (match(Token::Type::RightBrace)) {
             break;
