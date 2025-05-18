@@ -123,9 +123,14 @@ std::shared_ptr<Type> Codegen::generate(ast::ArrayType& type) noexcept {
         return nullptr;
     }
 
-    auto* constant = static_cast<llvm::ConstantInt*>(value->value);
+    if (auto* constant = llvm::dyn_cast<llvm::ConstantInt>(value->value)) {
+        return std::make_shared<types::Array>(
+            contained, constant->getZExtValue());
+    }
 
-    return std::make_shared<types::Array>(contained, constant->getZExtValue());
+    error(type.offset, "not a constant");
+
+    return nullptr;
 }
 
 std::shared_ptr<Type> Codegen::generate(ast::TupleType& type) noexcept {

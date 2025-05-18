@@ -4,7 +4,6 @@
 #include <memory>
 #include <utility>
 
-#include "cent/ast/literals.h"
 #include "cent/ast/node.h"
 
 namespace cent::ast {
@@ -12,11 +11,11 @@ namespace cent::ast {
 struct ArrayType : detail::Type<ArrayType> {
     [[nodiscard]] ArrayType(
         std::size_t offset, std::unique_ptr<ast::Type> type,
-        std::unique_ptr<IntLiteral> size) noexcept
+        std::unique_ptr<Expression> size) noexcept
     : Type{offset}, type{std::move(type)}, size{std::move(size)} {}
 
     std::unique_ptr<ast::Type> type;
-    std::unique_ptr<IntLiteral> size;
+    std::unique_ptr<Expression> size;
 };
 
 } // namespace cent::ast

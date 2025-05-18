@@ -563,7 +563,7 @@ std::unique_ptr<ast::ArrayType> Parser::parse_array_type() noexcept {
         return nullptr;
     }
 
-    auto size = expect("array size", Token::Type::IntLiteral);
+    auto size = expect_expr(false);
 
     if (!size) {
         return nullptr;
@@ -574,8 +574,7 @@ std::unique_ptr<ast::ArrayType> Parser::parse_array_type() noexcept {
     }
 
     return std::make_unique<ast::ArrayType>(
-        offset, std::move(type),
-        std::make_unique<ast::IntLiteral>(size->offset, size->value));
+        offset, std::move(type), std::move(size));
 }
 
 std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
