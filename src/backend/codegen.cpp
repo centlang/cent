@@ -1673,6 +1673,10 @@ void Codegen::generate(ast::Module& module, bool is_submodule) noexcept {
             continue;
         }
 
+        if (is_submodule && !enum_decl->is_public) {
+            continue;
+        }
+
         m_current_scope->types[enum_decl->name.value] =
             std::make_shared<types::Enum>(
                 m_current_scope_prefix + enum_decl->name.value, type);
@@ -1689,18 +1693,34 @@ void Codegen::generate(ast::Module& module, bool is_submodule) noexcept {
             continue;
         }
 
+        if (is_submodule && !struct_decl->is_public) {
+            continue;
+        }
+
         llvm::StructType::create(m_context, struct_decl->name.value);
     }
 
     for (auto& enum_decl : module.enums) {
+        if (is_submodule && !enum_decl->is_public) {
+            continue;
+        }
+
         enum_decl->codegen(*this);
     }
 
     for (auto& struct_decl : module.structs) {
+        if (is_submodule && !struct_decl->is_public) {
+            continue;
+        }
+
         struct_decl->codegen(*this);
     }
 
     for (auto& function : module.functions) {
+        if (is_submodule && !function->is_public) {
+            continue;
+        }
+
         generate_fn_proto(*function);
     }
 
