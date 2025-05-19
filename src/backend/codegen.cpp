@@ -1122,12 +1122,28 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) noexcept {
 
     auto iterator = m_methods[value->type].find(expr.name.value);
 
-    if (iterator == m_methods[value->type].end()) {
+    auto no_such_method = [&] {
         error(
             expr.name.offset,
             fmt::format("no such method: '{}'", expr.name.value));
+    };
 
-        return std::nullopt;
+    if (iterator == m_methods[value->type].end()) {
+        if (!value->type->is_pointer()) {
+            no_such_method();
+
+            return std::nullopt;
+        }
+
+        iterator =
+            m_methods[static_cast<types::Pointer&>(*value->type).type].find(
+                expr.name.value);
+
+        if (iterator == m_methods[value->type].end()) {
+            no_such_method();
+
+            return std::nullopt;
+        }
     }
 
     auto arg_size = iterator->second.function->arg_size();
@@ -1155,15 +1171,27 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) noexcept {
             return std::nullopt;
         }
 
-        if (!value->value->getType()->isPointerTy()) {
-            error(expr.value->offset, "type mismatch");
+        if (value->type->is_pointer()) {
+            arguments.push_back(load_value(*value).value);
+        } else {
+            if (!value->value->getType()->isPointerTy()) {
+                error(expr.value->offset, "type mismatch");
 
-            return std::nullopt;
+                return std::nullopt;
+            }
+
+            arguments.push_back(value->value);
         }
-
-        arguments.push_back(value->value);
     } else {
-        arguments.push_back(load_value(*value).value);
+        auto val = load_value(*value);
+
+        if (value->type->is_pointer()) {
+            arguments.push_back(m_builder.CreateLoad(
+                static_cast<types::Pointer&>(*value->type).type->codegen(*this),
+                val.value));
+        } else {
+            arguments.push_back(val.value);
+        }
     }
 
     for (std::size_t i = 0; i < expr.arguments.size(); ++i) {
