@@ -1805,12 +1805,6 @@ std::optional<Value> Codegen::primitive_cast(
     std::shared_ptr<Type>& type, llvm::Type* llvm_type, Value& value,
     bool implicit) noexcept {
     using enum llvm::Instruction::CastOps;
-
-    auto layout = m_module->getDataLayout();
-
-    std::size_t from_size = layout.getTypeAllocSize(value.type->codegen(*this));
-    std::size_t to_size = layout.getTypeAllocSize(llvm_type);
-
     bool value_is_float = value.type->is_float();
     bool value_is_sint = value.type->is_signed_int();
     bool value_is_uint = value.type->is_unsigned_int();
@@ -1821,6 +1815,11 @@ std::optional<Value> Codegen::primitive_cast(
         !value_is_enum) {
         return std::nullopt;
     }
+
+    auto layout = m_module->getDataLayout();
+
+    std::size_t from_size = layout.getTypeAllocSize(value.type->codegen(*this));
+    std::size_t to_size = layout.getTypeAllocSize(llvm_type);
 
     bool type_is_float = type->is_float();
     bool type_is_sint = type->is_signed_int();
