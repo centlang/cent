@@ -993,6 +993,7 @@ bool Parser::parse_submodule(
         module.functions.size() + submodule->functions.size());
 
     module.structs.reserve(module.structs.size() + submodule->structs.size());
+    module.enums.reserve(module.enums.size() + submodule->enums.size());
 
     for (auto& function : submodule->functions) {
         module.functions.push_back(std::move(function));
@@ -1000,6 +1001,10 @@ bool Parser::parse_submodule(
 
     for (auto& struct_decl : submodule->structs) {
         module.structs.push_back(std::move(struct_decl));
+    }
+
+    for (auto& enum_decl : submodule->enums) {
+        module.enums.push_back(std::move(enum_decl));
     }
 
     for (auto& submodule : submodule->submodules) {
