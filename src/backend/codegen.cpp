@@ -1955,7 +1955,7 @@ std::optional<Value> Codegen::generate_bin_expr(
             }
 
             auto* bool_ptr = m_builder.CreateStructGEP(
-                value->value->getType(), value->value, optional_member_bool);
+                type.codegen(*this), value->value, optional_member_bool);
 
             llvm::Value* val = m_builder.CreateLoad(
                 llvm::Type::getInt1Ty(m_context), bool_ptr);
