@@ -125,6 +125,7 @@ void Parser::expect_stmt(ast::BlockStmt& block) noexcept {
         return;
     case Let:
     case Mut:
+    case Const:
         parse_var(block);
         break;
     case Return:
@@ -679,7 +680,19 @@ std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
 
 void Parser::parse_var(ast::BlockStmt& block) noexcept {
     auto offset = peek().offset;
-    auto is_mutable = get().type == Token::Type::Mut;
+
+    auto mutability = [&] {
+        switch (get().type) {
+        case Token::Type::Let:
+            return ast::VarDecl::Mut::Immut;
+        case Token::Type::Mut:
+            return ast::VarDecl::Mut::Mut;
+        case Token::Type::Const:
+            return ast::VarDecl::Mut::Const;
+        default:
+            return ast::VarDecl::Mut::Mut;
+        }
+    }();
 
     auto name = expect("variable name", Token::Type::Identifier);
 
@@ -706,7 +719,7 @@ void Parser::parse_var(ast::BlockStmt& block) noexcept {
         }
 
         block.body.push_back(std::make_unique<ast::VarDecl>(
-            offset, is_mutable, ast::OffsetValue{name->value, name->offset},
+            offset, mutability, ast::OffsetValue{name->value, name->offset},
             std::move(type), nullptr));
 
         return;
@@ -721,7 +734,7 @@ void Parser::parse_var(ast::BlockStmt& block) noexcept {
     }
 
     block.body.push_back(std::make_unique<ast::VarDecl>(
-        offset, is_mutable, ast::OffsetValue{name->value, name->offset},
+        offset, mutability, ast::OffsetValue{name->value, name->offset},
         std::move(type), std::move(value)));
 }
 

@@ -420,6 +420,11 @@ void Lexer::ident() noexcept {
         return;
     }
 
+    if (m_token.value == "const") {
+        keyword(Const);
+        return;
+    }
+
     if (m_token.value == "return") {
         keyword(Return);
         return;

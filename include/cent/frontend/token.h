@@ -91,6 +91,7 @@ struct Token {
 
         Let,
         Mut,
+        Const,
 
         Return,
 

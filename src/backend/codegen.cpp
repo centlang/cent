@@ -1580,6 +1580,33 @@ std::optional<Value> Codegen::generate(ast::EnumDecl& decl) noexcept {
 }
 
 std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
+    if (decl.mutability == ast::VarDecl::Mut::Const) {
+        if (!decl.value) {
+            error(decl.name.offset, "constant has no value");
+            return std::nullopt;
+        }
+
+        auto value = decl.value->codegen(*this);
+
+        if (decl.type) {
+            auto type = decl.type->codegen(*this);
+            value = cast(type, *value);
+
+            if (!value) {
+                type_mismatch(decl.value->offset, *type, *value->type);
+                return std::nullopt;
+            }
+        }
+
+        if (!llvm::isa<llvm::Constant>(value->value)) {
+            error(decl.value->offset, "not a constant");
+            return std::nullopt;
+        }
+
+        m_scope.names[decl.name.value] = *value;
+        return std::nullopt;
+    }
+
     std::optional<Value> value = std::nullopt;
     std::shared_ptr<Type> type = nullptr;
 
@@ -1622,7 +1649,8 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
                 type_mismatch(decl.value->offset, *type, *value->type);
             } else {
                 m_scope.names[decl.name.value] = {
-                    type, m_current_result, decl.is_mutable};
+                    type, m_current_result,
+                    decl.mutability == ast::VarDecl::Mut::Mut};
             }
 
             m_current_result = nullptr;
@@ -1634,7 +1662,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
     if (value) {
         if (value->stack_allocated) {
             m_scope.names[decl.name.value] = {
-                type, value->value, decl.is_mutable};
+                type, value->value, decl.mutability == ast::VarDecl::Mut::Mut};
 
             return std::nullopt;
         }
@@ -1644,7 +1672,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
         m_builder.CreateStore(load_value(*value).value, m_current_result);
 
         m_scope.names[decl.name.value] = {
-            type, m_current_result, decl.is_mutable};
+            type, m_current_result, decl.mutability == ast::VarDecl::Mut::Mut};
     } else {
         m_current_result = m_builder.CreateAlloca(llvm_type);
 
@@ -1652,7 +1680,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
             llvm::Constant::getNullValue(llvm_type), m_current_result);
 
         m_scope.names[decl.name.value] = {
-            type, m_current_result, decl.is_mutable};
+            type, m_current_result, decl.mutability == ast::VarDecl::Mut::Mut};
     }
 
     m_current_result = nullptr;
