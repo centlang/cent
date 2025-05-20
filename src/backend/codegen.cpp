@@ -1083,8 +1083,11 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
     auto* function = static_cast<llvm::Function*>(value->value);
 
     auto arg_size = function->arg_size();
+    auto passed_args_size = expr.arguments.size();
+    auto default_args_size = type.default_args.size();
 
-    if (arg_size != expr.arguments.size()) {
+    if (passed_args_size < arg_size - default_args_size ||
+        passed_args_size > arg_size) {
         error(expr.identifier->offset, "incorrect number of arguments passed");
 
         return std::nullopt;
@@ -1093,7 +1096,7 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
     std::vector<llvm::Value*> arguments;
     arguments.reserve(arg_size);
 
-    for (std::size_t i = 0; i < arg_size; ++i) {
+    for (std::size_t i = 0; i < passed_args_size; ++i) {
         auto value = expr.arguments[i]->codegen(*this);
 
         if (!value) {
@@ -1108,6 +1111,11 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
 
             return std::nullopt;
         }
+    }
+
+    for (std::size_t i = default_args_size - (arg_size - passed_args_size);
+         i < default_args_size; ++i) {
+        arguments.push_back(type.default_args[i]);
     }
 
     return Value{type.return_type, m_builder.CreateCall(function, arguments)};
@@ -2267,9 +2275,10 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
     }
 
     auto* llvm_return_type = return_type->codegen(*this);
-
     std::vector<llvm::Type*> llvm_param_types;
+
     std::vector<std::shared_ptr<Type>> param_types;
+    std::vector<llvm::Constant*> default_args;
 
     llvm_param_types.reserve(decl.proto.params.size());
     param_types.reserve(decl.proto.params.size());
@@ -2294,6 +2303,25 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
 
         llvm_param_types.push_back(llvm_type);
         param_types.push_back(type);
+
+        if (!parameter.value) {
+            continue;
+        }
+
+        auto value = parameter.value->codegen(*this);
+
+        if (!value) {
+            return;
+        }
+
+        auto val = cast(type, *value);
+
+        if (!llvm::isa<llvm::Constant>(val->value)) {
+            error(parameter.value->offset, "not a constant");
+            return;
+        }
+
+        default_args.push_back(static_cast<llvm::Constant*>(val->value));
     }
 
     auto* function_type =
@@ -2308,7 +2336,7 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
     if (!decl.proto.type) {
         scope.names[decl.proto.name.value] = Value{
             std::make_shared<types::Function>(
-                return_type, std::move(param_types)),
+                return_type, std::move(param_types), std::move(default_args)),
             function};
 
         return;
@@ -2317,8 +2345,8 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
     auto type = get_type(
         decl.proto.type->offset, decl.proto.type->value, *m_current_scope);
 
-    auto func_type =
-        std::make_shared<types::Function>(return_type, std::move(param_types));
+    auto func_type = std::make_shared<types::Function>(
+        return_type, std::move(param_types), std::move(default_args));
 
     scope.names[decl.proto.name.value] = {func_type, function};
 

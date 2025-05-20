@@ -779,10 +779,22 @@ std::vector<ast::FnDecl::Param> Parser::parse_params() noexcept {
             return;
         }
 
-        if (auto type = expect_var_type()) {
-            result.emplace_back(
-                ast::OffsetValue{name->value, name->offset}, std::move(type));
+        std::unique_ptr<ast::Type> type = expect_var_type();
+
+        if (!type) {
+            return;
         }
+
+        std::unique_ptr<ast::Expression> value = nullptr;
+
+        if (match(Token::Type::Equal)) {
+            next();
+            value = expect_expr(false);
+        }
+
+        result.emplace_back(
+            ast::OffsetValue{name->value, name->offset}, std::move(type),
+            std::move(value));
     };
 
     if (match(Token::Type::Identifier)) {

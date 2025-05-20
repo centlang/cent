@@ -17,6 +17,8 @@ struct FnDecl : detail::Decl<FnDecl> {
     struct Param {
         OffsetValue<std::string> name;
         std::unique_ptr<Type> type;
+
+        std::unique_ptr<Expression> value;
     };
 
     struct Proto {
