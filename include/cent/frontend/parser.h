@@ -73,10 +73,13 @@ private:
         return ((type == types) || ...);
     }
 
-    std::optional<Token>
-    expect(std::string_view expected, auto... types) noexcept {
+    void expected(std::string_view what) noexcept {
+        error(fmt::format("expected {}", log::bold(what)));
+    }
+
+    std::optional<Token> expect(std::string_view what, auto... types) noexcept {
         if (!match(types...)) {
-            error(fmt::format("expected {}", expected));
+            expected(what);
             return std::nullopt;
         }
 

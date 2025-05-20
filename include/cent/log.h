@@ -181,42 +181,56 @@ inline auto strikethrough(Styled<ValueType> value) noexcept {
     return mode(value, Strikethrough);
 }
 
-inline void
-log(std::string_view type, std::uint32_t line, std::uint32_t column,
-    std::string_view filename, std::string_view message) noexcept {
-    fmt::print(
-        stderr, "{}:{}:{}: {}: {}\n", filename, line, column, type, message);
+template <typename ValueType> inline auto quoted(ValueType value) noexcept {
+    return fmt::format("'{}'", value);
 }
 
-inline void log(std::string_view type, std::string_view message) noexcept {
-    fmt::print(stderr, "{}: {}\n", type, message);
+inline void
+log(std::string_view type, Color type_fg, std::uint32_t line,
+    std::uint32_t column, std::string_view filename,
+    std::string_view message) noexcept {
+    fmt::print(
+        stderr, "{} {} {}\n",
+        bold(fmt::format("{}:{}:{}:", filename, line, column)),
+        bold(fg(fmt::format("{}:", type), type_fg)), message);
+}
+
+inline void
+log(std::string_view type, Color type_fg, std::string_view message) noexcept {
+    fmt::print(
+        stderr, "{} {}\n", bold(fg(fmt::format("{}:", type), type_fg)),
+        message);
 }
 
 inline void error(
     std::uint32_t line, std::uint32_t column, std::string_view filename,
     std::string_view message) noexcept {
-    log("error", line, column, filename, message);
+    log("error", Red, line, column, filename, message);
 }
 
-inline void error(std::string_view message) noexcept { log("error", message); }
+inline void error(std::string_view message) noexcept {
+    log("error", Red, message);
+}
 
 inline void warning(
     std::uint32_t line, std::uint32_t column, std::string_view filename,
     std::string_view message) noexcept {
-    log("warning", line, column, filename, message);
+    log("warning", Yellow, line, column, filename, message);
 }
 
 inline void warning(std::string_view message) noexcept {
-    log("warning", message);
+    log("warning", Yellow, message);
 }
 
 inline void note(
     std::uint32_t line, std::uint32_t column, std::string_view filename,
     std::string_view message) noexcept {
-    log("note", line, column, filename, message);
+    log("note", Cyan, line, column, filename, message);
 }
 
-inline void note(std::string_view message) noexcept { log("note", message); }
+inline void note(std::string_view message) noexcept {
+    log("note", Cyan, message);
+}
 
 } // namespace cent::log
 

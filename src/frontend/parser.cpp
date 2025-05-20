@@ -478,7 +478,7 @@ std::unique_ptr<ast::BlockStmt> Parser::expect_block() noexcept {
 
     while (true) {
         if (match(Token::Type::Eof)) {
-            error("expected '}'");
+            expected(fmt::format("{}", log::bold("'}'")));
             return result;
         }
 
@@ -699,7 +699,8 @@ void Parser::parse_var(ast::BlockStmt& block) noexcept {
 
     if (!match(Token::Type::Equal)) {
         if (!type) {
-            error("expected '=' or ':'");
+            expected(
+                fmt::format("{} or {}", log::bold("'='"), log::bold("':'")));
 
             return;
         }
@@ -911,7 +912,7 @@ bool Parser::parse_fn(
     } else if (match(Token::Type::Semicolon)) {
         next();
     } else {
-        error("expected '{' or ';'");
+        expected(fmt::format("{} or {}", log::bold("'{'"), log::bold("';'")));
 
         return false;
     }
@@ -1091,8 +1092,9 @@ bool Parser::parse_with(ast::Module& module) noexcept {
 
     if (!module_path.directory && !module_path.file) {
         error(
-            name->offset,
-            fmt::format("could not find module '{}'", name->value));
+            name->offset, fmt::format(
+                              "could not find module {}",
+                              log::bold(log::quoted(name->value))));
 
         return false;
     }

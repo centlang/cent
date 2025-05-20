@@ -488,7 +488,7 @@ std::optional<Value> Codegen::generate(ast::WhileLoop& stmt) noexcept {
 
 std::optional<Value> Codegen::generate(ast::BreakStmt& stmt) noexcept {
     if (!m_loop_end) {
-        error(stmt.offset, "'break' not in loop");
+        error(stmt.offset, fmt::format("{} not in loop", log::bold("'break'")));
 
         return std::nullopt;
     }
@@ -500,7 +500,9 @@ std::optional<Value> Codegen::generate(ast::BreakStmt& stmt) noexcept {
 
 std::optional<Value> Codegen::generate(ast::ContinueStmt& stmt) noexcept {
     if (!m_loop_body) {
-        error(stmt.offset, "'continue' not in loop");
+        error(
+            stmt.offset,
+            fmt::format("{} not in loop", log::bold("'continue'")));
 
         return std::nullopt;
     }
@@ -542,7 +544,10 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
         }
 
         if (!value->type->is_signed_int() && !value->type->is_unsigned_int()) {
-            error(expr.offset, "cannot apply '-' to a non-number type");
+            error(
+                expr.offset,
+                fmt::format(
+                    "cannot apply {} to a non-number type", log::bold("'-'")));
 
             return std::nullopt;
         }
@@ -551,7 +556,10 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
             value->type, m_builder.CreateNeg(load_value(*value).value)};
     case Bang:
         if (!value->type->is_bool()) {
-            error(expr.offset, "cannot apply '!' to a non-boolean type");
+            error(
+                expr.offset,
+                fmt::format(
+                    "cannot apply {} to a non-boolean type", log::bold("'!'")));
 
             return std::nullopt;
         }
@@ -583,7 +591,10 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
             value->value, false, true};
     case Not:
         if (!value->type->is_signed_int() && !value->type->is_unsigned_int()) {
-            error(expr.offset, "cannot apply '~' to a non-integer type");
+            error(
+                expr.offset,
+                fmt::format(
+                    "cannot apply {} to a non-integer type", log::bold("'~'")));
 
             return std::nullopt;
         }
@@ -879,7 +890,9 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
         if (iterator == members.end()) {
             error(
                 field.name.offset,
-                fmt::format("no such member: '{}'", field.name.value));
+                fmt::format(
+                    "no such member: {}",
+                    log::bold(log::quoted(field.name.value))));
 
             return std::nullopt;
         }
@@ -1133,7 +1146,8 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) noexcept {
     auto no_such_method = [&] {
         error(
             expr.name.offset,
-            fmt::format("no such method: '{}'", expr.name.value));
+            fmt::format(
+                "no such method: {}", log::bold(log::quoted(expr.name.value))));
     };
 
     if (iterator == m_methods[value->type].end()) {
@@ -1173,8 +1187,8 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) noexcept {
             error(
                 expr.name.offset,
                 fmt::format(
-                    "cannot call method '{}' on an immutable value",
-                    expr.name.value));
+                    "cannot call method {} on an immutable value",
+                    log::bold(log::quoted(expr.name.value))));
 
             return std::nullopt;
         }
@@ -1235,8 +1249,9 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
 
     auto no_such_member = [&] {
         error(
-            expr.member.offset,
-            fmt::format("no such member: '{}'", expr.member.value));
+            expr.member.offset, fmt::format(
+                                    "no such member: {}",
+                                    log::bold(log::quoted(expr.member.value))));
     };
 
     if (parent->type->is_tuple()) {
@@ -1307,8 +1322,9 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
 
     if (iterator == m_members[type->type].end()) {
         error(
-            expr.member.offset,
-            fmt::format("no such member: '{}'", expr.member.value));
+            expr.member.offset, fmt::format(
+                                    "no such member: {}",
+                                    log::bold(log::quoted(expr.member.value))));
 
         return std::nullopt;
     }
@@ -1489,8 +1505,10 @@ std::optional<Value> Codegen::generate(ast::Struct& decl) noexcept {
 
         if (llvm_type->isVoidTy()) {
             error(
-                field.name.offset,
-                fmt::format("'{}' cannot be of type 'void'", field.name.value));
+                field.name.offset, fmt::format(
+                                       "{} cannot be of type {}",
+                                       log::bold(log::quoted(field.name.value)),
+                                       log::bold("'void'")));
 
             return std::nullopt;
         }
@@ -1578,8 +1596,10 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
 
         if (llvm_type->isVoidTy()) {
             error(
-                decl.name.offset,
-                fmt::format("'{}' cannot be of type 'void'", decl.name.value));
+                decl.name.offset, fmt::format(
+                                      "{} cannot be of type {}",
+                                      log::bold(log::quoted(decl.name.value)),
+                                      log::bold("'void'")));
 
             return std::nullopt;
         }
@@ -1667,7 +1687,9 @@ void Codegen::generate(ast::Module& module, bool is_submodule) noexcept {
         if (m_current_scope->types.contains(enum_decl->name.value)) {
             error(
                 enum_decl->name.offset,
-                fmt::format("'{}' is already defined", enum_decl->name.value));
+                fmt::format(
+                    "{} is already defined",
+                    log::bold(log::quoted(enum_decl->name.value))));
 
             continue;
         }
@@ -1696,7 +1718,8 @@ void Codegen::generate(ast::Module& module, bool is_submodule) noexcept {
             error(
                 struct_decl->name.offset,
                 fmt::format(
-                    "'{}' is already defined", struct_decl->name.value));
+                    "{} is already defined",
+                    log::bold(log::quoted(struct_decl->name.value))));
 
             continue;
         }
@@ -2211,7 +2234,9 @@ std::shared_ptr<Type> Codegen::get_type(
     auto user = parent.types.find(name);
 
     if (user == parent.types.end()) {
-        error(offset, fmt::format("undeclared type: '{}'", name));
+        error(
+            offset,
+            fmt::format("undeclared type: {}", log::bold(log::quoted(name))));
 
         return nullptr;
     }
@@ -2224,7 +2249,10 @@ std::optional<Value> Codegen::get_name(
     auto iterator = parent.names.find(name);
 
     if (iterator == parent.names.end()) {
-        error(offset, fmt::format("undeclared identifier: '{}'", name));
+        error(
+            offset,
+            fmt::format(
+                "undeclared identifier: {}", log::bold(log::quoted(name))));
 
         return std::nullopt;
     }
@@ -2237,7 +2265,9 @@ Scope* Codegen::get_scope(
     auto iterator = parent.scopes.find(name);
 
     if (iterator == parent.scopes.end()) {
-        error(offset, fmt::format("could not find '{}'", name));
+        error(
+            offset,
+            fmt::format("could not find {}", log::bold(log::quoted(name))));
 
         return nullptr;
     }
@@ -2249,7 +2279,9 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
     if (!decl.is_extern && !decl.block) {
         error(
             decl.proto.name.offset,
-            fmt::format("'{}' has no body", decl.proto.name.value));
+            fmt::format(
+                "{} has no body",
+                log::bold(log::quoted(decl.proto.name.value))));
 
         return;
     }
@@ -2261,7 +2293,9 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
     if (scope.names.contains(decl.proto.name.value)) {
         error(
             decl.proto.name.offset,
-            fmt::format("'{}' is already defined", decl.proto.name.value));
+            fmt::format(
+                "{} is already defined",
+                log::bold(log::quoted(decl.proto.name.value))));
 
         return;
     }
@@ -2296,7 +2330,9 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
             error(
                 parameter.name.offset,
                 fmt::format(
-                    "'{}' cannot be of type 'void'", parameter.name.value));
+                    "{} cannot be of type {}",
+                    log::bold(log::quoted(parameter.name.value)),
+                    log::bold("'void'")));
 
             return;
         }
@@ -2371,8 +2407,9 @@ void Codegen::type_mismatch(
     std::size_t offset, Type& expected, Type& got) noexcept {
     error(
         offset, fmt::format(
-                    "expected '{}' but got '{}'", expected.to_string(),
-                    got.to_string()));
+                    "expected {} but got {}",
+                    log::bold(log::quoted(expected.to_string())),
+                    log::bold(log::quoted(got.to_string()))));
 }
 
 } // namespace cent::backend
