@@ -1254,6 +1254,19 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
                                     log::bold(log::quoted(expr.member.value))));
     };
 
+    auto get_member =
+        [&](llvm::StructType* type) -> std::optional<std::size_t> {
+        auto iterator = m_members[type].find(expr.member.value);
+
+        if (iterator == m_members[type].end()) {
+            no_such_member();
+
+            return std::nullopt;
+        }
+
+        return iterator->second;
+    };
+
     if (parent->type->is_tuple()) {
         if (expr.member.type != frontend::Token::Type::IntLiteral) {
             no_such_member();
@@ -1276,13 +1289,28 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
 
         return Value{
             type.types[value],
-            m_builder.CreateStructGEP(type.type, parent->value, value),
+            parent->value->getType()->isStructTy()
+                ? m_builder.CreateExtractValue(parent->value, value)
+                : m_builder.CreateStructGEP(type.type, parent->value, value),
             parent->is_mutable};
     }
 
     auto not_a_struct = [&] {
         error(expr.member.offset, "member access of a non-structure type");
     };
+
+    if (parent->value->getType()->isStructTy()) {
+        auto* type = static_cast<types::Struct*>(parent->type.get());
+        auto index = get_member(type->type);
+
+        if (!index) {
+            return std::nullopt;
+        }
+
+        return Value{
+            type->fields[*index],
+            m_builder.CreateExtractValue(parent->value, *index)};
+    }
 
     bool is_mutable = false;
 
@@ -1318,21 +1346,15 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
         }
     }
 
-    auto iterator = m_members[type->type].find(expr.member.value);
+    auto index = get_member(type->type);
 
-    if (iterator == m_members[type->type].end()) {
-        error(
-            expr.member.offset, fmt::format(
-                                    "no such member: {}",
-                                    log::bold(log::quoted(expr.member.value))));
-
+    if (!index) {
         return std::nullopt;
     }
 
     return Value{
-        type->fields[iterator->second],
-        m_builder.CreateStructGEP(type->type, value, iterator->second),
-        is_mutable};
+        type->fields[*index],
+        m_builder.CreateStructGEP(type->type, value, *index), is_mutable};
 }
 
 std::optional<Value> Codegen::generate(ast::IndexExpr& expr) noexcept {
