@@ -28,6 +28,7 @@
 #include "cent/ast/return_stmt.h"
 #include "cent/ast/tuple_type.h"
 #include "cent/ast/unary_expr.h"
+#include "cent/ast/unreachable.h"
 #include "cent/ast/var_decl.h"
 #include "cent/ast/while_loop.h"
 
@@ -509,6 +510,13 @@ std::optional<Value> Codegen::generate(ast::ContinueStmt& stmt) noexcept {
     }
 
     m_builder.CreateBr(m_loop_body);
+
+    return std::nullopt;
+}
+
+std::optional<Value>
+Codegen::generate([[maybe_unused]] ast::Unreachable& stmt) noexcept {
+    m_builder.CreateUnreachable();
 
     return std::nullopt;
 }

@@ -98,6 +98,8 @@ struct Token {
         Break,
         Continue,
 
+        Unreachable,
+
         Identifier
     };
 

@@ -439,6 +439,11 @@ void Lexer::ident() noexcept {
         keyword(Continue);
         return;
     }
+
+    if (m_token.value == "unreachable") {
+        keyword(Unreachable);
+        return;
+    }
 }
 
 } // namespace cent::frontend

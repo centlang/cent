@@ -15,6 +15,7 @@
 #include "cent/ast/return_stmt.h"
 #include "cent/ast/tuple_type.h"
 #include "cent/ast/unary_expr.h"
+#include "cent/ast/unreachable.h"
 #include "cent/ast/var_decl.h"
 #include "cent/ast/while_loop.h"
 
@@ -151,6 +152,9 @@ void Parser::expect_stmt(ast::BlockStmt& block) noexcept {
         break;
     case Continue:
         block.body.push_back(std::make_unique<ast::ContinueStmt>(get().offset));
+        break;
+    case Unreachable:
+        block.body.push_back(std::make_unique<ast::Unreachable>(get().offset));
         break;
     default:
         auto value = expect_expr(false);

@@ -36,6 +36,7 @@ struct ReturnStmt;
 struct WhileLoop;
 struct BreakStmt;
 struct ContinueStmt;
+struct Unreachable;
 
 struct BinaryExpr;
 struct UnaryExpr;
@@ -163,6 +164,7 @@ public:
     std::optional<Value> generate(ast::WhileLoop& stmt) noexcept;
     std::optional<Value> generate(ast::BreakStmt& stmt) noexcept;
     std::optional<Value> generate(ast::ContinueStmt& stmt) noexcept;
+    std::optional<Value> generate(ast::Unreachable& stmt) noexcept;
 
     std::optional<Value> generate(ast::BinaryExpr& expr) noexcept;
     std::optional<Value> generate(ast::UnaryExpr& expr) noexcept;
