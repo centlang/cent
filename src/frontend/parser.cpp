@@ -28,7 +28,7 @@ std::unique_ptr<ast::Module> Parser::parse() noexcept {
     using enum Token::Type;
 
     auto skip_until_decl = [&] {
-        while (!match(Eof, Fn, Type, With)) {
+        while (!match(Eof, Type, Fn, Const, Mut, With)) {
             next();
         }
     };
@@ -42,6 +42,21 @@ std::unique_ptr<ast::Module> Parser::parse() noexcept {
 
         if (match(Semicolon)) {
             next();
+            continue;
+        }
+
+        if (match(Const, Mut)) {
+            auto variable = parse_var();
+
+            if (!variable) {
+                skip_until_decl();
+                continue;
+            }
+
+            expect("';'", Token::Type::Semicolon);
+
+            result->variables.push_back(std::move(variable));
+
             continue;
         }
 
@@ -126,7 +141,7 @@ void Parser::expect_stmt(ast::BlockStmt& block) noexcept {
     case Let:
     case Mut:
     case Const:
-        parse_var(block);
+        block.body.push_back(parse_var());
         break;
     case Return:
         parse_return(block);
@@ -678,7 +693,7 @@ std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
     return std::make_unique<ast::NamedType>(offset, std::move(value));
 }
 
-void Parser::parse_var(ast::BlockStmt& block) noexcept {
+std::unique_ptr<ast::VarDecl> Parser::parse_var() noexcept {
     auto offset = peek().offset;
 
     auto mutability = [&] {
@@ -697,7 +712,7 @@ void Parser::parse_var(ast::BlockStmt& block) noexcept {
     auto name = expect("variable name", Token::Type::Identifier);
 
     if (!name) {
-        return;
+        return nullptr;
     }
 
     std::unique_ptr<ast::Type> type = nullptr;
@@ -706,7 +721,7 @@ void Parser::parse_var(ast::BlockStmt& block) noexcept {
         type = expect_var_type();
 
         if (!type) {
-            return;
+            return nullptr;
         }
     }
 
@@ -715,14 +730,12 @@ void Parser::parse_var(ast::BlockStmt& block) noexcept {
             expected(
                 fmt::format("{} or {}", log::bold("'='"), log::bold("':'")));
 
-            return;
+            return nullptr;
         }
 
-        block.body.push_back(std::make_unique<ast::VarDecl>(
+        return std::make_unique<ast::VarDecl>(
             offset, mutability, ast::OffsetValue{name->value, name->offset},
-            std::move(type), nullptr));
-
-        return;
+            std::move(type), nullptr);
     }
 
     next();
@@ -730,12 +743,12 @@ void Parser::parse_var(ast::BlockStmt& block) noexcept {
     auto value = expect_expr(false);
 
     if (!value) {
-        return;
+        return nullptr;
     }
 
-    block.body.push_back(std::make_unique<ast::VarDecl>(
+    return std::make_unique<ast::VarDecl>(
         offset, mutability, ast::OffsetValue{name->value, name->offset},
-        std::move(type), std::move(value)));
+        std::move(type), std::move(value));
 }
 
 void Parser::parse_while(ast::BlockStmt& block) noexcept {

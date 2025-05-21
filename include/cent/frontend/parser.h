@@ -25,6 +25,7 @@
 #include "cent/ast/module.h"
 #include "cent/ast/node.h"
 #include "cent/ast/struct.h"
+#include "cent/ast/var_decl.h"
 
 namespace cent::frontend {
 
@@ -122,7 +123,7 @@ private:
 
     [[nodiscard]] std::unique_ptr<ast::Type> expect_type() noexcept;
 
-    void parse_var(ast::BlockStmt& block) noexcept;
+    [[nodiscard]] std::unique_ptr<ast::VarDecl> parse_var() noexcept;
 
     void parse_while(ast::BlockStmt& block) noexcept;
 

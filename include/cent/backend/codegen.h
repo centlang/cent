@@ -246,6 +246,8 @@ private:
     llvm::BasicBlock* m_loop_body{nullptr};
     llvm::BasicBlock* m_loop_end{nullptr};
 
+    std::vector<std::unique_ptr<llvm::GlobalVariable>> m_globals;
+
     std::string m_current_scope_prefix;
 
     std::map<llvm::StructType*, std::map<std::string_view, std::size_t>>

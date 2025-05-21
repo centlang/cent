@@ -322,6 +322,7 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
     }
 
     if (!var->is_deref && !llvm::isa<llvm::AllocaInst>(var->value) &&
+        !llvm::isa<llvm::GlobalVariable>(var->value) &&
         !llvm::isa<llvm::LoadInst>(var->value) &&
         !llvm::isa<llvm::GetElementPtrInst>(var->value)) {
         error(stmt.variable->offset, "cannot assign to a value");
@@ -1630,6 +1631,13 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
         return std::nullopt;
     }
 
+    auto global_var_init = [&] {
+        error(
+            decl.value->offset, fmt::format(
+                                    "global variable {} cannot be initialized",
+                                    log::quoted(log::bold(decl.name.value))));
+    };
+
     std::optional<Value> value = std::nullopt;
     std::shared_ptr<Type> type = nullptr;
 
@@ -1666,7 +1674,12 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
             type = value->type;
             llvm_type = value->type->codegen(*this);
         } else {
-            m_current_result = m_builder.CreateAlloca(llvm_type);
+            if (m_current_function) {
+                m_current_result = m_builder.CreateAlloca(llvm_type);
+            } else {
+                global_var_init();
+                return std::nullopt;
+            }
 
             if (!cast_to_result(type, *value)) {
                 type_mismatch(decl.value->offset, *type, *value->type);
@@ -1690,20 +1703,40 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
             return std::nullopt;
         }
 
-        m_current_result = m_builder.CreateAlloca(llvm_type);
+        if (m_current_function) {
+            m_current_result = m_builder.CreateAlloca(llvm_type);
+        } else {
+            global_var_init();
+            return std::nullopt;
+        }
 
         m_builder.CreateStore(load_value(*value).value, m_current_result);
 
         m_scope.names[decl.name.value] = {
             type, m_current_result, decl.mutability == ast::VarDecl::Mut::Mut};
     } else {
-        m_current_result = m_builder.CreateAlloca(llvm_type);
+        if (m_current_function) {
+            m_current_result = m_builder.CreateAlloca(llvm_type);
 
-        m_builder.CreateStore(
-            llvm::Constant::getNullValue(llvm_type), m_current_result);
+            m_builder.CreateStore(
+                llvm::Constant::getNullValue(llvm_type), m_current_result);
 
-        m_scope.names[decl.name.value] = {
-            type, m_current_result, decl.mutability == ast::VarDecl::Mut::Mut};
+            m_scope.names[decl.name.value] = {
+                type, m_current_result,
+                decl.mutability == ast::VarDecl::Mut::Mut};
+        } else {
+            m_globals.push_back(std::make_unique<llvm::GlobalVariable>(
+                *m_module, llvm_type, false, llvm::GlobalValue::PrivateLinkage,
+                llvm::Constant::getNullValue(llvm_type)));
+
+            m_globals.back()->setAlignment(
+                m_module->getDataLayout().getPreferredAlign(
+                    m_globals.back().get()));
+
+            m_current_result = m_globals.back().get();
+
+            m_scope.names[decl.name.value] = {type, m_current_result, true};
+        }
     }
 
     m_current_result = nullptr;
@@ -1796,6 +1829,14 @@ void Codegen::generate(ast::Module& module, bool is_submodule) noexcept {
         }
 
         struct_decl->codegen(*this);
+    }
+
+    for (auto& variable : module.variables) {
+        if (is_submodule) {
+            continue;
+        }
+
+        variable->codegen(*this);
     }
 
     for (auto& function : module.functions) {
@@ -2252,6 +2293,14 @@ Value Codegen::load_value(Value& value) noexcept {
         return Value{
             value.type,
             m_builder.CreateLoad(variable->getAllocatedType(), variable),
+            value.is_mutable};
+    }
+
+    if (auto* variable =
+            llvm::dyn_cast_or_null<llvm::GlobalVariable>(value.value)) {
+        return Value{
+            value.type,
+            m_builder.CreateLoad(variable->getValueType(), variable),
             value.is_mutable};
     }
 
