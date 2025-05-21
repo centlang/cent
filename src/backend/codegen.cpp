@@ -1909,29 +1909,27 @@ std::optional<Value> Codegen::cast(
         auto& contained = static_cast<types::Optional&>(*type).type;
 
         if (contained->is_pointer()) {
-            if (!value.type->is_null()) {
-                return Value{type, value.value};
-            }
+            return Value{
+                type, value.type->is_null()
+                          ? llvm::Constant::getNullValue(llvm_type)
+                          : value.value};
+        }
 
-            auto* variable = m_builder.CreateAlloca(llvm_type);
+        if (value.type->is_null()) {
+            return Value{type, llvm::Constant::getNullValue(llvm_type)};
+        }
 
-            m_builder.CreateStore(
-                llvm::Constant::getNullValue(llvm_type), variable);
-
-            return Value{type, variable, false, false, false, true};
+        if (auto* val = llvm::dyn_cast<llvm::Constant>(value.value)) {
+            return Value{
+                type, llvm::ConstantStruct::get(
+                          static_cast<llvm::StructType*>(llvm_type),
+                          {val, llvm::ConstantInt::get(
+                                    llvm::Type::getInt1Ty(m_context), true)})};
         }
 
         auto* variable = m_builder.CreateAlloca(llvm_type);
         auto* bool_ptr = m_builder.CreateStructGEP(
             llvm_type, variable, optional_member_bool);
-
-        if (value.type->is_null()) {
-            m_builder.CreateStore(
-                llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), false),
-                bool_ptr);
-
-            return Value{type, variable, false, false, false, true};
-        }
 
         if (!types_equal(*contained, *value.type)) {
             return std::nullopt;
@@ -2055,28 +2053,34 @@ bool Codegen::cast_to_result(
         auto& contained = static_cast<types::Optional&>(*type).type;
 
         if (contained->is_pointer()) {
-            if (!value.type->is_null()) {
-                m_builder.CreateStore(value.value, m_current_result);
+            m_builder.CreateStore(
+                value.type->is_null() ? llvm::Constant::getNullValue(llvm_type)
+                                      : value.value,
+                m_current_result);
 
-                return true;
-            }
+            return true;
+        }
 
+        if (value.type->is_null()) {
             m_builder.CreateStore(
                 llvm::Constant::getNullValue(llvm_type), m_current_result);
 
             return true;
         }
 
-        auto* bool_ptr = m_builder.CreateStructGEP(
-            llvm_type, m_current_result, optional_member_bool);
-
-        if (value.type->is_null()) {
+        if (auto* val = llvm::dyn_cast<llvm::Constant>(value.value)) {
             m_builder.CreateStore(
-                llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), false),
-                bool_ptr);
+                llvm::ConstantStruct::get(
+                    static_cast<llvm::StructType*>(llvm_type),
+                    {val, llvm::ConstantInt::get(
+                              llvm::Type::getInt1Ty(m_context), true)}),
+                m_current_result);
 
             return true;
         }
+
+        auto* bool_ptr = m_builder.CreateStructGEP(
+            llvm_type, m_current_result, optional_member_bool);
 
         if (!types_equal(*contained, *value.type)) {
             return false;
@@ -2132,11 +2136,18 @@ std::optional<Value> Codegen::generate_bin_expr(
                 return Value{m_primitive_types["bool"], val};
             }
 
-            auto* bool_ptr = m_builder.CreateStructGEP(
-                type.codegen(*this), value->value, optional_member_bool);
+            llvm::Value* val = nullptr;
 
-            llvm::Value* val = m_builder.CreateLoad(
-                llvm::Type::getInt1Ty(m_context), bool_ptr);
+            if (value->value->getType()->isStructTy()) {
+                val = m_builder.CreateExtractValue(
+                    value->value, optional_member_bool);
+            } else {
+                auto* bool_ptr = m_builder.CreateStructGEP(
+                    type.codegen(*this), value->value, optional_member_bool);
+
+                val = m_builder.CreateLoad(
+                    llvm::Type::getInt1Ty(m_context), bool_ptr);
+            }
 
             if (oper.value == EqualEqual) {
                 val = m_builder.CreateNot(val);
