@@ -78,7 +78,7 @@ struct Token {
         Extern,
 
         Fn,
-        Struct,
+        Type,
         Enum,
         With,
 

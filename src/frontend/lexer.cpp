@@ -375,8 +375,8 @@ void Lexer::ident() noexcept {
         return;
     }
 
-    if (m_token.value == "struct") {
-        keyword(Struct);
+    if (m_token.value == "type") {
+        keyword(Type);
         return;
     }
 

@@ -28,7 +28,7 @@ std::unique_ptr<ast::Module> Parser::parse() noexcept {
     using enum Token::Type;
 
     auto skip_until_decl = [&] {
-        while (!match(Eof, Fn, Struct, With)) {
+        while (!match(Eof, Fn, Type, With)) {
             next();
         }
     };
@@ -64,7 +64,7 @@ std::unique_ptr<ast::Module> Parser::parse() noexcept {
             is_public = true;
         }
 
-        if (match(Struct)) {
+        if (match(Type)) {
             next();
 
             if (!parse_struct(*result, is_public)) {
