@@ -2311,32 +2311,28 @@ Value Codegen::load_value(Value& value) noexcept {
             llvm::dyn_cast_or_null<llvm::AllocaInst>(value.value)) {
         return Value{
             value.type,
-            m_builder.CreateLoad(variable->getAllocatedType(), variable),
-            value.is_mutable};
+            m_builder.CreateLoad(variable->getAllocatedType(), variable)};
     }
 
     if (auto* variable =
             llvm::dyn_cast_or_null<llvm::GlobalVariable>(value.value)) {
         return Value{
             value.type,
-            m_builder.CreateLoad(variable->getValueType(), variable),
-            value.is_mutable};
+            m_builder.CreateLoad(variable->getValueType(), variable)};
     }
 
     if (auto* val = llvm::dyn_cast_or_null<llvm::LoadInst>(value.value)) {
         auto* type = value.type->codegen(*this);
 
         if (val->getType()->isPointerTy() && !value.type->is_pointer()) {
-            return Value{
-                value.type, m_builder.CreateLoad(type, val), value.is_mutable};
+            return Value{value.type, m_builder.CreateLoad(type, val)};
         }
     }
 
     if (auto* ptr =
             llvm::dyn_cast_or_null<llvm::GetElementPtrInst>(value.value)) {
         return Value{
-            value.type, m_builder.CreateLoad(ptr->getResultElementType(), ptr),
-            value.is_mutable};
+            value.type, m_builder.CreateLoad(ptr->getResultElementType(), ptr)};
     }
 
     return value;
