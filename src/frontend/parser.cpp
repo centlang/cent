@@ -29,7 +29,7 @@ std::unique_ptr<ast::Module> Parser::parse() noexcept {
     using enum Token::Type;
 
     auto skip_until_decl = [&] {
-        while (!match(Eof, Type, Fn, Const, Mut, With)) {
+        while (!match(Eof, Type, Enum, Fn, Const, Mut, With)) {
             next();
         }
     };
