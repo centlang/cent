@@ -2022,11 +2022,21 @@ std::optional<Value> Codegen::primitive_cast(
         } else if (!implicit && type_is_ptr) {
             cast_op = IntToPtr;
         }
-    } else if (!implicit && value_is_ptr) {
-        if (type_is_sint || type_is_uint) {
+    } else if (value_is_ptr) {
+        if (!implicit && (type_is_sint || type_is_uint)) {
             cast_op = PtrToInt;
         } else if (type_is_ptr) {
-            return Value{type, value.value};
+            if (!implicit) {
+                return Value{type, value.value};
+            }
+
+            auto& value_ptr = static_cast<types::Pointer&>(*value.type);
+            auto& type_ptr = static_cast<types::Pointer&>(*type);
+
+            if (types_equal(*value_ptr.type, *type_ptr.type) &&
+                (value_ptr.is_mutable || !type_ptr.is_mutable)) {
+                return Value{type, value.value};
+            }
         }
     }
 
