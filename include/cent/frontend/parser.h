@@ -155,45 +155,45 @@ private:
     [[nodiscard]] static std::uint8_t precedence_of(Token::Type type) {
         using enum Token::Type;
 
-        enum Precedence {
-            None = 0,
-            LogicalOr,
-            LogicalAnd,
-            Or,
-            Xor,
-            And,
-            Comparison,
-            Additive,
-            Multiplicative
+        enum {
+            PNone = 0,
+            PLogicalOr,
+            PLogicalAnd,
+            POr,
+            PXor,
+            PAnd,
+            PCmp,
+            PAdd,
+            PMul
         };
 
         switch (type) {
         case OrOr:
-            return LogicalOr;
+            return PLogicalOr;
         case AndAnd:
-            return LogicalAnd;
-        case Token::Type::Or:
-            return Precedence::Or;
-        case Token::Type::Xor:
-            return Precedence::Xor;
-        case Token::Type::And:
-            return Precedence::And;
+            return PLogicalAnd;
+        case Or:
+            return POr;
+        case Xor:
+            return PXor;
+        case And:
+            return PAnd;
         case Less:
         case Greater:
         case EqualEqual:
         case BangEqual:
         case GreaterEqual:
         case LessEqual:
-            return Comparison;
+            return PCmp;
         case Plus:
         case Minus:
-            return Additive;
+            return PAdd;
         case Star:
         case Slash:
         case Percent:
-            return Multiplicative;
+            return PMul;
         default:
-            return None;
+            return PNone;
         }
     }
 
