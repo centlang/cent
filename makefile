@@ -7,10 +7,10 @@ BIN_DIR := bin
 CXX := c++
 CLANG_TIDY := clang-tidy
 
-CXX_FLAGS := -pedantic -Wall -Wextra -std=c++20 -O3 -c -I$(INCLUDE_DIR) \
+CXXFLAGS := -pedantic -Wall -Wextra -std=c++20 -O3 -c -I$(INCLUDE_DIR) \
     -fno-exceptions
 
-LD_FLAGS := -lLLVM -lfmt
+LDFLAGS := -lLLVM -lfmt
 
 SRC_FILES := $(wildcard $(SRC_DIR)/**/*.cpp $(SRC_DIR)/*.cpp)
 OBJ_FILES := $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(SRC_FILES))
@@ -25,12 +25,12 @@ all: $(TARGET)
 $(TARGET): $(OBJ_FILES)
 	@mkdir -p $(@D)
 
-	$(CXX) -o $@ $^ $(LD_FLAGS)
+	$(CXX) -o $@ $^ $(LDFLAGS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(@D)
 
-	$(CXX) -o $@ $< $(CXX_FLAGS)
+	$(CXX) -o $@ $< $(CXXFLAGS)
 
 install: $(TARGET) | $(DEST_BIN_DIR)
 	cp $(TARGET) $(DEST_BIN_DIR)
@@ -39,6 +39,6 @@ clean:
 	rm -rf $(OBJ_DIR) $(BIN_DIR)
 
 check: $(SRC_FILES)
-	$(CLANG_TIDY) $^ -- $(CXX_FLAGS)
+	$(CLANG_TIDY) $^ -- $(CXXFLAGS)
 
 .PHONY: all clean install check
