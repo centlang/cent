@@ -6,7 +6,7 @@
 
 #include <llvm/IR/DerivedTypes.h>
 
-#include "cent/backend/type.h"
+#include "cent/backend/llvm/type.h"
 
 namespace cent::backend::types {
 

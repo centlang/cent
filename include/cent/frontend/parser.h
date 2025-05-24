@@ -16,16 +16,19 @@
 #include "cent/log.h"
 #include "cent/util.h"
 
-#include "cent/ast/binary_expr.h"
-#include "cent/ast/block_stmt.h"
-#include "cent/ast/enum_decl.h"
-#include "cent/ast/fn_decl.h"
-#include "cent/ast/if_else.h"
-#include "cent/ast/literals.h"
 #include "cent/ast/module.h"
 #include "cent/ast/node.h"
-#include "cent/ast/struct.h"
-#include "cent/ast/var_decl.h"
+
+#include "cent/ast/expr/binary_expr.h"
+#include "cent/ast/expr/literals.h"
+
+#include "cent/ast/stmt/block_stmt.h"
+#include "cent/ast/stmt/if_else.h"
+
+#include "cent/ast/decl/enum_decl.h"
+#include "cent/ast/decl/fn_decl.h"
+#include "cent/ast/decl/struct.h"
+#include "cent/ast/decl/var_decl.h"
 
 namespace cent::frontend {
 

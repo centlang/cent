@@ -8,10 +8,10 @@
 
 #include "cent/modules.h"
 
-#include "cent/ast/enum_decl.h"
-#include "cent/ast/fn_decl.h"
-#include "cent/ast/struct.h"
-#include "cent/ast/var_decl.h"
+#include "cent/ast/decl/enum_decl.h"
+#include "cent/ast/decl/fn_decl.h"
+#include "cent/ast/decl/struct.h"
+#include "cent/ast/decl/var_decl.h"
 
 namespace cent::ast {
 

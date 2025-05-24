@@ -10,9 +10,10 @@
 #include <llvm/Target/TargetOptions.h>
 #include <llvm/TargetParser/Host.h>
 
-#include "cent/backend/codegen.h"
-#include "cent/backend/emit.h"
 #include "cent/frontend/parser.h"
+
+#include "cent/backend/llvm/codegen.h"
+#include "cent/backend/llvm/emit.h"
 
 #include "cent/log.h"
 #include "cent/util.h"

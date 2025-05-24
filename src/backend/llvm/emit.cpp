@@ -9,7 +9,7 @@
 
 #include "cent/log.h"
 
-#include "cent/backend/emit.h"
+#include "cent/backend/llvm/emit.h"
 
 namespace cent::backend {
 

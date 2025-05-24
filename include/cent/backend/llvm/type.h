@@ -5,7 +5,7 @@
 
 #include <llvm/IR/Type.h>
 
-#include "cent/backend/codegen.h"
+#include "cent/backend/llvm/codegen.h"
 
 namespace cent::backend {
 

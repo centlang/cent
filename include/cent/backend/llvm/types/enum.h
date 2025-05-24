@@ -1,7 +1,7 @@
 #ifndef CENT_BACKEND_TYPES_ENUM_H
 #define CENT_BACKEND_TYPES_ENUM_H
 
-#include "cent/backend/type.h"
+#include "cent/backend/llvm/type.h"
 
 namespace cent::backend::types {
 

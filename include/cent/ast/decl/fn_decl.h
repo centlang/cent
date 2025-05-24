@@ -8,8 +8,8 @@
 
 #include "cent/offset_value.h"
 
-#include "cent/ast/block_stmt.h"
 #include "cent/ast/node.h"
+#include "cent/ast/stmt/block_stmt.h"
 
 namespace cent::ast {
 

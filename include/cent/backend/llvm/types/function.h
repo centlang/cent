@@ -7,7 +7,7 @@
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Function.h>
 
-#include "cent/backend/type.h"
+#include "cent/backend/llvm/type.h"
 
 namespace cent::backend::types {
 

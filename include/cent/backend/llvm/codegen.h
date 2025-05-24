@@ -17,7 +17,7 @@
 #include "cent/offset_value.h"
 #include "cent/util.h"
 
-#include "cent/backend/scope.h"
+#include "cent/backend/llvm/scope.h"
 
 namespace cent::ast {
 

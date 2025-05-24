@@ -5,11 +5,11 @@
 #include <string>
 #include <vector>
 
+#include "cent/ast/node.h"
 #include "cent/offset_value.h"
 
-#include "cent/ast/array_type.h"
-#include "cent/ast/named_type.h"
-#include "cent/ast/node.h"
+#include "cent/ast/type/array_type.h"
+#include "cent/ast/type/named_type.h"
 
 namespace cent::ast {
 
