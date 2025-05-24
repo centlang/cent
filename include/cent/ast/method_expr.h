@@ -13,7 +13,7 @@ struct MethodExpr : detail::Expr<MethodExpr> {
     [[nodiscard]] MethodExpr(
         std::size_t offset, std::unique_ptr<Expression> value,
         OffsetValue<std::string> name,
-        std::vector<std::unique_ptr<Expression>> arguments) noexcept
+        std::vector<std::unique_ptr<Expression>> arguments)
     : Expr{offset}, value{std::move(value)}, name{std::move(name)},
       arguments{std::move(arguments)} {}
 

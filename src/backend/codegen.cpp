@@ -44,7 +44,7 @@
 
 namespace cent::backend {
 
-std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
+std::unique_ptr<llvm::Module> Codegen::generate() {
     m_primitive_types = {
         {"i8", std::make_shared<types::I8>()},
         {"i16", std::make_shared<types::I16>()},
@@ -69,7 +69,7 @@ std::unique_ptr<llvm::Module> Codegen::generate() noexcept {
     return std::move(m_module);
 }
 
-std::shared_ptr<Type> Codegen::generate(ast::NamedType& type) noexcept {
+std::shared_ptr<Type> Codegen::generate(ast::NamedType& type) {
     auto* scope = m_current_scope;
     std::size_t last_index = type.value.size() - 1;
 
@@ -85,7 +85,7 @@ std::shared_ptr<Type> Codegen::generate(ast::NamedType& type) noexcept {
         type.value[last_index].offset, type.value[last_index].value, *scope);
 }
 
-std::shared_ptr<Type> Codegen::generate(ast::Pointer& type) noexcept {
+std::shared_ptr<Type> Codegen::generate(ast::Pointer& type) {
     auto points_to = type.type->codegen(*this);
 
     if (!points_to) {
@@ -95,7 +95,7 @@ std::shared_ptr<Type> Codegen::generate(ast::Pointer& type) noexcept {
     return std::make_shared<types::Pointer>(points_to, type.is_mutable);
 }
 
-std::shared_ptr<Type> Codegen::generate(ast::Optional& type) noexcept {
+std::shared_ptr<Type> Codegen::generate(ast::Optional& type) {
     auto contained = type.type->codegen(*this);
 
     if (!contained) {
@@ -105,7 +105,7 @@ std::shared_ptr<Type> Codegen::generate(ast::Optional& type) noexcept {
     return std::make_shared<types::Optional>(contained);
 }
 
-std::shared_ptr<Type> Codegen::generate(ast::ArrayType& type) noexcept {
+std::shared_ptr<Type> Codegen::generate(ast::ArrayType& type) {
     auto contained = type.type->codegen(*this);
 
     if (!contained) {
@@ -134,7 +134,7 @@ std::shared_ptr<Type> Codegen::generate(ast::ArrayType& type) noexcept {
     return nullptr;
 }
 
-std::shared_ptr<Type> Codegen::generate(ast::TupleType& type) noexcept {
+std::shared_ptr<Type> Codegen::generate(ast::TupleType& type) {
     std::vector<std::shared_ptr<backend::Type>> types;
     std::vector<llvm::Type*> llvm_types;
 
@@ -159,85 +159,83 @@ std::shared_ptr<Type> Codegen::generate(ast::TupleType& type) noexcept {
         llvm::StructType::create(llvm_types), std::move(types));
 }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::I8& type) noexcept {
+llvm::Type* Codegen::generate([[maybe_unused]] types::I8& type) {
     return llvm::Type::getInt8Ty(m_context);
 }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::I16& type) noexcept {
+llvm::Type* Codegen::generate([[maybe_unused]] types::I16& type) {
     return llvm::Type::getInt16Ty(m_context);
 }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::I32& type) noexcept {
+llvm::Type* Codegen::generate([[maybe_unused]] types::I32& type) {
     return llvm::Type::getInt32Ty(m_context);
 }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::I64& type) noexcept {
+llvm::Type* Codegen::generate([[maybe_unused]] types::I64& type) {
     return llvm::Type::getInt64Ty(m_context);
 }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::ISize& type) noexcept {
+llvm::Type* Codegen::generate([[maybe_unused]] types::ISize& type) {
     return m_module->getDataLayout().getIntPtrType(m_context);
 }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::U8& type) noexcept {
+llvm::Type* Codegen::generate([[maybe_unused]] types::U8& type) {
     return llvm::Type::getInt8Ty(m_context);
 }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::U16& type) noexcept {
+llvm::Type* Codegen::generate([[maybe_unused]] types::U16& type) {
     return llvm::Type::getInt16Ty(m_context);
 }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::U32& type) noexcept {
+llvm::Type* Codegen::generate([[maybe_unused]] types::U32& type) {
     return llvm::Type::getInt32Ty(m_context);
 }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::U64& type) noexcept {
+llvm::Type* Codegen::generate([[maybe_unused]] types::U64& type) {
     return llvm::Type::getInt64Ty(m_context);
 }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::USize& type) noexcept {
+llvm::Type* Codegen::generate([[maybe_unused]] types::USize& type) {
     return m_module->getDataLayout().getIntPtrType(m_context);
 }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::F32& type) noexcept {
+llvm::Type* Codegen::generate([[maybe_unused]] types::F32& type) {
     return llvm::Type::getFloatTy(m_context);
 }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::F64& type) noexcept {
+llvm::Type* Codegen::generate([[maybe_unused]] types::F64& type) {
     return llvm::Type::getDoubleTy(m_context);
 }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::Str& type) noexcept {
+llvm::Type* Codegen::generate([[maybe_unused]] types::Str& type) {
     return llvm::Type::getInt8Ty(m_context)->getPointerTo();
 }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::Bool& type) noexcept {
+llvm::Type* Codegen::generate([[maybe_unused]] types::Bool& type) {
     return llvm::Type::getInt1Ty(m_context);
 }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::Null& type) noexcept {
+llvm::Type* Codegen::generate([[maybe_unused]] types::Null& type) {
     return nullptr;
 }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::Void& type) noexcept {
+llvm::Type* Codegen::generate([[maybe_unused]] types::Void& type) {
     return llvm::Type::getVoidTy(m_context);
 }
 
-llvm::Type* Codegen::generate(types::Pointer& type) noexcept {
+llvm::Type* Codegen::generate(types::Pointer& type) {
     auto* llvm_type = type.type->codegen(*this);
 
     return llvm_type->getPointerTo();
 }
 
-llvm::Type* Codegen::generate(types::Struct& type) noexcept {
-    return type.type;
-}
+llvm::Type* Codegen::generate(types::Struct& type) { return type.type; }
 
-llvm::Type* Codegen::generate(types::Enum& type) noexcept {
+llvm::Type* Codegen::generate(types::Enum& type) {
     return type.type->codegen(*this);
 }
 
-llvm::Type* Codegen::generate(types::Optional& type) noexcept {
+llvm::Type* Codegen::generate(types::Optional& type) {
     auto* contained = type.type->codegen(*this);
 
     if (type.type->is_pointer()) {
@@ -260,7 +258,7 @@ llvm::Type* Codegen::generate(types::Optional& type) noexcept {
     return llvm_type;
 }
 
-llvm::Type* Codegen::generate(types::Array& type) noexcept {
+llvm::Type* Codegen::generate(types::Array& type) {
     auto* llvm_type = type.type->codegen(*this);
 
     if (!llvm_type) {
@@ -270,14 +268,13 @@ llvm::Type* Codegen::generate(types::Array& type) noexcept {
     return llvm::ArrayType::get(llvm_type, type.size);
 }
 
-llvm::Type* Codegen::generate(types::Tuple& type) noexcept { return type.type; }
+llvm::Type* Codegen::generate(types::Tuple& type) { return type.type; }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::Function& type) noexcept {
+llvm::Type* Codegen::generate([[maybe_unused]] types::Function& type) {
     return nullptr;
 }
 
-std::optional<Value>
-Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
+std::optional<Value> Codegen::generate([[maybe_unused]] ast::Assignment& stmt) {
     auto var = stmt.variable->codegen(*this);
 
     if (!var) {
@@ -348,7 +345,7 @@ Codegen::generate([[maybe_unused]] ast::Assignment& stmt) noexcept {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::BlockStmt& stmt) noexcept {
+std::optional<Value> Codegen::generate(ast::BlockStmt& stmt) {
     auto scope = m_scope;
 
     for (auto& statement : stmt.body) {
@@ -360,7 +357,7 @@ std::optional<Value> Codegen::generate(ast::BlockStmt& stmt) noexcept {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::IfElse& stmt) noexcept {
+std::optional<Value> Codegen::generate(ast::IfElse& stmt) {
     auto condition = stmt.condition->codegen(*this);
 
     if (!condition) {
@@ -422,7 +419,7 @@ std::optional<Value> Codegen::generate(ast::IfElse& stmt) noexcept {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::ReturnStmt& stmt) noexcept {
+std::optional<Value> Codegen::generate(ast::ReturnStmt& stmt) {
     auto* function = m_builder.GetInsertBlock()->getParent();
 
     if (!stmt.value) {
@@ -457,7 +454,7 @@ std::optional<Value> Codegen::generate(ast::ReturnStmt& stmt) noexcept {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::WhileLoop& stmt) noexcept {
+std::optional<Value> Codegen::generate(ast::WhileLoop& stmt) {
     auto condition = stmt.condition->codegen(*this);
 
     if (!condition) {
@@ -488,7 +485,7 @@ std::optional<Value> Codegen::generate(ast::WhileLoop& stmt) noexcept {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::BreakStmt& stmt) noexcept {
+std::optional<Value> Codegen::generate(ast::BreakStmt& stmt) {
     if (!m_loop_end) {
         error(stmt.offset, fmt::format("{} not in loop", log::bold("'break'")));
 
@@ -500,7 +497,7 @@ std::optional<Value> Codegen::generate(ast::BreakStmt& stmt) noexcept {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::ContinueStmt& stmt) noexcept {
+std::optional<Value> Codegen::generate(ast::ContinueStmt& stmt) {
     if (!m_loop_body) {
         error(
             stmt.offset,
@@ -515,13 +512,13 @@ std::optional<Value> Codegen::generate(ast::ContinueStmt& stmt) noexcept {
 }
 
 std::optional<Value>
-Codegen::generate([[maybe_unused]] ast::Unreachable& stmt) noexcept {
+Codegen::generate([[maybe_unused]] ast::Unreachable& stmt) {
     m_builder.CreateUnreachable();
 
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::BinaryExpr& expr) noexcept {
+std::optional<Value> Codegen::generate(ast::BinaryExpr& expr) {
     using enum frontend::Token::Type;
 
     auto lhs = expr.lhs->codegen(*this);
@@ -536,7 +533,7 @@ std::optional<Value> Codegen::generate(ast::BinaryExpr& expr) noexcept {
         ast::OffsetValue<Value&>{*rhs, expr.rhs->offset}, expr.oper);
 }
 
-std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
+std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) {
     using enum frontend::Token::Type;
 
     auto value = expr.value->codegen(*this);
@@ -615,7 +612,7 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) noexcept {
     }
 }
 
-std::optional<Value> Codegen::generate(ast::IntLiteral& expr) noexcept {
+std::optional<Value> Codegen::generate(ast::IntLiteral& expr) {
     bool failed = false;
     std::string_view literal = expr.value;
 
@@ -752,7 +749,7 @@ std::optional<Value> Codegen::generate(ast::IntLiteral& expr) noexcept {
         llvm::ConstantInt::getSigned(llvm::Type::getInt32Ty(m_context), value)};
 }
 
-std::optional<Value> Codegen::generate(ast::FloatLiteral& expr) noexcept {
+std::optional<Value> Codegen::generate(ast::FloatLiteral& expr) {
     bool failed = false;
 
     std::string_view literal = expr.value;
@@ -815,23 +812,23 @@ std::optional<Value> Codegen::generate(ast::FloatLiteral& expr) noexcept {
         llvm::ConstantFP::get(llvm::Type::getFloatTy(m_context), value)};
 }
 
-std::optional<Value> Codegen::generate(ast::StrLiteral& expr) noexcept {
+std::optional<Value> Codegen::generate(ast::StrLiteral& expr) {
     return Value{
         m_primitive_types["str"], m_builder.CreateGlobalString(expr.value)};
 }
 
-std::optional<Value> Codegen::generate(ast::BoolLiteral& expr) noexcept {
+std::optional<Value> Codegen::generate(ast::BoolLiteral& expr) {
     return Value{
         m_primitive_types["bool"],
         llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), expr.value)};
 }
 
 std::optional<Value>
-Codegen::generate([[maybe_unused]] ast::NullLiteral& expr) noexcept {
+Codegen::generate([[maybe_unused]] ast::NullLiteral& expr) {
     return Value{m_null_type, nullptr};
 }
 
-std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
+std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
     auto type = expr.type->codegen(*this);
 
     if (!type) {
@@ -927,7 +924,7 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) noexcept {
     return Value{type, variable, false, false, false, stack_allocated};
 }
 
-std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) noexcept {
+std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) {
     auto type = expr.type->codegen(*this);
 
     if (!type) {
@@ -1003,7 +1000,7 @@ std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) noexcept {
     return Value{type, variable, false, false, false, stack_allocated};
 }
 
-std::optional<Value> Codegen::generate(ast::TupleLiteral& expr) noexcept {
+std::optional<Value> Codegen::generate(ast::TupleLiteral& expr) {
     bool is_const = true;
 
     std::vector<Value> values;
@@ -1072,7 +1069,7 @@ std::optional<Value> Codegen::generate(ast::TupleLiteral& expr) noexcept {
         stack_allocated};
 }
 
-std::optional<Value> Codegen::generate(ast::Identifier& expr) noexcept {
+std::optional<Value> Codegen::generate(ast::Identifier& expr) {
     auto* scope = m_current_scope;
     std::size_t last_index = expr.value.size() - 1;
 
@@ -1088,7 +1085,7 @@ std::optional<Value> Codegen::generate(ast::Identifier& expr) noexcept {
         expr.value[last_index].offset, expr.value[last_index].value, *scope);
 }
 
-std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
+std::optional<Value> Codegen::generate(ast::CallExpr& expr) {
     auto value = expr.identifier->codegen(*this);
 
     if (!value) {
@@ -1143,7 +1140,7 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) noexcept {
     return Value{type.return_type, m_builder.CreateCall(function, arguments)};
 }
 
-std::optional<Value> Codegen::generate(ast::MethodExpr& expr) noexcept {
+std::optional<Value> Codegen::generate(ast::MethodExpr& expr) {
     auto value = expr.value->codegen(*this);
 
     if (!value) {
@@ -1249,7 +1246,7 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) noexcept {
         m_builder.CreateCall(iterator->second.function, arguments)};
 }
 
-std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
+std::optional<Value> Codegen::generate(ast::MemberExpr& expr) {
     auto parent = expr.parent->codegen(*this);
 
     if (!parent) {
@@ -1366,7 +1363,7 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) noexcept {
         m_builder.CreateStructGEP(type->type, value, *index), is_mutable};
 }
 
-std::optional<Value> Codegen::generate(ast::IndexExpr& expr) noexcept {
+std::optional<Value> Codegen::generate(ast::IndexExpr& expr) {
     auto value = expr.value->codegen(*this);
 
     if (!value) {
@@ -1407,7 +1404,7 @@ std::optional<Value> Codegen::generate(ast::IndexExpr& expr) noexcept {
         value->is_mutable};
 }
 
-std::optional<Value> Codegen::generate(ast::AsExpr& expr) noexcept {
+std::optional<Value> Codegen::generate(ast::AsExpr& expr) {
     using enum llvm::Instruction::CastOps;
 
     auto value = expr.value->codegen(*this);
@@ -1435,7 +1432,7 @@ std::optional<Value> Codegen::generate(ast::AsExpr& expr) noexcept {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::FnDecl& decl) noexcept {
+std::optional<Value> Codegen::generate(ast::FnDecl& decl) {
     auto type = decl.proto.type ? get_type(
                                       decl.proto.type->offset,
                                       decl.proto.type->value, *m_current_scope)
@@ -1514,7 +1511,7 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) noexcept {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::Struct& decl) noexcept {
+std::optional<Value> Codegen::generate(ast::Struct& decl) {
     auto* struct_type =
         llvm::StructType::getTypeByName(m_context, decl.name.value);
 
@@ -1560,7 +1557,7 @@ std::optional<Value> Codegen::generate(ast::Struct& decl) noexcept {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::EnumDecl& decl) noexcept {
+std::optional<Value> Codegen::generate(ast::EnumDecl& decl) {
     auto& type = m_current_scope->types[decl.name.value];
     auto& enum_type = static_cast<types::Enum&>(*type);
 
@@ -1611,7 +1608,7 @@ std::optional<Value> Codegen::generate(ast::EnumDecl& decl) noexcept {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
+std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
     if (decl.mutability == ast::VarDecl::Mut::Const) {
         if (!decl.value) {
             error(decl.name.offset, "constant has no value");
@@ -1752,7 +1749,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) noexcept {
     return std::nullopt;
 }
 
-void Codegen::generate(ast::Module& module, bool is_submodule) noexcept {
+void Codegen::generate(ast::Module& module, bool is_submodule) {
     if (module.path.file) {
         auto iterator = m_generated_modules.find(*module.path.file);
 
@@ -1866,7 +1863,7 @@ void Codegen::generate(ast::Module& module, bool is_submodule) noexcept {
     }
 }
 
-bool Codegen::types_equal(Type& lhs, Type& rhs) noexcept {
+bool Codegen::types_equal(Type& lhs, Type& rhs) {
     if (&lhs == &rhs) {
         return true;
     }
@@ -1897,8 +1894,8 @@ bool Codegen::types_equal(Type& lhs, Type& rhs) noexcept {
     return false;
 }
 
-std::optional<Value> Codegen::cast(
-    std::shared_ptr<Type>& type, Value& value, bool implicit) noexcept {
+std::optional<Value>
+Codegen::cast(std::shared_ptr<Type>& type, Value& value, bool implicit) {
     if (types_equal(*type, *value.type)) {
         return value;
     }
@@ -1952,7 +1949,7 @@ std::optional<Value> Codegen::cast(
 
 std::optional<Value> Codegen::primitive_cast(
     std::shared_ptr<Type>& type, llvm::Type* llvm_type, Value& value,
-    bool implicit) noexcept {
+    bool implicit) {
     using enum llvm::Instruction::CastOps;
     bool value_is_float = value.type->is_float();
     bool value_is_sint = value.type->is_signed_int();
@@ -2050,7 +2047,7 @@ std::optional<Value> Codegen::primitive_cast(
 }
 
 bool Codegen::cast_to_result(
-    std::shared_ptr<Type>& type, Value& value, bool implicit) noexcept {
+    std::shared_ptr<Type>& type, Value& value, bool implicit) {
     if (types_equal(*type, *value.type)) {
         m_builder.CreateStore(load_value(value).value, m_current_result);
 
@@ -2118,7 +2115,7 @@ bool Codegen::cast_to_result(
 
 std::optional<Value> Codegen::generate_bin_expr(
     ast::OffsetValue<Value&> lhs, ast::OffsetValue<Value&> rhs,
-    ast::OffsetValue<frontend::Token::Type> oper) noexcept {
+    ast::OffsetValue<frontend::Token::Type> oper) {
     using enum frontend::Token::Type;
 
     if (oper.value == EqualEqual || oper.value == BangEqual) {
@@ -2312,7 +2309,7 @@ std::optional<Value> Codegen::generate_bin_expr(
     }
 }
 
-Value Codegen::load_value(Value& value) noexcept {
+Value Codegen::load_value(Value& value) {
     if (value.is_ref) {
         return value;
     }
@@ -2348,8 +2345,8 @@ Value Codegen::load_value(Value& value) noexcept {
     return value;
 }
 
-std::shared_ptr<Type> Codegen::get_type(
-    std::size_t offset, std::string_view name, Scope& parent) noexcept {
+std::shared_ptr<Type>
+Codegen::get_type(std::size_t offset, std::string_view name, Scope& parent) {
     auto primitive = m_primitive_types.find(name);
 
     if (primitive != m_primitive_types.end()) {
@@ -2369,8 +2366,8 @@ std::shared_ptr<Type> Codegen::get_type(
     return user->second;
 }
 
-std::optional<Value> Codegen::get_name(
-    std::size_t offset, std::string_view name, Scope& parent) noexcept {
+std::optional<Value>
+Codegen::get_name(std::size_t offset, std::string_view name, Scope& parent) {
     auto iterator = parent.names.find(name);
 
     if (iterator == parent.names.end()) {
@@ -2385,8 +2382,8 @@ std::optional<Value> Codegen::get_name(
     return iterator->second;
 }
 
-Scope* Codegen::get_scope(
-    std::size_t offset, std::string_view name, Scope& parent) noexcept {
+Scope*
+Codegen::get_scope(std::size_t offset, std::string_view name, Scope& parent) {
     auto iterator = parent.scopes.find(name);
 
     if (iterator == parent.scopes.end()) {
@@ -2400,7 +2397,7 @@ Scope* Codegen::get_scope(
     return &iterator->second;
 }
 
-void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
+void Codegen::generate_fn_proto(ast::FnDecl& decl) {
     if (!decl.is_extern && !decl.block) {
         error(
             decl.proto.name.offset,
@@ -2528,8 +2525,7 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) noexcept {
     }
 }
 
-void Codegen::type_mismatch(
-    std::size_t offset, Type& expected, Type& got) noexcept {
+void Codegen::type_mismatch(std::size_t offset, Type& expected, Type& got) {
     error(
         offset, fmt::format(
                     "expected {} but got {}",

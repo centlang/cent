@@ -8,8 +8,7 @@
 namespace cent::ast {
 
 struct Optional : detail::Type<Optional> {
-    [[nodiscard]] Optional(
-        std::size_t offset, std::unique_ptr<ast::Type> type) noexcept
+    [[nodiscard]] Optional(std::size_t offset, std::unique_ptr<ast::Type> type)
     : Type{offset}, type{std::move(type)} {}
 
     std::unique_ptr<ast::Type> type;

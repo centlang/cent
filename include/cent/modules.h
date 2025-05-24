@@ -14,8 +14,7 @@ struct ModulePath {
 };
 
 [[nodiscard]] ModulePath find_module(
-    std::span<std::string> path,
-    std::span<std::filesystem::path> search_paths) noexcept;
+    std::span<std::string> path, std::span<std::filesystem::path> search_paths);
 
 } // namespace cent
 

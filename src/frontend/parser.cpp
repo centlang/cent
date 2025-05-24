@@ -25,7 +25,7 @@
 
 namespace cent::frontend {
 
-std::unique_ptr<ast::Module> Parser::parse() noexcept {
+std::unique_ptr<ast::Module> Parser::parse() {
     using enum Token::Type;
 
     auto skip_until_decl = [&] {
@@ -126,7 +126,7 @@ std::unique_ptr<ast::Module> Parser::parse() noexcept {
     return result;
 }
 
-void Parser::expect_stmt(ast::BlockStmt& block) noexcept {
+void Parser::expect_stmt(ast::BlockStmt& block) {
     using enum Token::Type;
 
     switch (peek().type) {
@@ -179,7 +179,7 @@ void Parser::expect_stmt(ast::BlockStmt& block) noexcept {
     expect("';'", Token::Type::Semicolon);
 }
 
-std::vector<std::unique_ptr<ast::Expression>> Parser::parse_args() noexcept {
+std::vector<std::unique_ptr<ast::Expression>> Parser::parse_args() {
     std::vector<std::unique_ptr<ast::Expression>> result;
 
     if (!match(Token::Type::RightParen)) {
@@ -194,7 +194,7 @@ std::vector<std::unique_ptr<ast::Expression>> Parser::parse_args() noexcept {
     return result;
 }
 
-std::vector<ast::StructLiteral::Field> Parser::parse_field_values() noexcept {
+std::vector<ast::StructLiteral::Field> Parser::parse_field_values() {
     std::vector<ast::StructLiteral::Field> result;
 
     auto parse_field = [&] {
@@ -221,8 +221,7 @@ std::vector<ast::StructLiteral::Field> Parser::parse_field_values() noexcept {
     return result;
 }
 
-std::unique_ptr<ast::Expression>
-Parser::expect_prefix(bool is_condition) noexcept {
+std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
     using enum Token::Type;
 
     if (match(LeftBracket)) {
@@ -358,7 +357,7 @@ Parser::expect_prefix(bool is_condition) noexcept {
 }
 
 [[nodiscard]] std::unique_ptr<ast::Expression>
-Parser::expect_access_or_call_expr(bool is_condition) noexcept {
+Parser::expect_access_or_call_expr(bool is_condition) {
     using enum Token::Type;
 
     auto expression = expect_prefix(is_condition);
@@ -435,7 +434,7 @@ Parser::expect_access_or_call_expr(bool is_condition) noexcept {
 }
 
 [[nodiscard]] std::unique_ptr<ast::Expression>
-Parser::expect_as_expr(bool is_condition) noexcept {
+Parser::expect_as_expr(bool is_condition) {
     auto expression = expect_access_or_call_expr(is_condition);
 
     if (!match(Token::Type::As)) {
@@ -454,8 +453,8 @@ Parser::expect_as_expr(bool is_condition) noexcept {
         expression->offset, std::move(expression), std::move(type));
 }
 
-std::unique_ptr<ast::BinaryExpr> Parser::expect_infix(
-    std::unique_ptr<ast::Expression> lhs, bool is_condition) noexcept {
+std::unique_ptr<ast::BinaryExpr>
+Parser::expect_infix(std::unique_ptr<ast::Expression> lhs, bool is_condition) {
     auto oper = get();
     auto rhs = expect_bin_expr(is_condition, precedence_of(oper.type) + 1);
 
@@ -469,7 +468,7 @@ std::unique_ptr<ast::BinaryExpr> Parser::expect_infix(
 }
 
 std::unique_ptr<ast::Expression>
-Parser::expect_bin_expr(bool is_condition, std::uint8_t precedence) noexcept {
+Parser::expect_bin_expr(bool is_condition, std::uint8_t precedence) {
     auto expression = expect_as_expr(is_condition);
 
     while (precedence_of(peek().type) >= precedence) {
@@ -484,12 +483,11 @@ Parser::expect_bin_expr(bool is_condition, std::uint8_t precedence) noexcept {
     return expression;
 }
 
-std::unique_ptr<ast::Expression>
-Parser::expect_expr(bool is_condition) noexcept {
+std::unique_ptr<ast::Expression> Parser::expect_expr(bool is_condition) {
     return expect_bin_expr(is_condition);
 }
 
-std::unique_ptr<ast::BlockStmt> Parser::expect_block() noexcept {
+std::unique_ptr<ast::BlockStmt> Parser::expect_block() {
     auto result = std::make_unique<ast::BlockStmt>(peek().offset);
 
     if (!expect("'{'", Token::Type::LeftBrace)) {
@@ -518,7 +516,7 @@ std::unique_ptr<ast::BlockStmt> Parser::expect_block() noexcept {
     return result;
 }
 
-std::unique_ptr<ast::IfElse> Parser::parse_if_else() noexcept {
+std::unique_ptr<ast::IfElse> Parser::parse_if_else() {
     auto offset = get().offset;
 
     auto condition = expect_expr(true);
@@ -563,7 +561,7 @@ std::unique_ptr<ast::IfElse> Parser::parse_if_else() noexcept {
         std::move(else_block));
 }
 
-std::unique_ptr<ast::Type> Parser::expect_var_type() noexcept {
+std::unique_ptr<ast::Type> Parser::expect_var_type() {
     if (!expect("':'", Token::Type::Colon)) {
         return nullptr;
     }
@@ -571,7 +569,7 @@ std::unique_ptr<ast::Type> Parser::expect_var_type() noexcept {
     return expect_type();
 }
 
-std::unique_ptr<ast::ArrayType> Parser::parse_array_type() noexcept {
+std::unique_ptr<ast::ArrayType> Parser::parse_array_type() {
     auto offset = get().offset;
     auto type = expect_type();
 
@@ -597,7 +595,7 @@ std::unique_ptr<ast::ArrayType> Parser::parse_array_type() noexcept {
         offset, std::move(type), std::move(size));
 }
 
-std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
+std::unique_ptr<ast::Type> Parser::expect_type() {
     using enum Token::Type;
 
     auto offset = peek().offset;
@@ -697,7 +695,7 @@ std::unique_ptr<ast::Type> Parser::expect_type() noexcept {
     return std::make_unique<ast::NamedType>(offset, std::move(value));
 }
 
-std::unique_ptr<ast::VarDecl> Parser::parse_var() noexcept {
+std::unique_ptr<ast::VarDecl> Parser::parse_var() {
     auto offset = peek().offset;
 
     auto mutability = [&] {
@@ -755,7 +753,7 @@ std::unique_ptr<ast::VarDecl> Parser::parse_var() noexcept {
         std::move(type), std::move(value));
 }
 
-void Parser::parse_while(ast::BlockStmt& block) noexcept {
+void Parser::parse_while(ast::BlockStmt& block) {
     auto offset = get().offset;
     auto condition = expect_expr(true);
 
@@ -773,7 +771,7 @@ void Parser::parse_while(ast::BlockStmt& block) noexcept {
         offset, std::move(condition), std::move(body)));
 }
 
-void Parser::parse_return(ast::BlockStmt& block) noexcept {
+void Parser::parse_return(ast::BlockStmt& block) {
     auto offset = get().offset;
 
     std::unique_ptr<ast::Expression> value = nullptr;
@@ -787,7 +785,7 @@ void Parser::parse_return(ast::BlockStmt& block) noexcept {
 }
 
 void Parser::parse_assignment(
-    ast::BlockStmt& block, std::unique_ptr<ast::Expression> variable) noexcept {
+    ast::BlockStmt& block, std::unique_ptr<ast::Expression> variable) {
     auto oper = get();
     auto value = expect_expr(false);
 
@@ -800,7 +798,7 @@ void Parser::parse_assignment(
         ast::OffsetValue{oper.type, oper.offset}));
 }
 
-std::vector<ast::FnDecl::Param> Parser::parse_params() noexcept {
+std::vector<ast::FnDecl::Param> Parser::parse_params() {
     std::vector<ast::FnDecl::Param> result;
 
     auto parse_param = [&] {
@@ -840,7 +838,7 @@ std::vector<ast::FnDecl::Param> Parser::parse_params() noexcept {
     return result;
 }
 
-std::vector<ast::Struct::Field> Parser::parse_fields() noexcept {
+std::vector<ast::Struct::Field> Parser::parse_fields() {
     std::vector<ast::Struct::Field> result;
 
     auto parse_field = [&] {
@@ -865,7 +863,7 @@ std::vector<ast::Struct::Field> Parser::parse_fields() noexcept {
     return result;
 }
 
-std::vector<ast::EnumDecl::Field> Parser::parse_enum_fields() noexcept {
+std::vector<ast::EnumDecl::Field> Parser::parse_enum_fields() {
     std::vector<ast::EnumDecl::Field> result;
 
     auto parse_field = [&] {
@@ -895,8 +893,7 @@ std::vector<ast::EnumDecl::Field> Parser::parse_enum_fields() noexcept {
     return result;
 }
 
-bool Parser::parse_fn(
-    ast::Module& module, bool is_public, bool is_extern) noexcept {
+bool Parser::parse_fn(ast::Module& module, bool is_public, bool is_extern) {
     auto name = expect("function name", Token::Type::Identifier);
     std::optional<ast::OffsetValue<std::string>> type = std::nullopt;
 
@@ -959,7 +956,7 @@ bool Parser::parse_fn(
     return true;
 }
 
-bool Parser::parse_struct(ast::Module& module, bool is_public) noexcept {
+bool Parser::parse_struct(ast::Module& module, bool is_public) {
     auto name = expect("struct name", Token::Type::Identifier);
 
     if (!name) {
@@ -983,7 +980,7 @@ bool Parser::parse_struct(ast::Module& module, bool is_public) noexcept {
     return true;
 }
 
-bool Parser::parse_enum(ast::Module& module, bool is_public) noexcept {
+bool Parser::parse_enum(ast::Module& module, bool is_public) {
     auto name = expect("enum name", Token::Type::Identifier);
 
     if (!name) {
@@ -1018,7 +1015,7 @@ bool Parser::parse_enum(ast::Module& module, bool is_public) noexcept {
 }
 
 bool Parser::parse_submodule(
-    ast::Module& module, const std::filesystem::path& path) noexcept {
+    ast::Module& module, const std::filesystem::path& path) {
     auto code = cent::read_file(path);
 
     if (!code) {
@@ -1058,7 +1055,7 @@ bool Parser::parse_submodule(
 }
 
 bool Parser::parse_submodule_dir(
-    ast::Module& module, const std::filesystem::path& path) noexcept {
+    ast::Module& module, const std::filesystem::path& path) {
     for (const auto& entry :
          std::filesystem::recursive_directory_iterator{path}) {
         auto name = entry.path().stem().string();
@@ -1093,7 +1090,7 @@ bool Parser::parse_submodule_dir(
     return true;
 }
 
-bool Parser::parse_with(ast::Module& module) noexcept {
+bool Parser::parse_with(ast::Module& module) {
     auto name = expect("module name", Token::Type::Identifier);
 
     if (!name) {

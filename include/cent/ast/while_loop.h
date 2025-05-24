@@ -12,7 +12,7 @@ namespace cent::ast {
 struct WhileLoop : detail::Stmt<WhileLoop> {
     [[nodiscard]] WhileLoop(
         std::size_t offset, std::unique_ptr<Expression> condition,
-        std::unique_ptr<BlockStmt> body) noexcept
+        std::unique_ptr<BlockStmt> body)
     : Stmt{offset}, condition{std::move(condition)}, body{std::move(body)} {}
 
     std::unique_ptr<Expression> condition;

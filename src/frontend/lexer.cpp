@@ -4,7 +4,7 @@
 
 namespace cent::frontend {
 
-void Lexer::next_token() noexcept {
+void Lexer::next_token() {
     using enum Token::Type;
 
     skip_whitespaces();
@@ -195,7 +195,7 @@ void Lexer::next_token() noexcept {
     }
 }
 
-void Lexer::number() noexcept {
+void Lexer::number() {
     m_token = {Token::Type::IntLiteral, {}, m_offset};
 
     static constexpr auto hex = 16;
@@ -278,7 +278,7 @@ void Lexer::number() noexcept {
     }
 }
 
-void Lexer::string() noexcept {
+void Lexer::string() {
     get();
     m_token = {Token::Type::StrLiteral, {}, m_offset};
 
@@ -331,7 +331,7 @@ void Lexer::string() noexcept {
     }
 }
 
-void Lexer::ident() noexcept {
+void Lexer::ident() {
     using enum Token::Type;
 
     m_token = {Identifier, {}, m_offset};

@@ -10,34 +10,32 @@ namespace cent::frontend {
 
 class Lexer {
 public:
-    [[nodiscard]] Lexer(std::string_view source) noexcept : m_source{source} {
+    [[nodiscard]] Lexer(std::string_view source) : m_source{source} {
         next_token();
     }
 
-    [[nodiscard]] auto token() const noexcept { return m_token; }
+    [[nodiscard]] auto token() const { return m_token; }
 
-    void next_token() noexcept;
+    void next_token();
 
 private:
-    [[nodiscard]] char peek() const noexcept { return m_source[m_offset]; }
+    [[nodiscard]] char peek() const { return m_source[m_offset]; }
 
-    char get() noexcept { return m_source[m_offset++]; }
+    char get() { return m_source[m_offset++]; }
 
-    [[nodiscard]] bool eof() const noexcept {
-        return m_offset == m_source.size();
-    }
+    [[nodiscard]] bool eof() const { return m_offset == m_source.size(); }
 
-    void skip_whitespaces() noexcept {
+    void skip_whitespaces() {
         while (!eof() && std::isspace(peek())) {
             get();
         }
     }
 
-    void number() noexcept;
-    void string() noexcept;
-    void ident() noexcept;
+    void number();
+    void string();
+    void ident();
 
-    [[nodiscard]] static bool is_ident(char character) noexcept {
+    [[nodiscard]] static bool is_ident(char character) {
         return std::isalnum(character) || character == '_';
     }
 

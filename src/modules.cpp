@@ -4,7 +4,7 @@ namespace cent {
 
 ModulePath find_module(
     std::span<std::string> path,
-    std::span<std::filesystem::path> search_paths) noexcept {
+    std::span<std::filesystem::path> search_paths) {
     for (const auto& search_path : search_paths) {
         std::filesystem::path fs_path = search_path;
 

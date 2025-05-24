@@ -11,7 +11,7 @@ namespace cent::ast {
 struct ArrayType : detail::Type<ArrayType> {
     [[nodiscard]] ArrayType(
         std::size_t offset, std::unique_ptr<ast::Type> type,
-        std::unique_ptr<Expression> size) noexcept
+        std::unique_ptr<Expression> size)
     : Type{offset}, type{std::move(type)}, size{std::move(size)} {}
 
     std::unique_ptr<ast::Type> type;

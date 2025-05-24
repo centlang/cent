@@ -10,8 +10,7 @@ namespace cent::ast {
 
 struct NamedType : detail::Type<NamedType> {
     [[nodiscard]] NamedType(
-        std::size_t offset,
-        std::vector<OffsetValue<std::string>> value) noexcept
+        std::size_t offset, std::vector<OffsetValue<std::string>> value)
     : Type{offset}, value{std::move(value)} {}
 
     std::vector<OffsetValue<std::string>> value;

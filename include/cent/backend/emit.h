@@ -9,12 +9,11 @@
 
 namespace cent::backend {
 
-void optimize_module(
-    llvm::Module& module, llvm::OptimizationLevel opt_level) noexcept;
+void optimize_module(llvm::Module& module, llvm::OptimizationLevel opt_level);
 
 [[nodiscard]] bool emit_obj(
     llvm::Module& module, llvm::TargetMachine& machine,
-    const std::filesystem::path& path) noexcept;
+    const std::filesystem::path& path);
 
 } // namespace cent::backend
 

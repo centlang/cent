@@ -110,7 +110,7 @@ public:
     [[nodiscard]] Codegen(
         std::unique_ptr<ast::Module> program, std::string_view source,
         std::string_view filename, const llvm::DataLayout& layout,
-        const std::string& triple) noexcept
+        const std::string& triple)
     : m_module{std::make_unique<llvm::Module>("", m_context)},
       m_builder{m_context}, m_program{std::move(program)}, m_source{source},
       m_filename{filename} {
@@ -118,112 +118,109 @@ public:
         m_module->setTargetTriple(triple);
     }
 
-    [[nodiscard]] std::unique_ptr<llvm::Module> generate() noexcept;
+    [[nodiscard]] std::unique_ptr<llvm::Module> generate();
 
-    std::shared_ptr<Type> generate(ast::NamedType& type) noexcept;
-    std::shared_ptr<Type> generate(ast::Pointer& type) noexcept;
-    std::shared_ptr<Type> generate(ast::Optional& type) noexcept;
-    std::shared_ptr<Type> generate(ast::ArrayType& type) noexcept;
-    std::shared_ptr<Type> generate(ast::TupleType& type) noexcept;
+    std::shared_ptr<Type> generate(ast::NamedType& type);
+    std::shared_ptr<Type> generate(ast::Pointer& type);
+    std::shared_ptr<Type> generate(ast::Optional& type);
+    std::shared_ptr<Type> generate(ast::ArrayType& type);
+    std::shared_ptr<Type> generate(ast::TupleType& type);
 
-    llvm::Type* generate(types::I8& type) noexcept;
-    llvm::Type* generate(types::I16& type) noexcept;
-    llvm::Type* generate(types::I32& type) noexcept;
-    llvm::Type* generate(types::I64& type) noexcept;
-    llvm::Type* generate(types::ISize& type) noexcept;
+    llvm::Type* generate(types::I8& type);
+    llvm::Type* generate(types::I16& type);
+    llvm::Type* generate(types::I32& type);
+    llvm::Type* generate(types::I64& type);
+    llvm::Type* generate(types::ISize& type);
 
-    llvm::Type* generate(types::U8& type) noexcept;
-    llvm::Type* generate(types::U16& type) noexcept;
-    llvm::Type* generate(types::U32& type) noexcept;
-    llvm::Type* generate(types::U64& type) noexcept;
-    llvm::Type* generate(types::USize& type) noexcept;
+    llvm::Type* generate(types::U8& type);
+    llvm::Type* generate(types::U16& type);
+    llvm::Type* generate(types::U32& type);
+    llvm::Type* generate(types::U64& type);
+    llvm::Type* generate(types::USize& type);
 
-    llvm::Type* generate(types::F32& type) noexcept;
-    llvm::Type* generate(types::F64& type) noexcept;
+    llvm::Type* generate(types::F32& type);
+    llvm::Type* generate(types::F64& type);
 
-    llvm::Type* generate(types::Str& type) noexcept;
+    llvm::Type* generate(types::Str& type);
 
-    llvm::Type* generate(types::Bool& type) noexcept;
-    llvm::Type* generate(types::Null& type) noexcept;
-    llvm::Type* generate(types::Void& type) noexcept;
+    llvm::Type* generate(types::Bool& type);
+    llvm::Type* generate(types::Null& type);
+    llvm::Type* generate(types::Void& type);
 
-    llvm::Type* generate(types::Pointer& type) noexcept;
-    llvm::Type* generate(types::Optional& type) noexcept;
+    llvm::Type* generate(types::Pointer& type);
+    llvm::Type* generate(types::Optional& type);
 
-    llvm::Type* generate(types::Array& type) noexcept;
-    llvm::Type* generate(types::Tuple& type) noexcept;
+    llvm::Type* generate(types::Array& type);
+    llvm::Type* generate(types::Tuple& type);
 
-    llvm::Type* generate(types::Struct& type) noexcept;
-    llvm::Type* generate(types::Enum& type) noexcept;
-    llvm::Type* generate(types::Function& type) noexcept;
+    llvm::Type* generate(types::Struct& type);
+    llvm::Type* generate(types::Enum& type);
+    llvm::Type* generate(types::Function& type);
 
-    std::optional<Value> generate(ast::Assignment& stmt) noexcept;
-    std::optional<Value> generate(ast::BlockStmt& stmt) noexcept;
-    std::optional<Value> generate(ast::IfElse& stmt) noexcept;
-    std::optional<Value> generate(ast::ReturnStmt& stmt) noexcept;
-    std::optional<Value> generate(ast::WhileLoop& stmt) noexcept;
-    std::optional<Value> generate(ast::BreakStmt& stmt) noexcept;
-    std::optional<Value> generate(ast::ContinueStmt& stmt) noexcept;
-    std::optional<Value> generate(ast::Unreachable& stmt) noexcept;
+    std::optional<Value> generate(ast::Assignment& stmt);
+    std::optional<Value> generate(ast::BlockStmt& stmt);
+    std::optional<Value> generate(ast::IfElse& stmt);
+    std::optional<Value> generate(ast::ReturnStmt& stmt);
+    std::optional<Value> generate(ast::WhileLoop& stmt);
+    std::optional<Value> generate(ast::BreakStmt& stmt);
+    std::optional<Value> generate(ast::ContinueStmt& stmt);
+    std::optional<Value> generate(ast::Unreachable& stmt);
 
-    std::optional<Value> generate(ast::BinaryExpr& expr) noexcept;
-    std::optional<Value> generate(ast::UnaryExpr& expr) noexcept;
-    std::optional<Value> generate(ast::IntLiteral& expr) noexcept;
-    std::optional<Value> generate(ast::FloatLiteral& expr) noexcept;
-    std::optional<Value> generate(ast::StrLiteral& expr) noexcept;
-    std::optional<Value> generate(ast::BoolLiteral& expr) noexcept;
-    std::optional<Value> generate(ast::NullLiteral& expr) noexcept;
-    std::optional<Value> generate(ast::StructLiteral& expr) noexcept;
-    std::optional<Value> generate(ast::ArrayLiteral& expr) noexcept;
-    std::optional<Value> generate(ast::TupleLiteral& expr) noexcept;
-    std::optional<Value> generate(ast::Identifier& expr) noexcept;
-    std::optional<Value> generate(ast::CallExpr& expr) noexcept;
-    std::optional<Value> generate(ast::MethodExpr& expr) noexcept;
-    std::optional<Value> generate(ast::MemberExpr& expr) noexcept;
-    std::optional<Value> generate(ast::IndexExpr& expr) noexcept;
-    std::optional<Value> generate(ast::AsExpr& expr) noexcept;
+    std::optional<Value> generate(ast::BinaryExpr& expr);
+    std::optional<Value> generate(ast::UnaryExpr& expr);
+    std::optional<Value> generate(ast::IntLiteral& expr);
+    std::optional<Value> generate(ast::FloatLiteral& expr);
+    std::optional<Value> generate(ast::StrLiteral& expr);
+    std::optional<Value> generate(ast::BoolLiteral& expr);
+    std::optional<Value> generate(ast::NullLiteral& expr);
+    std::optional<Value> generate(ast::StructLiteral& expr);
+    std::optional<Value> generate(ast::ArrayLiteral& expr);
+    std::optional<Value> generate(ast::TupleLiteral& expr);
+    std::optional<Value> generate(ast::Identifier& expr);
+    std::optional<Value> generate(ast::CallExpr& expr);
+    std::optional<Value> generate(ast::MethodExpr& expr);
+    std::optional<Value> generate(ast::MemberExpr& expr);
+    std::optional<Value> generate(ast::IndexExpr& expr);
+    std::optional<Value> generate(ast::AsExpr& expr);
 
-    std::optional<Value> generate(ast::FnDecl& decl) noexcept;
-    std::optional<Value> generate(ast::Struct& decl) noexcept;
-    std::optional<Value> generate(ast::EnumDecl& decl) noexcept;
+    std::optional<Value> generate(ast::FnDecl& decl);
+    std::optional<Value> generate(ast::Struct& decl);
+    std::optional<Value> generate(ast::EnumDecl& decl);
 
-    std::optional<Value> generate(ast::VarDecl& decl) noexcept;
+    std::optional<Value> generate(ast::VarDecl& decl);
 
 private:
-    void generate(ast::Module& module, bool is_submodule = false) noexcept;
+    void generate(ast::Module& module, bool is_submodule = false);
 
-    [[nodiscard]] bool types_equal(Type& lhs, Type& rhs) noexcept;
+    [[nodiscard]] bool types_equal(Type& lhs, Type& rhs);
 
-    [[nodiscard]] std::optional<Value> cast(
-        std::shared_ptr<Type>& type, Value& value,
-        bool implicit = true) noexcept;
+    [[nodiscard]] std::optional<Value>
+    cast(std::shared_ptr<Type>& type, Value& value, bool implicit = true);
 
     [[nodiscard]] std::optional<Value> primitive_cast(
         std::shared_ptr<Type>& type, llvm::Type* llvm_type, Value& value,
-        bool implicit = true) noexcept;
+        bool implicit = true);
 
     bool cast_to_result(
-        std::shared_ptr<Type>& type, Value& value,
-        bool implicit = true) noexcept;
+        std::shared_ptr<Type>& type, Value& value, bool implicit = true);
 
     std::optional<Value> generate_bin_expr(
         ast::OffsetValue<Value&> lhs, ast::OffsetValue<Value&> rhs,
-        ast::OffsetValue<frontend::Token::Type> oper) noexcept;
+        ast::OffsetValue<frontend::Token::Type> oper);
 
-    Value load_value(Value& value) noexcept;
+    Value load_value(Value& value);
 
     std::shared_ptr<Type>
-    get_type(std::size_t offset, std::string_view name, Scope& parent) noexcept;
+    get_type(std::size_t offset, std::string_view name, Scope& parent);
 
     std::optional<Value>
-    get_name(std::size_t offset, std::string_view name, Scope& parent) noexcept;
+    get_name(std::size_t offset, std::string_view name, Scope& parent);
 
-    Scope* get_scope(
-        std::size_t offset, std::string_view name, Scope& parent) noexcept;
+    Scope* get_scope(std::size_t offset, std::string_view name, Scope& parent);
 
-    void generate_fn_proto(ast::FnDecl& decl) noexcept;
+    void generate_fn_proto(ast::FnDecl& decl);
 
-    void type_mismatch(std::size_t offset, Type& expected, Type& got) noexcept;
+    void type_mismatch(std::size_t offset, Type& expected, Type& got);
 
     void error(std::size_t offset, std::string_view message) {
         auto [line, column] = cent::offset_to_pos(m_source, offset);

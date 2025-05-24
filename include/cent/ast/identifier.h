@@ -11,8 +11,7 @@ namespace cent::ast {
 
 struct Identifier : detail::Expr<Identifier> {
     [[nodiscard]] Identifier(
-        std::size_t offset,
-        std::vector<OffsetValue<std::string>> value) noexcept
+        std::size_t offset, std::vector<OffsetValue<std::string>> value)
     : Expr{offset}, value{std::move(value)} {}
 
     std::vector<OffsetValue<std::string>> value;

@@ -13,8 +13,7 @@
 
 namespace cent::backend {
 
-void optimize_module(
-    llvm::Module& module, llvm::OptimizationLevel opt_level) noexcept {
+void optimize_module(llvm::Module& module, llvm::OptimizationLevel opt_level) {
     llvm::LoopAnalysisManager loop_manager;
     llvm::FunctionAnalysisManager function_manager;
     llvm::CGSCCAnalysisManager cg_manager;
@@ -36,7 +35,7 @@ void optimize_module(
 
 bool emit_obj(
     llvm::Module& module, llvm::TargetMachine& machine,
-    const std::filesystem::path& path) noexcept {
+    const std::filesystem::path& path) {
     std::error_code code;
     llvm::raw_fd_ostream file{path.string(), code, llvm::sys::fs::OF_None};
 

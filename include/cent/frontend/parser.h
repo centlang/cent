@@ -31,8 +31,7 @@ namespace cent::frontend {
 
 class Parser {
 public:
-    [[nodiscard]] Parser(
-        std::string_view source, std::string_view filename) noexcept
+    [[nodiscard]] Parser(std::string_view source, std::string_view filename)
     : m_lexer{source}, m_source{source}, m_filename{filename} {
         for (auto& token : m_buffer) {
             token = m_lexer.token();
@@ -40,21 +39,21 @@ public:
         }
     }
 
-    [[nodiscard]] std::unique_ptr<ast::Module> parse() noexcept;
+    [[nodiscard]] std::unique_ptr<ast::Module> parse();
 
 private:
-    [[nodiscard]] auto peek(std::uint8_t ahead = 0) const noexcept {
+    [[nodiscard]] auto peek(std::uint8_t ahead = 0) const {
         return m_buffer[(m_buffer_index + ahead) % buffer_size];
     }
 
-    [[nodiscard]] auto get() noexcept {
+    [[nodiscard]] auto get() {
         auto result = peek();
         next();
 
         return result;
     }
 
-    void next() noexcept {
+    void next() {
         m_buffer[m_buffer_index] = m_lexer.token();
         m_lexer.next_token();
 
@@ -62,23 +61,21 @@ private:
         m_buffer_index %= buffer_size;
     }
 
-    [[nodiscard]] bool
-    match(std::same_as<Token::Type> auto... types) const noexcept {
+    [[nodiscard]] bool match(std::same_as<Token::Type> auto... types) const {
         return match(0, types...);
     }
 
-    [[nodiscard]] bool match(
-        std::uint8_t ahead,
-        std::same_as<Token::Type> auto... types) const noexcept {
+    [[nodiscard]] bool
+    match(std::uint8_t ahead, std::same_as<Token::Type> auto... types) const {
         auto type = peek(ahead).type;
         return ((type == types) || ...);
     }
 
-    void expected(std::string_view what) noexcept {
+    void expected(std::string_view what) {
         error(fmt::format("expected {}", log::bold(what)));
     }
 
-    std::optional<Token> expect(std::string_view what, auto... types) noexcept {
+    std::optional<Token> expect(std::string_view what, auto... types) {
         if (!match(types...)) {
             expected(what);
             return std::nullopt;
@@ -87,78 +84,72 @@ private:
         return get();
     }
 
-    [[nodiscard]] std::unique_ptr<ast::BlockStmt> expect_block() noexcept;
+    [[nodiscard]] std::unique_ptr<ast::BlockStmt> expect_block();
 
-    [[nodiscard]] std::unique_ptr<ast::IfElse> parse_if_else() noexcept;
+    [[nodiscard]] std::unique_ptr<ast::IfElse> parse_if_else();
 
-    void expect_stmt(ast::BlockStmt& block) noexcept;
+    void expect_stmt(ast::BlockStmt& block);
 
-    [[nodiscard]] std::vector<std::unique_ptr<ast::Expression>>
-    parse_args() noexcept;
+    [[nodiscard]] std::vector<std::unique_ptr<ast::Expression>> parse_args();
 
-    [[nodiscard]] std::vector<ast::StructLiteral::Field>
-    parse_field_values() noexcept;
+    [[nodiscard]] std::vector<ast::StructLiteral::Field> parse_field_values();
 
     [[nodiscard]] std::unique_ptr<ast::Expression>
-    expect_prefix(bool is_condition) noexcept;
+    expect_prefix(bool is_condition);
 
     [[nodiscard]] std::unique_ptr<ast::Expression>
-    expect_access_or_call_expr(bool is_condition) noexcept;
+    expect_access_or_call_expr(bool is_condition);
 
     [[nodiscard]] std::unique_ptr<ast::Expression>
-    expect_as_expr(bool is_condition) noexcept;
+    expect_as_expr(bool is_condition);
 
-    [[nodiscard]] std::unique_ptr<ast::BinaryExpr> expect_infix(
-        std::unique_ptr<ast::Expression> lhs, bool is_condition) noexcept;
-
-    [[nodiscard]] std::unique_ptr<ast::Expression>
-    expect_bin_expr(bool is_condition, std::uint8_t precedence = 1) noexcept;
+    [[nodiscard]] std::unique_ptr<ast::BinaryExpr>
+    expect_infix(std::unique_ptr<ast::Expression> lhs, bool is_condition);
 
     [[nodiscard]] std::unique_ptr<ast::Expression>
-    expect_expr(bool is_condition) noexcept;
+    expect_bin_expr(bool is_condition, std::uint8_t precedence = 1);
 
-    [[nodiscard]] std::unique_ptr<ast::Type> expect_var_type() noexcept;
+    [[nodiscard]] std::unique_ptr<ast::Expression>
+    expect_expr(bool is_condition);
 
-    [[nodiscard]] std::unique_ptr<ast::ArrayType> parse_array_type() noexcept;
+    [[nodiscard]] std::unique_ptr<ast::Type> expect_var_type();
 
-    [[nodiscard]] std::unique_ptr<ast::Type> expect_type() noexcept;
+    [[nodiscard]] std::unique_ptr<ast::ArrayType> parse_array_type();
 
-    [[nodiscard]] std::unique_ptr<ast::VarDecl> parse_var() noexcept;
+    [[nodiscard]] std::unique_ptr<ast::Type> expect_type();
 
-    void parse_while(ast::BlockStmt& block) noexcept;
+    [[nodiscard]] std::unique_ptr<ast::VarDecl> parse_var();
 
-    void parse_return(ast::BlockStmt& block) noexcept;
+    void parse_while(ast::BlockStmt& block);
+
+    void parse_return(ast::BlockStmt& block);
 
     void parse_assignment(
-        ast::BlockStmt& block,
-        std::unique_ptr<ast::Expression> variable) noexcept;
+        ast::BlockStmt& block, std::unique_ptr<ast::Expression> variable);
 
-    [[nodiscard]] std::vector<ast::FnDecl::Param> parse_params() noexcept;
+    [[nodiscard]] std::vector<ast::FnDecl::Param> parse_params();
 
-    [[nodiscard]] std::vector<ast::Struct::Field> parse_fields() noexcept;
+    [[nodiscard]] std::vector<ast::Struct::Field> parse_fields();
 
-    [[nodiscard]] std::vector<ast::EnumDecl::Field>
-    parse_enum_fields() noexcept;
+    [[nodiscard]] std::vector<ast::EnumDecl::Field> parse_enum_fields();
 
     [[nodiscard]] bool parse_fn(
-        ast::Module& module, bool is_public = false,
-        bool is_extern = false) noexcept;
+        ast::Module& module, bool is_public = false, bool is_extern = false);
 
     [[nodiscard]] bool
-    parse_struct(ast::Module& module, bool is_public = false) noexcept;
+    parse_struct(ast::Module& module, bool is_public = false);
+
+    [[nodiscard]] bool parse_enum(ast::Module& module, bool is_public = false);
 
     [[nodiscard]] bool
-    parse_enum(ast::Module& module, bool is_public = false) noexcept;
+    parse_submodule(ast::Module& module, const std::filesystem::path& path);
 
-    [[nodiscard]] bool parse_submodule(
-        ast::Module& module, const std::filesystem::path& path) noexcept;
+    [[nodiscard]] bool
+    parse_submodule_dir(ast::Module& module, const std::filesystem::path& path);
 
-    [[nodiscard]] bool parse_submodule_dir(
-        ast::Module& module, const std::filesystem::path& path) noexcept;
+    [[nodiscard]] bool parse_with(ast::Module& module);
 
-    [[nodiscard]] bool parse_with(ast::Module& module) noexcept;
-
-    [[nodiscard]] static std::uint8_t precedence_of(Token::Type type) noexcept {
+    [[nodiscard]] static std::uint8_t precedence_of(Token::Type type) {
         using enum Token::Type;
 
         enum Precedence {

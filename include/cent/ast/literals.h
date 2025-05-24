@@ -14,28 +14,28 @@
 namespace cent::ast {
 
 struct IntLiteral : detail::Expr<IntLiteral> {
-    [[nodiscard]] IntLiteral(std::size_t offset, std::string value) noexcept
+    [[nodiscard]] IntLiteral(std::size_t offset, std::string value)
     : Expr{offset}, value{std::move(value)} {}
 
     std::string value;
 };
 
 struct FloatLiteral : detail::Expr<FloatLiteral> {
-    [[nodiscard]] FloatLiteral(std::size_t offset, std::string value) noexcept
+    [[nodiscard]] FloatLiteral(std::size_t offset, std::string value)
     : Expr{offset}, value{std::move(value)} {}
 
     std::string value;
 };
 
 struct StrLiteral : detail::Expr<StrLiteral> {
-    [[nodiscard]] StrLiteral(std::size_t offset, std::string value) noexcept
+    [[nodiscard]] StrLiteral(std::size_t offset, std::string value)
     : Expr{offset}, value{std::move(value)} {}
 
     std::string value;
 };
 
 struct BoolLiteral : detail::Expr<BoolLiteral> {
-    [[nodiscard]] BoolLiteral(std::size_t offset, bool value) noexcept
+    [[nodiscard]] BoolLiteral(std::size_t offset, bool value)
     : Expr{offset}, value{value} {}
 
     bool value;
@@ -53,7 +53,7 @@ struct StructLiteral : detail::Expr<StructLiteral> {
 
     [[nodiscard]] StructLiteral(
         std::size_t offset, std::unique_ptr<NamedType> type,
-        std::vector<Field> fields) noexcept
+        std::vector<Field> fields)
     : Expr{offset}, type{std::move(type)}, fields{std::move(fields)} {}
 
     std::unique_ptr<NamedType> type;
@@ -63,7 +63,7 @@ struct StructLiteral : detail::Expr<StructLiteral> {
 struct ArrayLiteral : detail::Expr<ArrayLiteral> {
     [[nodiscard]] ArrayLiteral(
         std::size_t offset, std::unique_ptr<ArrayType> type,
-        std::vector<std::unique_ptr<Expression>> elements) noexcept
+        std::vector<std::unique_ptr<Expression>> elements)
     : Expr{offset}, type{std::move(type)}, elements{std::move(elements)} {}
 
     std::unique_ptr<ArrayType> type;
@@ -72,8 +72,7 @@ struct ArrayLiteral : detail::Expr<ArrayLiteral> {
 
 struct TupleLiteral : detail::Expr<TupleLiteral> {
     [[nodiscard]] TupleLiteral(
-        std::size_t offset,
-        std::vector<std::unique_ptr<Expression>> elements) noexcept
+        std::size_t offset, std::vector<std::unique_ptr<Expression>> elements)
     : Expr{offset}, elements{std::move(elements)} {}
 
     std::vector<std::unique_ptr<Expression>> elements;

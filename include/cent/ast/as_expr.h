@@ -11,7 +11,7 @@ namespace cent::ast {
 struct AsExpr : detail::Expr<AsExpr> {
     [[nodiscard]] AsExpr(
         std::size_t offset, std::unique_ptr<Expression> value,
-        std::unique_ptr<Type> type) noexcept
+        std::unique_ptr<Type> type)
     : Expr{offset}, value{std::move(value)}, type{std::move(type)} {}
 
     std::unique_ptr<Expression> value;

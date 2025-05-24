@@ -16,7 +16,7 @@
 namespace cent::ast {
 
 struct Module : Node {
-    [[nodiscard]] Module(ModulePath path) noexcept : path{std::move(path)} {};
+    [[nodiscard]] Module(ModulePath path) : path{std::move(path)} {};
 
     std::vector<std::unique_ptr<FnDecl>> functions;
     std::vector<std::unique_ptr<Struct>> structs;

@@ -14,7 +14,7 @@ namespace cent::ast {
 struct UnaryExpr : detail::Expr<UnaryExpr> {
     [[nodiscard]] UnaryExpr(
         std::size_t offset, OffsetValue<frontend::Token::Type> oper,
-        std::unique_ptr<Expression> value) noexcept
+        std::unique_ptr<Expression> value)
     : Expr{offset}, oper{oper}, value{std::move(value)} {}
 
     OffsetValue<frontend::Token::Type> oper;

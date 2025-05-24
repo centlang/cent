@@ -13,135 +13,131 @@
 namespace cent::backend::types {
 
 struct I8 : detail::Type<I8> {
-    std::string to_string() noexcept override { return "i8"; }
+    std::string to_string() override { return "i8"; }
 
-    bool is_signed_int() noexcept override { return true; };
+    bool is_signed_int() override { return true; };
 };
 
 struct I16 : detail::Type<I16> {
-    std::string to_string() noexcept override { return "i16"; }
+    std::string to_string() override { return "i16"; }
 
-    bool is_signed_int() noexcept override { return true; };
+    bool is_signed_int() override { return true; };
 };
 
 struct I32 : detail::Type<I32> {
-    std::string to_string() noexcept override { return "i32"; }
+    std::string to_string() override { return "i32"; }
 
-    bool is_signed_int() noexcept override { return true; };
+    bool is_signed_int() override { return true; };
 };
 
 struct I64 : detail::Type<I64> {
-    std::string to_string() noexcept override { return "i64"; }
+    std::string to_string() override { return "i64"; }
 
-    bool is_signed_int() noexcept override { return true; };
+    bool is_signed_int() override { return true; };
 };
 
 struct ISize : detail::Type<ISize> {
-    std::string to_string() noexcept override { return "isize"; }
+    std::string to_string() override { return "isize"; }
 
-    bool is_signed_int() noexcept override { return true; };
+    bool is_signed_int() override { return true; };
 };
 
 struct U8 : detail::Type<U8> {
-    std::string to_string() noexcept override { return "u8"; }
+    std::string to_string() override { return "u8"; }
 
-    bool is_unsigned_int() noexcept override { return true; };
+    bool is_unsigned_int() override { return true; };
 };
 
 struct U16 : detail::Type<U16> {
-    std::string to_string() noexcept override { return "u16"; }
+    std::string to_string() override { return "u16"; }
 
-    bool is_unsigned_int() noexcept override { return true; };
+    bool is_unsigned_int() override { return true; };
 };
 
 struct U32 : detail::Type<U32> {
-    std::string to_string() noexcept override { return "u32"; }
+    std::string to_string() override { return "u32"; }
 
-    bool is_unsigned_int() noexcept override { return true; };
+    bool is_unsigned_int() override { return true; };
 };
 
 struct U64 : detail::Type<U64> {
-    std::string to_string() noexcept override { return "u64"; }
+    std::string to_string() override { return "u64"; }
 
-    bool is_unsigned_int() noexcept override { return true; };
+    bool is_unsigned_int() override { return true; };
 };
 
 struct USize : detail::Type<USize> {
-    std::string to_string() noexcept override { return "usize"; }
+    std::string to_string() override { return "usize"; }
 
-    bool is_unsigned_int() noexcept override { return true; };
+    bool is_unsigned_int() override { return true; };
 };
 
 struct F32 : detail::Type<F32> {
-    std::string to_string() noexcept override { return "f32"; }
+    std::string to_string() override { return "f32"; }
 
-    bool is_float() noexcept override { return true; };
+    bool is_float() override { return true; };
 };
 
 struct F64 : detail::Type<F64> {
-    std::string to_string() noexcept override { return "f64"; }
+    std::string to_string() override { return "f64"; }
 
-    bool is_float() noexcept override { return true; };
+    bool is_float() override { return true; };
 };
 
 struct Str : detail::Type<Str> {
-    std::string to_string() noexcept override { return "str"; }
+    std::string to_string() override { return "str"; }
 };
 
 struct Bool : detail::Type<Bool> {
-    std::string to_string() noexcept override { return "bool"; }
+    std::string to_string() override { return "bool"; }
 
-    bool is_bool() noexcept override { return true; };
+    bool is_bool() override { return true; };
 };
 
 struct Null : detail::Type<Null> {
-    std::string to_string() noexcept override { return "null"; }
+    std::string to_string() override { return "null"; }
 
-    bool is_null() noexcept override { return true; };
+    bool is_null() override { return true; };
 };
 
 struct Void : detail::Type<Void> {
-    std::string to_string() noexcept override { return "void"; }
+    std::string to_string() override { return "void"; }
 };
 
 struct Pointer : detail::Type<Pointer> {
-    [[nodiscard]] Pointer(
-        std::shared_ptr<backend::Type> type, bool is_mutable) noexcept
+    [[nodiscard]] Pointer(std::shared_ptr<backend::Type> type, bool is_mutable)
     : type{std::move(type)}, is_mutable{is_mutable} {}
 
-    std::string to_string() noexcept override {
+    std::string to_string() override {
         return (is_mutable ? "*mut " : "*") + type->to_string();
     }
 
-    bool is_pointer() noexcept override { return true; };
+    bool is_pointer() override { return true; };
 
     std::shared_ptr<backend::Type> type;
     bool is_mutable;
 };
 
 struct Optional : detail::Type<Optional> {
-    [[nodiscard]] Optional(std::shared_ptr<backend::Type> type) noexcept
+    [[nodiscard]] Optional(std::shared_ptr<backend::Type> type)
     : type{std::move(type)} {}
 
-    std::string to_string() noexcept override {
-        return "?" + type->to_string();
-    }
+    std::string to_string() override { return "?" + type->to_string(); }
 
-    bool is_optional() noexcept override { return true; };
+    bool is_optional() override { return true; };
 
     std::shared_ptr<backend::Type> type;
 };
 
 struct Array : detail::Type<Array> {
-    [[nodiscard]] Array(
-        std::shared_ptr<backend::Type> type, std::size_t size) noexcept
+    [[nodiscard]] Array(std::shared_ptr<backend::Type> type, std::size_t size)
     : type{std::move(type)}, size{size} {}
 
-    std::string to_string() noexcept override {
+    std::string to_string() override {
         return fmt::format("[{}, {}]", type->to_string(), size);
     }
 
-    bool is_array() noexcept override { return true; };
+    bool is_array() override { return true; };
 
     std::shared_ptr<backend::Type> type;
     std::size_t size;
@@ -150,10 +146,10 @@ struct Array : detail::Type<Array> {
 struct Tuple : detail::Type<Tuple> {
     [[nodiscard]] Tuple(
         llvm::StructType* type,
-        std::vector<std::shared_ptr<backend::Type>> types) noexcept
+        std::vector<std::shared_ptr<backend::Type>> types)
     : type{type}, types{std::move(types)} {}
 
-    std::string to_string() noexcept override {
+    std::string to_string() override {
         std::string result = "(";
 
         for (std::size_t i = 0; i < types.size(); ++i) {
@@ -167,7 +163,7 @@ struct Tuple : detail::Type<Tuple> {
         return result + ")";
     }
 
-    bool is_tuple() noexcept override { return true; };
+    bool is_tuple() override { return true; };
 
     llvm::StructType* type;
     std::vector<std::shared_ptr<backend::Type>> types;

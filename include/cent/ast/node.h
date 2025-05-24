@@ -11,8 +11,8 @@
 namespace cent::ast {
 
 struct Node {
-    [[nodiscard]] Node() noexcept = default;
-    virtual ~Node() noexcept = default;
+    [[nodiscard]] Node() = default;
+    virtual ~Node() = default;
 
     Node(const Node&) = delete;
     Node(Node&&) = delete;
@@ -22,19 +22,19 @@ struct Node {
 };
 
 struct Type : Node {
-    [[nodiscard]] Type(std::size_t offset) noexcept : offset{offset} {}
+    [[nodiscard]] Type(std::size_t offset) : offset{offset} {}
 
     virtual std::shared_ptr<backend::Type>
-    codegen(backend::Codegen& codegen) noexcept = 0;
+    codegen(backend::Codegen& codegen) = 0;
 
     std::size_t offset;
 };
 
 struct Statement : Node {
-    [[nodiscard]] Statement(std::size_t offset) noexcept : offset{offset} {}
+    [[nodiscard]] Statement(std::size_t offset) : offset{offset} {}
 
     virtual std::optional<backend::Value>
-    codegen(backend::Codegen& codegen) noexcept = 0;
+    codegen(backend::Codegen& codegen) = 0;
 
     std::size_t offset;
 };
@@ -44,8 +44,7 @@ struct Expression : Statement {
 };
 
 struct Declaration : Statement {
-    [[nodiscard]] Declaration(
-        std::size_t offset, bool is_public = false) noexcept
+    [[nodiscard]] Declaration(std::size_t offset, bool is_public = false)
     : Statement{offset}, is_public{is_public} {}
 
     bool is_public;
@@ -56,8 +55,7 @@ namespace detail {
 template <typename Derived> struct Type : ast::Type {
     using ast::Type::Type;
 
-    std::shared_ptr<backend::Type>
-    codegen(backend::Codegen& codegen) noexcept override {
+    std::shared_ptr<backend::Type> codegen(backend::Codegen& codegen) override {
         return codegen.generate(static_cast<Derived&>(*this));
     }
 };
@@ -65,8 +63,7 @@ template <typename Derived> struct Type : ast::Type {
 template <typename Derived> struct Stmt : Statement {
     using Statement::Statement;
 
-    std::optional<backend::Value>
-    codegen(backend::Codegen& codegen) noexcept override {
+    std::optional<backend::Value> codegen(backend::Codegen& codegen) override {
         return codegen.generate(static_cast<Derived&>(*this));
     }
 };
@@ -75,7 +72,7 @@ template <typename Derived> struct Expr : Expression {
     using Expression::Expression;
 
     [[nodiscard]] std::optional<backend::Value>
-    codegen(backend::Codegen& codegen) noexcept override {
+    codegen(backend::Codegen& codegen) override {
         return codegen.generate(static_cast<Derived&>(*this));
     }
 };
@@ -83,8 +80,7 @@ template <typename Derived> struct Expr : Expression {
 template <typename Derived> struct Decl : Declaration {
     using Declaration::Declaration;
 
-    std::optional<backend::Value>
-    codegen(backend::Codegen& codegen) noexcept override {
+    std::optional<backend::Value> codegen(backend::Codegen& codegen) override {
         return codegen.generate(static_cast<Derived&>(*this));
     }
 };

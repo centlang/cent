@@ -16,7 +16,7 @@ struct VarDecl : detail::Decl<VarDecl> {
 
     [[nodiscard]] VarDecl(
         std::size_t offset, Mut mutability, OffsetValue<std::string> name,
-        std::unique_ptr<Type> type, std::unique_ptr<Expression> value) noexcept
+        std::unique_ptr<Type> type, std::unique_ptr<Expression> value)
     : Decl{offset}, mutability{mutability}, name{std::move(name)},
       type{std::move(type)}, value{std::move(value)} {}
 

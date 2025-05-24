@@ -11,8 +11,7 @@ namespace cent::ast {
 
 struct TupleType : detail::Type<TupleType> {
     [[nodiscard]] TupleType(
-        std::size_t offset,
-        std::vector<std::unique_ptr<ast::Type>> types) noexcept
+        std::size_t offset, std::vector<std::unique_ptr<ast::Type>> types)
     : Type{offset}, types{std::move(types)} {}
 
     std::vector<std::unique_ptr<ast::Type>> types;

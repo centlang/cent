@@ -15,7 +15,7 @@ struct Assignment : detail::Stmt<Assignment> {
     [[nodiscard]] Assignment(
         std::size_t offset, std::unique_ptr<Expression> variable,
         std::unique_ptr<Expression> value,
-        OffsetValue<frontend::Token::Type> oper) noexcept
+        OffsetValue<frontend::Token::Type> oper)
     : Stmt{offset}, variable{std::move(variable)}, value{std::move(value)},
       oper{oper} {}
 

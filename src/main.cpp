@@ -17,7 +17,7 @@
 #include "cent/log.h"
 #include "cent/util.h"
 
-void help() noexcept { fmt::print("Usage: centc FILE...\n"); }
+void help() { fmt::print("Usage: centc FILE...\n"); }
 
 int main(int argc, char** argv) {
     std::span args{argv, static_cast<std::size_t>(argc)};

@@ -10,8 +10,8 @@
 namespace cent::backend {
 
 struct Type {
-    [[nodiscard]] Type() noexcept = default;
-    virtual ~Type() noexcept = default;
+    [[nodiscard]] Type() = default;
+    virtual ~Type() = default;
 
     Type(const Type&) = delete;
     Type(Type&&) = delete;
@@ -19,29 +19,28 @@ struct Type {
     auto operator=(const Type&) = delete;
     auto operator=(Type&&) = delete;
 
-    virtual llvm::Type* codegen(backend::Codegen& codegen) noexcept = 0;
-    virtual std::string to_string() noexcept = 0;
+    virtual llvm::Type* codegen(backend::Codegen& codegen) = 0;
+    virtual std::string to_string() = 0;
 
-    virtual bool is_bool() noexcept { return false; }
-    virtual bool is_null() noexcept { return false; }
-    virtual bool is_signed_int() noexcept { return false; };
-    virtual bool is_unsigned_int() noexcept { return false; };
-    virtual bool is_float() noexcept { return false; };
-    virtual bool is_pointer() noexcept { return false; }
-    virtual bool is_optional() noexcept { return false; }
-    virtual bool is_array() noexcept { return false; }
-    virtual bool is_tuple() noexcept { return false; }
+    virtual bool is_bool() { return false; }
+    virtual bool is_null() { return false; }
+    virtual bool is_signed_int() { return false; };
+    virtual bool is_unsigned_int() { return false; };
+    virtual bool is_float() { return false; };
+    virtual bool is_pointer() { return false; }
+    virtual bool is_optional() { return false; }
+    virtual bool is_array() { return false; }
+    virtual bool is_tuple() { return false; }
 
-    virtual bool is_function() noexcept { return false; }
-    virtual bool is_struct() noexcept { return false; }
-    virtual bool is_enum() noexcept { return false; }
+    virtual bool is_function() { return false; }
+    virtual bool is_struct() { return false; }
+    virtual bool is_enum() { return false; }
 };
 
 namespace detail {
 
 template <typename Derived> struct Type : backend::Type {
-    [[nodiscard]] llvm::Type*
-    codegen(backend::Codegen& codegen) noexcept override {
+    [[nodiscard]] llvm::Type* codegen(backend::Codegen& codegen) override {
         return codegen.generate(static_cast<Derived&>(*this));
     }
 };

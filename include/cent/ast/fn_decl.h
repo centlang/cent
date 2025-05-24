@@ -31,7 +31,7 @@ struct FnDecl : detail::Decl<FnDecl> {
 
     [[nodiscard]] FnDecl(
         std::size_t offset, Proto proto, std::unique_ptr<BlockStmt> block,
-        bool is_public = false, bool is_extern = false) noexcept
+        bool is_public = false, bool is_extern = false)
     : Decl{offset, is_public}, proto{std::move(proto)}, block{std::move(block)},
       is_extern{is_extern} {}
 

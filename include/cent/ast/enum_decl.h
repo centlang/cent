@@ -19,7 +19,7 @@ struct EnumDecl : detail::Decl<EnumDecl> {
     [[nodiscard]] EnumDecl(
         std::size_t offset, OffsetValue<std::string> name,
         std::unique_ptr<Type> type, std::vector<Field> fields,
-        bool is_public = false) noexcept
+        bool is_public = false)
     : Decl{offset, is_public}, name{std::move(name)}, type{std::move(type)},
       fields{std::move(fields)} {}
 

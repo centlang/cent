@@ -14,8 +14,7 @@ namespace cent::ast {
 struct BinaryExpr : detail::Expr<BinaryExpr> {
     [[nodiscard]] BinaryExpr(
         std::size_t offset, OffsetValue<frontend::Token::Type> oper,
-        std::unique_ptr<Expression> lhs,
-        std::unique_ptr<Expression> rhs) noexcept
+        std::unique_ptr<Expression> lhs, std::unique_ptr<Expression> rhs)
     : Expr{offset}, oper{oper}, lhs{std::move(lhs)}, rhs{std::move(rhs)} {}
 
     OffsetValue<frontend::Token::Type> oper;

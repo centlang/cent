@@ -13,7 +13,7 @@
 namespace cent {
 
 [[nodiscard]] inline std::optional<std::string>
-read_file(const std::string& filename) noexcept {
+read_file(const std::string& filename) {
     std::ifstream file{filename};
 
     if (!file) {

@@ -15,11 +15,11 @@ struct Function : detail::Type<Function> {
     [[nodiscard]] Function(
         std::shared_ptr<backend::Type> return_type,
         std::vector<std::shared_ptr<backend::Type>> param_types,
-        std::vector<llvm::Constant*> default_args) noexcept
+        std::vector<llvm::Constant*> default_args)
     : return_type{std::move(return_type)}, param_types{std::move(param_types)},
       default_args{std::move(default_args)} {}
 
-    std::string to_string() noexcept override {
+    std::string to_string() override {
         std::string result = "fn(";
 
         for (std::size_t i = 0; i < param_types.size(); ++i) {
@@ -33,7 +33,7 @@ struct Function : detail::Type<Function> {
         return result + ") " + return_type->to_string();
     }
 
-    bool is_function() noexcept override { return true; };
+    bool is_function() override { return true; };
 
     std::shared_ptr<backend::Type> return_type;
     std::vector<std::shared_ptr<backend::Type>> param_types;
