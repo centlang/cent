@@ -63,10 +63,10 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
         {"f32", std::make_shared<types::F32>()},
         {"f64", std::make_shared<types::F64>()},
         {"str", std::make_shared<types::Str>()},
-        {"bool", std::make_shared<types::Bool>()},
-        {"void", std::make_shared<types::Void>()}};
+        {"bool", std::make_shared<types::Bool>()}};
 
     m_null_type = std::make_shared<types::Null>();
+    m_void_type = std::make_shared<types::Void>();
 
     generate(*m_program);
 
@@ -1536,16 +1536,6 @@ std::optional<Value> Codegen::generate(ast::Struct& decl) {
 
         auto* llvm_type = type->codegen(*this);
 
-        if (llvm_type->isVoidTy()) {
-            error(
-                field.name.offset, fmt::format(
-                                       "{} cannot be of type {}",
-                                       log::bold(log::quoted(field.name.value)),
-                                       log::bold("'void'")));
-
-            return std::nullopt;
-        }
-
         llvm_fields.push_back(llvm_type);
         fields.push_back(type);
 
@@ -1660,16 +1650,6 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
         }
 
         llvm_type = type->codegen(*this);
-
-        if (llvm_type->isVoidTy()) {
-            error(
-                decl.name.offset, fmt::format(
-                                      "{} cannot be of type {}",
-                                      log::bold(log::quoted(decl.name.value)),
-                                      log::bold("'void'")));
-
-            return std::nullopt;
-        }
     }
 
     if (decl.value) {
@@ -2428,7 +2408,7 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) {
 
     auto return_type = decl.proto.return_type
                            ? decl.proto.return_type->codegen(*this)
-                           : m_primitive_types["void"];
+                           : m_void_type;
 
     if (!return_type) {
         return;
@@ -2451,17 +2431,6 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) {
         }
 
         auto* llvm_type = type->codegen(*this);
-
-        if (llvm_type->isVoidTy()) {
-            error(
-                parameter.name.offset,
-                fmt::format(
-                    "{} cannot be of type {}",
-                    log::bold(log::quoted(parameter.name.value)),
-                    log::bold("'void'")));
-
-            return;
-        }
 
         llvm_param_types.push_back(llvm_type);
         param_types.push_back(type);

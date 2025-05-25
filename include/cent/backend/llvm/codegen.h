@@ -263,6 +263,7 @@ private:
     std::map<std::filesystem::path, Scope> m_generated_modules;
 
     std::shared_ptr<types::Null> m_null_type;
+    std::shared_ptr<types::Void> m_void_type;
 
     std::map<llvm::Type*, llvm::StructType*> m_optional_types;
 
