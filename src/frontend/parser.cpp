@@ -1116,6 +1116,20 @@ bool Parser::parse_with(ast::Module& module) {
         path.push_back(name->value);
     }
 
+    auto module_name = path.back();
+
+    if (match(Token::Type::As)) {
+        next();
+
+        auto token = expect("module name", Token::Type::Identifier);
+
+        if (!token) {
+            return false;
+        }
+
+        module_name = token->value;
+    }
+
     std::array<std::filesystem::path, 1> search_paths = {
         std::filesystem::path{m_filename}.parent_path()};
 
@@ -1130,12 +1144,12 @@ bool Parser::parse_with(ast::Module& module) {
         return false;
     }
 
-    if (!module.submodules[path.back()]) {
-        module.submodules[path.back()] =
+    if (!module.submodules[module_name]) {
+        module.submodules[module_name] =
             std::make_unique<ast::Module>(module_path);
     }
 
-    auto& submodule = module.submodules[path.back()];
+    auto& submodule = module.submodules[module_name];
 
     if (module_path.file) {
         if (!parse_submodule(*submodule, *module_path.file)) {
