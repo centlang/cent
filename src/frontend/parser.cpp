@@ -69,6 +69,7 @@ std::unique_ptr<ast::Module> Parser::parse() {
 
             if (!parse_with(*result)) {
                 skip_until_decl();
+                continue;
             }
 
             expect("';'", Token::Type::Semicolon);
