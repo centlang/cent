@@ -928,7 +928,7 @@ bool Parser::parse_fn(ast::Module& module, bool is_public, bool is_extern) {
 
     std::unique_ptr<ast::Type> return_type = nullptr;
 
-    if (!match(Token::Type::LeftBrace)) {
+    if (!match(Token::Type::LeftBrace, Token::Type::Semicolon)) {
         return_type = expect_type();
 
         if (!return_type) {
