@@ -151,6 +151,8 @@ struct Slice : detail::Type<Slice> {
         return fmt::format("[{}]", type->to_string());
     }
 
+    bool is_slice() override { return true; };
+
     std::shared_ptr<backend::Type> type;
 };
 

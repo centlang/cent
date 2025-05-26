@@ -30,6 +30,7 @@ struct Type {
     virtual bool is_pointer() { return false; }
     virtual bool is_optional() { return false; }
     virtual bool is_array() { return false; }
+    virtual bool is_slice() { return false; }
     virtual bool is_tuple() { return false; }
 
     virtual bool is_function() { return false; }

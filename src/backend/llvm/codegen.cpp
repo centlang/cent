@@ -1897,6 +1897,13 @@ bool Codegen::types_equal(Type& lhs, Type& rhs) {
                types_equal(*lhs_array.type, *rhs_array.type);
     }
 
+    if (lhs.is_slice() && rhs.is_slice()) {
+        auto& lhs_slice = static_cast<types::Slice&>(lhs);
+        auto& rhs_slice = static_cast<types::Slice&>(rhs);
+
+        return types_equal(*lhs_slice.type, *rhs_slice.type);
+    }
+
     return false;
 }
 
