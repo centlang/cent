@@ -116,6 +116,10 @@ std::shared_ptr<Type> Codegen::generate(ast::ArrayType& type) {
         return nullptr;
     }
 
+    if (!type.size) {
+        return std::make_shared<types::Slice>(contained);
+    }
+
     auto size = type.size->codegen(*this);
 
     if (!size) {
@@ -270,6 +274,16 @@ llvm::Type* Codegen::generate(types::Array& type) {
     }
 
     return llvm::ArrayType::get(llvm_type, type.size);
+}
+
+llvm::Type* Codegen::generate(types::Slice& type) {
+    if (!type.type->codegen(*this)) {
+        return nullptr;
+    }
+
+    return llvm::StructType::create(
+        {llvm::PointerType::get(m_context, 0),
+         m_module->getDataLayout().getIntPtrType(m_context)});
 }
 
 llvm::Type* Codegen::generate(types::Tuple& type) { return type.type; }

@@ -94,6 +94,7 @@ struct Pointer;
 struct Optional;
 
 struct Array;
+struct Slice;
 struct Tuple;
 
 struct Struct;
@@ -151,6 +152,7 @@ public:
     llvm::Type* generate(types::Optional& type);
 
     llvm::Type* generate(types::Array& type);
+    llvm::Type* generate(types::Slice& type);
     llvm::Type* generate(types::Tuple& type);
 
     llvm::Type* generate(types::Struct& type);

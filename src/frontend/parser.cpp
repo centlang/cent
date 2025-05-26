@@ -581,7 +581,14 @@ std::unique_ptr<ast::ArrayType> Parser::parse_array_type() {
         return nullptr;
     }
 
-    if (!expect("','", Token::Type::Comma)) {
+    if (match(Token::Type::RightBracket)) {
+        next();
+
+        return std::make_unique<ast::ArrayType>(
+            offset, std::move(type), nullptr);
+    }
+
+    if (!expect("',' or ']'", Token::Type::Comma)) {
         return nullptr;
     }
 

@@ -143,6 +143,17 @@ struct Array : detail::Type<Array> {
     std::size_t size;
 };
 
+struct Slice : detail::Type<Slice> {
+    [[nodiscard]] Slice(std::shared_ptr<backend::Type> type)
+    : type{std::move(type)} {}
+
+    std::string to_string() override {
+        return fmt::format("[{}]", type->to_string());
+    }
+
+    std::shared_ptr<backend::Type> type;
+};
+
 struct Tuple : detail::Type<Tuple> {
     [[nodiscard]] Tuple(
         llvm::StructType* type,
