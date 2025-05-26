@@ -1630,6 +1630,14 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
         return std::nullopt;
     }
 
+    if (decl.mutability == ast::VarDecl::Mut::Immut && !decl.value) {
+        error(
+            decl.name.offset, fmt::format(
+                                  "immutable variable {} must be initialized",
+                                  log::quoted(log::bold(decl.name.value))));
+        return std::nullopt;
+    }
+
     auto global_var_init = [&] {
         error(
             decl.value->offset, fmt::format(
