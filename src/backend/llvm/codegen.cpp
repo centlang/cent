@@ -1971,6 +1971,40 @@ Codegen::cast(std::shared_ptr<Type>& type, Value& value, bool implicit) {
         return Value{type, variable, false, false, false, true};
     }
 
+    if (type->is_slice()) {
+        if (!value.type->is_array()) {
+            return std::nullopt;
+        }
+
+        auto& array_type = static_cast<types::Array&>(*value.type);
+        auto& contained = static_cast<types::Slice&>(*type).type;
+
+        auto* variable = m_builder.CreateAlloca(llvm_type);
+
+        if (!types_equal(*contained, *array_type.type)) {
+            return std::nullopt;
+        }
+
+        auto* ptr_member =
+            m_builder.CreateStructGEP(llvm_type, variable, slice_member_ptr);
+
+        auto* len_member =
+            m_builder.CreateStructGEP(llvm_type, variable, slice_member_len);
+
+        auto* intptr = m_module->getDataLayout().getIntPtrType(m_context);
+
+        auto* ptr_value = m_builder.CreateGEP(
+            contained->codegen(*this), value.value,
+            llvm::ConstantInt::get(intptr, 0));
+
+        m_builder.CreateStore(ptr_value, ptr_member);
+
+        m_builder.CreateStore(
+            llvm::ConstantInt::get(intptr, array_type.size), len_member);
+
+        return Value{type, variable, false, false, false, true};
+    }
+
     return primitive_cast(type, llvm_type, value, implicit);
 }
 
@@ -2128,6 +2162,38 @@ bool Codegen::cast_to_result(
         m_builder.CreateStore(
             llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), true),
             bool_ptr);
+
+        return true;
+    }
+
+    if (type->is_slice()) {
+        if (!value.type->is_array()) {
+            return false;
+        }
+
+        auto& array_type = static_cast<types::Array&>(*value.type);
+        auto& contained = static_cast<types::Slice&>(*type).type;
+
+        if (!types_equal(*contained, *array_type.type)) {
+            return false;
+        }
+
+        auto* ptr_member = m_builder.CreateStructGEP(
+            llvm_type, m_current_result, slice_member_ptr);
+
+        auto* len_member = m_builder.CreateStructGEP(
+            llvm_type, m_current_result, slice_member_len);
+
+        auto* intptr = m_module->getDataLayout().getIntPtrType(m_context);
+
+        auto* ptr_value = m_builder.CreateGEP(
+            contained->codegen(*this), value.value,
+            llvm::ConstantInt::get(intptr, 0));
+
+        m_builder.CreateStore(ptr_value, ptr_member);
+
+        m_builder.CreateStore(
+            llvm::ConstantInt::get(intptr, array_type.size), len_member);
 
         return true;
     }
