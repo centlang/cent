@@ -1388,12 +1388,6 @@ std::optional<Value> Codegen::generate(ast::IndexExpr& expr) {
         return std::nullopt;
     }
 
-    if (!value->type->is_array()) {
-        error(expr.value->offset, "index access of a non-array type");
-
-        return std::nullopt;
-    }
-
     auto index = expr.index->codegen(*this);
 
     if (!index) {
@@ -1406,6 +1400,26 @@ std::optional<Value> Codegen::generate(ast::IndexExpr& expr) {
     if (!val) {
         type_mismatch(
             expr.index->offset, *m_primitive_types["usize"], *index->type);
+
+        return std::nullopt;
+    }
+
+    if (value->type->is_slice()) {
+        auto* type = static_cast<types::Slice*>(value->type.get());
+
+        auto* ptr_member = m_builder.CreateStructGEP(
+            type->codegen(*this), value->value, slice_member_ptr);
+
+        auto* ptr_value = m_builder.CreateLoad(
+            llvm::PointerType::get(m_context, 0), ptr_member);
+
+        return Value{
+            type->type, m_builder.CreateGEP(
+                            type->type->codegen(*this), ptr_value, val->value)};
+    }
+
+    if (!value->type->is_array()) {
+        error(expr.value->offset, "index access of a non-array type");
 
         return std::nullopt;
     }
