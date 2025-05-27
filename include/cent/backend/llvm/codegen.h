@@ -270,6 +270,8 @@ private:
     std::shared_ptr<types::Null> m_null_type;
     std::shared_ptr<types::Void> m_void_type;
 
+    llvm::StructType* m_slice_type{};
+
     std::map<llvm::Type*, llvm::StructType*> m_optional_types;
 
     std::unique_ptr<ast::Module> m_program;

@@ -68,6 +68,10 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
     m_null_type = std::make_shared<types::Null>();
     m_void_type = std::make_shared<types::Void>();
 
+    m_slice_type = llvm::StructType::create(
+        {llvm::PointerType::get(m_context, 0),
+         m_module->getDataLayout().getIntPtrType(m_context)});
+
     generate(*m_program);
 
     return std::move(m_module);
@@ -281,9 +285,7 @@ llvm::Type* Codegen::generate(types::Slice& type) {
         return nullptr;
     }
 
-    return llvm::StructType::create(
-        {llvm::PointerType::get(m_context, 0),
-         m_module->getDataLayout().getIntPtrType(m_context)});
+    return m_slice_type;
 }
 
 llvm::Type* Codegen::generate(types::Tuple& type) { return type.type; }
