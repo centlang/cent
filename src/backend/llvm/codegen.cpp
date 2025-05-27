@@ -2037,7 +2037,7 @@ std::optional<Value> Codegen::primitive_cast(
             cast_op = PtrToInt;
         } else if (type_is_ptr) {
             if (!implicit) {
-                return Value{type, value.value};
+                return Value{type, value.value, false, value.is_ref};
             }
 
             auto& value_ptr = static_cast<types::Pointer&>(*value.type);
@@ -2045,7 +2045,7 @@ std::optional<Value> Codegen::primitive_cast(
 
             if (types_equal(*value_ptr.type, *type_ptr.type) &&
                 (value_ptr.is_mutable || !type_ptr.is_mutable)) {
-                return Value{type, value.value};
+                return Value{type, value.value, false, value.is_ref};
             }
         }
     }
