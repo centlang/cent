@@ -261,7 +261,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
 
     auto token = expect(
         "expression", IntLiteral, FloatLiteral, StrLiteral, True, False, Null,
-        Identifier, Minus, Bang, Star, And, Not, LeftParen);
+        Undefined, Identifier, Minus, Bang, Star, And, Not, LeftParen);
 
     if (!token) {
         return nullptr;
@@ -280,6 +280,8 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
         return std::make_unique<ast::BoolLiteral>(token->offset, false);
     case Null:
         return std::make_unique<ast::NullLiteral>(token->offset);
+    case Undefined:
+        return std::make_unique<ast::Undefined>(token->offset);
     case Identifier: {
         std::vector<ast::OffsetValue<std::string>> value;
         value.push_back(ast::OffsetValue{token->value, token->offset});

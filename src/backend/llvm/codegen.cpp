@@ -67,6 +67,7 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
         {"bool", std::make_shared<types::Bool>()}};
 
     m_null_type = std::make_shared<types::Null>();
+    m_undefined_type = std::make_shared<types::Undefined>();
     m_void_type = std::make_shared<types::Void>();
 
     m_slice_type = llvm::StructType::create(
@@ -235,6 +236,10 @@ llvm::Type* Codegen::generate([[maybe_unused]] types::Bool& type) {
 }
 
 llvm::Type* Codegen::generate([[maybe_unused]] types::Null& type) {
+    return nullptr;
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::Undefined& type) {
     return nullptr;
 }
 
@@ -853,6 +858,10 @@ std::optional<Value> Codegen::generate(ast::BoolLiteral& expr) {
 std::optional<Value>
 Codegen::generate([[maybe_unused]] ast::NullLiteral& expr) {
     return Value{m_null_type, nullptr};
+}
+
+std::optional<Value> Codegen::generate([[maybe_unused]] ast::Undefined& expr) {
+    return Value{m_undefined_type, nullptr};
 }
 
 std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
@@ -1728,15 +1737,33 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
         }
 
         if (!type) {
+            if (value->type->is_null() || value->type->is_undefined()) {
+                error(
+                    decl.name.offset,
+                    fmt::format(
+                        "cannot infer type for {}",
+                        log::bold(log::quoted(decl.name.value))));
+
+                return std::nullopt;
+            }
+
             type = value->type;
             llvm_type = value->type->codegen(*this);
         } else {
-            if (m_current_function) {
-                m_current_result = m_builder.CreateAlloca(llvm_type);
-            } else {
+            if (!m_current_function) {
                 global_var_init();
                 return std::nullopt;
             }
+
+            if (value->type->is_undefined()) {
+                m_scope.names[decl.name.value] = {
+                    type, m_builder.CreateAlloca(llvm_type),
+                    decl.mutability == ast::VarDecl::Mut::Mut};
+
+                return std::nullopt;
+            }
+
+            m_current_result = m_builder.CreateAlloca(llvm_type);
 
             if (!cast_to_result(type, *value)) {
                 type_mismatch(decl.value->offset, *type, *value->type);
@@ -1767,7 +1794,9 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
             return std::nullopt;
         }
 
-        m_builder.CreateStore(load_value(*value).value, m_current_result);
+        if (!value->type->is_undefined()) {
+            m_builder.CreateStore(load_value(*value).value, m_current_result);
+        }
 
         m_scope.names[decl.name.value] = {
             type, m_current_result, decl.mutability == ast::VarDecl::Mut::Mut};

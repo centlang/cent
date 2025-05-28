@@ -45,6 +45,10 @@ struct NullLiteral : detail::Expr<NullLiteral> {
     using Expr::Expr;
 };
 
+struct Undefined : detail::Expr<Undefined> {
+    using Expr::Expr;
+};
+
 struct StructLiteral : detail::Expr<StructLiteral> {
     struct Field {
         OffsetValue<std::string> name;

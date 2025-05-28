@@ -24,6 +24,7 @@ struct Type {
 
     virtual bool is_bool() { return false; }
     virtual bool is_null() { return false; }
+    virtual bool is_undefined() { return false; }
     virtual bool is_signed_int() { return false; };
     virtual bool is_unsigned_int() { return false; };
     virtual bool is_float() { return false; };

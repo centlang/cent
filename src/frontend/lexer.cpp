@@ -444,6 +444,11 @@ void Lexer::ident() {
         keyword(Unreachable);
         return;
     }
+
+    if (m_token.value == "undefined") {
+        keyword(Undefined);
+        return;
+    }
 }
 
 } // namespace cent::frontend

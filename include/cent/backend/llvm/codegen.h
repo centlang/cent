@@ -46,6 +46,7 @@ struct FloatLiteral;
 struct StrLiteral;
 struct BoolLiteral;
 struct NullLiteral;
+struct Undefined;
 struct StructLiteral;
 struct ArrayLiteral;
 struct TupleLiteral;
@@ -89,6 +90,7 @@ struct Str;
 
 struct Bool;
 struct Null;
+struct Undefined;
 struct Void;
 
 struct Pointer;
@@ -148,6 +150,7 @@ public:
 
     llvm::Type* generate(types::Bool& type);
     llvm::Type* generate(types::Null& type);
+    llvm::Type* generate(types::Undefined& type);
     llvm::Type* generate(types::Void& type);
 
     llvm::Type* generate(types::Pointer& type);
@@ -177,6 +180,7 @@ public:
     std::optional<Value> generate(ast::StrLiteral& expr);
     std::optional<Value> generate(ast::BoolLiteral& expr);
     std::optional<Value> generate(ast::NullLiteral& expr);
+    std::optional<Value> generate(ast::Undefined& expr);
     std::optional<Value> generate(ast::StructLiteral& expr);
     std::optional<Value> generate(ast::ArrayLiteral& expr);
     std::optional<Value> generate(ast::TupleLiteral& expr);
@@ -270,6 +274,7 @@ private:
     std::map<std::filesystem::path, Scope> m_generated_modules;
 
     std::shared_ptr<types::Null> m_null_type;
+    std::shared_ptr<types::Undefined> m_undefined_type;
     std::shared_ptr<types::Void> m_void_type;
 
     llvm::StructType* m_slice_type{};

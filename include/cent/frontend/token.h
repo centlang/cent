@@ -99,6 +99,7 @@ struct Token {
         Continue,
 
         Unreachable,
+        Undefined,
 
         Identifier
     };

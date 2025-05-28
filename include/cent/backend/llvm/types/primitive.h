@@ -100,6 +100,12 @@ struct Null : detail::Type<Null> {
     bool is_null() override { return true; };
 };
 
+struct Undefined : detail::Type<Undefined> {
+    std::string to_string() override { return "undefined"; }
+
+    bool is_undefined() override { return true; };
+};
+
 struct Void : detail::Type<Void> {
     std::string to_string() override { return "void"; }
 };
