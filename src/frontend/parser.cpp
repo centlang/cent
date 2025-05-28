@@ -20,6 +20,7 @@
 #include "cent/ast/type/named_type.h"
 #include "cent/ast/type/optional.h"
 #include "cent/ast/type/pointer.h"
+#include "cent/ast/type/slice_type.h"
 #include "cent/ast/type/tuple_type.h"
 
 #include "cent/modules.h"
@@ -573,8 +574,17 @@ std::unique_ptr<ast::Type> Parser::expect_var_type() {
     return expect_type();
 }
 
-std::unique_ptr<ast::ArrayType> Parser::parse_array_type() {
+std::unique_ptr<ast::Type> Parser::parse_array_type() {
     auto offset = get().offset;
+
+    std::size_t is_mutable_offset = 0;
+    bool is_mutable = false;
+
+    if (match(Token::Type::Mut)) {
+        is_mutable_offset = get().offset;
+        is_mutable = true;
+    }
+
     auto type = expect_type();
 
     if (!type) {
@@ -584,8 +594,8 @@ std::unique_ptr<ast::ArrayType> Parser::parse_array_type() {
     if (match(Token::Type::RightBracket)) {
         next();
 
-        return std::make_unique<ast::ArrayType>(
-            offset, std::move(type), nullptr);
+        return std::make_unique<ast::SliceType>(
+            offset, std::move(type), is_mutable);
     }
 
     if (!expect("',' or ']'", Token::Type::Comma)) {
@@ -600,6 +610,10 @@ std::unique_ptr<ast::ArrayType> Parser::parse_array_type() {
 
     if (!expect("']'", Token::Type::RightBracket)) {
         return nullptr;
+    }
+
+    if (is_mutable) {
+        error(is_mutable_offset, "array type cannot be mutable");
     }
 
     return std::make_unique<ast::ArrayType>(

@@ -25,6 +25,7 @@ struct NamedType;
 struct Pointer;
 struct Optional;
 struct ArrayType;
+struct SliceType;
 struct TupleType;
 
 struct Module;
@@ -125,6 +126,7 @@ public:
     std::shared_ptr<Type> generate(ast::Pointer& type);
     std::shared_ptr<Type> generate(ast::Optional& type);
     std::shared_ptr<Type> generate(ast::ArrayType& type);
+    std::shared_ptr<Type> generate(ast::SliceType& type);
     std::shared_ptr<Type> generate(ast::TupleType& type);
 
     llvm::Type* generate(types::I8& type);

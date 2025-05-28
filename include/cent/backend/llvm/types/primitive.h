@@ -144,8 +144,8 @@ struct Array : detail::Type<Array> {
 };
 
 struct Slice : detail::Type<Slice> {
-    [[nodiscard]] Slice(std::shared_ptr<backend::Type> type)
-    : type{std::move(type)} {}
+    [[nodiscard]] Slice(std::shared_ptr<backend::Type> type, bool is_mutable)
+    : type{std::move(type)}, is_mutable{is_mutable} {}
 
     std::string to_string() override {
         return fmt::format("[{}]", type->to_string());
@@ -154,6 +154,7 @@ struct Slice : detail::Type<Slice> {
     bool is_slice() override { return true; };
 
     std::shared_ptr<backend::Type> type;
+    bool is_mutable;
 };
 
 struct Tuple : detail::Type<Tuple> {

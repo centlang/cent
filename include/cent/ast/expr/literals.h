@@ -62,11 +62,11 @@ struct StructLiteral : detail::Expr<StructLiteral> {
 
 struct ArrayLiteral : detail::Expr<ArrayLiteral> {
     [[nodiscard]] ArrayLiteral(
-        std::size_t offset, std::unique_ptr<ArrayType> type,
+        std::size_t offset, std::unique_ptr<Type> type,
         std::vector<std::unique_ptr<Expression>> elements)
     : Expr{offset}, type{std::move(type)}, elements{std::move(elements)} {}
 
-    std::unique_ptr<ArrayType> type;
+    std::unique_ptr<Type> type;
     std::vector<std::unique_ptr<Expression>> elements;
 };
 

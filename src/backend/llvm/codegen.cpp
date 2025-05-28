@@ -34,6 +34,7 @@
 #include "cent/ast/type/named_type.h"
 #include "cent/ast/type/optional.h"
 #include "cent/ast/type/pointer.h"
+#include "cent/ast/type/slice_type.h"
 #include "cent/ast/type/tuple_type.h"
 
 #include "cent/backend/llvm/type.h"
@@ -120,10 +121,6 @@ std::shared_ptr<Type> Codegen::generate(ast::ArrayType& type) {
         return nullptr;
     }
 
-    if (!type.size) {
-        return std::make_shared<types::Slice>(contained);
-    }
-
     auto size = type.size->codegen(*this);
 
     if (!size) {
@@ -144,6 +141,16 @@ std::shared_ptr<Type> Codegen::generate(ast::ArrayType& type) {
     error(type.offset, "not a constant");
 
     return nullptr;
+}
+
+std::shared_ptr<Type> Codegen::generate(ast::SliceType& type) {
+    auto contained = type.type->codegen(*this);
+
+    if (!contained) {
+        return nullptr;
+    }
+
+    return std::make_shared<types::Slice>(contained, type.is_mutable);
 }
 
 std::shared_ptr<Type> Codegen::generate(ast::TupleType& type) {
@@ -1330,7 +1337,7 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) {
 
         if (expr.member.value == "ptr") {
             return Value{
-                std::make_shared<types::Pointer>(type.type, false),
+                std::make_shared<types::Pointer>(type.type, type.is_mutable),
                 m_builder.CreateStructGEP(
                     m_slice_type, parent->value, slice_member_ptr)};
         }
@@ -1437,8 +1444,10 @@ std::optional<Value> Codegen::generate(ast::IndexExpr& expr) {
             llvm::PointerType::get(m_context, 0), ptr_member);
 
         return Value{
-            type->type, m_builder.CreateGEP(
-                            type->type->codegen(*this), ptr_value, val->value)};
+            type->type,
+            m_builder.CreateGEP(
+                type->type->codegen(*this), ptr_value, val->value),
+            type->is_mutable};
     }
 
     if (!value->type->is_array()) {
