@@ -1325,6 +1325,27 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) {
         error(expr.member.offset, "member access of a non-structure type");
     };
 
+    if (parent->type->is_slice()) {
+        auto& type = static_cast<types::Slice&>(*parent->type);
+
+        if (expr.member.value == "ptr") {
+            return Value{
+                std::make_shared<types::Pointer>(type.type, false),
+                m_builder.CreateStructGEP(
+                    m_slice_type, parent->value, slice_member_ptr)};
+        }
+
+        if (expr.member.value == "len") {
+            return Value{
+                m_primitive_types["usize"],
+                m_builder.CreateStructGEP(
+                    m_slice_type, parent->value, slice_member_len)};
+        }
+
+        not_a_struct();
+        return std::nullopt;
+    }
+
     if (parent->value->getType()->isStructTy()) {
         auto* type = static_cast<types::Struct*>(parent->type.get());
         auto index = get_member(type->type);
