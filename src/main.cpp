@@ -53,19 +53,35 @@ int main(int argc, char** argv) {
     auto* machine = target->createTargetMachine(
         triple, "generic", "", llvm::TargetOptions{}, llvm::Reloc::PIC_);
 
-    std::vector<std::filesystem::path> object_files;
-    object_files.reserve(args.size());
+    std::vector<std::filesystem::path> source_files;
+    source_files.reserve(args.size());
+
+    bool compile_only = false;
 
     for (const char* arg_cstr : args.subspan(1)) {
         std::string arg = arg_cstr;
 
-        auto code = cent::read_file(arg);
+        if (arg == "-c") {
+            compile_only = true;
+            continue;
+        }
+
+        source_files.emplace_back(arg);
+    }
+
+    std::vector<std::filesystem::path> object_files;
+    object_files.reserve(args.size());
+
+    for (auto& file : source_files) {
+        auto code = cent::read_file(file);
 
         if (!code) {
             return 1;
         }
 
-        cent::frontend::Parser parser{*code, arg};
+        std::string filename = file.string();
+
+        cent::frontend::Parser parser{*code, filename};
         auto program = parser.parse();
 
         if (!program) {
@@ -73,7 +89,7 @@ int main(int argc, char** argv) {
         }
 
         cent::backend::Codegen codegen{
-            std::move(program), *code, arg, machine->createDataLayout(),
+            std::move(program), *code, filename, machine->createDataLayout(),
             triple};
 
         auto module = codegen.generate();
@@ -84,28 +100,34 @@ int main(int argc, char** argv) {
 
         cent::backend::optimize_module(*module, llvm::OptimizationLevel::O3);
 
-        std::filesystem::path file = std::tmpnam(nullptr);
-        file.replace_extension(".o");
+        std::filesystem::path object_file =
+            compile_only ? file : std::tmpnam(nullptr);
 
-        if (!cent::backend::emit_obj(*module, *machine, file)) {
+        object_file.replace_extension(".o");
+
+        if (!cent::backend::emit_obj(*module, *machine, object_file)) {
             return 1;
         }
 
-        object_files.push_back(file);
+        object_files.push_back(object_file);
     }
 
-    std::string command = "gcc -o main";
+    if (!compile_only) {
+        std::string command = "gcc -o main";
 
-    for (auto& file : object_files) {
-        command += ' ';
-        command += file;
+        for (auto& file : object_files) {
+            command += ' ';
+            command += file;
+        }
+
+        auto exit_code = std::system(command.c_str());
+
+        for (auto& file : object_files) {
+            std::filesystem::remove(file);
+        }
+
+        return exit_code;
     }
 
-    auto exit_code = std::system(command.c_str());
-
-    for (auto& file : object_files) {
-        std::filesystem::remove(file);
-    }
-
-    return exit_code;
+    return 0;
 }
