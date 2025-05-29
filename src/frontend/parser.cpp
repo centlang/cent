@@ -828,6 +828,8 @@ void Parser::parse_assignment(
 std::vector<ast::FnDecl::Param> Parser::parse_params() {
     std::vector<ast::FnDecl::Param> result;
 
+    bool had_default = false;
+
     auto parse_param = [&] {
         auto name = expect("parameter name", Token::Type::Identifier);
 
@@ -844,8 +846,13 @@ std::vector<ast::FnDecl::Param> Parser::parse_params() {
         std::unique_ptr<ast::Expression> value = nullptr;
 
         if (match(Token::Type::Equal)) {
+            had_default = true;
+
             next();
             value = expect_expr(false);
+        } else if (had_default) {
+            error(name->offset, "default parameters must be at the end");
+            return;
         }
 
         result.emplace_back(
