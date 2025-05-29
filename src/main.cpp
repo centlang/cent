@@ -1,6 +1,9 @@
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <span>
+#include <string>
+#include <vector>
 
 #include <fmt/core.h>
 
@@ -50,6 +53,9 @@ int main(int argc, char** argv) {
     auto* machine = target->createTargetMachine(
         triple, "generic", "", llvm::TargetOptions{}, llvm::Reloc::PIC_);
 
+    std::vector<std::filesystem::path> object_files;
+    object_files.reserve(args.size());
+
     for (const char* arg_cstr : args.subspan(1)) {
         std::string arg = arg_cstr;
 
@@ -78,12 +84,28 @@ int main(int argc, char** argv) {
 
         cent::backend::optimize_module(*module, llvm::OptimizationLevel::O3);
 
-        if (!cent::backend::emit_obj(
-                *module, *machine,
-                arg.substr(0, arg.find_last_of('.')) + ".o")) {
+        std::filesystem::path file = std::tmpnam(nullptr);
+        file.replace_extension(".o");
+
+        if (!cent::backend::emit_obj(*module, *machine, file)) {
             return 1;
         }
+
+        object_files.push_back(file);
     }
 
-    return 0;
+    std::string command = "gcc -o main";
+
+    for (auto& file : object_files) {
+        command += ' ';
+        command += file;
+    }
+
+    auto exit_code = std::system(command.c_str());
+
+    for (auto& file : object_files) {
+        std::filesystem::remove(file);
+    }
+
+    return exit_code;
 }
