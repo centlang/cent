@@ -57,12 +57,18 @@ int main(int argc, char** argv) {
     source_files.reserve(args.size());
 
     bool compile_only = false;
+    bool optimize = false;
 
     for (const char* arg_cstr : args.subspan(1)) {
         std::string arg = arg_cstr;
 
         if (arg == "-c") {
             compile_only = true;
+            continue;
+        }
+
+        if (arg == "-O") {
+            optimize = true;
             continue;
         }
 
@@ -98,7 +104,10 @@ int main(int argc, char** argv) {
             return 1;
         }
 
-        cent::backend::optimize_module(*module, llvm::OptimizationLevel::O3);
+        if (optimize) {
+            cent::backend::optimize_module(
+                *module, llvm::OptimizationLevel::O3);
+        }
 
         std::filesystem::path object_file =
             compile_only ? file : std::tmpnam(nullptr);
