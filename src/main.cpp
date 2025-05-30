@@ -58,6 +58,7 @@ int main(int argc, char** argv) {
 
     bool compile_only = false;
     bool optimize = false;
+    bool emit_llvm = false;
 
     for (const char* arg_cstr : args.subspan(1)) {
         std::string arg = arg_cstr;
@@ -69,6 +70,11 @@ int main(int argc, char** argv) {
 
         if (arg == "-O") {
             optimize = true;
+            continue;
+        }
+
+        if (arg == "--emit-llvm") {
+            emit_llvm = true;
             continue;
         }
 
@@ -109,6 +115,17 @@ int main(int argc, char** argv) {
                 *module, llvm::OptimizationLevel::O3);
         }
 
+        if (emit_llvm) {
+            std::filesystem::path ir_file = file;
+            ir_file.replace_extension(".ll");
+
+            if (!cent::backend::emit_llvm(*module, ir_file)) {
+                return 1;
+            }
+
+            continue;
+        }
+
         std::filesystem::path object_file =
             compile_only ? file : std::tmpnam(nullptr);
 
@@ -121,7 +138,7 @@ int main(int argc, char** argv) {
         object_files.push_back(object_file);
     }
 
-    if (!compile_only) {
+    if (!compile_only && !emit_llvm) {
         std::string command = "gcc -o main";
 
         for (auto& file : object_files) {

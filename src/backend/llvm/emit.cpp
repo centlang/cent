@@ -55,4 +55,19 @@ bool emit_obj(
     return true;
 }
 
+bool emit_llvm(llvm::Module& module, const std::filesystem::path& path) {
+    std::error_code code;
+    llvm::raw_fd_ostream file{path.string(), code, llvm::sys::fs::OF_None};
+
+    if (code) {
+        log::error(fmt::format("could not open file: {}", code.message()));
+
+        return false;
+    }
+
+    module.print(file, nullptr);
+
+    return true;
+}
+
 } // namespace cent::backend
