@@ -136,8 +136,8 @@ private:
 
     [[nodiscard]] std::vector<ast::EnumDecl::Field> parse_enum_fields();
 
-    [[nodiscard]] bool parse_fn(
-        ast::Module& module, bool is_public = false, bool is_extern = false);
+    [[nodiscard]] std::unique_ptr<ast::FnDecl>
+    parse_fn(bool is_public = false, bool is_extern = false);
 
     [[nodiscard]] bool
     parse_struct(ast::Module& module, bool is_public = false);

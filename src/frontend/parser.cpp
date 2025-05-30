@@ -115,7 +115,11 @@ std::unique_ptr<ast::Module> Parser::parse() {
         if (match(Fn)) {
             next();
 
-            if (!parse_fn(*result, is_public, is_extern)) {
+            auto function = parse_fn(is_public, is_extern);
+
+            if (function) {
+                result->functions.push_back(std::move(function));
+            } else {
                 skip_until_decl();
             }
 
@@ -143,6 +147,11 @@ void Parser::expect_stmt(ast::BlockStmt& block) {
         return;
     case While:
         parse_while(block);
+        return;
+    case Fn:
+        next();
+        block.body.push_back(parse_fn());
+
         return;
     case Let:
     case Mut:
@@ -927,12 +936,12 @@ std::vector<ast::EnumDecl::Field> Parser::parse_enum_fields() {
     return result;
 }
 
-bool Parser::parse_fn(ast::Module& module, bool is_public, bool is_extern) {
+std::unique_ptr<ast::FnDecl> Parser::parse_fn(bool is_public, bool is_extern) {
     auto name = expect("function name", Token::Type::Identifier);
     std::optional<ast::OffsetValue<std::string>> type = std::nullopt;
 
     if (!name) {
-        return false;
+        return nullptr;
     }
 
     if (match(Token::Type::ColonColon)) {
@@ -942,18 +951,18 @@ bool Parser::parse_fn(ast::Module& module, bool is_public, bool is_extern) {
         name = expect("function name", Token::Type::Identifier);
 
         if (!name) {
-            return false;
+            return nullptr;
         }
     }
 
     if (!expect("'('", Token::Type::LeftParen)) {
-        return false;
+        return nullptr;
     }
 
     auto params = parse_params();
 
     if (!expect("')'", Token::Type::RightParen)) {
-        return false;
+        return nullptr;
     }
 
     std::unique_ptr<ast::Type> return_type = nullptr;
@@ -962,7 +971,7 @@ bool Parser::parse_fn(ast::Module& module, bool is_public, bool is_extern) {
         return_type = expect_type();
 
         if (!return_type) {
-            return false;
+            return nullptr;
         }
     }
 
@@ -975,19 +984,17 @@ bool Parser::parse_fn(ast::Module& module, bool is_public, bool is_extern) {
     } else {
         expected(fmt::format("{} or {}", log::bold("'{'"), log::bold("';'")));
 
-        return false;
+        return nullptr;
     }
 
-    module.functions.push_back(std::make_unique<ast::FnDecl>(
+    return std::make_unique<ast::FnDecl>(
         name->offset,
         ast::FnDecl::Proto{
             std::move(type),
             {name->value, name->offset},
             std::move(params),
             std::move(return_type)},
-        std::move(body), is_public, is_extern));
-
-    return true;
+        std::move(body), is_public, is_extern);
 }
 
 bool Parser::parse_struct(ast::Module& module, bool is_public) {

@@ -1506,6 +1506,10 @@ std::optional<Value> Codegen::generate(ast::AsExpr& expr) {
 }
 
 std::optional<Value> Codegen::generate(ast::FnDecl& decl) {
+    if (m_current_function) {
+        generate_fn_proto(decl);
+    }
+
     auto type = decl.proto.type ? get_type(
                                       decl.proto.type->offset,
                                       decl.proto.type->value, *m_current_scope)
@@ -1551,6 +1555,7 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) {
     auto* entry = llvm::BasicBlock::Create(
         m_context, "", static_cast<llvm::Function*>(function));
 
+    auto* insert_point = m_builder.GetInsertBlock();
     m_builder.SetInsertPoint(entry);
 
     m_current_function = static_cast<types::Function*>(function_type.get());
@@ -1568,6 +1573,7 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) {
     decl.block->codegen(*this);
 
     if (m_builder.GetInsertBlock()->getTerminator()) {
+        m_builder.SetInsertPoint(insert_point);
         return std::nullopt;
     }
 
@@ -1576,10 +1582,12 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) {
             decl.proto.name.offset,
             "non-void function does not return a value");
 
+        m_builder.SetInsertPoint(insert_point);
         return std::nullopt;
     }
 
     m_builder.CreateRetVoid();
+    m_builder.SetInsertPoint(insert_point);
 
     return std::nullopt;
 }
