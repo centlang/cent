@@ -1574,6 +1574,8 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) {
 
     if (m_builder.GetInsertBlock()->getTerminator()) {
         m_builder.SetInsertPoint(insert_point);
+        m_current_function = nullptr;
+
         return std::nullopt;
     }
 
@@ -1583,11 +1585,15 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) {
             "non-void function does not return a value");
 
         m_builder.SetInsertPoint(insert_point);
+        m_current_function = nullptr;
+
         return std::nullopt;
     }
 
     m_builder.CreateRetVoid();
+
     m_builder.SetInsertPoint(insert_point);
+    m_current_function = nullptr;
 
     return std::nullopt;
 }
