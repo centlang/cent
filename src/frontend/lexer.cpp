@@ -144,6 +144,8 @@ void Lexer::next_token() {
         m_token.offset = m_offset;
         m_token.value = {};
 
+        get();
+
         if (eof()) {
             m_token.type = Slash;
             return;
