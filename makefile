@@ -1,8 +1,11 @@
 SRC_DIR := src
 INCLUDE_DIR := include
+TEST_DIR := test
 
 OBJ_DIR := obj
 BIN_DIR := bin
+TEST_BIN_DIR := $(BIN_DIR)/test
+TEST_OBJ_DIR := $(OBJ_DIR)/test
 
 CXX := c++
 CLANG_TIDY := clang-tidy
@@ -14,6 +17,8 @@ LDFLAGS := -lLLVM -lfmt
 
 SRC_FILES := $(shell find $(SRC_DIR) -name '*.cpp')
 OBJ_FILES := $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(SRC_FILES))
+TEST_FILES := $(shell find $(TEST_DIR) -name '*.cn')
+TEST_BIN_FILES := $(patsubst $(TEST_DIR)/%.cn,$(TEST_BIN_DIR)/%,$(TEST_FILES))
 
 TARGET := $(BIN_DIR)/centc
 
@@ -41,4 +46,15 @@ clean:
 check: $(SRC_FILES)
 	$(CLANG_TIDY) $^ -- $(CXXFLAGS)
 
-.PHONY: all clean install check
+$(TEST_BIN_DIR)/%: $(TEST_DIR)/%.cn $(TARGET)
+	@mkdir -p $(@D)
+
+	$(TARGET) -o $@ $<
+
+test: $(TEST_BIN_FILES)
+	@for test in $^; do \
+		echo "Running test: $$test"; \
+		./$$test || exit 1; \
+	done
+
+.PHONY: all install clean check test
