@@ -84,6 +84,8 @@ int main(int argc, char** argv) {
     std::vector<std::filesystem::path> object_files;
     object_files.reserve(args.size());
 
+    bool had_error = false;
+
     for (auto& file : source_files) {
         auto code = cent::read_file(file);
 
@@ -108,6 +110,11 @@ int main(int argc, char** argv) {
 
         if (!module) {
             return 1;
+        }
+
+        if (parser.had_error() || codegen.had_error()) {
+            had_error = true;
+            continue;
         }
 
         if (optimize) {
@@ -136,6 +143,10 @@ int main(int argc, char** argv) {
         }
 
         object_files.push_back(object_file);
+    }
+
+    if (had_error) {
+        return 1;
     }
 
     if (!compile_only && !emit_llvm) {

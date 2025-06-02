@@ -44,6 +44,8 @@ public:
 
     [[nodiscard]] std::unique_ptr<ast::Module> parse();
 
+    [[nodiscard]] bool had_error() const { return m_had_error; };
+
 private:
     [[nodiscard]] auto peek(std::uint8_t ahead = 0) const {
         return m_buffer[(m_buffer_index + ahead) % buffer_size];
@@ -200,11 +202,15 @@ private:
     void error(std::string_view message) {
         auto [line, column] = cent::offset_to_pos(m_source, peek().offset);
         log::error(line, column, m_filename, message);
+
+        m_had_error = true;
     }
 
     void error(std::size_t offset, std::string_view message) {
         auto [line, column] = cent::offset_to_pos(m_source, offset);
         log::error(line, column, m_filename, message);
+
+        m_had_error = true;
     }
 
     static constexpr auto buffer_size = 2;
@@ -216,6 +222,8 @@ private:
 
     std::string_view m_source;
     std::string_view m_filename;
+
+    bool m_had_error{false};
 };
 
 } // namespace cent::frontend

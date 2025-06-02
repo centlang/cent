@@ -124,6 +124,8 @@ public:
 
     [[nodiscard]] std::unique_ptr<llvm::Module> generate();
 
+    [[nodiscard]] bool had_error() const { return m_had_error; }
+
     std::shared_ptr<Type> generate(ast::NamedType& type);
     std::shared_ptr<Type> generate(ast::Pointer& type);
     std::shared_ptr<Type> generate(ast::Optional& type);
@@ -233,6 +235,8 @@ private:
     void error(std::size_t offset, std::string_view message) {
         auto [line, column] = cent::offset_to_pos(m_source, offset);
         log::error(line, column, m_filename, message);
+
+        m_had_error = true;
     }
 
     static constexpr auto optional_member_value = 0;
@@ -285,6 +289,8 @@ private:
 
     std::string_view m_source;
     std::string_view m_filename;
+
+    bool m_had_error{false};
 };
 
 } // namespace cent::backend
