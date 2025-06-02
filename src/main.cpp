@@ -56,12 +56,23 @@ int main(int argc, char** argv) {
     std::vector<std::filesystem::path> source_files;
     source_files.reserve(args.size());
 
+    std::string output = "main";
+
     bool compile_only = false;
     bool optimize = false;
     bool emit_llvm = false;
 
+    bool expecting_output = false;
+
     for (const char* arg_cstr : args.subspan(1)) {
         std::string arg = arg_cstr;
+
+        if (expecting_output) {
+            output = arg;
+            expecting_output = false;
+
+            continue;
+        }
 
         if (arg == "-c") {
             compile_only = true;
@@ -78,7 +89,17 @@ int main(int argc, char** argv) {
             continue;
         }
 
+        if (arg == "-o") {
+            expecting_output = true;
+            continue;
+        }
+
         source_files.emplace_back(arg);
+    }
+
+    if (expecting_output) {
+        cent::log::error("missing filename");
+        return 1;
     }
 
     std::vector<std::filesystem::path> object_files;
@@ -150,7 +171,7 @@ int main(int argc, char** argv) {
     }
 
     if (!compile_only && !emit_llvm) {
-        std::string command = "gcc -o main";
+        std::string command = "gcc -o " + output;
 
         for (auto& file : object_files) {
             command += ' ';
