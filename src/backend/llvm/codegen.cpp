@@ -2482,6 +2482,12 @@ Value Codegen::load_value(Value& value) {
         return value;
     }
 
+    if (value.is_deref) {
+        return Value{
+            value.type,
+            m_builder.CreateLoad(value.type->codegen(*this), value.value)};
+    }
+
     if (auto* variable =
             llvm::dyn_cast_or_null<llvm::AllocaInst>(value.value)) {
         return Value{
