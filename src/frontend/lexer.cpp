@@ -114,7 +114,26 @@ void Lexer::next_token() {
         single_char(Comma);
         break;
     case '.':
-        single_char(Dot);
+        m_token.offset = m_offset;
+        m_token.value = {};
+
+        get();
+
+        if (eof() || peek() != '.') {
+            m_token.type = Dot;
+            return;
+        }
+
+        get();
+
+        if (eof() || peek() != '.') {
+            m_token.type = DotDot;
+            return;
+        }
+
+        get();
+        m_token.type = Ellipsis;
+
         break;
     case ':':
         twice(Colon, ColonColon);

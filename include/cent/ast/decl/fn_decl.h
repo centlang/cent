@@ -27,6 +27,8 @@ struct FnDecl : detail::Decl<FnDecl> {
 
         std::vector<Param> params;
         std::unique_ptr<Type> return_type;
+
+        bool variadic;
     };
 
     [[nodiscard]] FnDecl(

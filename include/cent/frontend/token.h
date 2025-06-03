@@ -20,6 +20,8 @@ struct Token {
         Equal,
         Comma,
         Dot,
+        DotDot,
+        Ellipsis,
         Colon,
         Semicolon,
         ColonColon,

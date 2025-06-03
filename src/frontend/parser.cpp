@@ -834,53 +834,6 @@ void Parser::parse_assignment(
         ast::OffsetValue{oper.type, oper.offset}));
 }
 
-std::vector<ast::FnDecl::Param> Parser::parse_params() {
-    std::vector<ast::FnDecl::Param> result;
-
-    bool had_default = false;
-
-    auto parse_param = [&] {
-        auto name = expect("parameter name", Token::Type::Identifier);
-
-        if (!name) {
-            return;
-        }
-
-        std::unique_ptr<ast::Type> type = expect_var_type();
-
-        if (!type) {
-            return;
-        }
-
-        std::unique_ptr<ast::Expression> value = nullptr;
-
-        if (match(Token::Type::Equal)) {
-            had_default = true;
-
-            next();
-            value = expect_expr(false);
-        } else if (had_default) {
-            error(name->offset, "default parameters must be at the end");
-            return;
-        }
-
-        result.emplace_back(
-            ast::OffsetValue{name->value, name->offset}, std::move(type),
-            std::move(value));
-    };
-
-    if (match(Token::Type::Identifier)) {
-        parse_param();
-
-        while (match(Token::Type::Comma)) {
-            next();
-            parse_param();
-        }
-    }
-
-    return result;
-}
-
 std::vector<ast::Struct::Field> Parser::parse_fields() {
     std::vector<ast::Struct::Field> result;
 
@@ -944,6 +897,59 @@ std::unique_ptr<ast::FnDecl> Parser::parse_fn(bool is_public, bool is_extern) {
         return nullptr;
     }
 
+    bool variadic = false;
+    std::vector<ast::FnDecl::Param> params;
+
+    bool had_default = false;
+
+    auto parse_param = [&] {
+        if (match(Token::Type::Ellipsis)) {
+            next();
+            variadic = true;
+
+            return;
+        }
+
+        auto name = expect("parameter name", Token::Type::Identifier);
+
+        if (!name) {
+            return;
+        }
+
+        std::unique_ptr<ast::Type> type = expect_var_type();
+
+        if (!type) {
+            return;
+        }
+
+        std::unique_ptr<ast::Expression> value = nullptr;
+
+        if (match(Token::Type::Equal)) {
+            had_default = true;
+
+            next();
+            value = expect_expr(false);
+        } else if (had_default) {
+            error(name->offset, "default parameters must be at the end");
+            return;
+        }
+
+        params.emplace_back(
+            ast::OffsetValue{name->value, name->offset}, std::move(type),
+            std::move(value));
+    };
+
+    auto parse_params = [&] {
+        if (match(Token::Type::Identifier, Token::Type::Ellipsis)) {
+            parse_param();
+
+            while (!variadic && match(Token::Type::Comma)) {
+                next();
+                parse_param();
+            }
+        }
+    };
+
     if (match(Token::Type::ColonColon)) {
         next();
 
@@ -959,7 +965,7 @@ std::unique_ptr<ast::FnDecl> Parser::parse_fn(bool is_public, bool is_extern) {
         return nullptr;
     }
 
-    auto params = parse_params();
+    parse_params();
 
     if (!expect("')'", Token::Type::RightParen)) {
         return nullptr;
@@ -993,7 +999,8 @@ std::unique_ptr<ast::FnDecl> Parser::parse_fn(bool is_public, bool is_extern) {
             std::move(type),
             {name->value, name->offset},
             std::move(params),
-            std::move(return_type)},
+            std::move(return_type),
+            variadic},
         std::move(body), is_public, is_extern);
 }
 

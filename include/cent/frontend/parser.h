@@ -132,8 +132,6 @@ private:
     void parse_assignment(
         ast::BlockStmt& block, std::unique_ptr<ast::Expression> variable);
 
-    [[nodiscard]] std::vector<ast::FnDecl::Param> parse_params();
-
     [[nodiscard]] std::vector<ast::Struct::Field> parse_fields();
 
     [[nodiscard]] std::vector<ast::EnumDecl::Field> parse_enum_fields();

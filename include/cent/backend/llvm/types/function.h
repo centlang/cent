@@ -15,9 +15,9 @@ struct Function : detail::Type<Function> {
     [[nodiscard]] Function(
         std::shared_ptr<backend::Type> return_type,
         std::vector<std::shared_ptr<backend::Type>> param_types,
-        std::vector<llvm::Constant*> default_args)
+        std::vector<llvm::Constant*> default_args, bool variadic)
     : return_type{std::move(return_type)}, param_types{std::move(param_types)},
-      default_args{std::move(default_args)} {}
+      default_args{std::move(default_args)}, variadic{variadic} {}
 
     std::string to_string() override {
         std::string result = "fn(";
@@ -39,6 +39,7 @@ struct Function : detail::Type<Function> {
     std::vector<std::shared_ptr<backend::Type>> param_types;
 
     std::vector<llvm::Constant*> default_args;
+    bool variadic;
 };
 
 } // namespace cent::backend::types

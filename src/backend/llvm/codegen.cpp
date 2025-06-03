@@ -1137,12 +1137,12 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) {
     auto& type = static_cast<types::Function&>(*value->type);
     auto* function = static_cast<llvm::Function*>(value->value);
 
-    auto arg_size = function->arg_size();
+    auto arg_size = type.param_types.size();
     auto passed_args_size = expr.arguments.size();
     auto default_args_size = type.default_args.size();
 
-    if (passed_args_size < arg_size - default_args_size ||
-        passed_args_size > arg_size) {
+    if (!type.variadic && (passed_args_size < arg_size - default_args_size ||
+                           passed_args_size > arg_size)) {
         error(expr.identifier->offset, "incorrect number of arguments passed");
 
         return std::nullopt;
@@ -1156,6 +1156,11 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) {
 
         if (!value) {
             return std::nullopt;
+        }
+
+        if (type.variadic && i >= arg_size) {
+            arguments.push_back(load_value(*value).value);
+            continue;
         }
 
         if (auto val = cast(type.param_types[i], *value)) {
@@ -2645,8 +2650,8 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) {
         default_args.push_back(static_cast<llvm::Constant*>(val->value));
     }
 
-    auto* function_type =
-        llvm::FunctionType::get(llvm_return_type, llvm_param_types, false);
+    auto* function_type = llvm::FunctionType::get(
+        llvm_return_type, llvm_param_types, decl.proto.variadic);
 
     auto* function = llvm::Function::Create(
         function_type,
@@ -2657,7 +2662,8 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) {
     if (!decl.proto.type) {
         scope.names[decl.proto.name.value] = Value{
             std::make_shared<types::Function>(
-                return_type, std::move(param_types), std::move(default_args)),
+                return_type, std::move(param_types), std::move(default_args),
+                decl.proto.variadic),
             function};
 
         return;
@@ -2667,7 +2673,8 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) {
         decl.proto.type->offset, decl.proto.type->value, *m_current_scope);
 
     auto func_type = std::make_shared<types::Function>(
-        return_type, std::move(param_types), std::move(default_args));
+        return_type, std::move(param_types), std::move(default_args),
+        decl.proto.variadic);
 
     scope.names[decl.proto.name.value] = {func_type, function};
 
