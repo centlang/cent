@@ -28,6 +28,7 @@ struct Type {
     virtual bool is_signed_int() { return false; };
     virtual bool is_unsigned_int() { return false; };
     virtual bool is_float() { return false; };
+    virtual bool is_str() { return false; };
     virtual bool is_pointer() { return false; }
     virtual bool is_optional() { return false; }
     virtual bool is_array() { return false; }

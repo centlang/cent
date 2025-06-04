@@ -86,6 +86,8 @@ struct F64 : detail::Type<F64> {
 
 struct Str : detail::Type<Str> {
     std::string to_string() override { return "str"; }
+
+    bool is_str() override { return true; };
 };
 
 struct Bool : detail::Type<Bool> {

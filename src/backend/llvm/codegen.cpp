@@ -2502,9 +2502,11 @@ Value Codegen::load_value(Value& value) {
 
     if (auto* variable =
             llvm::dyn_cast_or_null<llvm::GlobalVariable>(value.value)) {
-        return Value{
-            value.type,
-            m_builder.CreateLoad(variable->getValueType(), variable)};
+        if (!(variable->isConstant() && value.type->is_str())) {
+            return Value{
+                value.type,
+                m_builder.CreateLoad(variable->getValueType(), variable)};
+        }
     }
 
     if (auto* val = llvm::dyn_cast_or_null<llvm::LoadInst>(value.value)) {
