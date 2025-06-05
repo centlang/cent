@@ -11,12 +11,13 @@ CXX := c++
 CLANG_TIDY := clang-tidy
 
 CXXFLAGS := -pedantic -Wall -Wextra -std=c++20 -O3 -c -I$(INCLUDE_DIR) \
-    -fno-exceptions
+    -fno-exceptions -MMD
 
 LDFLAGS := -lLLVM -lfmt
 
 SRC_FILES := $(shell find $(SRC_DIR) -name '*.cpp')
 OBJ_FILES := $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(SRC_FILES))
+DEP_FILES := $(patsubst %.o,%.d,$(OBJ_FILES))
 TEST_FILES := $(shell find $(TEST_DIR) -name '*.cn')
 TEST_BIN_FILES := $(patsubst $(TEST_DIR)/%.cn,$(TEST_BIN_DIR)/%,$(TEST_FILES))
 
@@ -56,5 +57,7 @@ test: $(TEST_BIN_FILES)
 		echo "Running test: $$test"; \
 		./$$test || exit 1; \
 	done
+
+-include $(DEP_FILES)
 
 .PHONY: all install clean check test
