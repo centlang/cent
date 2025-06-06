@@ -16,6 +16,7 @@
 #include "cent/ast/expr/literals.h"
 #include "cent/ast/expr/member_expr.h"
 #include "cent/ast/expr/method_expr.h"
+#include "cent/ast/expr/slice_expr.h"
 #include "cent/ast/expr/unary_expr.h"
 
 #include "cent/ast/stmt/assignment.h"
@@ -1480,6 +1481,81 @@ std::optional<Value> Codegen::generate(ast::IndexExpr& expr) {
                  m_module->getDataLayout().getIntPtrType(m_context), 0),
              val->value}),
         value->is_mutable};
+}
+
+std::optional<Value> Codegen::generate(ast::SliceExpr& expr) {
+    auto value = expr.value->codegen(*this);
+
+    if (!value) {
+        return std::nullopt;
+    }
+
+    auto low = expr.low->codegen(*this);
+
+    if (!low) {
+        return std::nullopt;
+    }
+
+    low = load_value(*low);
+    auto low_val = cast(m_primitive_types["usize"], *low);
+
+    if (!low_val) {
+        type_mismatch(
+            expr.low->offset, *m_primitive_types["usize"], *low->type);
+
+        return std::nullopt;
+    }
+
+    auto high = expr.high->codegen(*this);
+
+    if (!high) {
+        return std::nullopt;
+    }
+
+    high = load_value(*high);
+    auto high_val = cast(m_primitive_types["usize"], *high);
+
+    if (!high_val) {
+        type_mismatch(
+            expr.low->offset, *m_primitive_types["usize"], *high->type);
+
+        return std::nullopt;
+    }
+
+    if (!value->type->is_slice()) {
+        error(expr.value->offset, "slice expression of a non-slice type");
+
+        return std::nullopt;
+    }
+
+    auto& type = static_cast<types::Slice&>(*value->type);
+    auto* llvm_type = type.codegen(*this);
+
+    auto* ptr_member =
+        m_builder.CreateStructGEP(llvm_type, value->value, slice_member_ptr);
+
+    auto* ptr_value =
+        m_builder.CreateLoad(llvm::PointerType::get(m_context, 0), ptr_member);
+
+    auto* new_ptr_value = m_builder.CreateGEP(
+        type.type->codegen(*this), ptr_value, low_val->value);
+
+    auto* new_len_value = m_builder.CreateSub(high_val->value, low_val->value);
+
+    auto* variable =
+        m_current_result ? m_current_result : m_builder.CreateAlloca(llvm_type);
+
+    auto* new_ptr_member =
+        m_builder.CreateStructGEP(llvm_type, variable, slice_member_ptr);
+
+    auto* new_len_member =
+        m_builder.CreateStructGEP(llvm_type, variable, slice_member_len);
+
+    m_builder.CreateStore(new_ptr_value, new_ptr_member);
+    m_builder.CreateStore(new_len_value, new_len_member);
+
+    return Value{value->type, variable, false,
+                 false,       false,    m_current_result == nullptr};
 }
 
 std::optional<Value> Codegen::generate(ast::AsExpr& expr) {

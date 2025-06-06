@@ -55,6 +55,7 @@ struct CallExpr;
 struct MethodExpr;
 struct MemberExpr;
 struct IndexExpr;
+struct SliceExpr;
 struct AsExpr;
 
 struct FnDecl;
@@ -191,6 +192,7 @@ public:
     std::optional<Value> generate(ast::MethodExpr& expr);
     std::optional<Value> generate(ast::MemberExpr& expr);
     std::optional<Value> generate(ast::IndexExpr& expr);
+    std::optional<Value> generate(ast::SliceExpr& expr);
     std::optional<Value> generate(ast::AsExpr& expr);
 
     std::optional<Value> generate(ast::FnDecl& decl);

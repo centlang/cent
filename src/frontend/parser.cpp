@@ -5,6 +5,7 @@
 #include "cent/ast/expr/literals.h"
 #include "cent/ast/expr/member_expr.h"
 #include "cent/ast/expr/method_expr.h"
+#include "cent/ast/expr/slice_expr.h"
 #include "cent/ast/expr/unary_expr.h"
 
 #include "cent/ast/stmt/assignment.h"
@@ -419,9 +420,28 @@ Parser::expect_access_or_call_expr(bool is_condition) {
         if (match(LeftBracket)) {
             next();
 
-            auto index = expect_expr(false);
+            auto low = expect_expr(false);
 
-            if (!index) {
+            if (!low) {
+                return nullptr;
+            }
+
+            if (match(RightBracket)) {
+                next();
+
+                expression = std::make_unique<ast::IndexExpr>(
+                    expression->offset, std::move(expression), std::move(low));
+
+                continue;
+            }
+
+            if (!expect("']' or ':'", Colon)) {
+                return nullptr;
+            }
+
+            auto high = expect_expr(false);
+
+            if (!high) {
                 return nullptr;
             }
 
@@ -429,8 +449,11 @@ Parser::expect_access_or_call_expr(bool is_condition) {
                 return nullptr;
             }
 
-            expression = std::make_unique<ast::IndexExpr>(
-                expression->offset, std::move(expression), std::move(index));
+            expression = std::make_unique<ast::SliceExpr>(
+                expression->offset, std::move(expression), std::move(low),
+                std::move(high));
+
+            continue;
         }
 
         if (!match(Dot)) {
