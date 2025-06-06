@@ -34,26 +34,7 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    auto triple = llvm::sys::getDefaultTargetTriple();
-
-    llvm::InitializeAllTargetInfos();
-    llvm::InitializeAllTargets();
-    llvm::InitializeAllTargetMCs();
-    llvm::InitializeAllAsmParsers();
-    llvm::InitializeAllAsmPrinters();
-
-    std::string message;
-
-    const auto* target = llvm::TargetRegistry::lookupTarget(triple, message);
-
-    if (!target) {
-        cent::log::error(message);
-
-        return 1;
-    }
-
-    auto* machine = target->createTargetMachine(
-        triple, "generic", "", llvm::TargetOptions{}, llvm::Reloc::PIC_);
+    std::string triple = llvm::sys::getDefaultTargetTriple();
 
     std::vector<std::filesystem::path> source_files;
     source_files.reserve(args.size());
@@ -65,6 +46,7 @@ int main(int argc, char** argv) {
     bool emit_llvm = false;
 
     bool expecting_output = false;
+    bool expecting_target = false;
 
     for (const char* arg_cstr : args.subspan(1)) {
         std::string arg = arg_cstr;
@@ -72,7 +54,12 @@ int main(int argc, char** argv) {
         if (expecting_output) {
             output = arg;
             expecting_output = false;
+            continue;
+        }
 
+        if (expecting_target) {
+            triple = arg;
+            expecting_target = false;
             continue;
         }
 
@@ -96,6 +83,11 @@ int main(int argc, char** argv) {
             continue;
         }
 
+        if (arg == "--target") {
+            expecting_target = true;
+            continue;
+        }
+
         source_files.emplace_back(arg);
     }
 
@@ -103,6 +95,30 @@ int main(int argc, char** argv) {
         cent::log::error("missing filename");
         return 1;
     }
+
+    if (expecting_target) {
+        cent::log::error("missing target triple");
+        return 1;
+    }
+
+    llvm::InitializeAllTargetInfos();
+    llvm::InitializeAllTargets();
+    llvm::InitializeAllTargetMCs();
+    llvm::InitializeAllAsmParsers();
+    llvm::InitializeAllAsmPrinters();
+
+    std::string message;
+
+    const auto* target = llvm::TargetRegistry::lookupTarget(triple, message);
+
+    if (!target) {
+        cent::log::error(message);
+
+        return 1;
+    }
+
+    auto* machine = target->createTargetMachine(
+        triple, "generic", "", llvm::TargetOptions{}, llvm::Reloc::PIC_);
 
     std::vector<std::filesystem::path> object_files;
     object_files.reserve(args.size());
