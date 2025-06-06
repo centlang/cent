@@ -229,6 +229,8 @@ private:
     Scope* get_scope(std::size_t offset, std::string_view name, Scope& parent);
 
     void generate_fn_proto(ast::FnDecl& decl);
+    void generate_struct(ast::Struct& decl);
+    void generate_enum(ast::EnumDecl& decl);
 
     void type_mismatch(std::size_t offset, Type& expected, Type& got);
 

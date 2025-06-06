@@ -139,10 +139,11 @@ private:
     [[nodiscard]] std::unique_ptr<ast::FnDecl>
     parse_fn(bool is_public = false, bool is_extern = false);
 
-    [[nodiscard]] bool
-    parse_struct(ast::Module& module, bool is_public = false);
+    [[nodiscard]] std::unique_ptr<ast::Struct>
+    parse_struct(bool is_public = false);
 
-    [[nodiscard]] bool parse_enum(ast::Module& module, bool is_public = false);
+    [[nodiscard]] std::unique_ptr<ast::EnumDecl>
+    parse_enum(bool is_public = false);
 
     [[nodiscard]] bool
     parse_submodule(ast::Module& module, const std::filesystem::path& path);

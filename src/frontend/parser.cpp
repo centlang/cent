@@ -88,7 +88,11 @@ std::unique_ptr<ast::Module> Parser::parse() {
         if (match(Type)) {
             next();
 
-            if (!parse_struct(*result, is_public)) {
+            auto struct_decl = parse_struct(is_public);
+
+            if (struct_decl) {
+                result->structs.push_back(std::move(struct_decl));
+            } else {
                 skip_until_decl();
             }
 
@@ -98,7 +102,11 @@ std::unique_ptr<ast::Module> Parser::parse() {
         if (match(Enum)) {
             next();
 
-            if (!parse_enum(*result, is_public)) {
+            auto enum_decl = parse_enum(is_public);
+
+            if (enum_decl) {
+                result->enums.push_back(std::move(enum_decl));
+            } else {
                 skip_until_decl();
             }
 
@@ -151,6 +159,16 @@ void Parser::expect_stmt(ast::BlockStmt& block) {
     case Fn:
         next();
         block.body.push_back(parse_fn());
+
+        return;
+    case Type:
+        next();
+        block.body.push_back(parse_struct());
+
+        return;
+    case Enum:
+        next();
+        block.body.push_back(parse_enum());
 
         return;
     case Let:
@@ -1004,35 +1022,33 @@ std::unique_ptr<ast::FnDecl> Parser::parse_fn(bool is_public, bool is_extern) {
         std::move(body), is_public, is_extern);
 }
 
-bool Parser::parse_struct(ast::Module& module, bool is_public) {
+std::unique_ptr<ast::Struct> Parser::parse_struct(bool is_public) {
     auto name = expect("struct name", Token::Type::Identifier);
 
     if (!name) {
-        return false;
+        return nullptr;
     }
 
     if (!expect("'{'", Token::Type::LeftBrace)) {
-        return false;
+        return nullptr;
     }
 
     auto fields = parse_fields();
 
     if (!expect("'}'", Token::Type::RightBrace)) {
-        return false;
+        return nullptr;
     }
 
-    module.structs.push_back(std::make_unique<ast::Struct>(
+    return std::make_unique<ast::Struct>(
         name->offset, ast::OffsetValue{name->value, name->offset},
-        std::move(fields), is_public));
-
-    return true;
+        std::move(fields), is_public);
 }
 
-bool Parser::parse_enum(ast::Module& module, bool is_public) {
+std::unique_ptr<ast::EnumDecl> Parser::parse_enum(bool is_public) {
     auto name = expect("enum name", Token::Type::Identifier);
 
     if (!name) {
-        return false;
+        return nullptr;
     }
 
     std::unique_ptr<ast::Type> type = nullptr;
@@ -1041,25 +1057,23 @@ bool Parser::parse_enum(ast::Module& module, bool is_public) {
         type = expect_type();
 
         if (!type) {
-            return false;
+            return nullptr;
         }
     }
 
     if (!expect("'{'", Token::Type::LeftBrace)) {
-        return false;
+        return nullptr;
     }
 
     auto fields = parse_enum_fields();
 
     if (!expect("'}'", Token::Type::RightBrace)) {
-        return false;
+        return nullptr;
     }
 
-    module.enums.push_back(std::make_unique<ast::EnumDecl>(
+    return std::make_unique<ast::EnumDecl>(
         name->offset, ast::OffsetValue{name->value, name->offset},
-        std::move(type), std::move(fields), is_public));
-
-    return true;
+        std::move(type), std::move(fields), is_public);
 }
 
 bool Parser::parse_submodule(

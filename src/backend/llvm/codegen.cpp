@@ -1604,6 +1604,10 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) {
 }
 
 std::optional<Value> Codegen::generate(ast::Struct& decl) {
+    if (m_current_function) {
+        generate_struct(decl);
+    }
+
     auto* struct_type =
         llvm::StructType::getTypeByName(m_context, decl.name.value);
 
@@ -1640,6 +1644,10 @@ std::optional<Value> Codegen::generate(ast::Struct& decl) {
 }
 
 std::optional<Value> Codegen::generate(ast::EnumDecl& decl) {
+    if (m_current_function) {
+        generate_enum(decl);
+    }
+
     auto& type = m_current_scope->types[decl.name.value];
     auto& enum_type = static_cast<types::Enum&>(*type);
 
@@ -1873,51 +1881,19 @@ void Codegen::generate(ast::Module& module, bool is_submodule) {
     m_current_scope_prefix = scope_prefix;
 
     for (auto& enum_decl : module.enums) {
-        if (m_current_scope->types.contains(enum_decl->name.value)) {
-            error(
-                enum_decl->name.offset,
-                fmt::format(
-                    "{} is already defined",
-                    log::bold(log::quoted(enum_decl->name.value))));
-
-            continue;
-        }
-
-        auto type = enum_decl->type ? enum_decl->type->codegen(*this)
-                                    : m_primitive_types["i32"];
-
-        if (!type->is_signed_int() && !type->is_unsigned_int() &&
-            !type->is_bool()) {
-            error(enum_decl->type->offset, "type mismatch");
-            continue;
-        }
-
         if (is_submodule && !enum_decl->is_public) {
             continue;
         }
 
-        m_current_scope->types[enum_decl->name.value] =
-            std::make_shared<types::Enum>(
-                m_current_scope_prefix + enum_decl->name.value, type);
+        generate_enum(*enum_decl);
     }
 
     for (auto& struct_decl : module.structs) {
-        if (llvm::StructType::getTypeByName(
-                m_context, struct_decl->name.value)) {
-            error(
-                struct_decl->name.offset,
-                fmt::format(
-                    "{} is already defined",
-                    log::bold(log::quoted(struct_decl->name.value))));
-
-            continue;
-        }
-
         if (is_submodule && !struct_decl->is_public) {
             continue;
         }
 
-        llvm::StructType::create(m_context, struct_decl->name.value);
+        generate_struct(*struct_decl);
     }
 
     for (auto& enum_decl : module.enums) {
@@ -2695,6 +2671,42 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) {
             m_methods[type][decl.proto.name.value] = {func_type, function};
         }
     }
+}
+
+void Codegen::generate_struct(ast::Struct& decl) {
+    if (llvm::StructType::getTypeByName(m_context, decl.name.value)) {
+        error(
+            decl.name.offset, fmt::format(
+                                  "{} is already defined",
+                                  log::bold(log::quoted(decl.name.value))));
+
+        return;
+    }
+
+    llvm::StructType::create(m_context, decl.name.value);
+}
+
+void Codegen::generate_enum(ast::EnumDecl& decl) {
+    if (m_current_scope->types.contains(decl.name.value)) {
+        error(
+            decl.name.offset, fmt::format(
+                                  "{} is already defined",
+                                  log::bold(log::quoted(decl.name.value))));
+
+        return;
+    }
+
+    auto type =
+        decl.type ? decl.type->codegen(*this) : m_primitive_types["i32"];
+
+    if (!type->is_signed_int() && !type->is_unsigned_int() &&
+        !type->is_bool()) {
+        error(decl.type->offset, "type mismatch");
+        return;
+    }
+
+    m_current_scope->types[decl.name.value] = std::make_shared<types::Enum>(
+        m_current_scope_prefix + decl.name.value, type);
 }
 
 void Codegen::type_mismatch(std::size_t offset, Type& expected, Type& got) {
