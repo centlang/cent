@@ -1,8 +1,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <fmt/core.h>
@@ -56,7 +58,7 @@ int main(int argc, char** argv) {
     std::vector<std::filesystem::path> source_files;
     source_files.reserve(args.size());
 
-    std::string output = "main";
+    std::optional<std::filesystem::path> output = std::nullopt;
 
     bool compile_only = false;
     bool optimize = false;
@@ -143,11 +145,19 @@ int main(int argc, char** argv) {
                 *module, llvm::OptimizationLevel::O3);
         }
 
-        if (emit_llvm) {
-            std::filesystem::path ir_file = file;
-            ir_file.replace_extension(".ll");
+        auto get_output_file = [&](std::string_view extension) {
+            if (source_files.size() == 1 && output) {
+                return *output;
+            }
 
-            if (!cent::backend::emit_llvm(*module, ir_file)) {
+            auto result = file;
+            result.replace_extension(extension);
+
+            return result;
+        };
+
+        if (emit_llvm) {
+            if (!cent::backend::emit_llvm(*module, get_output_file(".ll"))) {
                 return 1;
             }
 
@@ -155,9 +165,7 @@ int main(int argc, char** argv) {
         }
 
         std::filesystem::path object_file =
-            compile_only ? file : std::tmpnam(nullptr);
-
-        object_file.replace_extension(".o");
+            compile_only ? get_output_file(".o") : std::tmpnam(nullptr);
 
         if (!cent::backend::emit_obj(*module, *machine, object_file)) {
             return 1;
@@ -171,7 +179,7 @@ int main(int argc, char** argv) {
     }
 
     if (!compile_only && !emit_llvm) {
-        std::string command = "gcc -o " + output;
+        std::string command = "gcc -o " + (output ? output->string() : "main");
 
         for (auto& file : object_files) {
             command += ' ';
