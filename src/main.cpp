@@ -101,6 +101,13 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    if (output && source_files.size() > 1 && (compile_only || emit_llvm)) {
+        cent::log::error(fmt::format(
+            "cannot specify {} with multiple output files",
+            cent::log::bold("'-o'")));
+        return 1;
+    }
+
     llvm::InitializeAllTargetInfos();
     llvm::InitializeAllTargets();
     llvm::InitializeAllTargetMCs();
@@ -162,7 +169,7 @@ int main(int argc, char** argv) {
         }
 
         auto get_output_file = [&](std::string_view extension) {
-            if (source_files.size() == 1 && output) {
+            if (output) {
                 return *output;
             }
 
