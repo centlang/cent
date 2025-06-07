@@ -1,0 +1,16 @@
+pub fn main() i32 {
+    let array = [i32, 5]{1, 2, 3, 4, 5};
+    mut slice: [i32] = array;
+
+    if slice.len != 5 || slice[0] != 1 {
+        return 1;
+    }
+
+    slice = slice[1:3];
+
+    if slice.len != 2 || slice[0] != 2 {
+        return 1;
+    }
+
+    return 0;
+}
