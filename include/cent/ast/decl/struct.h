@@ -18,8 +18,9 @@ struct Struct : detail::Decl<Struct> {
 
     [[nodiscard]] Struct(
         std::size_t offset, OffsetValue<std::string> name,
-        std::vector<Field> fields, bool is_public = false)
-    : Decl{offset, is_public}, name{std::move(name)},
+        std::vector<Field> fields, std::vector<Attribute> attributes,
+        bool is_public = false)
+    : Decl{offset, std::move(attributes), is_public}, name{std::move(name)},
       fields{std::move(fields)} {}
 
     OffsetValue<std::string> name;

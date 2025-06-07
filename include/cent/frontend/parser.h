@@ -16,6 +16,7 @@
 #include "cent/log.h"
 #include "cent/util.h"
 
+#include "cent/ast/attribute.h"
 #include "cent/ast/module.h"
 #include "cent/ast/node.h"
 
@@ -95,6 +96,8 @@ private:
 
     void expect_stmt(ast::BlockStmt& block);
 
+    [[nodiscard]] std::vector<ast::Attribute> parse_attrs();
+
     [[nodiscard]] std::vector<std::unique_ptr<ast::Expression>> parse_args();
 
     [[nodiscard]] std::vector<ast::StructLiteral::Field> parse_field_values();
@@ -123,7 +126,8 @@ private:
 
     [[nodiscard]] std::unique_ptr<ast::Type> expect_type();
 
-    [[nodiscard]] std::unique_ptr<ast::VarDecl> parse_var();
+    [[nodiscard]] std::unique_ptr<ast::VarDecl>
+    parse_var(std::vector<ast::Attribute> attrs);
 
     void parse_while(ast::BlockStmt& block);
 
@@ -136,14 +140,15 @@ private:
 
     [[nodiscard]] std::vector<ast::EnumDecl::Field> parse_enum_fields();
 
-    [[nodiscard]] std::unique_ptr<ast::FnDecl>
-    parse_fn(bool is_public = false, bool is_extern = false);
+    [[nodiscard]] std::unique_ptr<ast::FnDecl> parse_fn(
+        std::vector<ast::Attribute> attrs, bool is_public = false,
+        bool is_extern = false);
 
     [[nodiscard]] std::unique_ptr<ast::Struct>
-    parse_struct(bool is_public = false);
+    parse_struct(std::vector<ast::Attribute> attrs, bool is_public = false);
 
     [[nodiscard]] std::unique_ptr<ast::EnumDecl>
-    parse_enum(bool is_public = false);
+    parse_enum(std::vector<ast::Attribute> attrs, bool is_public = false);
 
     [[nodiscard]] bool
     parse_submodule(ast::Module& module, const std::filesystem::path& path);

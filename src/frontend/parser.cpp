@@ -51,8 +51,10 @@ std::unique_ptr<ast::Module> Parser::parse() {
             continue;
         }
 
+        auto attrs = parse_attrs();
+
         if (match(Const, Mut)) {
-            auto variable = parse_var();
+            auto variable = parse_var(std::move(attrs));
 
             if (!variable) {
                 skip_until_decl();
@@ -89,7 +91,7 @@ std::unique_ptr<ast::Module> Parser::parse() {
         if (match(Type)) {
             next();
 
-            auto struct_decl = parse_struct(is_public);
+            auto struct_decl = parse_struct(std::move(attrs), is_public);
 
             if (struct_decl) {
                 result->structs.push_back(std::move(struct_decl));
@@ -103,7 +105,7 @@ std::unique_ptr<ast::Module> Parser::parse() {
         if (match(Enum)) {
             next();
 
-            auto enum_decl = parse_enum(is_public);
+            auto enum_decl = parse_enum(std::move(attrs), is_public);
 
             if (enum_decl) {
                 result->enums.push_back(std::move(enum_decl));
@@ -124,7 +126,7 @@ std::unique_ptr<ast::Module> Parser::parse() {
         if (match(Fn)) {
             next();
 
-            auto function = parse_fn(is_public, is_extern);
+            auto function = parse_fn(std::move(attrs), is_public, is_extern);
 
             if (function) {
                 result->functions.push_back(std::move(function));
@@ -147,6 +149,8 @@ std::unique_ptr<ast::Module> Parser::parse() {
 void Parser::expect_stmt(ast::BlockStmt& block) {
     using enum Token::Type;
 
+    auto expect_semicolon = [&] { expect("';'", Token::Type::Semicolon); };
+
     switch (peek().type) {
     case LeftBrace:
         block.body.push_back(expect_block());
@@ -157,37 +161,29 @@ void Parser::expect_stmt(ast::BlockStmt& block) {
     case While:
         parse_while(block);
         return;
+    case Return:
+        parse_return(block);
+        expect_semicolon();
+        return;
+    case Break:
+        block.body.push_back(std::make_unique<ast::BreakStmt>(get().offset));
+        expect_semicolon();
+        return;
+    case Continue:
+        block.body.push_back(std::make_unique<ast::ContinueStmt>(get().offset));
+        expect_semicolon();
+        return;
+    case Unreachable:
+        block.body.push_back(std::make_unique<ast::Unreachable>(get().offset));
+        expect_semicolon();
+        return;
+    case Bang:
     case Fn:
-        next();
-        block.body.push_back(parse_fn());
-
-        return;
     case Type:
-        next();
-        block.body.push_back(parse_struct());
-
-        return;
     case Enum:
-        next();
-        block.body.push_back(parse_enum());
-
-        return;
     case Let:
     case Mut:
     case Const:
-        block.body.push_back(parse_var());
-        break;
-    case Return:
-        parse_return(block);
-        break;
-    case Break:
-        block.body.push_back(std::make_unique<ast::BreakStmt>(get().offset));
-        break;
-    case Continue:
-        block.body.push_back(std::make_unique<ast::ContinueStmt>(get().offset));
-        break;
-    case Unreachable:
-        block.body.push_back(std::make_unique<ast::Unreachable>(get().offset));
         break;
     default:
         auto value = expect_expr(false);
@@ -201,15 +197,81 @@ void Parser::expect_stmt(ast::BlockStmt& block) {
                 Equal, PlusEqual, MinusEqual, StarEqual, SlashEqual,
                 PercentEqual, AndEqual, OrEqual, XorEqual)) {
             block.body.push_back(std::move(value));
-            break;
+            expect_semicolon();
+
+            return;
         }
 
         parse_assignment(block, std::move(value));
+        expect_semicolon();
 
-        break;
+        return;
     }
 
-    expect("';'", Token::Type::Semicolon);
+    auto attrs = parse_attrs();
+
+    switch (peek().type) {
+    case Fn:
+        next();
+        block.body.push_back(parse_fn(std::move(attrs)));
+        return;
+    case Type:
+        next();
+        block.body.push_back(parse_struct(std::move(attrs)));
+        return;
+    case Enum:
+        next();
+        block.body.push_back(parse_enum(std::move(attrs)));
+        return;
+    case Let:
+    case Mut:
+    case Const:
+        block.body.push_back(parse_var(std::move(attrs)));
+        expect_semicolon();
+        return;
+    default:
+        return;
+    }
+}
+
+std::vector<ast::Attribute> Parser::parse_attrs() {
+    std::vector<ast::Attribute> result;
+
+    if (!match(Token::Type::Bang)) {
+        return {};
+    }
+
+    next();
+
+    if (!expect("'('", Token::Type::LeftParen)) {
+        return {};
+    }
+
+    auto attribute = expect("attribute name", Token::Type::Identifier);
+
+    if (!attribute) {
+        return {};
+    }
+
+    result.emplace_back(attribute->offset, attribute->value);
+
+    while (match(Token::Type::Comma)) {
+        next();
+
+        attribute = expect("attribute name", Token::Type::Identifier);
+
+        if (!attribute) {
+            return {};
+        }
+
+        result.emplace_back(attribute->offset, attribute->value);
+    }
+
+    if (!expect("')'", Token::Type::RightParen)) {
+        return {};
+    }
+
+    return result;
 }
 
 std::vector<std::unique_ptr<ast::Expression>> Parser::parse_args() {
@@ -788,7 +850,8 @@ std::unique_ptr<ast::Type> Parser::expect_type() {
     return std::make_unique<ast::NamedType>(offset, std::move(value));
 }
 
-std::unique_ptr<ast::VarDecl> Parser::parse_var() {
+std::unique_ptr<ast::VarDecl>
+Parser::parse_var(std::vector<ast::Attribute> attrs) {
     auto offset = peek().offset;
 
     auto mutability = [&] {
@@ -830,7 +893,7 @@ std::unique_ptr<ast::VarDecl> Parser::parse_var() {
 
         return std::make_unique<ast::VarDecl>(
             offset, mutability, ast::OffsetValue{name->value, name->offset},
-            std::move(type), nullptr);
+            std::move(type), nullptr, std::move(attrs));
     }
 
     next();
@@ -843,7 +906,7 @@ std::unique_ptr<ast::VarDecl> Parser::parse_var() {
 
     return std::make_unique<ast::VarDecl>(
         offset, mutability, ast::OffsetValue{name->value, name->offset},
-        std::move(type), std::move(value));
+        std::move(type), std::move(value), std::move(attrs));
 }
 
 void Parser::parse_while(ast::BlockStmt& block) {
@@ -946,7 +1009,8 @@ std::vector<ast::EnumDecl::Field> Parser::parse_enum_fields() {
     return result;
 }
 
-std::unique_ptr<ast::FnDecl> Parser::parse_fn(bool is_public, bool is_extern) {
+std::unique_ptr<ast::FnDecl> Parser::parse_fn(
+    std::vector<ast::Attribute> attrs, bool is_public, bool is_extern) {
     auto name = expect("function name", Token::Type::Identifier);
     std::optional<ast::OffsetValue<std::string>> type = std::nullopt;
 
@@ -1058,10 +1122,11 @@ std::unique_ptr<ast::FnDecl> Parser::parse_fn(bool is_public, bool is_extern) {
             std::move(params),
             std::move(return_type),
             variadic},
-        std::move(body), is_public, is_extern);
+        std::move(body), std::move(attrs), is_public, is_extern);
 }
 
-std::unique_ptr<ast::Struct> Parser::parse_struct(bool is_public) {
+std::unique_ptr<ast::Struct>
+Parser::parse_struct(std::vector<ast::Attribute> attrs, bool is_public) {
     auto name = expect("struct name", Token::Type::Identifier);
 
     if (!name) {
@@ -1080,10 +1145,11 @@ std::unique_ptr<ast::Struct> Parser::parse_struct(bool is_public) {
 
     return std::make_unique<ast::Struct>(
         name->offset, ast::OffsetValue{name->value, name->offset},
-        std::move(fields), is_public);
+        std::move(fields), std::move(attrs), is_public);
 }
 
-std::unique_ptr<ast::EnumDecl> Parser::parse_enum(bool is_public) {
+std::unique_ptr<ast::EnumDecl>
+Parser::parse_enum(std::vector<ast::Attribute> attrs, bool is_public) {
     auto name = expect("enum name", Token::Type::Identifier);
 
     if (!name) {
@@ -1112,7 +1178,7 @@ std::unique_ptr<ast::EnumDecl> Parser::parse_enum(bool is_public) {
 
     return std::make_unique<ast::EnumDecl>(
         name->offset, ast::OffsetValue{name->value, name->offset},
-        std::move(type), std::move(fields), is_public);
+        std::move(type), std::move(fields), std::move(attrs), is_public);
 }
 
 bool Parser::parse_submodule(

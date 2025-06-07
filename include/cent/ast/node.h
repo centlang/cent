@@ -3,10 +3,13 @@
 
 #include <memory>
 #include <optional>
+#include <vector>
 
 #include "cent/backend/llvm/codegen.h"
 #include "cent/backend/llvm/type.h"
 #include "cent/backend/llvm/value.h"
+
+#include "cent/ast/attribute.h"
 
 namespace cent::ast {
 
@@ -44,9 +47,13 @@ struct Expression : Statement {
 };
 
 struct Declaration : Statement {
-    [[nodiscard]] Declaration(std::size_t offset, bool is_public = false)
-    : Statement{offset}, is_public{is_public} {}
+    [[nodiscard]] Declaration(
+        std::size_t offset, std::vector<Attribute> attributes,
+        bool is_public = false)
+    : Statement{offset}, attributes{std::move(attributes)},
+      is_public{is_public} {}
 
+    std::vector<Attribute> attributes;
     bool is_public;
 };
 
