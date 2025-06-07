@@ -65,6 +65,7 @@ struct EnumDecl;
 struct VarDecl;
 
 struct Expression;
+struct Declaration;
 
 } // namespace cent::ast
 
@@ -242,6 +243,8 @@ private:
 
         m_had_error = true;
     }
+
+    static bool has_attr(ast::Declaration& decl, std::string_view name);
 
     static constexpr auto optional_member_value = 0;
     static constexpr auto optional_member_bool = 1;

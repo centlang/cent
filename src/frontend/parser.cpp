@@ -116,17 +116,10 @@ std::unique_ptr<ast::Module> Parser::parse() {
             continue;
         }
 
-        bool is_extern = false;
-
-        if (match(Extern)) {
-            next();
-            is_extern = true;
-        }
-
         if (match(Fn)) {
             next();
 
-            auto function = parse_fn(std::move(attrs), is_public, is_extern);
+            auto function = parse_fn(std::move(attrs), is_public);
 
             if (function) {
                 result->functions.push_back(std::move(function));
@@ -1009,8 +1002,8 @@ std::vector<ast::EnumDecl::Field> Parser::parse_enum_fields() {
     return result;
 }
 
-std::unique_ptr<ast::FnDecl> Parser::parse_fn(
-    std::vector<ast::Attribute> attrs, bool is_public, bool is_extern) {
+std::unique_ptr<ast::FnDecl>
+Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
     auto name = expect("function name", Token::Type::Identifier);
     std::optional<ast::OffsetValue<std::string>> type = std::nullopt;
 
@@ -1122,7 +1115,7 @@ std::unique_ptr<ast::FnDecl> Parser::parse_fn(
             std::move(params),
             std::move(return_type),
             variadic},
-        std::move(body), std::move(attrs), is_public, is_extern);
+        std::move(body), std::move(attrs), is_public);
 }
 
 std::unique_ptr<ast::Struct>

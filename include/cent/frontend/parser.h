@@ -140,9 +140,8 @@ private:
 
     [[nodiscard]] std::vector<ast::EnumDecl::Field> parse_enum_fields();
 
-    [[nodiscard]] std::unique_ptr<ast::FnDecl> parse_fn(
-        std::vector<ast::Attribute> attrs, bool is_public = false,
-        bool is_extern = false);
+    [[nodiscard]] std::unique_ptr<ast::FnDecl>
+    parse_fn(std::vector<ast::Attribute> attrs, bool is_public = false);
 
     [[nodiscard]] std::unique_ptr<ast::Struct>
     parse_struct(std::vector<ast::Attribute> attrs, bool is_public = false);

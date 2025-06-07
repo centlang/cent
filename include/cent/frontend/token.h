@@ -77,7 +77,6 @@ struct Token {
         Null,
 
         Pub,
-        Extern,
 
         Fn,
         Type,

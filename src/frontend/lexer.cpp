@@ -386,11 +386,6 @@ void Lexer::ident() {
         return;
     }
 
-    if (m_token.value == "extern") {
-        keyword(Extern);
-        return;
-    }
-
     if (m_token.value == "fn") {
         keyword(Fn);
         return;

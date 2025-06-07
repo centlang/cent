@@ -33,15 +33,12 @@ struct FnDecl : detail::Decl<FnDecl> {
 
     [[nodiscard]] FnDecl(
         std::size_t offset, Proto proto, std::unique_ptr<BlockStmt> block,
-        std::vector<Attribute> attributes, bool is_public = false,
-        bool is_extern = false)
+        std::vector<Attribute> attributes, bool is_public = false)
     : Decl{offset, std::move(attributes), is_public}, proto{std::move(proto)},
-      block{std::move(block)}, is_extern{is_extern} {}
+      block{std::move(block)} {}
 
     Proto proto;
     std::unique_ptr<BlockStmt> block;
-
-    bool is_extern;
 };
 
 } // namespace cent::ast
