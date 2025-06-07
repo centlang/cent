@@ -6,4 +6,5 @@ pub fn main() i32 {
     return 0;
 }
 
-extern fn strlen(s: str) usize;
+!(extern)
+fn strlen(s: str) usize;

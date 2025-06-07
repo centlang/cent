@@ -3,4 +3,5 @@ pub fn main() i32 {
     return 0;
 }
 
-extern fn printf(fmt: str, ...);
+!(extern)
+fn printf(fmt: str, ...);
