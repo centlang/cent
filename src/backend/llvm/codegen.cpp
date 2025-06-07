@@ -1490,38 +1490,6 @@ std::optional<Value> Codegen::generate(ast::SliceExpr& expr) {
         return std::nullopt;
     }
 
-    auto low = expr.low->codegen(*this);
-
-    if (!low) {
-        return std::nullopt;
-    }
-
-    low = load_value(*low);
-    auto low_val = cast(m_primitive_types["usize"], *low);
-
-    if (!low_val) {
-        type_mismatch(
-            expr.low->offset, *m_primitive_types["usize"], *low->type);
-
-        return std::nullopt;
-    }
-
-    auto high = expr.high->codegen(*this);
-
-    if (!high) {
-        return std::nullopt;
-    }
-
-    high = load_value(*high);
-    auto high_val = cast(m_primitive_types["usize"], *high);
-
-    if (!high_val) {
-        type_mismatch(
-            expr.low->offset, *m_primitive_types["usize"], *high->type);
-
-        return std::nullopt;
-    }
-
     if (!value->type->is_slice()) {
         error(expr.value->offset, "slice expression of a non-slice type");
 
@@ -1531,16 +1499,74 @@ std::optional<Value> Codegen::generate(ast::SliceExpr& expr) {
     auto& type = static_cast<types::Slice&>(*value->type);
     auto* llvm_type = type.codegen(*this);
 
+    std::optional<Value> low = std::nullopt;
+
+    if (expr.low) {
+        low = expr.low->codegen(*this);
+
+        if (!low) {
+            return std::nullopt;
+        }
+
+        low = load_value(*low);
+        auto low_val = cast(m_primitive_types["usize"], *low);
+
+        if (!low_val) {
+            type_mismatch(
+                expr.low->offset, *m_primitive_types["usize"], *low->type);
+
+            return std::nullopt;
+        }
+
+        low = low_val;
+    } else {
+        low = {
+            m_primitive_types["usize"],
+            llvm::ConstantInt::get(
+                m_module->getDataLayout().getIntPtrType(m_context), 0)};
+    }
+
+    std::optional<Value> high = std::nullopt;
+
+    if (expr.high) {
+        high = expr.high->codegen(*this);
+
+        if (!high) {
+            return std::nullopt;
+        }
+
+        high = load_value(*high);
+        auto high_val = cast(m_primitive_types["usize"], *high);
+
+        if (!high_val) {
+            type_mismatch(
+                expr.high->offset, *m_primitive_types["usize"], *high->type);
+
+            return std::nullopt;
+        }
+
+        high = high_val;
+    } else {
+        auto* len_member = m_builder.CreateStructGEP(
+            llvm_type, value->value, slice_member_len);
+
+        high = {
+            m_primitive_types["usize"],
+            m_builder.CreateLoad(
+                m_module->getDataLayout().getIntPtrType(m_context),
+                len_member)};
+    }
+
     auto* ptr_member =
         m_builder.CreateStructGEP(llvm_type, value->value, slice_member_ptr);
 
     auto* ptr_value =
         m_builder.CreateLoad(llvm::PointerType::get(m_context, 0), ptr_member);
 
-    auto* new_ptr_value = m_builder.CreateGEP(
-        type.type->codegen(*this), ptr_value, low_val->value);
+    auto* new_ptr_value =
+        m_builder.CreateGEP(type.type->codegen(*this), ptr_value, low->value);
 
-    auto* new_len_value = m_builder.CreateSub(high_val->value, low_val->value);
+    auto* new_len_value = m_builder.CreateSub(high->value, low->value);
 
     auto* variable =
         m_current_result ? m_current_result : m_builder.CreateAlloca(llvm_type);

@@ -420,10 +420,16 @@ Parser::expect_access_or_call_expr(bool is_condition) {
         if (match(LeftBracket)) {
             next();
 
-            auto low = expect_expr(false);
+            auto offset = peek().offset;
 
-            if (!low) {
-                return nullptr;
+            std::unique_ptr<ast::Expression> low = nullptr;
+
+            if (!match(Colon)) {
+                low = expect_expr(false);
+
+                if (!low) {
+                    return nullptr;
+                }
             }
 
             if (match(RightBracket)) {
@@ -439,13 +445,23 @@ Parser::expect_access_or_call_expr(bool is_condition) {
                 return nullptr;
             }
 
-            auto high = expect_expr(false);
+            std::unique_ptr<ast::Expression> high = nullptr;
 
-            if (!high) {
-                return nullptr;
+            if (!match(RightBracket)) {
+                high = expect_expr(false);
+
+                if (!high) {
+                    return nullptr;
+                }
             }
 
             if (!expect("']'", RightBracket)) {
+                return nullptr;
+            }
+
+            if (!low && !high) {
+                error(offset, "slice expressions require at least one index");
+
                 return nullptr;
             }
 
