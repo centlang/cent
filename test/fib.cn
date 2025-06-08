@@ -1,0 +1,15 @@
+fn fib(n: u64) u64 {
+    if n < 2 {
+        return n;
+    } 
+
+    return fib(n - 1) + fib(n - 2); 
+}
+
+pub fn main() i32 {
+    if fib(36) != 14930352 {
+        return 1;
+    }
+
+    return 0; 
+}
