@@ -2657,9 +2657,9 @@ Codegen::get_scope(std::size_t offset, std::string_view name, Scope& parent) {
 }
 
 void Codegen::generate_fn_proto(ast::FnDecl& decl) {
-    bool is_extern = has_attr(decl, "extern");
+    auto attrs = parse_attrs(decl);
 
-    if (!is_extern && !decl.block) {
+    if (!attrs.is_extern && !decl.block) {
         error(
             decl.proto.name.offset,
             fmt::format(
@@ -2737,8 +2737,8 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) {
 
     auto* function = llvm::Function::Create(
         function_type,
-        (decl.is_public || is_extern) ? llvm::Function::ExternalLinkage
-                                      : llvm::Function::PrivateLinkage,
+        (decl.is_public || attrs.is_extern) ? llvm::Function::ExternalLinkage
+                                            : llvm::Function::PrivateLinkage,
         decl.proto.name.value, *m_module);
 
     if (!decl.proto.type) {
@@ -2821,14 +2821,22 @@ void Codegen::type_mismatch(std::size_t offset, Type& expected, Type& got) {
                     log::bold(log::quoted(got.to_string()))));
 }
 
-bool Codegen::has_attr(ast::Declaration& decl, std::string_view name) {
+Attributes Codegen::parse_attrs(ast::Declaration& decl) {
+    Attributes result;
+
     for (auto& attr : decl.attributes) {
-        if (attr.name == name) {
-            return true;
+        if (attr.name == "extern") {
+            result.is_extern = true;
+            continue;
         }
+
+        error(
+            attr.offset,
+            fmt::format(
+                "unknown attribute {}", log::bold(log::quoted(attr.name))));
     }
 
-    return false;
+    return result;
 }
 
 } // namespace cent::backend

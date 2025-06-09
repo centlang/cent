@@ -111,6 +111,10 @@ struct Function;
 struct Value;
 struct Type;
 
+struct Attributes {
+    bool is_extern = false;
+};
+
 class Codegen {
 public:
     [[nodiscard]] Codegen(
@@ -244,7 +248,7 @@ private:
         m_had_error = true;
     }
 
-    static bool has_attr(ast::Declaration& decl, std::string_view name);
+    [[nodiscard]] Attributes parse_attrs(ast::Declaration& decl);
 
     static constexpr auto optional_member_value = 0;
     static constexpr auto optional_member_bool = 1;
