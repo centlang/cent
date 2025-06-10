@@ -29,6 +29,7 @@
 #include "cent/ast/decl/enum_decl.h"
 #include "cent/ast/decl/fn_decl.h"
 #include "cent/ast/decl/struct.h"
+#include "cent/ast/decl/type_alias.h"
 #include "cent/ast/decl/var_decl.h"
 
 namespace cent::frontend {
@@ -145,6 +146,9 @@ private:
 
     [[nodiscard]] std::unique_ptr<ast::Struct>
     parse_struct(std::vector<ast::Attribute> attrs, bool is_public = false);
+
+    [[nodiscard]] std::unique_ptr<ast::TypeAlias>
+    parse_type_alias(std::vector<ast::Attribute> attrs, bool is_public = false);
 
     [[nodiscard]] std::unique_ptr<ast::EnumDecl>
     parse_enum(std::vector<ast::Attribute> attrs, bool is_public = false);

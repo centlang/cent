@@ -41,6 +41,26 @@ std::unique_ptr<ast::Module> Parser::parse() {
 
     auto result = std::make_unique<ast::Module>(ModulePath{.file = m_filename});
 
+    auto handle_type = [&](std::vector<ast::Attribute> attrs, bool is_public) {
+        if (match(1, Equal)) {
+            auto type = parse_type_alias(std::move(attrs), is_public);
+
+            if (type) {
+                result->aliases.push_back(std::move(type));
+            } else {
+                skip_until_decl();
+            }
+        } else {
+            auto struct_decl = parse_struct(std::move(attrs), is_public);
+
+            if (struct_decl) {
+                result->structs.push_back(std::move(struct_decl));
+            } else {
+                skip_until_decl();
+            }
+        }
+    };
+
     while (true) {
         if (match(Eof)) {
             break;
@@ -90,14 +110,7 @@ std::unique_ptr<ast::Module> Parser::parse() {
 
         if (match(Type)) {
             next();
-
-            auto struct_decl = parse_struct(std::move(attrs), is_public);
-
-            if (struct_decl) {
-                result->structs.push_back(std::move(struct_decl));
-            } else {
-                skip_until_decl();
-            }
+            handle_type(std::move(attrs), is_public);
 
             continue;
         }
@@ -210,7 +223,13 @@ void Parser::expect_stmt(ast::BlockStmt& block) {
         return;
     case Type:
         next();
-        block.body.push_back(parse_struct(std::move(attrs)));
+
+        if (match(1, Equal)) {
+            block.body.push_back(parse_type_alias(std::move(attrs)));
+        } else {
+            block.body.push_back(parse_struct(std::move(attrs)));
+        }
+
         return;
     case Enum:
         next();
@@ -1139,6 +1158,29 @@ Parser::parse_struct(std::vector<ast::Attribute> attrs, bool is_public) {
     return std::make_unique<ast::Struct>(
         name->offset, ast::OffsetValue{name->value, name->offset},
         std::move(fields), std::move(attrs), is_public);
+}
+
+std::unique_ptr<ast::TypeAlias>
+Parser::parse_type_alias(std::vector<ast::Attribute> attrs, bool is_public) {
+    auto name = expect("type name", Token::Type::Identifier);
+
+    if (!name) {
+        return nullptr;
+    }
+
+    if (!expect("'='", Token::Type::Equal)) {
+        return nullptr;
+    }
+
+    auto type = expect_type();
+
+    if (!type) {
+        return nullptr;
+    }
+
+    return std::make_unique<ast::TypeAlias>(
+        name->offset, ast::OffsetValue{name->value, name->offset},
+        std::move(type), std::move(attrs), is_public);
 }
 
 std::unique_ptr<ast::EnumDecl>

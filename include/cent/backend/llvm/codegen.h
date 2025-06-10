@@ -61,6 +61,7 @@ struct AsExpr;
 struct FnDecl;
 struct Struct;
 struct EnumDecl;
+struct TypeAlias;
 
 struct VarDecl;
 
@@ -104,6 +105,7 @@ struct Tuple;
 
 struct Struct;
 struct Enum;
+struct Alias;
 struct Function;
 
 } // namespace types
@@ -170,6 +172,7 @@ public:
 
     llvm::Type* generate(types::Struct& type);
     llvm::Type* generate(types::Enum& type);
+    llvm::Type* generate(types::Alias& type);
     llvm::Type* generate(types::Function& type);
 
     std::optional<Value> generate(ast::Assignment& stmt);
@@ -203,6 +206,7 @@ public:
     std::optional<Value> generate(ast::FnDecl& decl);
     std::optional<Value> generate(ast::Struct& decl);
     std::optional<Value> generate(ast::EnumDecl& decl);
+    std::optional<Value> generate(ast::TypeAlias& decl);
 
     std::optional<Value> generate(ast::VarDecl& decl);
 

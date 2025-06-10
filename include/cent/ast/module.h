@@ -11,6 +11,7 @@
 #include "cent/ast/decl/enum_decl.h"
 #include "cent/ast/decl/fn_decl.h"
 #include "cent/ast/decl/struct.h"
+#include "cent/ast/decl/type_alias.h"
 #include "cent/ast/decl/var_decl.h"
 
 namespace cent::ast {
@@ -20,6 +21,7 @@ struct Module : Node {
 
     std::vector<std::unique_ptr<FnDecl>> functions;
     std::vector<std::unique_ptr<Struct>> structs;
+    std::vector<std::unique_ptr<TypeAlias>> aliases;
     std::vector<std::unique_ptr<EnumDecl>> enums;
     std::vector<std::unique_ptr<VarDecl>> variables;
     std::map<std::string, std::unique_ptr<Module>> submodules;

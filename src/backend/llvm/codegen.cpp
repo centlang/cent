@@ -30,6 +30,7 @@
 #include "cent/ast/stmt/while_loop.h"
 
 #include "cent/ast/decl/fn_decl.h"
+#include "cent/ast/decl/type_alias.h"
 #include "cent/ast/decl/var_decl.h"
 
 #include "cent/ast/type/array_type.h"
@@ -42,6 +43,7 @@
 #include "cent/backend/llvm/type.h"
 #include "cent/backend/llvm/value.h"
 
+#include "cent/backend/llvm/types/alias.h"
 #include "cent/backend/llvm/types/enum.h"
 #include "cent/backend/llvm/types/function.h"
 #include "cent/backend/llvm/types/primitive.h"
@@ -258,6 +260,10 @@ llvm::Type* Codegen::generate(types::Pointer& type) {
 llvm::Type* Codegen::generate(types::Struct& type) { return type.type; }
 
 llvm::Type* Codegen::generate(types::Enum& type) {
+    return type.type->codegen(*this);
+}
+
+llvm::Type* Codegen::generate(types::Alias& type) {
     return type.type->codegen(*this);
 }
 
@@ -1818,6 +1824,15 @@ std::optional<Value> Codegen::generate(ast::EnumDecl& decl) {
     return std::nullopt;
 }
 
+std::optional<Value> Codegen::generate(ast::TypeAlias& decl) {
+    auto type = decl.type->codegen(*this);
+
+    m_current_scope->types[decl.name.value] = std::make_shared<types::Alias>(
+        m_current_scope_prefix + decl.name.value, type);
+
+    return std::nullopt;
+}
+
 std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
     if (decl.mutability == ast::VarDecl::Mut::Const) {
         if (!decl.value) {
@@ -2022,6 +2037,14 @@ void Codegen::generate(ast::Module& module, bool is_submodule) {
         }
 
         enum_decl->codegen(*this);
+    }
+
+    for (auto& type : module.aliases) {
+        if (is_submodule && !type->is_public) {
+            continue;
+        }
+
+        type->codegen(*this);
     }
 
     for (auto& struct_decl : module.structs) {
