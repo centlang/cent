@@ -7,9 +7,6 @@ fn fib(n: u64) u64 {
 }
 
 pub fn main() i32 {
-    if fib(36) != 14930352 {
-        return 1;
-    }
-
+    assert fib(36) == 14_930_352;
     return 0; 
 }

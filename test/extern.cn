@@ -1,8 +1,5 @@
 pub fn main() i32 {
-    if strlen("Hello, world!") != 13 {
-        return 1;
-    }
-
+    assert strlen("Hello, world!") == 13;
     return 0;
 }
 
