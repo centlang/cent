@@ -100,6 +100,7 @@ struct Token {
         Continue,
 
         Unreachable,
+        Assert,
         Undefined,
 
         Identifier

@@ -38,6 +38,7 @@ struct WhileLoop;
 struct BreakStmt;
 struct ContinueStmt;
 struct Unreachable;
+struct AssertStmt;
 
 struct BinaryExpr;
 struct UnaryExpr;
@@ -183,6 +184,7 @@ public:
     std::optional<Value> generate(ast::BreakStmt& stmt);
     std::optional<Value> generate(ast::ContinueStmt& stmt);
     std::optional<Value> generate(ast::Unreachable& stmt);
+    std::optional<Value> generate(ast::AssertStmt& stmt);
 
     std::optional<Value> generate(ast::BinaryExpr& expr);
     std::optional<Value> generate(ast::UnaryExpr& expr);
@@ -238,6 +240,8 @@ private:
     get_name(std::size_t offset, std::string_view name, Scope& parent);
 
     Scope* get_scope(std::size_t offset, std::string_view name, Scope& parent);
+
+    void create_panic_fn();
 
     void generate_fn_proto(ast::FnDecl& decl);
     void generate_struct(ast::Struct& decl);
@@ -297,6 +301,7 @@ private:
     std::shared_ptr<types::Void> m_void_type;
 
     llvm::StructType* m_slice_type{};
+    llvm::Function* m_panic_fn{};
 
     std::map<llvm::Type*, llvm::StructType*> m_optional_types;
 

@@ -20,6 +20,7 @@
 #include "cent/ast/expr/slice_expr.h"
 #include "cent/ast/expr/unary_expr.h"
 
+#include "cent/ast/stmt/assert_stmt.h"
 #include "cent/ast/stmt/assignment.h"
 #include "cent/ast/stmt/block_stmt.h"
 #include "cent/ast/stmt/break_stmt.h"
@@ -77,6 +78,8 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
     m_slice_type = llvm::StructType::create(
         {llvm::PointerType::get(m_context, 0),
          m_module->getDataLayout().getIntPtrType(m_context)});
+
+    create_panic_fn();
 
     generate(*m_program);
 
@@ -554,6 +557,32 @@ std::optional<Value> Codegen::generate(ast::ContinueStmt& stmt) {
 std::optional<Value>
 Codegen::generate([[maybe_unused]] ast::Unreachable& stmt) {
     m_builder.CreateUnreachable();
+
+    return std::nullopt;
+}
+
+std::optional<Value> Codegen::generate(ast::AssertStmt& stmt) {
+    auto condition = stmt.condition->codegen(*this);
+
+    if (!condition) {
+        return std::nullopt;
+    }
+
+    auto* function = m_builder.GetInsertBlock()->getParent();
+
+    auto* success = llvm::BasicBlock::Create(m_context, "", function);
+    auto* failure = llvm::BasicBlock::Create(m_context, "", function);
+
+    m_builder.CreateCondBr(condition->value, success, failure);
+
+    m_builder.SetInsertPoint(failure);
+
+    m_builder.CreateCall(
+        m_panic_fn, {m_builder.CreateGlobalString("Assertion failed\n")});
+
+    m_builder.CreateUnreachable();
+
+    m_builder.SetInsertPoint(success);
 
     return std::nullopt;
 }
@@ -2695,6 +2724,52 @@ Codegen::get_scope(std::size_t offset, std::string_view name, Scope& parent) {
     }
 
     return &iterator->second;
+}
+
+void Codegen::create_panic_fn() {
+    auto* panic_type = llvm::FunctionType::get(
+        llvm::Type::getVoidTy(m_context),
+        llvm::Type::getInt8Ty(m_context)->getPointerTo(), false);
+
+    m_panic_fn = llvm::Function::Create(
+        panic_type, llvm::Function::PrivateLinkage, "panic", *m_module);
+
+    auto* fputs_type = llvm::FunctionType::get(
+        llvm::Type::getInt32Ty(m_context),
+        {llvm::Type::getInt8Ty(m_context)->getPointerTo(),
+         llvm::PointerType::get(m_context, 0)},
+        false);
+
+    auto* fputs_fn = llvm::Function::Create(
+        fputs_type, llvm::Function::ExternalLinkage, "fputs", *m_module);
+
+    m_globals.push_back(std::make_unique<llvm::GlobalVariable>(
+        *m_module, llvm::PointerType::get(m_context, 0), false,
+        llvm::GlobalValue::ExternalLinkage, nullptr, "stderr"));
+
+    auto* stderr_ptr = m_globals.back().get();
+
+    auto* exit_type = llvm::FunctionType::get(
+        llvm::Type::getVoidTy(m_context), {llvm::Type::getInt32Ty(m_context)},
+        false);
+
+    auto* exit_fn = llvm::Function::Create(
+        exit_type, llvm::Function::ExternalLinkage, "exit", *m_module);
+
+    auto* entry = llvm::BasicBlock::Create(m_context, "", m_panic_fn);
+
+    m_builder.SetInsertPoint(entry);
+
+    auto* stderr_value =
+        m_builder.CreateLoad(llvm::PointerType::get(m_context, 0), stderr_ptr);
+
+    m_builder.CreateCall(fputs_fn, {m_panic_fn->getArg(0), stderr_value});
+
+    m_builder.CreateCall(
+        exit_fn,
+        llvm::ConstantInt::getSigned(llvm::Type::getInt32Ty(m_context), 1));
+
+    m_builder.CreateUnreachable();
 }
 
 void Codegen::generate_fn_proto(ast::FnDecl& decl) {
