@@ -216,6 +216,12 @@ void Lexer::next_token() {
     }
 }
 
+void Lexer::get_ident() {
+    while (!eof() && is_ident(peek())) {
+        m_token.value += get();
+    }
+}
+
 void Lexer::number() {
     m_token = {Token::Type::IntLiteral, {}, m_offset};
 
@@ -277,14 +283,16 @@ void Lexer::number() {
 
     get_int();
 
-    if (!eof() && (peek() == 'i' || peek() == 'u')) {
-        m_token.value += get();
-        get_int();
-
+    if (eof()) {
         return;
     }
 
-    if (eof() || peek() != '.') {
+    if (is_ident(peek())) {
+        get_ident();
+        return;
+    }
+
+    if (peek() != '.') {
         return;
     }
 
@@ -293,9 +301,8 @@ void Lexer::number() {
 
     get_int();
 
-    if (!eof() && peek() == 'f') {
-        m_token.value += get();
-        get_int();
+    if (!eof() && is_ident(peek())) {
+        get_ident();
     }
 }
 

@@ -1,5 +1,6 @@
 #include <array>
 #include <charconv>
+#include <cstddef>
 #include <cstdint>
 
 #include <llvm/IR/Constants.h>
@@ -734,6 +735,15 @@ std::optional<Value> Codegen::generate(ast::IntLiteral& expr) {
         return std::nullopt;
     }
 
+    if (auto value =
+            with_type_suffix.operator()<std::ptrdiff_t>("isize", true)) {
+        return value;
+    }
+
+    if (failed) {
+        return std::nullopt;
+    }
+
     if (auto value = with_type_suffix.operator()<std::uint8_t>("u8", false)) {
         return value;
     }
@@ -759,6 +769,14 @@ std::optional<Value> Codegen::generate(ast::IntLiteral& expr) {
     }
 
     if (auto value = with_type_suffix.operator()<std::uint64_t>("u64", false)) {
+        return value;
+    }
+
+    if (failed) {
+        return std::nullopt;
+    }
+
+    if (auto value = with_type_suffix.operator()<std::size_t>("usize", false)) {
         return value;
     }
 
