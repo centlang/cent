@@ -2002,15 +2002,14 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
                 type, m_current_result,
                 decl.mutability == ast::VarDecl::Mut::Mut};
         } else {
-            m_globals.push_back(std::make_unique<llvm::GlobalVariable>(
+            auto* global = new llvm::GlobalVariable{
                 *m_module, llvm_type, false, llvm::GlobalValue::PrivateLinkage,
-                llvm::Constant::getNullValue(llvm_type)));
+                llvm::Constant::getNullValue(llvm_type)};
 
-            m_globals.back()->setAlignment(
-                m_module->getDataLayout().getPreferredAlign(
-                    m_globals.back().get()));
+            global->setAlignment(
+                m_module->getDataLayout().getPreferredAlign(global));
 
-            m_current_result = m_globals.back().get();
+            m_current_result = global;
 
             m_scope.names[decl.name.value] = {type, m_current_result, true};
         }
@@ -2743,11 +2742,10 @@ void Codegen::create_panic_fn() {
     auto* fputs_fn = llvm::Function::Create(
         fputs_type, llvm::Function::ExternalLinkage, "fputs", *m_module);
 
-    m_globals.push_back(std::make_unique<llvm::GlobalVariable>(
-        *m_module, llvm::PointerType::get(m_context, 0), false,
-        llvm::GlobalValue::ExternalLinkage, nullptr, "stderr"));
-
-    auto* stderr_ptr = m_globals.back().get();
+    auto* stderr_ptr = new llvm::GlobalVariable{
+        *m_module, llvm::PointerType::get(m_context, 0),
+        false,     llvm::GlobalValue::ExternalLinkage,
+        nullptr,   "stderr"};
 
     auto* exit_type = llvm::FunctionType::get(
         llvm::Type::getVoidTy(m_context), {llvm::Type::getInt32Ty(m_context)},
