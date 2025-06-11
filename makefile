@@ -55,7 +55,7 @@ $(TEST_BIN_DIR)/%: $(TEST_DIR)/%.cn $(TARGET)
 test: $(TEST_BIN_FILES)
 	@for test in $^; do \
 		echo "Running test: $$test"; \
-		./$$test || exit 1; \
+		./$$test > /dev/null || exit 1; \
 	done
 
 -include $(DEP_FILES)
