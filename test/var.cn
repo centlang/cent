@@ -1,0 +1,15 @@
+pub fn main() i32 {
+    let var = 3;
+    assert var == 3;
+
+    mut var = var;
+    assert var == 3;
+
+    var = 2;
+    assert var == 2;
+
+    let var: i32 = var + 3;
+    assert var == 5;
+
+    return 0;
+}
