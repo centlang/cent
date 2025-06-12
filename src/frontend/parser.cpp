@@ -1058,6 +1058,13 @@ Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
             return;
         }
 
+        bool is_mutable = false;
+
+        if (match(Token::Type::Mut)) {
+            next();
+            is_mutable = true;
+        }
+
         auto name = expect("parameter name", Token::Type::Identifier);
 
         if (!name) {
@@ -1078,17 +1085,19 @@ Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
             next();
             value = expect_expr(false);
         } else if (had_default) {
-            error(name->offset, "default parameters must be at the end");
             return;
+            error(name->offset, "default parameters must be at the end");
         }
 
         params.emplace_back(
             ast::OffsetValue{name->value, name->offset}, std::move(type),
-            std::move(value));
+            std::move(value), is_mutable);
     };
 
     auto parse_params = [&] {
-        if (match(Token::Type::Identifier, Token::Type::Ellipsis)) {
+        if (match(
+                Token::Type::Mut, Token::Type::Identifier,
+                Token::Type::Ellipsis)) {
             parse_param();
 
             while (!variadic && match(Token::Type::Comma)) {

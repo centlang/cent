@@ -1721,13 +1721,15 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) {
     m_current_function = static_cast<types::Function*>(function_type.get());
 
     for (std::size_t i = 0; i < decl.proto.params.size(); ++i) {
+        auto& param = decl.proto.params[i];
+
         auto* value = function->getArg(i);
         auto* variable = m_builder.CreateAlloca(value->getType());
 
         m_builder.CreateStore(value, variable);
 
-        m_scope.names[decl.proto.params[i].name.value] = {
-            m_current_function->param_types[i], variable};
+        m_scope.names[param.name.value] = {
+            m_current_function->param_types[i], variable, param.is_mutable};
     }
 
     decl.block->codegen(*this);

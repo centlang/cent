@@ -19,6 +19,7 @@ struct FnDecl : detail::Decl<FnDecl> {
         std::unique_ptr<Type> type;
 
         std::unique_ptr<Expression> value;
+        bool is_mutable;
     };
 
     struct Proto {
