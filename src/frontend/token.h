@@ -80,6 +80,7 @@ struct Token {
 
         Fn,
         Type,
+        Union,
         Enum,
         With,
 

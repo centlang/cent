@@ -116,6 +116,20 @@ std::unique_ptr<ast::Module> Parser::parse() {
             continue;
         }
 
+        if (match(Union)) {
+            next();
+
+            auto union_decl = parse_union(std::move(attrs), is_public);
+
+            if (union_decl) {
+                result->unions.push_back(std::move(union_decl));
+            } else {
+                skip_until_decl();
+            }
+
+            continue;
+        }
+
         if (match(Enum)) {
             next();
 
@@ -1180,6 +1194,29 @@ Parser::parse_struct(std::vector<ast::Attribute> attrs, bool is_public) {
     }
 
     return std::make_unique<ast::Struct>(
+        name->offset, ast::OffsetValue{name->value, name->offset},
+        std::move(fields), std::move(attrs), is_public);
+}
+
+std::unique_ptr<ast::Union>
+Parser::parse_union(std::vector<ast::Attribute> attrs, bool is_public) {
+    auto name = expect("union name", Token::Type::Identifier);
+
+    if (!name) {
+        return nullptr;
+    }
+
+    if (!expect("'{'", Token::Type::LeftBrace)) {
+        return nullptr;
+    }
+
+    auto fields = parse_fields();
+
+    if (!expect("'}'", Token::Type::RightBrace)) {
+        return nullptr;
+    }
+
+    return std::make_unique<ast::Union>(
         name->offset, ast::OffsetValue{name->value, name->offset},
         std::move(fields), std::move(attrs), is_public);
 }

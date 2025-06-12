@@ -403,6 +403,11 @@ void Lexer::ident() {
         return;
     }
 
+    if (m_token.value == "union") {
+        keyword(Union);
+        return;
+    }
+
     if (m_token.value == "enum") {
         keyword(Enum);
         return;

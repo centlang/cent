@@ -49,6 +49,7 @@
 #include "backend/llvm/types/function.h"
 #include "backend/llvm/types/primitive.h"
 #include "backend/llvm/types/struct.h"
+#include "backend/llvm/types/union.h"
 
 #include "backend/llvm/codegen.h"
 
@@ -261,6 +262,8 @@ llvm::Type* Codegen::generate(types::Pointer& type) {
 }
 
 llvm::Type* Codegen::generate(types::Struct& type) { return type.type; }
+
+llvm::Type* Codegen::generate(types::Union& type) { return type.type; }
 
 llvm::Type* Codegen::generate(types::Enum& type) {
     return type.type->codegen(*this);
@@ -1800,6 +1803,51 @@ std::optional<Value> Codegen::generate(ast::Struct& decl) {
     return std::nullopt;
 }
 
+std::optional<Value> Codegen::generate(ast::Union& decl) {
+    if (m_current_function) {
+        generate_union(decl);
+    }
+
+    auto* struct_type =
+        llvm::StructType::getTypeByName(m_context, decl.name.value);
+
+    std::vector<std::shared_ptr<Type>> fields;
+    fields.reserve(decl.fields.size());
+
+    for (auto& field : decl.fields) {
+        auto type = field.type->codegen(*this);
+
+        if (!type) {
+            return std::nullopt;
+        }
+
+        fields.push_back(type);
+    }
+
+    std::size_t max = 0;
+    llvm::Type* max_type = nullptr;
+
+    auto layout = m_module->getDataLayout();
+
+    for (auto& field : decl.fields) {
+        auto* type = field.type->codegen(*this)->codegen(*this);
+        auto size = layout.getTypeAllocSize(type);
+
+        if (size > max) {
+            max = size;
+            max_type = type;
+        }
+    }
+
+    struct_type->setBody(max_type);
+
+    m_current_scope->types[decl.name.value] = std::make_shared<types::Union>(
+        m_current_scope_prefix + decl.name.value, struct_type,
+        std::move(fields));
+
+    return std::nullopt;
+}
+
 std::optional<Value> Codegen::generate(ast::EnumDecl& decl) {
     if (m_current_function) {
         generate_enum(decl);
@@ -2061,6 +2109,14 @@ void Codegen::generate(ast::Module& module, bool is_submodule) {
         generate_struct(*struct_decl);
     }
 
+    for (auto& union_decl : module.unions) {
+        if (is_submodule && !union_decl->is_public) {
+            continue;
+        }
+
+        generate_union(*union_decl);
+    }
+
     for (auto& enum_decl : module.enums) {
         if (is_submodule && !enum_decl->is_public) {
             continue;
@@ -2083,6 +2139,14 @@ void Codegen::generate(ast::Module& module, bool is_submodule) {
         }
 
         struct_decl->codegen(*this);
+    }
+
+    for (auto& union_decl : module.unions) {
+        if (is_submodule && !union_decl->is_public) {
+            continue;
+        }
+
+        union_decl->codegen(*this);
     }
 
     for (auto& variable : module.variables) {
@@ -2894,6 +2958,19 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) {
 }
 
 void Codegen::generate_struct(ast::Struct& decl) {
+    if (llvm::StructType::getTypeByName(m_context, decl.name.value)) {
+        error(
+            decl.name.offset, fmt::format(
+                                  "{} is already defined",
+                                  log::bold(log::quoted(decl.name.value))));
+
+        return;
+    }
+
+    llvm::StructType::create(m_context, decl.name.value);
+}
+
+void Codegen::generate_union(ast::Union& decl) {
     if (llvm::StructType::getTypeByName(m_context, decl.name.value)) {
         error(
             decl.name.offset, fmt::format(

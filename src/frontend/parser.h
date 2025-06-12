@@ -30,6 +30,7 @@
 #include "ast/decl/fn_decl.h"
 #include "ast/decl/struct.h"
 #include "ast/decl/type_alias.h"
+#include "ast/decl/union.h"
 #include "ast/decl/var_decl.h"
 
 namespace cent::frontend {
@@ -146,6 +147,9 @@ private:
 
     [[nodiscard]] std::unique_ptr<ast::Struct>
     parse_struct(std::vector<ast::Attribute> attrs, bool is_public = false);
+
+    [[nodiscard]] std::unique_ptr<ast::Union>
+    parse_union(std::vector<ast::Attribute> attrs, bool is_public = false);
 
     [[nodiscard]] std::unique_ptr<ast::TypeAlias>
     parse_type_alias(std::vector<ast::Attribute> attrs, bool is_public = false);

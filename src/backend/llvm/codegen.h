@@ -61,6 +61,7 @@ struct AsExpr;
 
 struct FnDecl;
 struct Struct;
+struct Union;
 struct EnumDecl;
 struct TypeAlias;
 
@@ -105,6 +106,7 @@ struct Slice;
 struct Tuple;
 
 struct Struct;
+struct Union;
 struct Enum;
 struct Alias;
 struct Function;
@@ -172,6 +174,7 @@ public:
     llvm::Type* generate(types::Tuple& type);
 
     llvm::Type* generate(types::Struct& type);
+    llvm::Type* generate(types::Union& type);
     llvm::Type* generate(types::Enum& type);
     llvm::Type* generate(types::Alias& type);
     llvm::Type* generate(types::Function& type);
@@ -207,6 +210,7 @@ public:
 
     std::optional<Value> generate(ast::FnDecl& decl);
     std::optional<Value> generate(ast::Struct& decl);
+    std::optional<Value> generate(ast::Union& decl);
     std::optional<Value> generate(ast::EnumDecl& decl);
     std::optional<Value> generate(ast::TypeAlias& decl);
 
@@ -245,6 +249,7 @@ private:
 
     void generate_fn_proto(ast::FnDecl& decl);
     void generate_struct(ast::Struct& decl);
+    void generate_union(ast::Union& decl);
     void generate_enum(ast::EnumDecl& decl);
 
     void type_mismatch(std::size_t offset, Type& expected, Type& got);
