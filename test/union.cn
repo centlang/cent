@@ -1,0 +1,16 @@
+union Union {
+    a: i32,
+    b: i64,
+}
+
+pub fn main() i32 {
+    mut u: Union;
+
+    u.b = 42;
+    assert u.b == 42;
+
+    u.a = u.b as i32;
+    assert u.a == 42;
+
+    return 0;
+}
