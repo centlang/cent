@@ -15,13 +15,13 @@
 #include <llvm/Target/TargetOptions.h>
 #include <llvm/TargetParser/Host.h>
 
-#include "cent/frontend/parser.h"
+#include "frontend/parser.h"
 
-#include "cent/backend/llvm/codegen.h"
-#include "cent/backend/llvm/emit.h"
+#include "backend/llvm/codegen.h"
+#include "backend/llvm/emit.h"
 
-#include "cent/log.h"
-#include "cent/util.h"
+#include "log.h"
+#include "util.h"
 
 void help() { fmt::print("Usage: centc FILE...\n"); }
 

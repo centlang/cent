@@ -1,0 +1,26 @@
+#ifndef CENT_AST_UNARY_EXPR_H
+#define CENT_AST_UNARY_EXPR_H
+
+#include <memory>
+#include <utility>
+
+#include "frontend/token.h"
+#include "offset_value.h"
+
+#include "ast/node.h"
+
+namespace cent::ast {
+
+struct UnaryExpr : detail::Expr<UnaryExpr> {
+    [[nodiscard]] UnaryExpr(
+        std::size_t offset, OffsetValue<frontend::Token::Type> oper,
+        std::unique_ptr<Expression> value)
+    : Expr{offset}, oper{oper}, value{std::move(value)} {}
+
+    OffsetValue<frontend::Token::Type> oper;
+    std::unique_ptr<Expression> value;
+};
+
+} // namespace cent::ast
+
+#endif

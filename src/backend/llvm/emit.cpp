@@ -7,9 +7,9 @@
 #include <llvm/Analysis/CGSCCPassManager.h>
 #include <llvm/Analysis/LoopAnalysisManager.h>
 
-#include "cent/log.h"
+#include "log.h"
 
-#include "cent/backend/llvm/emit.h"
+#include "backend/llvm/emit.h"
 
 namespace cent::backend {
 

@@ -1,5 +1,4 @@
 SRC_DIR := src
-INCLUDE_DIR := include
 TEST_DIR := test
 
 OBJ_DIR := obj
@@ -10,7 +9,7 @@ TEST_OBJ_DIR := $(OBJ_DIR)/test
 CXX := c++
 CLANG_TIDY := clang-tidy
 
-CXXFLAGS := -pedantic -Wall -Wextra -std=c++20 -O3 -c -I$(INCLUDE_DIR) \
+CXXFLAGS := -pedantic -Wall -Wextra -std=c++20 -O3 -c -I$(SRC_DIR) \
     -fno-exceptions -MMD
 
 LDFLAGS := -lLLVM -lfmt

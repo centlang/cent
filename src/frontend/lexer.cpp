@@ -1,6 +1,6 @@
 #include <cstdint>
 
-#include "cent/frontend/lexer.h"
+#include "frontend/lexer.h"
 
 namespace cent::frontend {
 
