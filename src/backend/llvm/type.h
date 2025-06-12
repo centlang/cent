@@ -37,6 +37,7 @@ struct Type {
 
     virtual bool is_function() { return false; }
     virtual bool is_struct() { return false; }
+    virtual bool is_union() { return false; }
     virtual bool is_enum() { return false; }
 };
 

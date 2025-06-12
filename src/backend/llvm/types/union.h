@@ -18,6 +18,8 @@ struct Union : detail::Type<Union> {
 
     std::string to_string() override { return name; }
 
+    bool is_union() override { return true; };
+
     std::string name;
 
     llvm::StructType* type;

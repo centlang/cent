@@ -1424,6 +1424,22 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) {
         return std::nullopt;
     }
 
+    if (parent->type->is_union()) {
+        auto& type = static_cast<types::Union&>(*parent->type);
+        auto index = get_member(type.type);
+
+        if (!index) {
+            return std::nullopt;
+        }
+
+        return Value{
+            type.fields[*index],
+            parent->value->getType()->isStructTy()
+                ? m_builder.CreateExtractValue(parent->value, 0)
+                : m_builder.CreateStructGEP(type.type, parent->value, 0),
+            parent->is_mutable};
+    }
+
     if (parent->value->getType()->isStructTy()) {
         auto* type = static_cast<types::Struct*>(parent->type.get());
         auto index = get_member(type->type);
@@ -1814,7 +1830,9 @@ std::optional<Value> Codegen::generate(ast::Union& decl) {
     std::vector<std::shared_ptr<Type>> fields;
     fields.reserve(decl.fields.size());
 
-    for (auto& field : decl.fields) {
+    for (std::size_t i = 0; i < decl.fields.size(); ++i) {
+        auto& field = decl.fields[i];
+
         auto type = field.type->codegen(*this);
 
         if (!type) {
@@ -1822,6 +1840,7 @@ std::optional<Value> Codegen::generate(ast::Union& decl) {
         }
 
         fields.push_back(type);
+        m_members[struct_type][field.name.value] = i;
     }
 
     std::size_t max = 0;
@@ -2710,7 +2729,7 @@ Value Codegen::load_value(Value& value) {
             llvm::dyn_cast_or_null<llvm::AllocaInst>(value.value)) {
         return Value{
             value.type,
-            m_builder.CreateLoad(variable->getAllocatedType(), variable)};
+            m_builder.CreateLoad(value.type->codegen(*this), variable)};
     }
 
     if (auto* variable =
@@ -2718,7 +2737,7 @@ Value Codegen::load_value(Value& value) {
         if (!(variable->isConstant() && value.type->is_str())) {
             return Value{
                 value.type,
-                m_builder.CreateLoad(variable->getValueType(), variable)};
+                m_builder.CreateLoad(value.type->codegen(*this), variable)};
         }
     }
 
@@ -2733,7 +2752,7 @@ Value Codegen::load_value(Value& value) {
     if (auto* ptr =
             llvm::dyn_cast_or_null<llvm::GetElementPtrInst>(value.value)) {
         return Value{
-            value.type, m_builder.CreateLoad(ptr->getResultElementType(), ptr)};
+            value.type, m_builder.CreateLoad(value.type->codegen(*this), ptr)};
     }
 
     return value;
