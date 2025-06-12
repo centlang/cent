@@ -2678,12 +2678,24 @@ std::optional<Value> Codegen::generate_bin_expr(
             m_primitive_types["bool"],
             m_builder.CreateLogicalOr(lhs_value.value, right->value)};
     case Less:
+        if (lhs_value.type->is_float()) {
+            return Value{
+                m_primitive_types["bool"],
+                m_builder.CreateFCmpULT(lhs_value.value, right->value)};
+        }
+
         return Value{
             m_primitive_types["bool"],
             lhs_value.type->is_signed_int()
                 ? m_builder.CreateICmpSLT(lhs_value.value, right->value)
                 : m_builder.CreateICmpULT(lhs_value.value, right->value)};
     case Greater:
+        if (lhs_value.type->is_float()) {
+            return Value{
+                m_primitive_types["bool"],
+                m_builder.CreateFCmpUGT(lhs_value.value, right->value)};
+        }
+
         return Value{
             m_primitive_types["bool"],
             lhs_value.type->is_signed_int()
@@ -2692,18 +2704,34 @@ std::optional<Value> Codegen::generate_bin_expr(
     case EqualEqual:
         return Value{
             m_primitive_types["bool"],
-            m_builder.CreateICmpEQ(lhs_value.value, right->value)};
+            lhs_value.type->is_float()
+                ? m_builder.CreateFCmpUEQ(lhs_value.value, right->value)
+                : m_builder.CreateICmpEQ(lhs_value.value, right->value)};
     case BangEqual:
         return Value{
             m_primitive_types["bool"],
-            m_builder.CreateICmpNE(lhs_value.value, right->value)};
+            lhs_value.type->is_float()
+                ? m_builder.CreateFCmpUNE(lhs_value.value, right->value)
+                : m_builder.CreateICmpNE(lhs_value.value, right->value)};
     case GreaterEqual:
+        if (lhs_value.type->is_float()) {
+            return Value{
+                m_primitive_types["bool"],
+                m_builder.CreateFCmpUGE(lhs_value.value, right->value)};
+        }
+
         return Value{
             m_primitive_types["bool"],
             lhs_value.type->is_signed_int()
                 ? m_builder.CreateICmpSGE(lhs_value.value, right->value)
                 : m_builder.CreateICmpUGE(lhs_value.value, right->value)};
     case LessEqual:
+        if (lhs_value.type->is_float()) {
+            return Value{
+                m_primitive_types["bool"],
+                m_builder.CreateFCmpULE(lhs_value.value, right->value)};
+        }
+
         return Value{
             m_primitive_types["bool"],
             lhs_value.type->is_signed_int()
