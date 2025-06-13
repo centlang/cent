@@ -976,9 +976,8 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
             type, llvm::ConstantStruct::get(struct_type.type, llvm_values)};
     }
 
-    auto* variable = m_current_result
-                         ? m_current_result
-                         : m_builder.CreateAlloca(struct_type.type);
+    auto* variable =
+        m_current_result ? m_current_result : create_alloca(struct_type.type);
 
     for (std::size_t i = 0; i < expr.fields.size(); ++i) {
         auto& field = expr.fields[i];
@@ -1066,7 +1065,7 @@ std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) {
     }
 
     auto* variable =
-        m_current_result ? m_current_result : m_builder.CreateAlloca(llvm_type);
+        m_current_result ? m_current_result : create_alloca(llvm_type);
 
     for (std::size_t i = 0; i < expr.elements.size(); ++i) {
         auto& value = values[i];
@@ -1144,8 +1143,8 @@ std::optional<Value> Codegen::generate(ast::TupleLiteral& expr) {
             llvm::ConstantStruct::get(struct_type, llvm_values)};
     }
 
-    auto* variable = m_current_result ? m_current_result
-                                      : m_builder.CreateAlloca(struct_type);
+    auto* variable =
+        m_current_result ? m_current_result : create_alloca(struct_type);
 
     for (std::size_t i = 0; i < values.size(); ++i) {
         auto* pointer = m_builder.CreateStructGEP(struct_type, variable, i);
@@ -1641,7 +1640,7 @@ std::optional<Value> Codegen::generate(ast::SliceExpr& expr) {
     auto* new_len_value = m_builder.CreateSub(high->value, low->value);
 
     auto* variable =
-        m_current_result ? m_current_result : m_builder.CreateAlloca(llvm_type);
+        m_current_result ? m_current_result : create_alloca(llvm_type);
 
     auto* new_ptr_member =
         m_builder.CreateStructGEP(llvm_type, variable, slice_member_ptr);
@@ -1743,7 +1742,7 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) {
         auto& param = decl.proto.params[i];
 
         auto* value = function->getArg(i);
-        auto* variable = m_builder.CreateAlloca(value->getType());
+        auto* variable = create_alloca(value->getType());
 
         m_builder.CreateStore(value, variable);
 
@@ -1752,6 +1751,8 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) {
     }
 
     decl.block->codegen(*this);
+
+    m_last_alloca = nullptr;
 
     if (m_builder.GetInsertBlock()->getTerminator()) {
         m_builder.SetInsertPoint(insert_point);
@@ -2017,13 +2018,13 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
 
             if (value->type->is_undefined()) {
                 m_scope.names[decl.name.value] = {
-                    type, m_builder.CreateAlloca(llvm_type),
+                    type, create_alloca(llvm_type),
                     decl.mutability == ast::VarDecl::Mut::Mut};
 
                 return std::nullopt;
             }
 
-            m_current_result = m_builder.CreateAlloca(llvm_type);
+            m_current_result = create_alloca(llvm_type);
 
             if (!cast_to_result(type, *value)) {
                 type_mismatch(decl.value->offset, *type, *value->type);
@@ -2048,7 +2049,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
         }
 
         if (m_current_function) {
-            m_current_result = m_builder.CreateAlloca(llvm_type);
+            m_current_result = create_alloca(llvm_type);
         } else {
             global_var_init();
             return std::nullopt;
@@ -2062,7 +2063,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
             type, m_current_result, decl.mutability == ast::VarDecl::Mut::Mut};
     } else {
         if (m_current_function) {
-            m_current_result = m_builder.CreateAlloca(llvm_type);
+            m_current_result = create_alloca(llvm_type);
 
             m_builder.CreateStore(
                 llvm::Constant::getNullValue(llvm_type), m_current_result);
@@ -2263,7 +2264,7 @@ Codegen::cast(std::shared_ptr<Type>& type, Value& value, bool implicit) {
                                     llvm::Type::getInt1Ty(m_context), true)})};
         }
 
-        auto* variable = m_builder.CreateAlloca(llvm_type);
+        auto* variable = create_alloca(llvm_type);
         auto* bool_ptr = m_builder.CreateStructGEP(
             llvm_type, variable, optional_member_bool);
 
@@ -2291,7 +2292,7 @@ Codegen::cast(std::shared_ptr<Type>& type, Value& value, bool implicit) {
         auto& array_type = static_cast<types::Array&>(*value.type);
         auto& contained = static_cast<types::Slice&>(*type).type;
 
-        auto* variable = m_builder.CreateAlloca(llvm_type);
+        auto* variable = create_alloca(llvm_type);
 
         if (!types_equal(*contained, *array_type.type)) {
             return std::nullopt;
@@ -2784,6 +2785,21 @@ Value Codegen::load_value(Value& value) {
     }
 
     return value;
+}
+
+llvm::Value* Codegen::create_alloca(llvm::Type* type) {
+    if (!m_last_alloca) {
+        m_last_alloca = m_builder.CreateAlloca(type);
+        return m_last_alloca;
+    }
+
+    auto* insert_point = m_builder.GetInsertBlock();
+
+    m_builder.SetInsertPoint(m_last_alloca);
+    m_last_alloca = m_builder.CreateAlloca(type);
+
+    m_builder.SetInsertPoint(insert_point);
+    return m_last_alloca;
 }
 
 std::shared_ptr<Type>

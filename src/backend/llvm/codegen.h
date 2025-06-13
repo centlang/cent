@@ -237,6 +237,8 @@ private:
 
     Value load_value(Value& value);
 
+    llvm::Value* create_alloca(llvm::Type* type);
+
     std::shared_ptr<Type>
     get_type(std::size_t offset, std::string_view name, Scope& parent);
 
@@ -280,6 +282,7 @@ private:
     Scope* m_current_scope{&m_scope};
     types::Function* m_current_function{nullptr};
     llvm::Value* m_current_result{nullptr};
+    llvm::AllocaInst* m_last_alloca{nullptr};
 
     llvm::BasicBlock* m_loop_body{nullptr};
     llvm::BasicBlock* m_loop_end{nullptr};
