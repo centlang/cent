@@ -2245,15 +2245,19 @@ Codegen::cast(std::shared_ptr<Type>& type, Value& value, bool implicit) {
     if (type->is_optional()) {
         auto& contained = static_cast<types::Optional&>(*type).type;
 
+        if (value.type->is_null()) {
+            return Value{type, llvm::Constant::getNullValue(llvm_type)};
+        }
+
+        if (!types_equal(*contained, *value.type)) {
+            return std::nullopt;
+        }
+
         if (contained->is_pointer()) {
             return Value{
                 type, value.type->is_null()
                           ? llvm::Constant::getNullValue(llvm_type)
                           : value.value};
-        }
-
-        if (value.type->is_null()) {
-            return Value{type, llvm::Constant::getNullValue(llvm_type)};
         }
 
         if (auto* val = llvm::dyn_cast<llvm::Constant>(value.value)) {
@@ -2267,10 +2271,6 @@ Codegen::cast(std::shared_ptr<Type>& type, Value& value, bool implicit) {
         auto* variable = create_alloca(llvm_type);
         auto* bool_ptr = m_builder.CreateStructGEP(
             llvm_type, variable, optional_member_bool);
-
-        if (!types_equal(*contained, *value.type)) {
-            return std::nullopt;
-        }
 
         auto* value_ptr = m_builder.CreateStructGEP(
             llvm_type, variable, optional_member_value);
@@ -2433,18 +2433,22 @@ bool Codegen::cast_to_result(
     if (type->is_optional()) {
         auto& contained = static_cast<types::Optional&>(*type).type;
 
+        if (value.type->is_null()) {
+            m_builder.CreateStore(
+                llvm::Constant::getNullValue(llvm_type), m_current_result);
+
+            return true;
+        }
+
+        if (!types_equal(*contained, *value.type)) {
+            return false;
+        }
+
         if (contained->is_pointer()) {
             m_builder.CreateStore(
                 value.type->is_null() ? llvm::Constant::getNullValue(llvm_type)
                                       : value.value,
                 m_current_result);
-
-            return true;
-        }
-
-        if (value.type->is_null()) {
-            m_builder.CreateStore(
-                llvm::Constant::getNullValue(llvm_type), m_current_result);
 
             return true;
         }
@@ -2462,10 +2466,6 @@ bool Codegen::cast_to_result(
 
         auto* bool_ptr = m_builder.CreateStructGEP(
             llvm_type, m_current_result, optional_member_bool);
-
-        if (!types_equal(*contained, *value.type)) {
-            return false;
-        }
 
         auto* value_ptr = m_builder.CreateStructGEP(
             llvm_type, m_current_result, optional_member_value);
