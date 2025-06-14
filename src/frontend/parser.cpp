@@ -916,14 +916,28 @@ void Parser::parse_switch(ast::BlockStmt& block) {
     std::unique_ptr<ast::BlockStmt> else_block = nullptr;
 
     while (!match(Token::Type::RightBrace, Token::Type::Else)) {
+        std::vector<std::unique_ptr<ast::Expression>> values;
+
         auto value = expect_expr(true);
 
         if (!value) {
             return;
         }
 
+        values.push_back(std::move(value));
+
+        while (match_next(Token::Type::Comma)) {
+            auto value = expect_expr(true);
+
+            if (!value) {
+                return;
+            }
+
+            values.push_back(std::move(value));
+        }
+
         auto body = expect_block();
-        cases.emplace_back(std::move(value), std::move(body));
+        cases.emplace_back(std::move(values), std::move(body));
     }
 
     if (match_next(Token::Type::Else)) {

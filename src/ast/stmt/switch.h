@@ -11,7 +11,7 @@ namespace cent::ast {
 
 struct Switch : detail::Stmt<Switch> {
     struct Case {
-        std::unique_ptr<Expression> value;
+        std::vector<std::unique_ptr<Expression>> values;
         std::unique_ptr<BlockStmt> block;
     };
 

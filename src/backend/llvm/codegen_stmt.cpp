@@ -189,24 +189,27 @@ std::optional<Value> Codegen::generate(ast::Switch& stmt) {
     bool all_terminate = true;
 
     for (auto& case_stmt : stmt.cases) {
-        auto value = case_stmt.value->codegen(*this);
+        auto* block = llvm::BasicBlock::Create(m_context, "", function);
 
-        if (auto* constant = llvm::dyn_cast<llvm::ConstantInt>(value->value)) {
-            auto* block = llvm::BasicBlock::Create(m_context, "", function);
-            switch_inst->addCase(constant, block);
+        m_builder.SetInsertPoint(block);
+        case_stmt.block->codegen(*this);
 
-            m_builder.SetInsertPoint(block);
-            case_stmt.block->codegen(*this);
-
-            if (!m_builder.GetInsertBlock()->getTerminator()) {
-                m_builder.CreateBr(end);
-                all_terminate = false;
-            }
-
-            continue;
+        if (!m_builder.GetInsertBlock()->getTerminator()) {
+            m_builder.CreateBr(end);
+            all_terminate = false;
         }
 
-        error(case_stmt.value->offset, "not a constant");
+        for (auto& value : case_stmt.values) {
+            auto val = value->codegen(*this);
+
+            if (auto* constant =
+                    llvm::dyn_cast<llvm::ConstantInt>(val->value)) {
+                switch_inst->addCase(constant, block);
+                continue;
+            }
+
+            error(value->offset, "not a constant");
+        }
     }
 
     if (stmt.else_block) {
