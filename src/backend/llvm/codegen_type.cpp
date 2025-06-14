@@ -1,0 +1,302 @@
+#include <array>
+#include <cstddef>
+
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/Instruction.h>
+#include <llvm/IR/Instructions.h>
+
+#include "ast/module.h"
+
+#include "ast/type/array_type.h"
+#include "ast/type/named_type.h"
+#include "ast/type/optional.h"
+#include "ast/type/pointer.h"
+#include "ast/type/slice_type.h"
+#include "ast/type/tuple_type.h"
+
+#include "backend/llvm/type.h"
+#include "backend/llvm/value.h"
+
+#include "backend/llvm/types/alias.h"
+#include "backend/llvm/types/enum.h"
+#include "backend/llvm/types/function.h"
+#include "backend/llvm/types/primitive.h"
+#include "backend/llvm/types/struct.h"
+#include "backend/llvm/types/union.h"
+
+#include "backend/llvm/codegen.h"
+
+namespace cent::backend {
+
+std::shared_ptr<Type> Codegen::generate(ast::NamedType& type) {
+    auto* scope = m_current_scope;
+    std::size_t last_index = type.value.size() - 1;
+
+    for (std::size_t i = 0; i < last_index; ++i) {
+        scope = get_scope(type.value[i].offset, type.value[i].value, *scope);
+
+        if (!scope) {
+            return nullptr;
+        }
+    }
+
+    return get_type(
+        type.value[last_index].offset, type.value[last_index].value, *scope);
+}
+
+std::shared_ptr<Type> Codegen::generate(ast::Pointer& type) {
+    auto points_to = type.type->codegen(*this);
+
+    if (!points_to) {
+        return nullptr;
+    }
+
+    return std::make_shared<types::Pointer>(points_to, type.is_mutable);
+}
+
+std::shared_ptr<Type> Codegen::generate(ast::Optional& type) {
+    auto contained = type.type->codegen(*this);
+
+    if (!contained) {
+        return nullptr;
+    }
+
+    return std::make_shared<types::Optional>(contained);
+}
+
+std::shared_ptr<Type> Codegen::generate(ast::ArrayType& type) {
+    auto contained = type.type->codegen(*this);
+
+    if (!contained) {
+        return nullptr;
+    }
+
+    auto size = type.size->codegen(*this);
+
+    if (!size) {
+        return nullptr;
+    }
+
+    auto value = cast(m_primitive_types["usize"], *size);
+
+    if (!value) {
+        return nullptr;
+    }
+
+    if (auto* constant = llvm::dyn_cast<llvm::ConstantInt>(value->value)) {
+        return std::make_shared<types::Array>(
+            contained, constant->getZExtValue());
+    }
+
+    error(type.offset, "not a constant");
+
+    return nullptr;
+}
+
+std::shared_ptr<Type> Codegen::generate(ast::SliceType& type) {
+    auto contained = type.type->codegen(*this);
+
+    if (!contained) {
+        return nullptr;
+    }
+
+    return std::make_shared<types::Slice>(contained, type.is_mutable);
+}
+
+std::shared_ptr<Type> Codegen::generate(ast::TupleType& type) {
+    std::vector<std::shared_ptr<backend::Type>> types;
+    std::vector<llvm::Type*> llvm_types;
+
+    types.reserve(type.types.size());
+    llvm_types.reserve(type.types.size());
+
+    for (auto& element_type : type.types) {
+        auto el_type = element_type->codegen(*this);
+
+        if (!el_type) {
+            return nullptr;
+        }
+
+        types.push_back(std::move(el_type));
+    }
+
+    for (auto& element_type : types) {
+        llvm_types.push_back(element_type->codegen(*this));
+    }
+
+    return std::make_shared<types::Tuple>(
+        llvm::StructType::create(llvm_types), std::move(types));
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::I8& type) {
+    return llvm::Type::getInt8Ty(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::I16& type) {
+    return llvm::Type::getInt16Ty(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::I32& type) {
+    return llvm::Type::getInt32Ty(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::I64& type) {
+    return llvm::Type::getInt64Ty(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::ISize& type) {
+    return m_module->getDataLayout().getIntPtrType(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::U8& type) {
+    return llvm::Type::getInt8Ty(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::U16& type) {
+    return llvm::Type::getInt16Ty(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::U32& type) {
+    return llvm::Type::getInt32Ty(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::U64& type) {
+    return llvm::Type::getInt64Ty(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::USize& type) {
+    return m_module->getDataLayout().getIntPtrType(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::F32& type) {
+    return llvm::Type::getFloatTy(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::F64& type) {
+    return llvm::Type::getDoubleTy(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::Str& type) {
+    return llvm::Type::getInt8Ty(m_context)->getPointerTo();
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::Bool& type) {
+    return llvm::Type::getInt1Ty(m_context);
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::Null& type) {
+    return nullptr;
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::Undefined& type) {
+    return nullptr;
+}
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::Void& type) {
+    return llvm::Type::getVoidTy(m_context);
+}
+
+llvm::Type* Codegen::generate(types::Pointer& type) {
+    auto* llvm_type = type.type->codegen(*this);
+
+    return llvm_type->getPointerTo();
+}
+
+llvm::Type* Codegen::generate(types::Struct& type) { return type.type; }
+
+llvm::Type* Codegen::generate(types::Union& type) { return type.type; }
+
+llvm::Type* Codegen::generate(types::Enum& type) {
+    return type.type->codegen(*this);
+}
+
+llvm::Type* Codegen::generate(types::Alias& type) {
+    return type.type->codegen(*this);
+}
+
+llvm::Type* Codegen::generate(types::Optional& type) {
+    auto* contained = type.type->codegen(*this);
+
+    if (type.type->is_pointer()) {
+        return contained;
+    }
+
+    auto iterator = m_optional_types.find(contained);
+
+    if (iterator != m_optional_types.end()) {
+        return iterator->second;
+    }
+
+    std::array<llvm::Type*, 2> fields = {
+        contained, llvm::Type::getInt1Ty(m_context)};
+
+    auto* llvm_type = llvm::StructType::create(fields);
+
+    m_optional_types[contained] = llvm_type;
+
+    return llvm_type;
+}
+
+llvm::Type* Codegen::generate(types::Array& type) {
+    auto* llvm_type = type.type->codegen(*this);
+
+    if (!llvm_type) {
+        return nullptr;
+    }
+
+    return llvm::ArrayType::get(llvm_type, type.size);
+}
+
+llvm::Type* Codegen::generate(types::Slice& type) {
+    if (!type.type->codegen(*this)) {
+        return nullptr;
+    }
+
+    return m_slice_type;
+}
+
+llvm::Type* Codegen::generate(types::Tuple& type) { return type.type; }
+
+llvm::Type* Codegen::generate([[maybe_unused]] types::Function& type) {
+    return nullptr;
+}
+
+bool Codegen::types_equal(Type& lhs, Type& rhs) {
+    if (&lhs == &rhs) {
+        return true;
+    }
+
+    if (lhs.is_pointer() && rhs.is_pointer()) {
+        auto& lhs_pointer = static_cast<types::Pointer&>(lhs);
+        auto& rhs_pointer = static_cast<types::Pointer&>(rhs);
+
+        return lhs_pointer.is_mutable == rhs_pointer.is_mutable &&
+               types_equal(*lhs_pointer.type, *rhs_pointer.type);
+    }
+
+    if (lhs.is_optional() && rhs.is_optional()) {
+        auto& lhs_optional = static_cast<types::Optional&>(lhs);
+        auto& rhs_optional = static_cast<types::Optional&>(rhs);
+
+        return types_equal(*lhs_optional.type, *rhs_optional.type);
+    }
+
+    if (lhs.is_array() && rhs.is_array()) {
+        auto& lhs_array = static_cast<types::Array&>(lhs);
+        auto& rhs_array = static_cast<types::Array&>(rhs);
+
+        return lhs_array.size == rhs_array.size &&
+               types_equal(*lhs_array.type, *rhs_array.type);
+    }
+
+    if (lhs.is_slice() && rhs.is_slice()) {
+        auto& lhs_slice = static_cast<types::Slice&>(lhs);
+        auto& rhs_slice = static_cast<types::Slice&>(rhs);
+
+        return types_equal(*lhs_slice.type, *rhs_slice.type);
+    }
+
+    return false;
+}
+
+} // namespace cent::backend
