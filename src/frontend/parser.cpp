@@ -13,6 +13,7 @@
 #include "ast/stmt/break_stmt.h"
 #include "ast/stmt/continue_stmt.h"
 #include "ast/stmt/return_stmt.h"
+#include "ast/stmt/switch.h"
 #include "ast/stmt/unreachable.h"
 #include "ast/stmt/while_loop.h"
 
@@ -167,6 +168,9 @@ void Parser::expect_stmt(ast::BlockStmt& block) {
         return;
     case If:
         block.body.push_back(parse_if_else());
+        return;
+    case Switch:
+        parse_switch(block);
         return;
     case While:
         parse_while(block);
@@ -894,6 +898,50 @@ Parser::parse_var(std::vector<ast::Attribute> attrs) {
     return std::make_unique<ast::VarDecl>(
         offset, mutability, ast::OffsetValue{name->value, name->offset},
         std::move(type), std::move(value), std::move(attrs));
+}
+
+void Parser::parse_switch(ast::BlockStmt& block) {
+    auto offset = get().offset;
+    auto value = expect_expr(true);
+
+    if (!value) {
+        return;
+    }
+
+    if (!expect("'{'", Token::Type::LeftBrace)) {
+        return;
+    }
+
+    std::vector<ast::Switch::Case> cases;
+    std::unique_ptr<ast::BlockStmt> else_block = nullptr;
+
+    while (!match(Token::Type::RightBrace, Token::Type::Else)) {
+        auto value = expect_expr(true);
+
+        if (!value) {
+            return;
+        }
+
+        auto body = expect_block();
+        cases.emplace_back(std::move(value), std::move(body));
+    }
+
+    if (match_next(Token::Type::Else)) {
+        auto body = expect_block();
+
+        if (!body) {
+            return;
+        }
+
+        else_block = std::move(body);
+    }
+
+    if (!expect("'}'", Token::Type::RightBrace)) {
+        return;
+    }
+
+    block.body.push_back(std::make_unique<ast::Switch>(
+        offset, std::move(value), std::move(cases), std::move(else_block)));
 }
 
 void Parser::parse_while(ast::BlockStmt& block) {

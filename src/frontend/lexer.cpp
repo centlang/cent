@@ -433,6 +433,11 @@ void Lexer::ident() {
         return;
     }
 
+    if (m_token.value == "switch") {
+        keyword(Switch);
+        return;
+    }
+
     if (m_token.value == "while") {
         keyword(While);
         return;

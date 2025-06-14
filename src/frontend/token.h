@@ -88,6 +88,7 @@ struct Token {
 
         If,
         Else,
+        Switch,
 
         While,
 

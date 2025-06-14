@@ -140,6 +140,8 @@ private:
     [[nodiscard]] std::unique_ptr<ast::VarDecl>
     parse_var(std::vector<ast::Attribute> attrs);
 
+    void parse_switch(ast::BlockStmt& block);
+
     void parse_while(ast::BlockStmt& block);
 
     void parse_return(ast::BlockStmt& block);

@@ -11,6 +11,7 @@
 #include "ast/stmt/continue_stmt.h"
 #include "ast/stmt/if_else.h"
 #include "ast/stmt/return_stmt.h"
+#include "ast/stmt/switch.h"
 #include "ast/stmt/unreachable.h"
 #include "ast/stmt/while_loop.h"
 
@@ -161,6 +162,68 @@ std::optional<Value> Codegen::generate(ast::IfElse& stmt) {
 
     m_builder.CreateBr(end);
     m_builder.SetInsertPoint(end);
+
+    return std::nullopt;
+}
+
+std::optional<Value> Codegen::generate(ast::Switch& stmt) {
+    auto value = stmt.value->codegen(*this);
+
+    if (!value) {
+        return std::nullopt;
+    }
+
+    auto val = load_value(*value);
+
+    auto* function = m_builder.GetInsertBlock()->getParent();
+
+    auto* end = llvm::BasicBlock::Create(m_context, "", function);
+
+    auto* else_block = stmt.else_block
+                           ? llvm::BasicBlock::Create(m_context, "", function)
+                           : nullptr;
+
+    auto* switch_inst = m_builder.CreateSwitch(
+        val.value, else_block ? else_block : end, stmt.cases.size());
+
+    bool all_terminate = true;
+
+    for (auto& case_stmt : stmt.cases) {
+        auto value = case_stmt.value->codegen(*this);
+
+        if (auto* constant = llvm::dyn_cast<llvm::ConstantInt>(value->value)) {
+            auto* block = llvm::BasicBlock::Create(m_context, "", function);
+            switch_inst->addCase(constant, block);
+
+            m_builder.SetInsertPoint(block);
+            case_stmt.block->codegen(*this);
+
+            if (!m_builder.GetInsertBlock()->getTerminator()) {
+                m_builder.CreateBr(end);
+                all_terminate = false;
+            }
+
+            continue;
+        }
+
+        error(case_stmt.value->offset, "not a constant");
+    }
+
+    if (stmt.else_block) {
+        m_builder.SetInsertPoint(else_block);
+        stmt.else_block->codegen(*this);
+
+        if (!m_builder.GetInsertBlock()->getTerminator()) {
+            m_builder.CreateBr(end);
+            all_terminate = false;
+        }
+    }
+
+    if (!all_terminate) {
+        m_builder.SetInsertPoint(end);
+    } else {
+        end->eraseFromParent();
+    }
 
     return std::nullopt;
 }

@@ -33,6 +33,7 @@ struct Module;
 struct Assignment;
 struct BlockStmt;
 struct IfElse;
+struct Switch;
 struct ReturnStmt;
 struct WhileLoop;
 struct BreakStmt;
@@ -182,6 +183,7 @@ public:
     std::optional<Value> generate(ast::Assignment& stmt);
     std::optional<Value> generate(ast::BlockStmt& stmt);
     std::optional<Value> generate(ast::IfElse& stmt);
+    std::optional<Value> generate(ast::Switch& stmt);
     std::optional<Value> generate(ast::ReturnStmt& stmt);
     std::optional<Value> generate(ast::WhileLoop& stmt);
     std::optional<Value> generate(ast::BreakStmt& stmt);
