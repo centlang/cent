@@ -67,8 +67,7 @@ std::unique_ptr<ast::Module> Parser::parse() {
             break;
         }
 
-        if (match(Semicolon)) {
-            next();
+        if (match_next(Semicolon)) {
             continue;
         }
 
@@ -89,9 +88,7 @@ std::unique_ptr<ast::Module> Parser::parse() {
             continue;
         }
 
-        if (match(With)) {
-            next();
-
+        if (match_next(With)) {
             if (!parse_with(*result)) {
                 skip_until_decl();
                 continue;
@@ -104,21 +101,17 @@ std::unique_ptr<ast::Module> Parser::parse() {
 
         bool is_public = false;
 
-        if (match(Pub)) {
-            next();
+        if (match_next(Pub)) {
             is_public = true;
         }
 
-        if (match(Type)) {
-            next();
+        if (match_next(Type)) {
             handle_type(std::move(attrs), is_public);
 
             continue;
         }
 
-        if (match(Union)) {
-            next();
-
+        if (match_next(Union)) {
             auto union_decl = parse_union(std::move(attrs), is_public);
 
             if (union_decl) {
@@ -130,9 +123,7 @@ std::unique_ptr<ast::Module> Parser::parse() {
             continue;
         }
 
-        if (match(Enum)) {
-            next();
-
+        if (match_next(Enum)) {
             auto enum_decl = parse_enum(std::move(attrs), is_public);
 
             if (enum_decl) {
@@ -144,9 +135,7 @@ std::unique_ptr<ast::Module> Parser::parse() {
             continue;
         }
 
-        if (match(Fn)) {
-            next();
-
+        if (match_next(Fn)) {
             auto function = parse_fn(std::move(attrs), is_public);
 
             if (function) {
@@ -278,11 +267,9 @@ void Parser::expect_stmt(ast::BlockStmt& block) {
 std::vector<ast::Attribute> Parser::parse_attrs() {
     std::vector<ast::Attribute> result;
 
-    if (!match(Token::Type::Bang)) {
+    if (!match_next(Token::Type::Bang)) {
         return {};
     }
-
-    next();
 
     if (!expect("'('", Token::Type::LeftParen)) {
         return {};
@@ -296,9 +283,7 @@ std::vector<ast::Attribute> Parser::parse_attrs() {
 
     result.emplace_back(attribute->offset, attribute->value);
 
-    while (match(Token::Type::Comma)) {
-        next();
-
+    while (match_next(Token::Type::Comma)) {
         attribute = expect("attribute name", Token::Type::Identifier);
 
         if (!attribute) {
@@ -321,8 +306,7 @@ std::vector<std::unique_ptr<ast::Expression>> Parser::parse_args() {
     if (!match(Token::Type::RightParen)) {
         result.push_back(expect_expr(false));
 
-        while (match(Token::Type::Comma)) {
-            next();
+        while (match_next(Token::Type::Comma)) {
             result.push_back(expect_expr(false));
         }
     }
@@ -379,9 +363,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
                 elements.push_back(std::move(value));
             }
 
-            if (match(RightBrace)) {
-                next();
-
+            if (match_next(RightBrace)) {
                 return std::make_unique<ast::ArrayLiteral>(
                     offset, std::move(type), std::move(elements));
             }
@@ -417,8 +399,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
         std::vector<ast::OffsetValue<std::string>> value;
         value.push_back(ast::OffsetValue{token->value, token->offset});
 
-        while (match(ColonColon)) {
-            next();
+        while (match_next(ColonColon)) {
             auto name = expect("name", Identifier);
 
             if (!name) {
@@ -428,9 +409,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
             value.push_back(ast::OffsetValue{name->value, name->offset});
         }
 
-        if (!is_condition && match(LeftBrace)) {
-            next();
-
+        if (!is_condition && match_next(LeftBrace)) {
             auto fields = parse_field_values();
 
             if (!expect("',' or '}'", RightBrace)) {
@@ -462,8 +441,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
     case LeftParen: {
         auto value = expect_expr(false);
 
-        if (match(RightParen)) {
-            next();
+        if (match_next(RightParen)) {
             return value;
         }
 
@@ -479,9 +457,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
                 elements.push_back(std::move(value));
             }
 
-            if (match(RightParen)) {
-                next();
-
+            if (match_next(RightParen)) {
                 return std::make_unique<ast::TupleLiteral>(
                     token->offset, std::move(elements));
             }
@@ -505,9 +481,7 @@ Parser::expect_access_or_call_expr(bool is_condition) {
     }
 
     while (true) {
-        if (match(LeftParen)) {
-            next();
-
+        if (match_next(LeftParen)) {
             auto args = parse_args();
 
             if (!expect("')'", RightParen)) {
@@ -520,9 +494,7 @@ Parser::expect_access_or_call_expr(bool is_condition) {
             continue;
         }
 
-        if (match(LeftBracket)) {
-            next();
-
+        if (match_next(LeftBracket)) {
             auto offset = peek().offset;
 
             std::unique_ptr<ast::Expression> low = nullptr;
@@ -535,9 +507,7 @@ Parser::expect_access_or_call_expr(bool is_condition) {
                 }
             }
 
-            if (match(RightBracket)) {
-                next();
-
+            if (match_next(RightBracket)) {
                 expression = std::make_unique<ast::IndexExpr>(
                     expression->offset, std::move(expression), std::move(low));
 
@@ -575,11 +545,9 @@ Parser::expect_access_or_call_expr(bool is_condition) {
             continue;
         }
 
-        if (!match(Dot)) {
+        if (!match_next(Dot)) {
             return expression;
         }
-
-        next();
 
         auto member = expect("member name", Identifier, IntLiteral);
 
@@ -587,9 +555,7 @@ Parser::expect_access_or_call_expr(bool is_condition) {
             return nullptr;
         }
 
-        if (match(LeftParen)) {
-            next();
-
+        if (match_next(LeftParen)) {
             auto args = parse_args();
 
             if (!expect("')'", RightParen)) {
@@ -613,11 +579,9 @@ Parser::expect_access_or_call_expr(bool is_condition) {
 Parser::expect_as_expr(bool is_condition) {
     auto expression = expect_access_or_call_expr(is_condition);
 
-    if (!match(Token::Type::As)) {
+    if (!match_next(Token::Type::As)) {
         return expression;
     }
-
-    next();
 
     auto type = expect_type();
 
@@ -676,13 +640,11 @@ std::unique_ptr<ast::BlockStmt> Parser::expect_block() {
             return result;
         }
 
-        if (match(Token::Type::RightBrace)) {
-            next();
+        if (match_next(Token::Type::RightBrace)) {
             break;
         }
 
-        if (match(Token::Type::Semicolon)) {
-            next();
+        if (match_next(Token::Type::Semicolon)) {
             continue;
         }
 
@@ -707,12 +669,10 @@ std::unique_ptr<ast::IfElse> Parser::parse_if_else() {
         return nullptr;
     }
 
-    if (!match(Token::Type::Else)) {
+    if (!match_next(Token::Type::Else)) {
         return std::make_unique<ast::IfElse>(
             condition->offset, std::move(condition), std::move(if_block));
     }
-
-    next();
 
     if (match(Token::Type::If)) {
         auto else_block = parse_if_else();
@@ -762,9 +722,7 @@ std::unique_ptr<ast::Type> Parser::parse_array_type() {
         return nullptr;
     }
 
-    if (match(Token::Type::RightBracket)) {
-        next();
-
+    if (match_next(Token::Type::RightBracket)) {
         return std::make_unique<ast::SliceType>(
             offset, std::move(type), is_mutable);
     }
@@ -796,14 +754,11 @@ std::unique_ptr<ast::Type> Parser::expect_type() {
 
     auto offset = peek().offset;
 
-    if (match(Star)) {
-        next();
-
+    if (match_next(Star)) {
         bool is_mutable = false;
 
-        if (match(Mut)) {
+        if (match_next(Mut)) {
             is_mutable = true;
-            next();
         }
 
         auto type = expect_type();
@@ -816,9 +771,7 @@ std::unique_ptr<ast::Type> Parser::expect_type() {
             offset, std::move(type), is_mutable);
     }
 
-    if (match(QuestionMark)) {
-        next();
-
+    if (match_next(QuestionMark)) {
         auto type = expect_type();
 
         if (!type) {
@@ -828,9 +781,7 @@ std::unique_ptr<ast::Type> Parser::expect_type() {
         return std::make_unique<ast::Optional>(offset, std::move(type));
     }
 
-    if (match(LeftParen)) {
-        next();
-
+    if (match_next(LeftParen)) {
         std::vector<std::unique_ptr<ast::Type>> types;
 
         auto parse_type = [&] {
@@ -849,9 +800,7 @@ std::unique_ptr<ast::Type> Parser::expect_type() {
             return nullptr;
         }
 
-        while (match(Comma)) {
-            next();
-
+        while (match_next(Comma)) {
             if (!parse_type()) {
                 return nullptr;
             }
@@ -877,8 +826,7 @@ std::unique_ptr<ast::Type> Parser::expect_type() {
 
     value.push_back(ast::OffsetValue{token->value, token->offset});
 
-    while (match(ColonColon)) {
-        next();
+    while (match_next(ColonColon)) {
         auto name = expect("name", Identifier);
 
         if (!name) {
@@ -924,7 +872,7 @@ Parser::parse_var(std::vector<ast::Attribute> attrs) {
         }
     }
 
-    if (!match(Token::Type::Equal)) {
+    if (!match_next(Token::Type::Equal)) {
         if (!type) {
             expected(
                 fmt::format("{} or {}", log::bold("'='"), log::bold("':'")));
@@ -936,8 +884,6 @@ Parser::parse_var(std::vector<ast::Attribute> attrs) {
             offset, mutability, ast::OffsetValue{name->value, name->offset},
             std::move(type), nullptr, std::move(attrs));
     }
-
-    next();
 
     auto value = expect_expr(false);
 
@@ -1026,8 +972,7 @@ std::vector<ast::EnumDecl::Field> Parser::parse_enum_fields() {
     auto parse_field = [&] {
         auto name = get();
 
-        if (match(Token::Type::Equal)) {
-            next();
+        if (match_next(Token::Type::Equal)) {
             auto value = expect_expr(false);
 
             result.emplace_back(
@@ -1065,17 +1010,14 @@ Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
     bool had_default = false;
 
     auto parse_param = [&] {
-        if (match(Token::Type::Ellipsis)) {
-            next();
+        if (match_next(Token::Type::Ellipsis)) {
             variadic = true;
-
             return;
         }
 
         bool is_mutable = false;
 
-        if (match(Token::Type::Mut)) {
-            next();
+        if (match_next(Token::Type::Mut)) {
             is_mutable = true;
         }
 
@@ -1093,10 +1035,8 @@ Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
 
         std::unique_ptr<ast::Expression> value = nullptr;
 
-        if (match(Token::Type::Equal)) {
+        if (match_next(Token::Type::Equal)) {
             had_default = true;
-
-            next();
             value = expect_expr(false);
         } else if (had_default) {
             return;
@@ -1114,16 +1054,13 @@ Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
                 Token::Type::Ellipsis)) {
             parse_param();
 
-            while (!variadic && match(Token::Type::Comma)) {
-                next();
+            while (!variadic && match_next(Token::Type::Comma)) {
                 parse_param();
             }
         }
     };
 
-    if (match(Token::Type::ColonColon)) {
-        next();
-
+    if (match_next(Token::Type::ColonColon)) {
         type = {name->value, name->offset};
         name = expect("function name", Token::Type::Identifier);
 
@@ -1156,9 +1093,7 @@ Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
 
     if (match(Token::Type::LeftBrace)) {
         body = expect_block();
-    } else if (match(Token::Type::Semicolon)) {
-        next();
-    } else {
+    } else if (!match_next(Token::Type::Semicolon)) {
         expected(fmt::format("{} or {}", log::bold("'{'"), log::bold("';'")));
 
         return nullptr;
@@ -1363,9 +1298,7 @@ bool Parser::parse_with(ast::Module& module) {
     std::vector<std::string> path;
     path.push_back(name->value);
 
-    while (match(Token::Type::ColonColon)) {
-        next();
-
+    while (match_next(Token::Type::ColonColon)) {
         name = expect("module name", Token::Type::Identifier);
 
         if (!name) {
@@ -1377,9 +1310,7 @@ bool Parser::parse_with(ast::Module& module) {
 
     auto module_name = path.back();
 
-    if (match(Token::Type::As)) {
-        next();
-
+    if (match_next(Token::Type::As)) {
         auto token = expect("module name", Token::Type::Identifier);
 
         if (!token) {

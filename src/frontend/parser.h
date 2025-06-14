@@ -79,6 +79,15 @@ private:
         return ((type == types) || ...);
     }
 
+    [[nodiscard]] bool match_next(std::same_as<Token::Type> auto... types) {
+        if (match(types...)) {
+            next();
+            return true;
+        }
+
+        return false;
+    }
+
     void expected(std::string_view what) {
         error(fmt::format("expected {}", log::bold(what)));
     }
