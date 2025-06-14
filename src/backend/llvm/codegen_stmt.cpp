@@ -346,8 +346,12 @@ std::optional<Value> Codegen::generate(ast::AssertStmt& stmt) {
 
     m_builder.SetInsertPoint(failure);
 
+    auto [line, column] = cent::offset_to_pos(m_source, stmt.condition->offset);
+
     m_builder.CreateCall(
-        m_panic_fn, {m_builder.CreateGlobalString("Assertion failed\n")});
+        m_panic_fn,
+        {m_builder.CreateGlobalString(fmt::format(
+            "Assertion failed at {}:{}:{}\n", m_filename, line, column))});
 
     m_builder.CreateUnreachable();
 
