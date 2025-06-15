@@ -500,8 +500,7 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
 
         if (!cast_to_result(struct_type.fields[index], value)) {
             type_mismatch(
-                expr.fields[index].value->offset, *struct_type.fields[index],
-                *value.type);
+                field.value->offset, *struct_type.fields[index], *value.type);
 
             m_current_result = nullptr;
 
