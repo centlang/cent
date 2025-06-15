@@ -371,6 +371,61 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
         return std::nullopt;
     }
 
+    if (type->is_union()) {
+        auto& union_type = static_cast<types::Union&>(*type);
+        auto& members = m_members[union_type.type];
+
+        bool stack_allocated = m_current_result == nullptr;
+
+        if (expr.fields.size() != 1) {
+            error(
+                expr.type->offset,
+                "union literals must have exactly one field");
+
+            return std::nullopt;
+        }
+
+        auto& field = expr.fields[0];
+        auto value = field.value->codegen(*this);
+
+        if (!value) {
+            return std::nullopt;
+        }
+
+        auto* variable = m_current_result ? m_current_result
+                                          : create_alloca(union_type.type);
+
+        auto iterator = members.find(field.name.value);
+
+        if (iterator == members.end()) {
+            error(
+                field.name.offset,
+                fmt::format(
+                    "no such member: {}",
+                    log::bold(log::quoted(field.name.value))));
+
+            return std::nullopt;
+        }
+
+        auto index = iterator->second;
+
+        m_current_result =
+            m_builder.CreateStructGEP(union_type.type, variable, 0);
+
+        if (!cast_to_result(union_type.fields[index], *value)) {
+            type_mismatch(
+                field.value->offset, *union_type.fields[index], *value->type);
+
+            m_current_result = nullptr;
+
+            return std::nullopt;
+        }
+
+        m_current_result = nullptr;
+
+        return Value{type, variable, false, false, false, stack_allocated};
+    }
+
     if (!type->is_struct()) {
         error(expr.type->offset, "not a structure");
 
