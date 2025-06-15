@@ -4,7 +4,11 @@ union Union {
 }
 
 pub fn main() i32 {
-    mut u: Union;
+    mut u = Union { b: 42 };
+    assert u.b == 42;
+
+    u = Union { a: 1 };
+    assert u.a == 1;
 
     u.b = 42;
     assert u.b == 42;
