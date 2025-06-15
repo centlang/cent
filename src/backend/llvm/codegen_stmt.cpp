@@ -199,8 +199,14 @@ std::optional<Value> Codegen::generate(ast::Switch& stmt) {
             all_terminate = false;
         }
 
-        for (auto& value : case_stmt.values) {
-            auto val = value->codegen(*this);
+        for (auto& case_value : case_stmt.values) {
+            auto case_val = case_value->codegen(*this);
+            auto val = cast(value->type, *case_val);
+
+            if (!val) {
+                type_mismatch(stmt.offset, *value->type, *case_val->type);
+                return std::nullopt;
+            }
 
             if (auto* constant =
                     llvm::dyn_cast<llvm::ConstantInt>(val->value)) {
@@ -208,7 +214,7 @@ std::optional<Value> Codegen::generate(ast::Switch& stmt) {
                 continue;
             }
 
-            error(value->offset, "not a constant");
+            error(case_value->offset, "not a constant");
         }
     }
 
