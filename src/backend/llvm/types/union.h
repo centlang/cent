@@ -13,8 +13,10 @@ namespace cent::backend::types {
 struct Union : detail::Type<Union> {
     [[nodiscard]] Union(
         std::string name, llvm::StructType* type,
-        std::vector<std::shared_ptr<backend::Type>> fields)
-    : name{std::move(name)}, type{type}, fields{std::move(fields)} {}
+        std::vector<std::shared_ptr<backend::Type>> fields,
+        std::shared_ptr<Enum> tag_type = nullptr)
+    : name{std::move(name)}, type{type}, fields{std::move(fields)},
+      tag_type{std::move(tag_type)} {}
 
     std::string to_string() override { return name; }
 
@@ -24,6 +26,8 @@ struct Union : detail::Type<Union> {
 
     llvm::StructType* type;
     std::vector<std::shared_ptr<backend::Type>> fields;
+
+    std::shared_ptr<Enum> tag_type;
 };
 
 } // namespace cent::backend::types

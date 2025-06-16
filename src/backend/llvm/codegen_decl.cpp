@@ -217,13 +217,19 @@ std::optional<Value> Codegen::generate(ast::Union& decl) {
         }
 
         struct_type->setBody({max_type, tag_type->codegen(*this)});
+
+        m_current_scope->types[decl.name.value] =
+            std::make_shared<types::Union>(
+                m_current_scope_prefix + decl.name.value, struct_type,
+                std::move(fields), tag_type);
     } else {
         struct_type->setBody(max_type);
-    }
 
-    m_current_scope->types[decl.name.value] = std::make_shared<types::Union>(
-        m_current_scope_prefix + decl.name.value, struct_type,
-        std::move(fields));
+        m_current_scope->types[decl.name.value] =
+            std::make_shared<types::Union>(
+                m_current_scope_prefix + decl.name.value, struct_type,
+                std::move(fields));
+    }
 
     return std::nullopt;
 }

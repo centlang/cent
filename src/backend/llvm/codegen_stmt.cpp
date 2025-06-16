@@ -16,7 +16,9 @@
 #include "ast/stmt/while_loop.h"
 
 #include "backend/llvm/codegen.h"
+#include "backend/llvm/types/enum.h"
 #include "backend/llvm/types/function.h"
+#include "backend/llvm/types/union.h"
 #include "backend/llvm/value.h"
 
 namespace cent::backend {
@@ -173,7 +175,27 @@ std::optional<Value> Codegen::generate(ast::Switch& stmt) {
         return std::nullopt;
     }
 
-    auto val = load_value(*value);
+    if (value->type->is_union()) {
+        auto& union_type = static_cast<types::Union&>(*value->type);
+
+        if (!union_type.tag_type) {
+            error(stmt.value->offset, "switch on an untagged union");
+            return std::nullopt;
+        }
+
+        auto* tag_member =
+            value->value->getType()->isStructTy()
+                ? m_builder.CreateExtractValue(value->value, union_member_tag)
+                : m_builder.CreateLoad(
+                      union_type.tag_type->codegen(*this),
+                      m_builder.CreateStructGEP(
+                          union_type.codegen(*this), value->value,
+                          union_member_tag));
+
+        value = {union_type.tag_type, tag_member};
+    } else {
+        value = load_value(*value);
+    }
 
     auto* function = m_builder.GetInsertBlock()->getParent();
 
@@ -184,7 +206,7 @@ std::optional<Value> Codegen::generate(ast::Switch& stmt) {
                            : nullptr;
 
     auto* switch_inst = m_builder.CreateSwitch(
-        val.value, else_block ? else_block : end, stmt.cases.size());
+        value->value, else_block ? else_block : end, stmt.cases.size());
 
     bool all_terminate = true;
 

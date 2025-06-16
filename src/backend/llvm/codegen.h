@@ -273,6 +273,9 @@ private:
     static constexpr auto slice_member_ptr = 0;
     static constexpr auto slice_member_len = 1;
 
+    static constexpr auto union_member_value = 0;
+    static constexpr auto union_member_tag = 1;
+
     llvm::LLVMContext m_context;
     std::unique_ptr<llvm::Module> m_module;
     llvm::IRBuilder<> m_builder;
