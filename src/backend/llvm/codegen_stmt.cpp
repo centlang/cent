@@ -208,7 +208,7 @@ std::optional<Value> Codegen::generate(ast::Switch& stmt) {
     auto* switch_inst = m_builder.CreateSwitch(
         value->value, else_block ? else_block : end, stmt.cases.size());
 
-    bool all_terminate = true;
+    bool all_terminate = stmt.else_block != nullptr;
 
     for (auto& case_stmt : stmt.cases) {
         auto* block = llvm::BasicBlock::Create(m_context, "", function);
