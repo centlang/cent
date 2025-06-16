@@ -163,8 +163,8 @@ std::optional<Value> Codegen::generate(ast::Struct& decl) {
 }
 
 std::optional<Value> Codegen::generate(ast::Union& decl) {
-    auto attrs = parse_attrs(decl, {"tagged"});
-    bool tagged = attrs.contains("tagged");
+    auto attrs = parse_attrs(decl, {"untagged"});
+    bool untagged = attrs.contains("untagged");
 
     if (m_current_function) {
         generate_union(decl);
@@ -204,7 +204,14 @@ std::optional<Value> Codegen::generate(ast::Union& decl) {
         }
     }
 
-    if (tagged) {
+    if (untagged) {
+        struct_type->setBody(max_type);
+
+        m_current_scope->types[decl.name.value] =
+            std::make_shared<types::Union>(
+                m_current_scope_prefix + decl.name.value, struct_type,
+                std::move(fields));
+    } else {
         auto tag_type = std::make_shared<types::Enum>(
             m_current_scope_prefix + decl.name.value + "(tag)",
             m_primitive_types["i32"]);
@@ -222,13 +229,6 @@ std::optional<Value> Codegen::generate(ast::Union& decl) {
             std::make_shared<types::Union>(
                 m_current_scope_prefix + decl.name.value, struct_type,
                 std::move(fields), tag_type);
-    } else {
-        struct_type->setBody(max_type);
-
-        m_current_scope->types[decl.name.value] =
-            std::make_shared<types::Union>(
-                m_current_scope_prefix + decl.name.value, struct_type,
-                std::move(fields));
     }
 
     return std::nullopt;
