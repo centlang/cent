@@ -24,6 +24,7 @@
 #include "backend/llvm/type.h"
 #include "backend/llvm/value.h"
 
+#include "backend/llvm/types/enum.h"
 #include "backend/llvm/types/function.h"
 #include "backend/llvm/types/primitive.h"
 #include "backend/llvm/types/struct.h"
@@ -409,8 +410,8 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
 
         auto index = iterator->second;
 
-        m_current_result =
-            m_builder.CreateStructGEP(union_type.type, variable, 0);
+        m_current_result = m_builder.CreateStructGEP(
+            union_type.type, variable, union_member_value);
 
         if (!cast_to_result(union_type.fields[index], *value)) {
             type_mismatch(
@@ -419,6 +420,16 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
             m_current_result = nullptr;
 
             return std::nullopt;
+        }
+
+        if (union_type.tag_type) {
+            auto* tag_member = m_builder.CreateStructGEP(
+                union_type.type, variable, union_member_tag);
+
+            m_builder.CreateStore(
+                llvm::ConstantInt::get(
+                    union_type.tag_type->codegen(*this), index),
+                tag_member);
         }
 
         m_current_result = nullptr;
