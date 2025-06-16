@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <utility>
 
 #include <fmt/core.h>
@@ -117,9 +118,7 @@ struct Function;
 struct Value;
 struct Type;
 
-struct Attributes {
-    bool is_extern = false;
-};
+using Attributes = std::set<std::string_view>;
 
 class Codegen {
 public:
@@ -265,7 +264,8 @@ private:
         m_had_error = true;
     }
 
-    [[nodiscard]] Attributes parse_attrs(ast::Declaration& decl);
+    [[nodiscard]] Attributes parse_attrs(
+        ast::Declaration& decl, const std::set<std::string_view>& allowed);
 
     static constexpr auto optional_member_value = 0;
     static constexpr auto optional_member_bool = 1;

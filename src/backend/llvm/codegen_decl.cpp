@@ -163,6 +163,9 @@ std::optional<Value> Codegen::generate(ast::Struct& decl) {
 }
 
 std::optional<Value> Codegen::generate(ast::Union& decl) {
+    auto attrs = parse_attrs(decl, {"tagged"});
+    bool tagged = attrs.contains("tagged");
+
     if (m_current_function) {
         generate_union(decl);
     }
@@ -201,7 +204,22 @@ std::optional<Value> Codegen::generate(ast::Union& decl) {
         }
     }
 
-    struct_type->setBody(max_type);
+    if (tagged) {
+        auto tag_type = std::make_shared<types::Enum>(
+            m_current_scope_prefix + decl.name.value + "(tag)",
+            m_primitive_types["i32"]);
+
+        for (std::size_t i = 0; i < decl.fields.size(); ++i) {
+            m_current_scope->scopes[decl.name.value]
+                .names[decl.fields[i].name.value] = {
+                tag_type,
+                llvm::ConstantInt::get(llvm::Type::getInt32Ty(m_context), i)};
+        }
+
+        struct_type->setBody({max_type, tag_type->codegen(*this)});
+    } else {
+        struct_type->setBody(max_type);
+    }
 
     m_current_scope->types[decl.name.value] = std::make_shared<types::Union>(
         m_current_scope_prefix + decl.name.value, struct_type,
@@ -433,9 +451,10 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
 }
 
 void Codegen::generate_fn_proto(ast::FnDecl& decl) {
-    auto attrs = parse_attrs(decl);
+    auto attrs = parse_attrs(decl, {"extern"});
+    bool is_extern = attrs.contains("extern");
 
-    if (!attrs.is_extern && !decl.block) {
+    if (!is_extern && !decl.block) {
         error(
             decl.proto.name.offset,
             fmt::format(
@@ -513,8 +532,8 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) {
 
     auto* function = llvm::Function::Create(
         function_type,
-        (decl.is_public || attrs.is_extern) ? llvm::Function::ExternalLinkage
-                                            : llvm::Function::PrivateLinkage,
+        (decl.is_public || is_extern) ? llvm::Function::ExternalLinkage
+                                      : llvm::Function::PrivateLinkage,
         decl.proto.name.value, *m_module);
 
     if (!decl.proto.type) {

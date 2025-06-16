@@ -606,19 +606,20 @@ void Codegen::type_mismatch(std::size_t offset, Type& expected, Type& got) {
                     log::bold(log::quoted(got.to_string()))));
 }
 
-Attributes Codegen::parse_attrs(ast::Declaration& decl) {
+Attributes Codegen::parse_attrs(
+    ast::Declaration& decl, const std::set<std::string_view>& allowed) {
     Attributes result;
 
     for (auto& attr : decl.attributes) {
-        if (attr.name == "extern") {
-            result.is_extern = true;
+        if (allowed.contains(attr.name)) {
+            result.insert(attr.name);
             continue;
         }
 
         error(
             attr.offset,
             fmt::format(
-                "unknown attribute {}", log::bold(log::quoted(attr.name))));
+                "unexpected attribute {}", log::bold(log::quoted(attr.name))));
     }
 
     return result;
