@@ -945,8 +945,7 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) {
                 ? m_builder.CreateExtractValue(
                       parent->value, union_member_value)
                 : m_builder.CreateStructGEP(
-                      type.type, parent->value, union_member_value),
-            parent->is_mutable};
+                      type.type, parent->value, union_member_value)};
     }
 
     if (parent->value->getType()->isStructTy()) {
