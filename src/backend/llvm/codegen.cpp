@@ -130,7 +130,7 @@ void Codegen::generate(ast::Module& module, bool is_submodule) {
     }
 
     for (auto& variable : module.variables) {
-        if (is_submodule) {
+        if (is_submodule && !variable->is_public) {
             continue;
         }
 

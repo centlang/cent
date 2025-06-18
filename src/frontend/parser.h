@@ -139,9 +139,6 @@ private:
 
     [[nodiscard]] std::unique_ptr<ast::Type> expect_type();
 
-    [[nodiscard]] std::unique_ptr<ast::VarDecl>
-    parse_var(std::vector<ast::Attribute> attrs);
-
     void parse_switch(ast::BlockStmt& block);
 
     void parse_while(ast::BlockStmt& block);
@@ -154,6 +151,9 @@ private:
     [[nodiscard]] std::vector<ast::Struct::Field> parse_fields();
 
     [[nodiscard]] std::vector<ast::EnumDecl::Field> parse_enum_fields();
+
+    [[nodiscard]] std::unique_ptr<ast::VarDecl>
+    parse_var(std::vector<ast::Attribute> attrs, bool is_public = false);
 
     [[nodiscard]] std::unique_ptr<ast::FnDecl>
     parse_fn(std::vector<ast::Attribute> attrs, bool is_public = false);

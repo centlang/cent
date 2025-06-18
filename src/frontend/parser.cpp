@@ -75,21 +75,6 @@ std::unique_ptr<ast::Module> Parser::parse() {
 
         auto attrs = parse_attrs();
 
-        if (match(Const, Mut)) {
-            auto variable = parse_var(std::move(attrs));
-
-            if (!variable) {
-                skip_until_decl();
-                continue;
-            }
-
-            expect("';'", Token::Type::Semicolon);
-
-            result->variables.push_back(std::move(variable));
-
-            continue;
-        }
-
         if (match_next(With)) {
             if (!parse_with(*result)) {
                 skip_until_decl();
@@ -105,6 +90,21 @@ std::unique_ptr<ast::Module> Parser::parse() {
 
         if (match_next(Pub)) {
             is_public = true;
+        }
+
+        if (match(Const, Mut)) {
+            auto variable = parse_var(std::move(attrs), is_public);
+
+            if (!variable) {
+                skip_until_decl();
+                continue;
+            }
+
+            expect("';'", Token::Type::Semicolon);
+
+            result->variables.push_back(std::move(variable));
+
+            continue;
         }
 
         if (match_next(Type)) {
@@ -934,63 +934,6 @@ std::unique_ptr<ast::Type> Parser::expect_type() {
     return std::make_unique<ast::NamedType>(offset, std::move(value));
 }
 
-std::unique_ptr<ast::VarDecl>
-Parser::parse_var(std::vector<ast::Attribute> attrs) {
-    auto offset = peek().offset;
-
-    auto mutability = [&] {
-        switch (get().type) {
-        case Token::Type::Let:
-            return ast::VarDecl::Mut::Immut;
-        case Token::Type::Mut:
-            return ast::VarDecl::Mut::Mut;
-        case Token::Type::Const:
-            return ast::VarDecl::Mut::Const;
-        default:
-            return ast::VarDecl::Mut::Mut;
-        }
-    }();
-
-    auto name = expect("variable name", Token::Type::Identifier);
-
-    if (!name) {
-        return nullptr;
-    }
-
-    std::unique_ptr<ast::Type> type = nullptr;
-
-    if (match(Token::Type::Colon)) {
-        type = expect_var_type();
-
-        if (!type) {
-            return nullptr;
-        }
-    }
-
-    if (!match_next(Token::Type::Equal)) {
-        if (!type) {
-            expected(
-                fmt::format("{} or {}", log::bold("'='"), log::bold("':'")));
-
-            return nullptr;
-        }
-
-        return std::make_unique<ast::VarDecl>(
-            offset, mutability, ast::OffsetValue{name->value, name->offset},
-            std::move(type), nullptr, std::move(attrs));
-    }
-
-    auto value = expect_expr(false);
-
-    if (!value) {
-        return nullptr;
-    }
-
-    return std::make_unique<ast::VarDecl>(
-        offset, mutability, ast::OffsetValue{name->value, name->offset},
-        std::move(type), std::move(value), std::move(attrs));
-}
-
 void Parser::parse_switch(ast::BlockStmt& block) {
     auto offset = get().offset;
     auto value = expect_expr(true);
@@ -1146,6 +1089,63 @@ std::vector<ast::EnumDecl::Field> Parser::parse_enum_fields() {
     }
 
     return result;
+}
+
+std::unique_ptr<ast::VarDecl>
+Parser::parse_var(std::vector<ast::Attribute> attrs, bool is_public) {
+    auto offset = peek().offset;
+
+    auto mutability = [&] {
+        switch (get().type) {
+        case Token::Type::Let:
+            return ast::VarDecl::Mut::Immut;
+        case Token::Type::Mut:
+            return ast::VarDecl::Mut::Mut;
+        case Token::Type::Const:
+            return ast::VarDecl::Mut::Const;
+        default:
+            return ast::VarDecl::Mut::Mut;
+        }
+    }();
+
+    auto name = expect("variable name", Token::Type::Identifier);
+
+    if (!name) {
+        return nullptr;
+    }
+
+    std::unique_ptr<ast::Type> type = nullptr;
+
+    if (match(Token::Type::Colon)) {
+        type = expect_var_type();
+
+        if (!type) {
+            return nullptr;
+        }
+    }
+
+    if (!match_next(Token::Type::Equal)) {
+        if (!type) {
+            expected(
+                fmt::format("{} or {}", log::bold("'='"), log::bold("':'")));
+
+            return nullptr;
+        }
+
+        return std::make_unique<ast::VarDecl>(
+            offset, mutability, ast::OffsetValue{name->value, name->offset},
+            std::move(type), nullptr, std::move(attrs), is_public);
+    }
+
+    auto value = expect_expr(false);
+
+    if (!value) {
+        return nullptr;
+    }
+
+    return std::make_unique<ast::VarDecl>(
+        offset, mutability, ast::OffsetValue{name->value, name->offset},
+        std::move(type), std::move(value), std::move(attrs), is_public);
 }
 
 std::unique_ptr<ast::FnDecl>
@@ -1331,6 +1331,10 @@ bool Parser::parse_submodule(
 
     for (auto& enum_decl : submodule->enums) {
         module.enums.push_back(std::move(enum_decl));
+    }
+
+    for (auto& variable : submodule->variables) {
+        module.variables.push_back(std::move(variable));
     }
 
     for (auto& submodule : submodule->submodules) {

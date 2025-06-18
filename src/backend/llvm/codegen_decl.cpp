@@ -316,7 +316,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
             return std::nullopt;
         }
 
-        m_scope.names[decl.name.value] = *value;
+        m_current_scope->names[decl.name.value] = *value;
         return std::nullopt;
     }
 
@@ -378,7 +378,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
             }
 
             if (is<types::Undefined>(*value->type)) {
-                m_scope.names[decl.name.value] = {
+                m_current_scope->names[decl.name.value] = {
                     type, create_alloca(llvm_type),
                     decl.mutability == ast::VarDecl::Mut::Mut};
 
@@ -390,7 +390,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
             if (!cast_to_result(type, *value)) {
                 type_mismatch(decl.value->offset, *type, *value->type);
             } else {
-                m_scope.names[decl.name.value] = {
+                m_current_scope->names[decl.name.value] = {
                     type, m_current_result,
                     decl.mutability == ast::VarDecl::Mut::Mut};
             }
@@ -403,7 +403,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
 
     if (value) {
         if (value->stack_allocated) {
-            m_scope.names[decl.name.value] = {
+            m_current_scope->names[decl.name.value] = {
                 type, value->value, decl.mutability == ast::VarDecl::Mut::Mut};
 
             return std::nullopt;
@@ -420,7 +420,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
             m_builder.CreateStore(load_value(*value).value, m_current_result);
         }
 
-        m_scope.names[decl.name.value] = {
+        m_current_scope->names[decl.name.value] = {
             type, m_current_result, decl.mutability == ast::VarDecl::Mut::Mut};
     } else {
         if (m_current_function) {
@@ -429,7 +429,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
             m_builder.CreateStore(
                 llvm::Constant::getNullValue(llvm_type), m_current_result);
 
-            m_scope.names[decl.name.value] = {
+            m_current_scope->names[decl.name.value] = {
                 type, m_current_result,
                 decl.mutability == ast::VarDecl::Mut::Mut};
         } else {
@@ -442,7 +442,8 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
 
             m_current_result = global;
 
-            m_scope.names[decl.name.value] = {type, m_current_result, true};
+            m_current_scope->names[decl.name.value] = {
+                type, m_current_result, true};
         }
     }
 
