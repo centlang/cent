@@ -60,12 +60,12 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) {
 
     switch (expr.oper.value) {
     case Minus:
-        if (value->type->is_float()) {
+        if (is_float(*value->type)) {
             return Value{
                 value->type, m_builder.CreateFNeg(load_value(*value).value)};
         }
 
-        if (!value->type->is_signed_int() && !value->type->is_unsigned_int()) {
+        if (!is_sint(*value->type) && !is_uint(*value->type)) {
             error(
                 expr.offset,
                 fmt::format(
@@ -77,7 +77,7 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) {
         return Value{
             value->type, m_builder.CreateNeg(load_value(*value).value)};
     case Bang:
-        if (!value->type->is_bool()) {
+        if (!is<types::Bool>(*value->type)) {
             error(
                 expr.offset,
                 fmt::format(
@@ -89,7 +89,7 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) {
         return Value{
             value->type, m_builder.CreateNot(load_value(*value).value)};
     case Star: {
-        if (!value->type->is_pointer()) {
+        if (!is<types::Pointer>(*value->type)) {
             error(expr.offset, "dereference of a non-pointer type");
 
             return std::nullopt;
@@ -112,7 +112,7 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) {
             std::make_shared<types::Pointer>(value->type, value->is_mutable),
             value->value, false, true};
     case Not:
-        if (!value->type->is_signed_int() && !value->type->is_unsigned_int()) {
+        if (!is_sint(*value->type) && !is_uint(*value->type)) {
             error(
                 expr.offset,
                 fmt::format(
@@ -372,10 +372,8 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
         return std::nullopt;
     }
 
-    if (type->is_union()) {
-        auto& union_type = static_cast<types::Union&>(*type);
-        auto& members = m_members[union_type.type];
-
+    if (auto* union_type = dyn_cast<types::Union>(*type)) {
+        auto& members = m_members[union_type->type];
         bool stack_allocated = m_current_result == nullptr;
 
         if (expr.fields.size() != 1) {
@@ -394,7 +392,7 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
         }
 
         auto* variable = m_current_result ? m_current_result
-                                          : create_alloca(union_type.type);
+                                          : create_alloca(union_type->type);
 
         auto iterator = members.find(field.name.value);
 
@@ -411,24 +409,24 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
         auto index = iterator->second;
 
         m_current_result = m_builder.CreateStructGEP(
-            union_type.type, variable, union_member_value);
+            union_type->type, variable, union_member_value);
 
-        if (!cast_to_result(union_type.fields[index], *value)) {
+        if (!cast_to_result(union_type->fields[index], *value)) {
             type_mismatch(
-                field.value->offset, *union_type.fields[index], *value->type);
+                field.value->offset, *union_type->fields[index], *value->type);
 
             m_current_result = nullptr;
 
             return std::nullopt;
         }
 
-        if (union_type.tag_type) {
+        if (union_type->tag_type) {
             auto* tag_member = m_builder.CreateStructGEP(
-                union_type.type, variable, union_member_tag);
+                union_type->type, variable, union_member_tag);
 
             m_builder.CreateStore(
                 llvm::ConstantInt::get(
-                    union_type.tag_type->codegen(*this), index),
+                    union_type->tag_type->codegen(*this), index),
                 tag_member);
         }
 
@@ -437,20 +435,20 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
         return Value{type, variable, false, false, false, stack_allocated};
     }
 
-    if (!type->is_struct()) {
+    auto* struct_type = dyn_cast<types::Struct>(*type);
+
+    if (!struct_type) {
         error(expr.type->offset, "not a structure");
 
         return std::nullopt;
     }
 
-    auto& struct_type = static_cast<types::Struct&>(*type);
-    auto& members = m_members[struct_type.type];
+    auto& members = m_members[struct_type->type];
+    bool is_const = true;
 
     bool stack_allocated = m_current_result == nullptr;
 
-    bool is_const = true;
-
-    if (expr.fields.size() != struct_type.fields.size()) {
+    if (expr.fields.size() != struct_type->fields.size()) {
         error(expr.type->offset, "incorrect number of fields initialized");
 
         return std::nullopt;
@@ -482,11 +480,11 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
         }
 
         return Value{
-            type, llvm::ConstantStruct::get(struct_type.type, llvm_values)};
+            type, llvm::ConstantStruct::get(struct_type->type, llvm_values)};
     }
 
     auto* variable =
-        m_current_result ? m_current_result : create_alloca(struct_type.type);
+        m_current_result ? m_current_result : create_alloca(struct_type->type);
 
     for (std::size_t i = 0; i < expr.fields.size(); ++i) {
         auto& field = expr.fields[i];
@@ -507,11 +505,11 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
         auto index = iterator->second;
 
         m_current_result =
-            m_builder.CreateStructGEP(struct_type.type, variable, index);
+            m_builder.CreateStructGEP(struct_type->type, variable, index);
 
-        if (!cast_to_result(struct_type.fields[index], value)) {
+        if (!cast_to_result(struct_type->fields[index], value)) {
             type_mismatch(
-                field.value->offset, *struct_type.fields[index], *value.type);
+                field.value->offset, *struct_type->fields[index], *value.type);
 
             m_current_result = nullptr;
 
@@ -692,21 +690,22 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) {
         return std::nullopt;
     }
 
-    if (!value->type->is_function()) {
+    auto* type = dyn_cast<types::Function>(*value->type);
+
+    if (!type) {
         error(expr.identifier->offset, "not a function");
 
         return std::nullopt;
     }
 
-    auto& type = static_cast<types::Function&>(*value->type);
     auto* function = static_cast<llvm::Function*>(value->value);
 
-    auto arg_size = type.param_types.size();
+    auto arg_size = type->param_types.size();
     auto passed_args_size = expr.arguments.size();
-    auto default_args_size = type.default_args.size();
+    auto default_args_size = type->default_args.size();
 
-    if (!type.variadic && (passed_args_size < arg_size - default_args_size ||
-                           passed_args_size > arg_size)) {
+    if (!type->variadic && (passed_args_size < arg_size - default_args_size ||
+                            passed_args_size > arg_size)) {
         error(expr.identifier->offset, "incorrect number of arguments passed");
 
         return std::nullopt;
@@ -722,16 +721,16 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) {
             return std::nullopt;
         }
 
-        if (type.variadic && i >= arg_size) {
+        if (type->variadic && i >= arg_size) {
             arguments.push_back(load_value(*value).value);
             continue;
         }
 
-        if (auto val = cast(type.param_types[i], *value)) {
+        if (auto val = cast(type->param_types[i], *value)) {
             arguments.push_back(load_value(*val).value);
         } else {
             type_mismatch(
-                expr.arguments[i]->offset, *type.param_types[i], *value->type);
+                expr.arguments[i]->offset, *type->param_types[i], *value->type);
 
             return std::nullopt;
         }
@@ -739,10 +738,10 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) {
 
     for (std::size_t i = default_args_size - (arg_size - passed_args_size);
          i < default_args_size; ++i) {
-        arguments.push_back(type.default_args[i]);
+        arguments.push_back(type->default_args[i]);
     }
 
-    return Value{type.return_type, m_builder.CreateCall(function, arguments)};
+    return Value{type->return_type, m_builder.CreateCall(function, arguments)};
 }
 
 std::optional<Value> Codegen::generate(ast::MethodExpr& expr) {
@@ -762,17 +761,17 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) {
     };
 
     if (iterator == m_methods[value->type].end()) {
-        if (!value->type->is_pointer()) {
+        auto* type = dyn_cast<types::Pointer>(*value->type);
+
+        if (!type) {
             no_such_method();
 
             return std::nullopt;
         }
 
-        iterator =
-            m_methods[static_cast<types::Pointer&>(*value->type).type].find(
-                expr.name.value);
+        iterator = m_methods[type->type].find(expr.name.value);
 
-        if (iterator == m_methods[value->type].end()) {
+        if (iterator == m_methods[type->type].end()) {
             no_such_method();
 
             return std::nullopt;
@@ -790,11 +789,9 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) {
     std::vector<llvm::Value*> arguments;
     arguments.reserve(arg_size);
 
-    if (iterator->second.type->param_types[0]->is_pointer()) {
-        auto& self_type = static_cast<types::Pointer&>(
-            *iterator->second.type->param_types[0]);
-
-        if (!value->is_mutable && self_type.is_mutable) {
+    if (auto* type =
+            dyn_cast<types::Pointer>(*iterator->second.type->param_types[0])) {
+        if (!value->is_mutable && type->is_mutable) {
             error(
                 expr.name.offset,
                 fmt::format(
@@ -804,7 +801,7 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) {
             return std::nullopt;
         }
 
-        if (value->type->is_pointer()) {
+        if (is<types::Pointer>(*value->type)) {
             arguments.push_back(load_value(*value).value);
         } else {
             if (!value->value->getType()->isPointerTy()) {
@@ -818,10 +815,9 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) {
     } else {
         auto val = load_value(*value);
 
-        if (value->type->is_pointer()) {
-            arguments.push_back(m_builder.CreateLoad(
-                static_cast<types::Pointer&>(*value->type).type->codegen(*this),
-                val.value));
+        if (auto* pointer = dyn_cast<types::Pointer>(*value->type)) {
+            arguments.push_back(
+                m_builder.CreateLoad(pointer->type->codegen(*this), val.value));
         } else {
             arguments.push_back(val.value);
         }
@@ -878,7 +874,7 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) {
         return iterator->second;
     };
 
-    if (parent->type->is_tuple()) {
+    if (auto* tuple = dyn_cast<types::Tuple>(*parent->type)) {
         if (expr.member.type != frontend::Token::Type::IntLiteral) {
             no_such_member();
 
@@ -890,19 +886,17 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) {
 
         std::from_chars(literal.cbegin(), literal.cend(), value);
 
-        auto& type = static_cast<types::Tuple&>(*parent->type);
-
-        if (value >= type.types.size()) {
+        if (value >= tuple->types.size()) {
             no_such_member();
 
             return std::nullopt;
         }
 
         return Value{
-            type.types[value],
+            tuple->types[value],
             parent->value->getType()->isStructTy()
                 ? m_builder.CreateExtractValue(parent->value, value)
-                : m_builder.CreateStructGEP(type.type, parent->value, value),
+                : m_builder.CreateStructGEP(tuple->type, parent->value, value),
             parent->is_mutable};
     }
 
@@ -910,12 +904,11 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) {
         error(expr.member.offset, "member access of a non-structure type");
     };
 
-    if (parent->type->is_slice()) {
-        auto& type = static_cast<types::Slice&>(*parent->type);
-
+    if (auto* slice = dyn_cast<types::Slice>(*parent->type)) {
         if (expr.member.value == "ptr") {
             return Value{
-                std::make_shared<types::Pointer>(type.type, type.is_mutable),
+                std::make_shared<types::Pointer>(
+                    slice->type, slice->is_mutable),
                 m_builder.CreateStructGEP(
                     m_slice_type, parent->value, slice_member_ptr)};
         }
@@ -931,21 +924,20 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) {
         return std::nullopt;
     }
 
-    if (parent->type->is_union()) {
-        auto& type = static_cast<types::Union&>(*parent->type);
-        auto index = get_member(type.type);
+    if (auto* union_type = dyn_cast<types::Union>(*parent->type)) {
+        auto index = get_member(union_type->type);
 
         if (!index) {
             return std::nullopt;
         }
 
         return Value{
-            type.fields[*index],
+            union_type->fields[*index],
             parent->value->getType()->isStructTy()
                 ? m_builder.CreateExtractValue(
                       parent->value, union_member_value)
                 : m_builder.CreateStructGEP(
-                      type.type, parent->value, union_member_value)};
+                      union_type->type, parent->value, union_member_value)};
     }
 
     if (parent->value->getType()->isStructTy()) {
@@ -965,31 +957,31 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) {
 
     types::Struct* type = nullptr;
 
-    if (parent->type->is_pointer()) {
-        auto& pointer = static_cast<types::Pointer&>(*parent->type);
+    if (auto* pointer = dyn_cast<types::Pointer>(*parent->type)) {
+        type = dyn_cast<types::Struct>(*pointer->type);
 
-        if (!pointer.type->is_struct()) {
+        if (!type) {
             not_a_struct();
 
             return std::nullopt;
         }
 
-        is_mutable = pointer.is_mutable;
-        type = static_cast<types::Struct*>(pointer.type.get());
+        is_mutable = pointer->is_mutable;
     } else {
-        if (!parent->type->is_struct()) {
+        type = dyn_cast<types::Struct>(*parent->type);
+
+        if (!type) {
             not_a_struct();
 
             return std::nullopt;
         }
 
         is_mutable = parent->is_mutable;
-        type = static_cast<types::Struct*>(parent->type.get());
     }
 
     auto* value = parent->value;
 
-    if (parent->type->is_pointer()) {
+    if (is<types::Pointer>(*parent->type)) {
         if (auto* variable = llvm::dyn_cast<llvm::AllocaInst>(value)) {
             value = m_builder.CreateLoad(variable->getAllocatedType(), value);
         }
@@ -1029,9 +1021,7 @@ std::optional<Value> Codegen::generate(ast::IndexExpr& expr) {
         return std::nullopt;
     }
 
-    if (value->type->is_slice()) {
-        auto* type = static_cast<types::Slice*>(value->type.get());
-
+    if (auto* type = dyn_cast<types::Slice>(*value->type)) {
         auto* ptr_member = m_builder.CreateStructGEP(
             type->codegen(*this), value->value, slice_member_ptr);
 
@@ -1045,13 +1035,13 @@ std::optional<Value> Codegen::generate(ast::IndexExpr& expr) {
             type->is_mutable};
     }
 
-    if (!value->type->is_array()) {
+    auto* type = dyn_cast<types::Array>(*value->type);
+
+    if (!type) {
         error(expr.value->offset, "index access of a non-array type");
 
         return std::nullopt;
     }
-
-    auto* type = static_cast<types::Array*>(value->type.get());
 
     return Value{
         type->type,
@@ -1070,14 +1060,15 @@ std::optional<Value> Codegen::generate(ast::SliceExpr& expr) {
         return std::nullopt;
     }
 
-    if (!value->type->is_slice()) {
+    auto* type = dyn_cast<types::Slice>(*value->type);
+
+    if (!type) {
         error(expr.value->offset, "slice expression of a non-slice type");
 
         return std::nullopt;
     }
 
-    auto& type = static_cast<types::Slice&>(*value->type);
-    auto* llvm_type = type.codegen(*this);
+    auto* llvm_type = type->codegen(*this);
 
     std::optional<Value> low = std::nullopt;
 
@@ -1144,7 +1135,7 @@ std::optional<Value> Codegen::generate(ast::SliceExpr& expr) {
         m_builder.CreateLoad(llvm::PointerType::get(m_context, 0), ptr_member);
 
     auto* new_ptr_value =
-        m_builder.CreateGEP(type.type->codegen(*this), ptr_value, low->value);
+        m_builder.CreateGEP(type->type->codegen(*this), ptr_value, low->value);
 
     auto* new_len_value = m_builder.CreateSub(high->value, low->value);
 
@@ -1179,7 +1170,7 @@ std::optional<Value> Codegen::generate(ast::AsExpr& expr) {
         return std::nullopt;
     }
 
-    if (value->type->is_pointer() && type->is_pointer()) {
+    if (is<types::Pointer>(*value->type) && is<types::Pointer>(*type)) {
         return Value{type, value->value};
     }
 
@@ -1200,16 +1191,19 @@ std::optional<Value> Codegen::generate_bin_expr(
     if (oper.value == EqualEqual || oper.value == BangEqual) {
         std::optional<Value> value = std::nullopt;
 
-        if (lhs.value.type->is_optional() && rhs.value.type->is_null()) {
+        if (is<types::Optional>(*lhs.value.type) &&
+            is<types::Null>(*rhs.value.type)) {
             value = lhs.value;
-        } else if (rhs.value.type->is_optional() && lhs.value.type->is_null()) {
+        } else if (
+            is<types::Optional>(*rhs.value.type) &&
+            is<types::Null>(*lhs.value.type)) {
             value = rhs.value;
         }
 
         if (value) {
             auto& type = static_cast<types::Optional&>(*value->type);
 
-            if (type.type->is_pointer()) {
+            if (is<types::Pointer>(*type.type)) {
                 auto* null =
                     llvm::Constant::getNullValue(value->value->getType());
 
@@ -1265,8 +1259,7 @@ std::optional<Value> Codegen::generate_bin_expr(
     case LessEqual: {
         auto type = lhs_value.type;
 
-        if (!type->is_signed_int() && !type->is_unsigned_int() &&
-            !type->is_float()) {
+        if (!is_sint(*type) && !is_uint(*type) && !is_float(*type)) {
             error(lhs.offset, "type mismatch");
 
             return std::nullopt;
@@ -1278,15 +1271,16 @@ std::optional<Value> Codegen::generate_bin_expr(
     case And:
     case Or:
     case Xor:
-        if (!lhs_value.type->is_signed_int() &&
-            !lhs_value.type->is_unsigned_int()) {
+        if (!is_sint(*lhs_value.type) && !is_uint(*lhs_value.type)) {
             error(lhs.offset, "type mismatch");
+
+            return std::nullopt;
         }
 
         break;
     case AndAnd:
     case OrOr:
-        if (!lhs_value.type->is_bool()) {
+        if (!is<types::Bool>(*lhs_value.type)) {
             error(lhs.offset, "type mismatch");
 
             return std::nullopt;
@@ -1301,23 +1295,23 @@ std::optional<Value> Codegen::generate_bin_expr(
     case Plus:
         return Value{
             lhs_value.type,
-            lhs_value.type->is_float()
+            is_float(*lhs_value.type)
                 ? m_builder.CreateFAdd(lhs_value.value, right->value)
                 : m_builder.CreateAdd(lhs_value.value, right->value)};
     case Minus:
         return Value{
             lhs_value.type,
-            lhs_value.type->is_float()
+            is_float(*lhs_value.type)
                 ? m_builder.CreateFSub(lhs_value.value, right->value)
                 : m_builder.CreateSub(lhs_value.value, right->value)};
     case Star:
         return Value{
             lhs_value.type,
-            lhs_value.type->is_float()
+            is_float(*lhs_value.type)
                 ? m_builder.CreateFMul(lhs_value.value, right->value)
                 : m_builder.CreateMul(lhs_value.value, right->value)};
     case Slash:
-        if (lhs_value.type->is_float()) {
+        if (is_float(*lhs_value.type)) {
             return Value{
                 lhs_value.type,
                 m_builder.CreateFDiv(lhs_value.value, right->value)};
@@ -1325,13 +1319,13 @@ std::optional<Value> Codegen::generate_bin_expr(
 
         return Value{
             lhs_value.type,
-            lhs_value.type->is_signed_int()
+            is_sint(*lhs_value.type)
                 ? m_builder.CreateSDiv(lhs_value.value, right->value)
                 : m_builder.CreateUDiv(lhs_value.value, right->value)};
     case Percent:
         return Value{
             lhs_value.type,
-            lhs_value.type->is_signed_int()
+            is_sint(*lhs_value.type)
                 ? m_builder.CreateSRem(lhs_value.value, right->value)
                 : m_builder.CreateURem(lhs_value.value, right->value)};
     case And:
@@ -1352,7 +1346,7 @@ std::optional<Value> Codegen::generate_bin_expr(
             m_primitive_types["bool"],
             m_builder.CreateLogicalOr(lhs_value.value, right->value)};
     case Less:
-        if (lhs_value.type->is_float()) {
+        if (is_float(*lhs_value.type)) {
             return Value{
                 m_primitive_types["bool"],
                 m_builder.CreateFCmpULT(lhs_value.value, right->value)};
@@ -1360,11 +1354,11 @@ std::optional<Value> Codegen::generate_bin_expr(
 
         return Value{
             m_primitive_types["bool"],
-            lhs_value.type->is_signed_int()
+            is_sint(*lhs_value.type)
                 ? m_builder.CreateICmpSLT(lhs_value.value, right->value)
                 : m_builder.CreateICmpULT(lhs_value.value, right->value)};
     case Greater:
-        if (lhs_value.type->is_float()) {
+        if (is_float(*lhs_value.type)) {
             return Value{
                 m_primitive_types["bool"],
                 m_builder.CreateFCmpUGT(lhs_value.value, right->value)};
@@ -1372,23 +1366,23 @@ std::optional<Value> Codegen::generate_bin_expr(
 
         return Value{
             m_primitive_types["bool"],
-            lhs_value.type->is_signed_int()
+            is_sint(*lhs_value.type)
                 ? m_builder.CreateICmpSGT(lhs_value.value, right->value)
                 : m_builder.CreateICmpUGT(lhs_value.value, right->value)};
     case EqualEqual:
         return Value{
             m_primitive_types["bool"],
-            lhs_value.type->is_float()
+            is_float(*lhs_value.type)
                 ? m_builder.CreateFCmpUEQ(lhs_value.value, right->value)
                 : m_builder.CreateICmpEQ(lhs_value.value, right->value)};
     case BangEqual:
         return Value{
             m_primitive_types["bool"],
-            lhs_value.type->is_float()
+            is_float(*lhs_value.type)
                 ? m_builder.CreateFCmpUNE(lhs_value.value, right->value)
                 : m_builder.CreateICmpNE(lhs_value.value, right->value)};
     case GreaterEqual:
-        if (lhs_value.type->is_float()) {
+        if (is_float(*lhs_value.type)) {
             return Value{
                 m_primitive_types["bool"],
                 m_builder.CreateFCmpUGE(lhs_value.value, right->value)};
@@ -1396,11 +1390,11 @@ std::optional<Value> Codegen::generate_bin_expr(
 
         return Value{
             m_primitive_types["bool"],
-            lhs_value.type->is_signed_int()
+            is_sint(*lhs_value.type)
                 ? m_builder.CreateICmpSGE(lhs_value.value, right->value)
                 : m_builder.CreateICmpUGE(lhs_value.value, right->value)};
     case LessEqual:
-        if (lhs_value.type->is_float()) {
+        if (is_float(*lhs_value.type)) {
             return Value{
                 m_primitive_types["bool"],
                 m_builder.CreateFCmpULE(lhs_value.value, right->value)};
@@ -1408,7 +1402,7 @@ std::optional<Value> Codegen::generate_bin_expr(
 
         return Value{
             m_primitive_types["bool"],
-            lhs_value.type->is_signed_int()
+            is_sint(*lhs_value.type)
                 ? m_builder.CreateICmpSLE(lhs_value.value, right->value)
                 : m_builder.CreateICmpULE(lhs_value.value, right->value)};
     default:

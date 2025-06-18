@@ -217,7 +217,7 @@ llvm::Type* Codegen::generate(types::Alias& type) {
 llvm::Type* Codegen::generate(types::Optional& type) {
     auto* contained = type.type->codegen(*this);
 
-    if (type.type->is_pointer()) {
+    if (is<types::Pointer>(*type.type)) {
         return contained;
     }
 
@@ -266,34 +266,30 @@ bool Codegen::types_equal(Type& lhs, Type& rhs) {
         return true;
     }
 
-    if (lhs.is_pointer() && rhs.is_pointer()) {
-        auto& lhs_pointer = static_cast<types::Pointer&>(lhs);
-        auto& rhs_pointer = static_cast<types::Pointer&>(rhs);
-
-        return lhs_pointer.is_mutable == rhs_pointer.is_mutable &&
-               types_equal(*lhs_pointer.type, *rhs_pointer.type);
+    if (auto* lhs_pointer = dyn_cast<types::Pointer>(lhs)) {
+        if (auto* rhs_pointer = dyn_cast<types::Pointer>(rhs)) {
+            return lhs_pointer->is_mutable == rhs_pointer->is_mutable &&
+                   types_equal(*lhs_pointer->type, *rhs_pointer->type);
+        }
     }
 
-    if (lhs.is_optional() && rhs.is_optional()) {
-        auto& lhs_optional = static_cast<types::Optional&>(lhs);
-        auto& rhs_optional = static_cast<types::Optional&>(rhs);
-
-        return types_equal(*lhs_optional.type, *rhs_optional.type);
+    if (auto* lhs_optional = dyn_cast<types::Optional>(lhs)) {
+        if (auto* rhs_optional = dyn_cast<types::Optional>(rhs)) {
+            return types_equal(*lhs_optional->type, *rhs_optional->type);
+        }
     }
 
-    if (lhs.is_array() && rhs.is_array()) {
-        auto& lhs_array = static_cast<types::Array&>(lhs);
-        auto& rhs_array = static_cast<types::Array&>(rhs);
-
-        return lhs_array.size == rhs_array.size &&
-               types_equal(*lhs_array.type, *rhs_array.type);
+    if (auto* lhs_array = dyn_cast<types::Array>(lhs)) {
+        if (auto* rhs_array = dyn_cast<types::Array>(rhs)) {
+            return lhs_array->size == rhs_array->size &&
+                   types_equal(*lhs_array->type, *rhs_array->type);
+        }
     }
 
-    if (lhs.is_slice() && rhs.is_slice()) {
-        auto& lhs_slice = static_cast<types::Slice&>(lhs);
-        auto& rhs_slice = static_cast<types::Slice&>(rhs);
-
-        return types_equal(*lhs_slice.type, *rhs_slice.type);
+    if (auto* lhs_slice = dyn_cast<types::Slice>(lhs)) {
+        if (auto* rhs_slice = dyn_cast<types::Slice>(rhs)) {
+            return types_equal(*lhs_slice->type, *rhs_slice->type);
+        }
     }
 
     return false;

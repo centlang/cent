@@ -1,6 +1,7 @@
 #ifndef CENT_BACKEND_TYPE_H
 #define CENT_BACKEND_TYPE_H
 
+#include <cstdint>
 #include <string>
 
 #include <llvm/IR/Type.h>
@@ -10,7 +11,39 @@
 namespace cent::backend {
 
 struct Type {
-    [[nodiscard]] Type() = default;
+    enum struct Kind : std::uint8_t {
+        I8,
+        I16,
+        I32,
+        I64,
+        ISize,
+        U8,
+        U16,
+        U32,
+        U64,
+        USize,
+        F32,
+        F64,
+        Str,
+        Bool,
+        Null,
+        Undefined,
+        Void,
+
+        Pointer,
+        Optional,
+        Array,
+        Slice,
+        Tuple,
+
+        Enum,
+        Struct,
+        Union,
+        Function,
+        Alias
+    };
+
+    [[nodiscard]] Type(Kind kind) : kind{kind} {};
     virtual ~Type() = default;
 
     Type(const Type&) = delete;
@@ -22,30 +55,49 @@ struct Type {
     virtual llvm::Type* codegen(backend::Codegen& codegen) = 0;
     virtual std::string to_string() = 0;
 
-    virtual bool is_bool() { return false; }
-    virtual bool is_null() { return false; }
-    virtual bool is_undefined() { return false; }
-    virtual bool is_signed_int() { return false; };
-    virtual bool is_unsigned_int() { return false; };
-    virtual bool is_float() { return false; };
-    virtual bool is_str() { return false; };
-    virtual bool is_pointer() { return false; }
-    virtual bool is_optional() { return false; }
-    virtual bool is_array() { return false; }
-    virtual bool is_slice() { return false; }
-    virtual bool is_tuple() { return false; }
-
-    virtual bool is_function() { return false; }
-    virtual bool is_struct() { return false; }
-    virtual bool is_union() { return false; }
-    virtual bool is_enum() { return false; }
+    const Kind kind;
 };
+
+template <typename Derived> [[nodiscard]] inline bool is(const Type& value) {
+    return Derived::class_of(value);
+}
+
+template <typename DerivedFirst, typename DerivedSecond, typename... Derived>
+[[nodiscard]] inline bool is(const Type& value) {
+    return DerivedFirst::class_of(value) ||
+           is<DerivedSecond, Derived...>(value);
+}
+
+template <typename Derived>
+[[nodiscard]] inline const Derived* dyn_cast(const Type& value) {
+    if (Derived::class_of(value)) {
+        return static_cast<const Derived*>(&value);
+    }
+
+    return nullptr;
+}
+
+template <typename Derived>
+[[nodiscard]] inline Derived* dyn_cast(Type& value) {
+    if (Derived::class_of(value)) {
+        return static_cast<Derived*>(&value);
+    }
+
+    return nullptr;
+}
 
 namespace detail {
 
-template <typename Derived> struct Type : backend::Type {
+template <typename Derived, Type::Kind DerivedKind>
+struct Type : backend::Type {
+    [[nodiscard]] Type() : backend::Type{DerivedKind} {};
+
     [[nodiscard]] llvm::Type* codegen(backend::Codegen& codegen) override {
         return codegen.generate(static_cast<Derived&>(*this));
+    }
+
+    [[nodiscard]] static bool class_of(const backend::Type& type) {
+        return type.kind == DerivedKind;
     }
 };
 

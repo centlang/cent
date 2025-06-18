@@ -5,7 +5,7 @@
 
 namespace cent::backend::types {
 
-struct Alias : detail::Type<Alias> {
+struct Alias : detail::Type<Alias, Type::Kind::Alias> {
     [[nodiscard]] Alias(std::string name, std::shared_ptr<backend::Type> type)
     : name{std::move(name)}, type{std::move(type)} {}
 

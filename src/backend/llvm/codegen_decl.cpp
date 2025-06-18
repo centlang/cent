@@ -253,7 +253,7 @@ std::optional<Value> Codegen::generate(ast::EnumDecl& decl) {
             m_current_scope->scopes[decl.name.value].names[field.name.value] =
                 Value{
                     type, llvm::ConstantInt::get(
-                              llvm_type, number++, type->is_signed_int())};
+                              llvm_type, number++, is_sint(*type))};
 
             continue;
         }
@@ -270,8 +270,8 @@ std::optional<Value> Codegen::generate(ast::EnumDecl& decl) {
 
             if (auto* constant =
                     llvm::dyn_cast<llvm::ConstantInt>(val->value)) {
-                number = enum_type.is_signed_int() ? constant->getSExtValue()
-                                                   : constant->getZExtValue();
+                number = is_sint(enum_type) ? constant->getSExtValue()
+                                            : constant->getZExtValue();
             } else {
                 error(field.value->offset, "not a constant");
 
@@ -364,7 +364,8 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
         }
 
         if (!type) {
-            if (value->type->is_null() || value->type->is_undefined()) {
+            if (is<types::Null>(*value->type) ||
+                is<types::Undefined>(*value->type)) {
                 error(
                     decl.name.offset,
                     fmt::format(
@@ -382,7 +383,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
                 return std::nullopt;
             }
 
-            if (value->type->is_undefined()) {
+            if (is<types::Undefined>(*value->type)) {
                 m_scope.names[decl.name.value] = {
                     type, create_alloca(llvm_type),
                     decl.mutability == ast::VarDecl::Mut::Mut};
@@ -421,7 +422,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
             return std::nullopt;
         }
 
-        if (!value->type->is_undefined()) {
+        if (!is<types::Undefined>(*value->type)) {
             m_builder.CreateStore(load_value(*value).value, m_current_result);
         }
 
@@ -570,7 +571,7 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) {
             return;
         }
 
-        if (param_type->is_pointer() &&
+        if (is<types::Pointer>(*param_type) &&
             types_equal(
                 *static_cast<types::Pointer&>(*param_type).type, *type)) {
             m_methods[type][decl.proto.name.value] = {func_type, function};
@@ -617,8 +618,7 @@ void Codegen::generate_enum(ast::EnumDecl& decl) {
     auto type =
         decl.type ? decl.type->codegen(*this) : m_primitive_types["i32"];
 
-    if (!type->is_signed_int() && !type->is_unsigned_int() &&
-        !type->is_bool()) {
+    if (!is_sint(*type) && !is_uint(*type) && !is<types::Bool>(*type)) {
         error(decl.type->offset, "type mismatch");
         return;
     }

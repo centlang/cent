@@ -10,7 +10,7 @@
 
 namespace cent::backend::types {
 
-struct Union : detail::Type<Union> {
+struct Union : detail::Type<Union, Type::Kind::Union> {
     [[nodiscard]] Union(
         std::string name, llvm::StructType* type,
         std::vector<std::shared_ptr<backend::Type>> fields,
@@ -19,8 +19,6 @@ struct Union : detail::Type<Union> {
       tag_type{std::move(tag_type)} {}
 
     std::string to_string() override { return name; }
-
-    bool is_union() override { return true; };
 
     std::string name;
 

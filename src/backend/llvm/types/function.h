@@ -11,7 +11,7 @@
 
 namespace cent::backend::types {
 
-struct Function : detail::Type<Function> {
+struct Function : detail::Type<Function, Type::Kind::Function> {
     [[nodiscard]] Function(
         std::shared_ptr<backend::Type> return_type,
         std::vector<std::shared_ptr<backend::Type>> param_types,
@@ -32,8 +32,6 @@ struct Function : detail::Type<Function> {
 
         return result + ") " + return_type->to_string();
     }
-
-    bool is_function() override { return true; };
 
     std::shared_ptr<backend::Type> return_type;
     std::vector<std::shared_ptr<backend::Type>> param_types;

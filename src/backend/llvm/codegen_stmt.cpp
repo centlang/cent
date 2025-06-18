@@ -175,10 +175,8 @@ std::optional<Value> Codegen::generate(ast::Switch& stmt) {
         return std::nullopt;
     }
 
-    if (value->type->is_union()) {
-        auto& union_type = static_cast<types::Union&>(*value->type);
-
-        if (!union_type.tag_type) {
+    if (auto* union_type = dyn_cast<types::Union>(*value->type)) {
+        if (!union_type->tag_type) {
             error(stmt.value->offset, "switch on an untagged union");
             return std::nullopt;
         }
@@ -187,12 +185,12 @@ std::optional<Value> Codegen::generate(ast::Switch& stmt) {
             value->value->getType()->isStructTy()
                 ? m_builder.CreateExtractValue(value->value, union_member_tag)
                 : m_builder.CreateLoad(
-                      union_type.tag_type->codegen(*this),
+                      union_type->tag_type->codegen(*this),
                       m_builder.CreateStructGEP(
-                          union_type.codegen(*this), value->value,
+                          union_type->codegen(*this), value->value,
                           union_member_tag));
 
-        value = {union_type.tag_type, tag_member};
+        value = {union_type->tag_type, tag_member};
     } else {
         value = load_value(*value);
     }

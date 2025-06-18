@@ -10,15 +10,13 @@
 
 namespace cent::backend::types {
 
-struct Struct : detail::Type<Struct> {
+struct Struct : detail::Type<Struct, Type::Kind::Struct> {
     [[nodiscard]] Struct(
         std::string name, llvm::StructType* type,
         std::vector<std::shared_ptr<backend::Type>> fields)
     : name{std::move(name)}, type{type}, fields{std::move(fields)} {}
 
     std::string to_string() override { return name; }
-
-    bool is_struct() override { return true; };
 
     std::string name;
 

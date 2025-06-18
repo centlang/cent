@@ -267,6 +267,10 @@ private:
     [[nodiscard]] Attributes parse_attrs(
         ast::Declaration& decl, const std::set<std::string_view>& allowed);
 
+    [[nodiscard]] static bool is_float(const Type& type);
+    [[nodiscard]] static bool is_sint(const Type& type);
+    [[nodiscard]] static bool is_uint(const Type& type);
+
     static constexpr auto optional_member_value = 0;
     static constexpr auto optional_member_bool = 1;
 
