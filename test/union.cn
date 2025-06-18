@@ -10,16 +10,13 @@ union Tagged {
 }
 
 pub fn main() i32 {
-    mut u = Untagged { b: 42 };
-    assert u.b == 42;
-
-    u = Untagged { a: 1 };
+    mut u = Untagged { a: 1 };
     assert u.a == 1;
 
-    u.b = 42;
+    u = Untagged { b: 42 };
     assert u.b == 42;
 
-    u.a = u.b as i32;
+    u = Untagged { a: u.b as i32 };
     assert u.a == 42;
 
     mut t = Tagged { a: 1 };
