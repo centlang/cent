@@ -1,13 +1,19 @@
-union Union {
+!(untagged)
+union Untagged {
+    a: i32,
+    b: i64,
+}
+
+union Tagged {
     a: i32,
     b: i64,
 }
 
 pub fn main() i32 {
-    mut u = Union { b: 42 };
+    mut u = Untagged { b: 42 };
     assert u.b == 42;
 
-    u = Union { a: 1 };
+    u = Untagged { a: 1 };
     assert u.a == 1;
 
     u.b = 42;
@@ -16,5 +22,15 @@ pub fn main() i32 {
     u.a = u.b as i32;
     assert u.a == 42;
 
-    return 0;
+    mut t = Tagged { a: 1 };
+    assert t.a == 1;
+
+    t = Tagged { b: 42 };
+    assert t.b == 42;
+
+    switch t {
+        Tagged::a { return 1; }
+        Tagged::b { return 0; }
+        else { return 42; }
+    }
 }
