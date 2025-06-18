@@ -1,0 +1,41 @@
+fn add(a: i32, b: i32) i32 {
+    return a + b;
+}
+
+fn mul(a: i32, b: i32) i32 {
+    return a * b;
+}
+
+fn max(a: i32, b: i32) i32 {
+    if a >= b {
+        return a;
+    }
+
+    return b;
+}
+
+fn call(func: *fn(a: i32, b: i32) i32, a: i32, b: i32) i32 {
+    return func(a, b);
+}
+
+pub fn main() i32 {
+    let add_func = &add;
+
+    assert call(&add, 42, 42) == 84;
+    assert call(add_func, 42, 42) == 84;
+    assert add_func(42, 42) == 84;
+
+    let mul_func = &mul;
+
+    assert call(mul_func, 42, 42) == 1764;
+    assert call(&mul, 42, 42) == 1764;
+    assert mul_func(42, 42) == 1764;
+
+    let max_func = &max;
+
+    assert call(max_func, -42, 42) == 42;
+    assert call(&max, 42, -42) == 42;
+    assert max_func(-42, 42) == 42;
+
+    return 0;
+}
