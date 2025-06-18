@@ -20,6 +20,7 @@
 #include "ast/decl/var_decl.h"
 
 #include "ast/type/array_type.h"
+#include "ast/type/fn_pointer.h"
 #include "ast/type/named_type.h"
 #include "ast/type/optional.h"
 #include "ast/type/pointer.h"
@@ -343,6 +344,86 @@ std::vector<ast::StructLiteral::Field> Parser::parse_field_values() {
     }
 
     return result;
+}
+
+std::optional<ast::FnProto> Parser::parse_fn_proto() {
+    using enum Token::Type;
+
+    bool variadic = false;
+    std::vector<ast::FnProto::Param> params;
+
+    bool had_default = false;
+
+    auto parse_param = [&] {
+        if (match_next(Ellipsis)) {
+            variadic = true;
+            return;
+        }
+
+        bool is_mutable = false;
+
+        if (match_next(Mut)) {
+            is_mutable = true;
+        }
+
+        auto name = expect("parameter name", Identifier);
+
+        if (!name) {
+            return;
+        }
+
+        std::unique_ptr<ast::Type> type = expect_var_type();
+
+        if (!type) {
+            return;
+        }
+
+        std::unique_ptr<ast::Expression> value = nullptr;
+
+        if (match_next(Equal)) {
+            had_default = true;
+            value = expect_expr(false);
+        } else if (had_default) {
+            return;
+            error(name->offset, "default parameters must be at the end");
+        }
+
+        params.emplace_back(
+            ast::OffsetValue{name->value, name->offset}, std::move(type),
+            std::move(value), is_mutable);
+    };
+
+    auto parse_params = [&] {
+        if (match(Mut, Identifier, Ellipsis)) {
+            parse_param();
+
+            while (!variadic && match_next(Comma)) {
+                parse_param();
+            }
+        }
+    };
+
+    if (!expect("'('", LeftParen)) {
+        return std::nullopt;
+    }
+
+    parse_params();
+
+    if (!expect("')'", RightParen)) {
+        return std::nullopt;
+    }
+
+    std::unique_ptr<ast::Type> return_type = nullptr;
+
+    if (match(Star, QuestionMark, LeftParen, Fn, LeftBracket, Identifier)) {
+        return_type = expect_type();
+
+        if (!return_type) {
+            return std::nullopt;
+        }
+    }
+
+    return ast::FnProto{std::move(params), std::move(return_type), variadic};
 }
 
 std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
@@ -817,6 +898,16 @@ std::unique_ptr<ast::Type> Parser::expect_type() {
         return std::make_unique<ast::TupleType>(offset, std::move(types));
     }
 
+    if (match_next(Fn)) {
+        auto proto = parse_fn_proto();
+
+        if (!proto) {
+            return nullptr;
+        }
+
+        return std::make_unique<ast::FnPointer>(offset, std::move(*proto));
+    }
+
     if (match(LeftBracket)) {
         return parse_array_type();
     }
@@ -1066,62 +1157,6 @@ Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
         return nullptr;
     }
 
-    bool variadic = false;
-    std::vector<ast::FnDecl::Param> params;
-
-    bool had_default = false;
-
-    auto parse_param = [&] {
-        if (match_next(Token::Type::Ellipsis)) {
-            variadic = true;
-            return;
-        }
-
-        bool is_mutable = false;
-
-        if (match_next(Token::Type::Mut)) {
-            is_mutable = true;
-        }
-
-        auto name = expect("parameter name", Token::Type::Identifier);
-
-        if (!name) {
-            return;
-        }
-
-        std::unique_ptr<ast::Type> type = expect_var_type();
-
-        if (!type) {
-            return;
-        }
-
-        std::unique_ptr<ast::Expression> value = nullptr;
-
-        if (match_next(Token::Type::Equal)) {
-            had_default = true;
-            value = expect_expr(false);
-        } else if (had_default) {
-            return;
-            error(name->offset, "default parameters must be at the end");
-        }
-
-        params.emplace_back(
-            ast::OffsetValue{name->value, name->offset}, std::move(type),
-            std::move(value), is_mutable);
-    };
-
-    auto parse_params = [&] {
-        if (match(
-                Token::Type::Mut, Token::Type::Identifier,
-                Token::Type::Ellipsis)) {
-            parse_param();
-
-            while (!variadic && match_next(Token::Type::Comma)) {
-                parse_param();
-            }
-        }
-    };
-
     if (match_next(Token::Type::ColonColon)) {
         type = {name->value, name->offset};
         name = expect("function name", Token::Type::Identifier);
@@ -1131,13 +1166,9 @@ Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
         }
     }
 
-    if (!expect("'('", Token::Type::LeftParen)) {
-        return nullptr;
-    }
+    auto proto = parse_fn_proto();
 
-    parse_params();
-
-    if (!expect("')'", Token::Type::RightParen)) {
+    if (!proto) {
         return nullptr;
     }
 
@@ -1162,13 +1193,8 @@ Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
     }
 
     return std::make_unique<ast::FnDecl>(
-        name->offset,
-        ast::FnDecl::Proto{
-            std::move(type),
-            {name->value, name->offset},
-            std::move(params),
-            std::move(return_type),
-            variadic},
+        name->offset, std::move(type),
+        ast::OffsetValue{name->value, name->offset}, std::move(*proto),
         std::move(body), std::move(attrs), is_public);
 }
 

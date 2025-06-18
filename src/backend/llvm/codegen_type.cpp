@@ -8,6 +8,7 @@
 #include "ast/module.h"
 
 #include "ast/type/array_type.h"
+#include "ast/type/fn_pointer.h"
 #include "ast/type/named_type.h"
 #include "ast/type/optional.h"
 #include "ast/type/pointer.h"
@@ -126,6 +127,10 @@ std::shared_ptr<Type> Codegen::generate(ast::TupleType& type) {
 
     return std::make_shared<types::Tuple>(
         llvm::StructType::create(llvm_types), std::move(types));
+}
+
+std::shared_ptr<Type> Codegen::generate(ast::FnPointer& type) {
+    return generate_fn_type(type.proto);
 }
 
 llvm::Type* Codegen::generate([[maybe_unused]] types::I8& type) {
@@ -257,8 +262,16 @@ llvm::Type* Codegen::generate(types::Slice& type) {
 
 llvm::Type* Codegen::generate(types::Tuple& type) { return type.type; }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::Function& type) {
-    return nullptr;
+llvm::Type* Codegen::generate(types::Function& type) {
+    std::vector<llvm::Type*> llvm_param_types;
+    llvm_param_types.reserve(type.param_types.size());
+
+    for (const auto& parameter : type.param_types) {
+        llvm_param_types.push_back(parameter->codegen(*this));
+    }
+
+    return llvm::FunctionType::get(
+        type.return_type->codegen(*this), llvm_param_types, type.variadic);
 }
 
 bool Codegen::types_equal(Type& lhs, Type& rhs) {
@@ -292,7 +305,84 @@ bool Codegen::types_equal(Type& lhs, Type& rhs) {
         }
     }
 
+    if (auto* lhs_func = dyn_cast<types::Function>(lhs)) {
+        auto* rhs_func = dyn_cast<types::Function>(rhs);
+
+        if (!rhs_func) {
+            return false;
+        }
+
+        if (lhs_func->variadic != rhs_func->variadic) {
+            return false;
+        }
+
+        if (lhs_func->param_types.size() != rhs_func->param_types.size()) {
+            return false;
+        }
+
+        if (!types_equal(*lhs_func->return_type, *rhs_func->return_type)) {
+            return false;
+        }
+
+        for (std::size_t i = 0; i < lhs_func->param_types.size(); ++i) {
+            if (!types_equal(
+                    *lhs_func->param_types[i], *rhs_func->param_types[i])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     return false;
+}
+
+std::shared_ptr<types::Function>
+Codegen::generate_fn_type(ast::FnProto& proto) {
+    auto return_type =
+        proto.return_type ? proto.return_type->codegen(*this) : m_void_type;
+
+    if (!return_type) {
+        return nullptr;
+    }
+
+    std::vector<std::shared_ptr<Type>> param_types;
+    std::vector<llvm::Constant*> default_args;
+
+    param_types.reserve(proto.params.size());
+
+    for (const auto& parameter : proto.params) {
+        auto type = parameter.type->codegen(*this);
+
+        if (!type) {
+            return nullptr;
+        }
+
+        param_types.push_back(type);
+
+        if (!parameter.value) {
+            continue;
+        }
+
+        auto value = parameter.value->codegen(*this);
+
+        if (!value) {
+            return nullptr;
+        }
+
+        auto val = cast(type, *value);
+
+        if (!llvm::isa<llvm::Constant>(val->value)) {
+            error(parameter.value->offset, "not a constant");
+            return nullptr;
+        }
+
+        default_args.push_back(static_cast<llvm::Constant*>(val->value));
+    }
+
+    return std::make_shared<types::Function>(
+        return_type, std::move(param_types), std::move(default_args),
+        proto.variadic);
 }
 
 } // namespace cent::backend

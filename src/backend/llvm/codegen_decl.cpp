@@ -30,43 +30,39 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) {
         generate_fn_proto(decl);
     }
 
-    auto type = decl.proto.type ? get_type(
-                                      decl.proto.type->offset,
-                                      decl.proto.type->value, *m_current_scope)
-                                : nullptr;
+    auto type =
+        decl.type
+            ? get_type(decl.type->offset, decl.type->value, *m_current_scope)
+            : nullptr;
 
     auto get_fn_type = [&]() -> std::shared_ptr<Type> {
-        if (!decl.proto.type) {
-            return m_scope.names[decl.proto.name.value].type;
+        if (!decl.type) {
+            return m_scope.names[decl.name.value].type;
         }
 
-        auto method = m_methods[type].find(decl.proto.name.value);
+        auto method = m_methods[type].find(decl.name.value);
 
         if (method != m_methods[type].end()) {
             return method->second.type;
         }
 
-        return m_scope.scopes[decl.proto.type->value]
-            .names[decl.proto.name.value]
-            .type;
+        return m_scope.scopes[decl.type->value].names[decl.name.value].type;
     };
 
     auto get_llvm_fn = [&]() {
-        if (!decl.proto.type) {
+        if (!decl.type) {
             return static_cast<llvm::Function*>(
-                m_scope.names[decl.proto.name.value].value);
+                m_scope.names[decl.name.value].value);
         }
 
-        auto method = m_methods[type].find(decl.proto.name.value);
+        auto method = m_methods[type].find(decl.name.value);
 
         if (method != m_methods[type].end()) {
             return method->second.function;
         }
 
         return static_cast<llvm::Function*>(
-            m_scope.scopes[decl.proto.type->value]
-                .names[decl.proto.name.value]
-                .value);
+            m_scope.scopes[decl.type->value].names[decl.name.value].value);
     };
 
     auto function_type = get_fn_type();
@@ -104,9 +100,7 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) {
     }
 
     if (!function->getReturnType()->isVoidTy()) {
-        error(
-            decl.proto.name.offset,
-            "non-void function does not return a value");
+        error(decl.name.offset, "non-void function does not return a value");
 
         m_builder.SetInsertPoint(insert_point);
         m_current_function = nullptr;
@@ -463,110 +457,50 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) {
 
     if (!is_extern && !decl.block) {
         error(
-            decl.proto.name.offset,
+            decl.name.offset,
             fmt::format(
-                "{} has no body",
-                log::bold(log::quoted(decl.proto.name.value))));
+                "{} has no body", log::bold(log::quoted(decl.name.value))));
 
         return;
     }
 
-    auto& scope = decl.proto.type
-                      ? m_current_scope->scopes[decl.proto.type->value]
-                      : *m_current_scope;
+    auto& scope = decl.type ? m_current_scope->scopes[decl.type->value]
+                            : *m_current_scope;
 
-    if (scope.names.contains(decl.proto.name.value)) {
+    if (scope.names.contains(decl.name.value)) {
         error(
-            decl.proto.name.offset,
-            fmt::format(
-                "{} is already defined",
-                log::bold(log::quoted(decl.proto.name.value))));
+            decl.name.offset, fmt::format(
+                                  "{} is already defined",
+                                  log::bold(log::quoted(decl.name.value))));
 
         return;
     }
 
-    auto return_type = decl.proto.return_type
-                           ? decl.proto.return_type->codegen(*this)
-                           : m_void_type;
+    auto fn_type = generate_fn_type(decl.proto);
 
-    if (!return_type) {
-        return;
-    }
-
-    auto* llvm_return_type = return_type->codegen(*this);
-    std::vector<llvm::Type*> llvm_param_types;
-
-    std::vector<std::shared_ptr<Type>> param_types;
-    std::vector<llvm::Constant*> default_args;
-
-    llvm_param_types.reserve(decl.proto.params.size());
-    param_types.reserve(decl.proto.params.size());
-
-    for (const auto& parameter : decl.proto.params) {
-        auto type = parameter.type->codegen(*this);
-
-        if (!type) {
-            return;
-        }
-
-        auto* llvm_type = type->codegen(*this);
-
-        llvm_param_types.push_back(llvm_type);
-        param_types.push_back(type);
-
-        if (!parameter.value) {
-            continue;
-        }
-
-        auto value = parameter.value->codegen(*this);
-
-        if (!value) {
-            return;
-        }
-
-        auto val = cast(type, *value);
-
-        if (!llvm::isa<llvm::Constant>(val->value)) {
-            error(parameter.value->offset, "not a constant");
-            return;
-        }
-
-        default_args.push_back(static_cast<llvm::Constant*>(val->value));
-    }
-
-    auto* function_type = llvm::FunctionType::get(
-        llvm_return_type, llvm_param_types, decl.proto.variadic);
+    auto* llvm_fn_type =
+        static_cast<llvm::FunctionType*>(fn_type->codegen(*this));
 
     auto* function = llvm::Function::Create(
-        function_type,
+        llvm_fn_type,
         (decl.is_public || is_extern) ? llvm::Function::ExternalLinkage
                                       : llvm::Function::PrivateLinkage,
-        decl.proto.name.value, *m_module);
+        decl.name.value, *m_module);
 
-    if (!decl.proto.type) {
-        scope.names[decl.proto.name.value] = Value{
-            std::make_shared<types::Function>(
-                return_type, std::move(param_types), std::move(default_args),
-                decl.proto.variadic),
-            function};
-
+    if (!decl.type) {
+        scope.names[decl.name.value] = Value{fn_type, function};
         return;
     }
 
-    auto type = get_type(
-        decl.proto.type->offset, decl.proto.type->value, *m_current_scope);
+    auto type = get_type(decl.type->offset, decl.type->value, *m_current_scope);
 
-    auto func_type = std::make_shared<types::Function>(
-        return_type, std::move(param_types), std::move(default_args),
-        decl.proto.variadic);
-
-    scope.names[decl.proto.name.value] = {func_type, function};
+    scope.names[decl.name.value] = {fn_type, function};
 
     if (!decl.proto.params.empty()) {
         auto param_type = decl.proto.params[0].type->codegen(*this);
 
         if (types_equal(*param_type, *type)) {
-            m_methods[type][decl.proto.name.value] = {func_type, function};
+            m_methods[type][decl.name.value] = {fn_type, function};
 
             return;
         }
@@ -574,7 +508,7 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) {
         if (is<types::Pointer>(*param_type) &&
             types_equal(
                 *static_cast<types::Pointer&>(*param_type).type, *type)) {
-            m_methods[type][decl.proto.name.value] = {func_type, function};
+            m_methods[type][decl.name.value] = {fn_type, function};
         }
     }
 }

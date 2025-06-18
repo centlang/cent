@@ -101,6 +101,12 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) {
             pointer.type, value->value, pointer.is_mutable, false, true};
     }
     case And:
+        if (llvm::isa<llvm::Function>(value->value)) {
+            return Value{
+                std::make_shared<types::Pointer>(value->type, false),
+                value->value};
+        }
+
         if (!llvm::isa<llvm::AllocaInst>(value->value) &&
             !llvm::isa<llvm::GetElementPtrInst>(value->value)) {
             error(expr.offset, "taking the reference of a non-variable value");
@@ -690,15 +696,29 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) {
         return std::nullopt;
     }
 
+    value = load_value(*value);
+
+    auto not_a_function = [&] {
+        error(expr.identifier->offset, "not a function");
+    };
+
     auto* type = dyn_cast<types::Function>(*value->type);
 
     if (!type) {
-        error(expr.identifier->offset, "not a function");
+        auto* pointer = dyn_cast<types::Pointer>(*value->type);
 
-        return std::nullopt;
+        if (!pointer) {
+            not_a_function();
+            return std::nullopt;
+        }
+
+        type = dyn_cast<types::Function>(*pointer->type);
+
+        if (!type) {
+            not_a_function();
+            return std::nullopt;
+        }
     }
-
-    auto* function = static_cast<llvm::Function*>(value->value);
 
     auto arg_size = type->param_types.size();
     auto passed_args_size = expr.arguments.size();
@@ -741,7 +761,11 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) {
         arguments.push_back(type->default_args[i]);
     }
 
-    return Value{type->return_type, m_builder.CreateCall(function, arguments)};
+    return Value{
+        type->return_type,
+        m_builder.CreateCall(
+            static_cast<llvm::FunctionType*>(type->codegen(*this)),
+            value->value, arguments)};
 }
 
 std::optional<Value> Codegen::generate(ast::MethodExpr& expr) {

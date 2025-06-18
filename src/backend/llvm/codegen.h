@@ -28,6 +28,7 @@ struct Optional;
 struct ArrayType;
 struct SliceType;
 struct TupleType;
+struct FnPointer;
 
 struct Module;
 
@@ -61,6 +62,7 @@ struct IndexExpr;
 struct SliceExpr;
 struct AsExpr;
 
+struct FnProto;
 struct FnDecl;
 struct Struct;
 struct Union;
@@ -143,6 +145,7 @@ public:
     std::shared_ptr<Type> generate(ast::ArrayType& type);
     std::shared_ptr<Type> generate(ast::SliceType& type);
     std::shared_ptr<Type> generate(ast::TupleType& type);
+    std::shared_ptr<Type> generate(ast::FnPointer& type);
 
     llvm::Type* generate(types::I8& type);
     llvm::Type* generate(types::I16& type);
@@ -247,6 +250,9 @@ private:
     get_name(std::size_t offset, std::string_view name, Scope& parent);
 
     Scope* get_scope(std::size_t offset, std::string_view name, Scope& parent);
+
+    [[nodiscard]] std::shared_ptr<types::Function>
+    generate_fn_type(ast::FnProto& proto);
 
     void create_panic_fn();
 

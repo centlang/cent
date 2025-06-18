@@ -113,6 +113,8 @@ private:
 
     [[nodiscard]] std::vector<ast::StructLiteral::Field> parse_field_values();
 
+    [[nodiscard]] std::optional<ast::FnProto> parse_fn_proto();
+
     [[nodiscard]] std::unique_ptr<ast::Expression>
     expect_prefix(bool is_condition);
 
