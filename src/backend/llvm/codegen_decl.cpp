@@ -90,8 +90,6 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) {
 
     decl.block->codegen(*this);
 
-    m_last_alloca = nullptr;
-
     if (m_builder.GetInsertBlock()->getTerminator()) {
         m_builder.SetInsertPoint(insert_point);
         m_current_function = nullptr;

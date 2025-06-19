@@ -491,18 +491,13 @@ Value Codegen::load_value(Value& value) {
 }
 
 llvm::Value* Codegen::create_alloca(llvm::Type* type) {
-    if (!m_last_alloca) {
-        m_last_alloca = m_builder.CreateAlloca(type);
-        return m_last_alloca;
-    }
-
     auto* insert_point = m_builder.GetInsertBlock();
 
-    m_builder.SetInsertPoint(m_last_alloca);
-    m_last_alloca = m_builder.CreateAlloca(type);
-
+    m_builder.SetInsertPointPastAllocas(insert_point->getParent());
+    auto* result = m_builder.CreateAlloca(type);
     m_builder.SetInsertPoint(insert_point);
-    return m_last_alloca;
+
+    return result;
 }
 
 std::shared_ptr<Type>
