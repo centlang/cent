@@ -1,12 +1,11 @@
 #ifndef CENT_AST_MODULE_H
 #define CENT_AST_MODULE_H
 
-#include <map>
 #include <memory>
+#include <optional>
+#include <string>
 #include <utility>
 #include <vector>
-
-#include "modules.h"
 
 #include "ast/decl/enum_decl.h"
 #include "ast/decl/fn_decl.h"
@@ -18,7 +17,10 @@
 namespace cent::ast {
 
 struct Module : Node {
-    [[nodiscard]] Module(ModulePath path) : path{std::move(path)} {};
+    [[nodiscard]] Module(
+        std::filesystem::path path,
+        std::optional<std::string> name = std::nullopt)
+    : path{std::move(path)}, name{std::move(name)} {};
 
     std::vector<std::unique_ptr<FnDecl>> functions;
     std::vector<std::unique_ptr<Struct>> structs;
@@ -26,9 +28,10 @@ struct Module : Node {
     std::vector<std::unique_ptr<TypeAlias>> aliases;
     std::vector<std::unique_ptr<EnumDecl>> enums;
     std::vector<std::unique_ptr<VarDecl>> variables;
-    std::map<std::string, std::unique_ptr<Module>> submodules;
+    std::vector<std::unique_ptr<Module>> submodules;
 
-    ModulePath path;
+    std::filesystem::path path;
+    std::optional<std::string> name;
 };
 
 } // namespace cent::ast

@@ -170,11 +170,11 @@ private:
     [[nodiscard]] std::unique_ptr<ast::EnumDecl>
     parse_enum(std::vector<ast::Attribute> attrs, bool is_public = false);
 
-    [[nodiscard]] bool
-    parse_submodule(ast::Module& module, const std::filesystem::path& path);
+    [[nodiscard]] std::unique_ptr<ast::Module>
+    parse_submodule(const std::filesystem::path& path, std::string_view name);
 
-    [[nodiscard]] bool
-    parse_submodule_dir(ast::Module& module, const std::filesystem::path& path);
+    [[nodiscard]] std::unique_ptr<ast::Module> parse_submodule_dir(
+        const std::filesystem::path& path, std::string_view name);
 
     [[nodiscard]] bool parse_with(ast::Module& module);
 

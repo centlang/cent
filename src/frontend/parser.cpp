@@ -42,7 +42,7 @@ std::unique_ptr<ast::Module> Parser::parse() {
         }
     };
 
-    auto result = std::make_unique<ast::Module>(ModulePath{.file = m_filename});
+    auto result = std::make_unique<ast::Module>(m_filename);
 
     auto handle_type = [&](std::vector<ast::Attribute> attrs, bool is_public) {
         if (match(1, Equal)) {
@@ -1300,84 +1300,57 @@ Parser::parse_enum(std::vector<ast::Attribute> attrs, bool is_public) {
         std::move(type), std::move(fields), std::move(attrs), is_public);
 }
 
-bool Parser::parse_submodule(
-    ast::Module& module, const std::filesystem::path& path) {
+std::unique_ptr<ast::Module> Parser::parse_submodule(
+    const std::filesystem::path& path, std::string_view name) {
     auto code = cent::read_file(path);
 
     if (!code) {
-        return false;
+        return nullptr;
     }
 
     Parser parser{*code, path.relative_path().string()};
     auto submodule = parser.parse();
 
     if (!submodule) {
-        return false;
+        return nullptr;
     }
 
-    module.functions.reserve(
-        module.functions.size() + submodule->functions.size());
-
-    module.structs.reserve(module.structs.size() + submodule->structs.size());
-    module.enums.reserve(module.enums.size() + submodule->enums.size());
-
-    for (auto& function : submodule->functions) {
-        module.functions.push_back(std::move(function));
-    }
-
-    for (auto& struct_decl : submodule->structs) {
-        module.structs.push_back(std::move(struct_decl));
-    }
-
-    for (auto& enum_decl : submodule->enums) {
-        module.enums.push_back(std::move(enum_decl));
-    }
-
-    for (auto& variable : submodule->variables) {
-        module.variables.push_back(std::move(variable));
-    }
-
-    for (auto& submodule : submodule->submodules) {
-        module.submodules.insert(std::move(submodule));
-    }
-
-    return true;
+    submodule->name = name;
+    return submodule;
 }
 
-bool Parser::parse_submodule_dir(
-    ast::Module& module, const std::filesystem::path& path) {
+std::unique_ptr<ast::Module> Parser::parse_submodule_dir(
+    const std::filesystem::path& path, std::string_view name) {
+    auto result = std::make_unique<ast::Module>(path, std::string{name});
+
     for (const auto& entry :
          std::filesystem::recursive_directory_iterator{path}) {
         auto name = entry.path().stem().string();
 
-        auto& submodule = module.submodules[name];
-
-        if (!submodule) {
-            submodule = std::make_unique<ast::Module>(ModulePath{});
-        }
-
         if (entry.is_directory()) {
-            submodule->path.directory = entry;
+            auto submodule = parse_submodule_dir(entry, name);
 
-            if (!parse_submodule_dir(*submodule, entry)) {
-                return false;
+            if (!submodule) {
+                return nullptr;
             }
 
-            continue;
+            result->submodules.push_back(std::move(submodule));
         }
 
         if (entry.path().extension() != ".cn") {
             continue;
         }
 
-        submodule->path.file = entry;
+        auto submodule = parse_submodule(entry, name);
 
-        if (!parse_submodule(*submodule, entry)) {
-            return false;
+        if (!submodule) {
+            return nullptr;
         }
+
+        result->submodules.push_back(std::move(submodule));
     }
 
-    return true;
+    return result;
 }
 
 bool Parser::parse_with(ast::Module& module) {
@@ -1415,9 +1388,9 @@ bool Parser::parse_with(ast::Module& module) {
     std::array<std::filesystem::path, 1> search_paths = {
         std::filesystem::path{m_filename}.parent_path()};
 
-    auto module_path = cent::find_module(path, search_paths);
+    auto module_paths = cent::find_module(path, search_paths);
 
-    if (!module_path.directory && !module_path.file) {
+    if (module_paths.empty()) {
         error(
             name->offset, fmt::format(
                               "could not find module {}",
@@ -1426,24 +1399,21 @@ bool Parser::parse_with(ast::Module& module) {
         return false;
     }
 
-    if (!module.submodules[module_name]) {
-        module.submodules[module_name] =
-            std::make_unique<ast::Module>(module_path);
-    }
+    for (const auto& module_path : module_paths) {
+        auto name = module_path.stem().string();
 
-    auto& submodule = module.submodules[module_name];
+        auto submodule = std::filesystem::is_directory(module_path)
+                             ? parse_submodule_dir(module_path, name)
+                             : parse_submodule(module_path, name);
 
-    if (module_path.file) {
-        if (!parse_submodule(*submodule, *module_path.file)) {
+        if (!submodule) {
             return false;
         }
+
+        module.submodules.push_back(std::move(submodule));
     }
 
-    if (!module_path.directory) {
-        return true;
-    }
-
-    return parse_submodule_dir(*submodule, *module_path.directory);
+    return true;
 }
 
 } // namespace cent::frontend

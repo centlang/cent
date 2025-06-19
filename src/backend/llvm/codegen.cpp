@@ -51,23 +51,21 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
 }
 
 void Codegen::generate(ast::Module& module, bool is_submodule) {
-    if (module.path.file) {
-        auto iterator = m_generated_modules.find(*module.path.file);
+    auto iterator = m_generated_modules.find(module.path);
 
-        if (iterator != m_generated_modules.end()) {
-            *m_current_scope = iterator->second;
-            return;
-        }
+    if (iterator != m_generated_modules.end()) {
+        *m_current_scope = iterator->second;
+        return;
     }
 
     auto* scope = m_current_scope;
     auto scope_prefix = m_current_scope_prefix;
 
     for (auto& submodule : module.submodules) {
-        m_current_scope = &scope->scopes[submodule.first];
-        m_current_scope_prefix += submodule.first + "::";
+        m_current_scope = &scope->scopes[*submodule->name];
+        m_current_scope_prefix += *submodule->name + "::";
 
-        generate(*submodule.second, true);
+        generate(*submodule, true);
     }
 
     m_current_scope = scope;
@@ -151,9 +149,7 @@ void Codegen::generate(ast::Module& module, bool is_submodule) {
         }
     }
 
-    if (module.path.file) {
-        m_generated_modules[*module.path.file] = *m_current_scope;
-    }
+    m_generated_modules[module.path] = *m_current_scope;
 }
 
 std::optional<Value>
