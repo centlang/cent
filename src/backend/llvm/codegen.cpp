@@ -58,16 +58,19 @@ void Codegen::generate(ast::Module& module, bool is_submodule) {
         return;
     }
 
+    auto filename = m_filename;
     auto* scope = m_current_scope;
     auto scope_prefix = m_current_scope_prefix;
 
     for (auto& submodule : module.submodules) {
+        m_filename = submodule->path.string();
         m_current_scope = &scope->scopes[*submodule->name];
         m_current_scope_prefix += *submodule->name + "::";
 
         generate(*submodule, true);
     }
 
+    m_filename = filename;
     m_current_scope = scope;
     m_current_scope_prefix = scope_prefix;
 

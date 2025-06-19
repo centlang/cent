@@ -328,7 +328,7 @@ private:
     std::unique_ptr<ast::Module> m_program;
 
     std::string_view m_source;
-    std::string_view m_filename;
+    std::string m_filename;
 
     bool m_had_error{false};
 };
