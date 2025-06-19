@@ -478,6 +478,15 @@ Value Codegen::load_value(Value& value) {
             value.type, m_builder.CreateLoad(value.type->codegen(*this), ptr)};
     }
 
+    if (auto* constant =
+            llvm::dyn_cast_or_null<llvm::ConstantExpr>(value.value)) {
+        if (constant->getOpcode() == llvm::Instruction::GetElementPtr) {
+            return Value{
+                value.type,
+                m_builder.CreateLoad(value.type->codegen(*this), constant)};
+        }
+    }
+
     return value;
 }
 
