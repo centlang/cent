@@ -24,6 +24,7 @@
 #include "ast/type/named_type.h"
 #include "ast/type/optional.h"
 #include "ast/type/pointer.h"
+#include "ast/type/range_type.h"
 #include "ast/type/slice_type.h"
 #include "ast/type/tuple_type.h"
 
@@ -909,6 +910,16 @@ std::unique_ptr<ast::Type> Parser::expect_type() {
 
     if (match(LeftBracket)) {
         return parse_array_type();
+    }
+
+    if (match_next(DotDot)) {
+        auto type = expect_type();
+
+        if (!type) {
+            return nullptr;
+        }
+
+        return std::make_unique<ast::RangeType>(offset, std::move(type));
     }
 
     std::vector<ast::OffsetValue<std::string>> value;

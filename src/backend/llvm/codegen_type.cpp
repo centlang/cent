@@ -12,6 +12,7 @@
 #include "ast/type/named_type.h"
 #include "ast/type/optional.h"
 #include "ast/type/pointer.h"
+#include "ast/type/range_type.h"
 #include "ast/type/slice_type.h"
 #include "ast/type/tuple_type.h"
 
@@ -129,6 +130,16 @@ std::shared_ptr<Type> Codegen::generate(ast::TupleType& type) {
         llvm::StructType::create(llvm_types), std::move(types));
 }
 
+std::shared_ptr<Type> Codegen::generate(ast::RangeType& type) {
+    auto contained = type.type->codegen(*this);
+
+    if (!contained) {
+        return nullptr;
+    }
+
+    return std::make_shared<types::Range>(contained);
+}
+
 std::shared_ptr<Type> Codegen::generate(ast::FnPointer& type) {
     return generate_fn_type(type.proto);
 }
@@ -232,12 +243,26 @@ llvm::Type* Codegen::generate(types::Optional& type) {
         return iterator->second;
     }
 
-    std::array<llvm::Type*, 2> fields = {
-        contained, llvm::Type::getInt1Ty(m_context)};
-
-    auto* llvm_type = llvm::StructType::create(fields);
+    auto* llvm_type =
+        llvm::StructType::create({contained, llvm::Type::getInt1Ty(m_context)});
 
     m_optional_types[contained] = llvm_type;
+
+    return llvm_type;
+}
+
+llvm::Type* Codegen::generate(types::Range& type) {
+    auto* contained = type.type->codegen(*this);
+
+    auto iterator = m_range_types.find(contained);
+
+    if (iterator != m_range_types.end()) {
+        return iterator->second;
+    }
+
+    auto* llvm_type = llvm::StructType::create({contained, contained});
+
+    m_range_types[contained] = llvm_type;
 
     return llvm_type;
 }
@@ -289,6 +314,12 @@ bool Codegen::types_equal(Type& lhs, Type& rhs) {
     if (auto* lhs_optional = dyn_cast<types::Optional>(lhs)) {
         if (auto* rhs_optional = dyn_cast<types::Optional>(rhs)) {
             return types_equal(*lhs_optional->type, *rhs_optional->type);
+        }
+    }
+
+    if (auto* lhs_range = dyn_cast<types::Range>(lhs)) {
+        if (auto* rhs_range = dyn_cast<types::Range>(rhs)) {
+            return types_equal(*lhs_range->type, *rhs_range->type);
         }
     }
 

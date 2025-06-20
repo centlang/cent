@@ -101,6 +101,15 @@ struct Optional : detail::Type<Optional, Type::Kind::Optional> {
     std::shared_ptr<backend::Type> type;
 };
 
+struct Range : detail::Type<Range, Type::Kind::Range> {
+    [[nodiscard]] Range(std::shared_ptr<backend::Type> type)
+    : type{std::move(type)} {}
+
+    std::string to_string() override { return ".." + type->to_string(); }
+
+    std::shared_ptr<backend::Type> type;
+};
+
 struct Array : detail::Type<Array, Type::Kind::Array> {
     [[nodiscard]] Array(std::shared_ptr<backend::Type> type, std::size_t size)
     : type{std::move(type)}, size{size} {}

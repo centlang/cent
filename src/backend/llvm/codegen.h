@@ -28,6 +28,7 @@ struct Optional;
 struct ArrayType;
 struct SliceType;
 struct TupleType;
+struct RangeType;
 struct FnPointer;
 
 struct Module;
@@ -104,6 +105,7 @@ struct Void;
 
 struct Pointer;
 struct Optional;
+struct Range;
 
 struct Array;
 struct Slice;
@@ -145,6 +147,7 @@ public:
     std::shared_ptr<Type> generate(ast::ArrayType& type);
     std::shared_ptr<Type> generate(ast::SliceType& type);
     std::shared_ptr<Type> generate(ast::TupleType& type);
+    std::shared_ptr<Type> generate(ast::RangeType& type);
     std::shared_ptr<Type> generate(ast::FnPointer& type);
 
     llvm::Type* generate(types::I8& type);
@@ -171,6 +174,7 @@ public:
 
     llvm::Type* generate(types::Pointer& type);
     llvm::Type* generate(types::Optional& type);
+    llvm::Type* generate(types::Range& type);
 
     llvm::Type* generate(types::Array& type);
     llvm::Type* generate(types::Slice& type);
@@ -324,6 +328,7 @@ private:
     llvm::Function* m_panic_fn{};
 
     std::map<llvm::Type*, llvm::StructType*> m_optional_types;
+    std::map<llvm::Type*, llvm::StructType*> m_range_types;
 
     std::unique_ptr<ast::Module> m_program;
 

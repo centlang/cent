@@ -32,6 +32,7 @@ struct Type {
 
         Pointer,
         Optional,
+        Range,
         Array,
         Slice,
         Tuple,
