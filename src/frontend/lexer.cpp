@@ -296,6 +296,16 @@ void Lexer::number() {
         return;
     }
 
+    std::size_t offset = m_offset;
+    get();
+
+    if (!is_digit(peek())) {
+        m_offset = offset;
+        return;
+    }
+
+    m_token.value += '.';
+
     m_token.value += get();
     m_token.type = Token::Type::FloatLiteral;
 
