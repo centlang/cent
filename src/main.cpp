@@ -23,7 +23,7 @@
 #include "log.h"
 #include "util.h"
 
-void help() { fmt::print("Usage: centc FILE...\n"); }
+void help() { fmt::print("Usage: centc [options] FILE...\n"); }
 
 int main(int argc, char** argv) {
     std::span args{argv, static_cast<std::size_t>(argc)};
