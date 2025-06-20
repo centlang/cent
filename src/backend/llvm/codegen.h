@@ -52,6 +52,7 @@ struct StrLiteral;
 struct BoolLiteral;
 struct NullLiteral;
 struct Undefined;
+struct RangeLiteral;
 struct StructLiteral;
 struct ArrayLiteral;
 struct TupleLiteral;
@@ -205,6 +206,7 @@ public:
     std::optional<Value> generate(ast::BoolLiteral& expr);
     std::optional<Value> generate(ast::NullLiteral& expr);
     std::optional<Value> generate(ast::Undefined& expr);
+    std::optional<Value> generate(ast::RangeLiteral& expr);
     std::optional<Value> generate(ast::StructLiteral& expr);
     std::optional<Value> generate(ast::ArrayLiteral& expr);
     std::optional<Value> generate(ast::TupleLiteral& expr);
@@ -289,6 +291,9 @@ private:
 
     static constexpr auto union_member_value = 0;
     static constexpr auto union_member_tag = 1;
+
+    static constexpr auto range_member_begin = 0;
+    static constexpr auto range_member_end = 1;
 
     llvm::LLVMContext m_context;
     std::unique_ptr<llvm::Module> m_module;

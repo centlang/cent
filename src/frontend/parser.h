@@ -131,6 +131,9 @@ private:
     expect_bin_expr(bool is_condition, std::uint8_t precedence = 1);
 
     [[nodiscard]] std::unique_ptr<ast::Expression>
+    expect_range_expr(bool is_condition);
+
+    [[nodiscard]] std::unique_ptr<ast::Expression>
     expect_expr(bool is_condition);
 
     [[nodiscard]] std::unique_ptr<ast::Type> expect_var_type();

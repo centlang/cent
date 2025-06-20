@@ -708,8 +708,30 @@ Parser::expect_bin_expr(bool is_condition, std::uint8_t precedence) {
     return expression;
 }
 
+std::unique_ptr<ast::Expression> Parser::expect_range_expr(bool is_condition) {
+    auto begin = expect_bin_expr(is_condition);
+
+    if (!begin) {
+        next();
+        return nullptr;
+    }
+
+    if (!match_next(Token::Type::DotDot)) {
+        return begin;
+    }
+
+    auto end = expect_bin_expr(is_condition);
+
+    if (!end) {
+        return nullptr;
+    }
+
+    return std::make_unique<ast::RangeLiteral>(
+        begin->offset, std::move(begin), std::move(end));
+}
+
 std::unique_ptr<ast::Expression> Parser::expect_expr(bool is_condition) {
-    return expect_bin_expr(is_condition);
+    return expect_range_expr(is_condition);
 }
 
 std::unique_ptr<ast::BlockStmt> Parser::expect_block() {

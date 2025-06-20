@@ -49,6 +49,16 @@ struct Undefined : detail::Expr<Undefined> {
     using Expr::Expr;
 };
 
+struct RangeLiteral : detail::Expr<RangeLiteral> {
+    [[nodiscard]] RangeLiteral(
+        std::size_t offset, std::unique_ptr<Expression> begin,
+        std::unique_ptr<Expression> end)
+    : Expr{offset}, begin{std::move(begin)}, end{std::move(end)} {}
+
+    std::unique_ptr<Expression> begin;
+    std::unique_ptr<Expression> end;
+};
+
 struct StructLiteral : detail::Expr<StructLiteral> {
     struct Field {
         OffsetValue<std::string> name;

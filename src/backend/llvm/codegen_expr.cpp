@@ -371,6 +371,56 @@ std::optional<Value> Codegen::generate([[maybe_unused]] ast::Undefined& expr) {
     return Value{m_undefined_type, nullptr};
 }
 
+std::optional<Value> Codegen::generate(ast::RangeLiteral& expr) {
+    auto begin = expr.begin->codegen(*this);
+    auto end = expr.end->codegen(*this);
+
+    if (!begin || !end) {
+        return std::nullopt;
+    }
+
+    auto begin_value = load_value(*begin);
+    auto end_value = load_value(*end);
+
+    auto right = cast(begin_value.type, end_value);
+
+    if (!right) {
+        type_mismatch(expr.begin->offset, *begin_value.type, *end_value.type);
+
+        return std::nullopt;
+    }
+
+    auto type = std::make_shared<types::Range>(begin_value.type);
+    auto* llvm_type = type->codegen(*this);
+
+    if (auto* begin_constant =
+            llvm::dyn_cast<llvm::Constant>(begin_value.value)) {
+        if (auto* end_constant =
+                llvm::dyn_cast<llvm::Constant>(end_value.value)) {
+            return Value{
+                type, llvm::ConstantStruct::get(
+                          static_cast<llvm::StructType*>(llvm_type),
+                          {begin_constant, end_constant})};
+        }
+    }
+
+    bool stack_allocated = m_current_result == nullptr;
+
+    auto* variable =
+        m_current_result ? m_current_result : create_alloca(llvm_type);
+
+    auto* begin_ptr =
+        m_builder.CreateStructGEP(llvm_type, variable, range_member_begin);
+
+    auto* end_ptr =
+        m_builder.CreateStructGEP(llvm_type, variable, range_member_end);
+
+    m_builder.CreateStore(begin_value.value, begin_ptr);
+    m_builder.CreateStore(end_value.value, end_ptr);
+
+    return Value{type, variable, false, false, false, stack_allocated};
+}
+
 std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
     auto type = expr.type->codegen(*this);
 
