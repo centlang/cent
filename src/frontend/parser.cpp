@@ -73,8 +73,6 @@ std::unique_ptr<ast::Module> Parser::parse() {
             continue;
         }
 
-        auto attrs = parse_attrs();
-
         if (match_next(With)) {
             if (!parse_with(*result)) {
                 skip_until_decl();
@@ -86,6 +84,7 @@ std::unique_ptr<ast::Module> Parser::parse() {
             continue;
         }
 
+        auto attrs = parse_attrs();
         bool is_public = false;
 
         if (match_next(Pub)) {
