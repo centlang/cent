@@ -85,12 +85,14 @@ struct Token {
         With,
 
         As,
+        In,
 
         If,
         Else,
         Switch,
 
         While,
+        For,
 
         Let,
         Mut,

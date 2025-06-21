@@ -146,6 +146,8 @@ private:
 
     void parse_while(ast::BlockStmt& block);
 
+    void parse_for(ast::BlockStmt& block);
+
     void parse_return(ast::BlockStmt& block);
 
     void parse_assignment(

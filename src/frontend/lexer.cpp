@@ -433,6 +433,11 @@ void Lexer::ident() {
         return;
     }
 
+    if (m_token.value == "in") {
+        keyword(In);
+        return;
+    }
+
     if (m_token.value == "if") {
         keyword(If);
         return;
@@ -450,6 +455,11 @@ void Lexer::ident() {
 
     if (m_token.value == "while") {
         keyword(While);
+        return;
+    }
+
+    if (m_token.value == "for") {
+        keyword(For);
         return;
     }
 

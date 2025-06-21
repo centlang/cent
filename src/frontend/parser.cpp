@@ -12,6 +12,7 @@
 #include "ast/stmt/assignment.h"
 #include "ast/stmt/break_stmt.h"
 #include "ast/stmt/continue_stmt.h"
+#include "ast/stmt/for_loop.h"
 #include "ast/stmt/return_stmt.h"
 #include "ast/stmt/switch.h"
 #include "ast/stmt/unreachable.h"
@@ -175,6 +176,9 @@ void Parser::expect_stmt(ast::BlockStmt& block) {
         return;
     case While:
         parse_while(block);
+        return;
+    case For:
+        parse_for(block);
         return;
     case Return:
         parse_return(block);
@@ -1040,6 +1044,35 @@ void Parser::parse_while(ast::BlockStmt& block) {
 
     block.body.push_back(std::make_unique<ast::WhileLoop>(
         offset, std::move(condition), std::move(body)));
+}
+
+void Parser::parse_for(ast::BlockStmt& block) {
+    auto offset = get().offset;
+    auto name = expect("variable name", Token::Type::Identifier);
+
+    if (!name) {
+        return;
+    }
+
+    if (!expect("'in'", Token::Type::In)) {
+        return;
+    }
+
+    auto value = expect_expr(true);
+
+    if (!value) {
+        return;
+    }
+
+    auto body = expect_block();
+
+    if (!body) {
+        return;
+    }
+
+    block.body.push_back(std::make_unique<ast::ForLoop>(
+        offset, ast::OffsetValue{std::move(name->value), name->offset},
+        std::move(value), std::move(body)));
 }
 
 void Parser::parse_return(ast::BlockStmt& block) {

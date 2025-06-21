@@ -9,6 +9,7 @@
 #include "ast/stmt/block_stmt.h"
 #include "ast/stmt/break_stmt.h"
 #include "ast/stmt/continue_stmt.h"
+#include "ast/stmt/for_loop.h"
 #include "ast/stmt/if_else.h"
 #include "ast/stmt/return_stmt.h"
 #include "ast/stmt/switch.h"
@@ -18,6 +19,7 @@
 #include "backend/llvm/codegen.h"
 #include "backend/llvm/types/enum.h"
 #include "backend/llvm/types/function.h"
+#include "backend/llvm/types/primitive.h"
 #include "backend/llvm/types/union.h"
 #include "backend/llvm/value.h"
 
@@ -314,6 +316,89 @@ std::optional<Value> Codegen::generate(ast::WhileLoop& stmt) {
 
     m_builder.CreateCondBr(
         load_value(*condition).value, m_loop_body, m_loop_end);
+
+    m_builder.SetInsertPoint(m_loop_end);
+
+    m_loop_body = nullptr;
+    m_loop_end = nullptr;
+
+    return std::nullopt;
+}
+
+std::optional<Value> Codegen::generate(ast::ForLoop& stmt) {
+    auto value = stmt.value->codegen(*this);
+
+    if (!value) {
+        return std::nullopt;
+    }
+
+    auto* range_type = dyn_cast<types::Range>(*value->type);
+
+    if (!range_type) {
+        error(stmt.value->offset, "not a range");
+
+        return std::nullopt;
+    }
+
+    auto* llvm_type = range_type->codegen(*this);
+    auto* llvm_contained_type = range_type->type->codegen(*this);
+
+    llvm::Value* begin = nullptr;
+    llvm::Value* end = nullptr;
+
+    if (value->value->getType()->isStructTy()) {
+        begin = m_builder.CreateExtractValue(value->value, range_member_begin);
+        end = m_builder.CreateExtractValue(value->value, range_member_end);
+    } else {
+        begin = m_builder.CreateLoad(
+            llvm_contained_type,
+            m_builder.CreateStructGEP(
+                llvm_type, value->value, range_member_begin));
+
+        end = m_builder.CreateLoad(
+            llvm_contained_type,
+            m_builder.CreateStructGEP(
+                llvm_type, value->value, range_member_end));
+    }
+
+    if (!is_sint(*range_type->type) && !is_uint(*range_type->type)) {
+        error(stmt.value->offset, "type mismatch");
+
+        return std::nullopt;
+    }
+
+    auto* function = m_builder.GetInsertBlock()->getParent();
+
+    m_loop_body = llvm::BasicBlock::Create(m_context, "", function);
+    m_loop_end = llvm::BasicBlock::Create(m_context, "", function);
+
+    auto* variable = create_alloca(llvm_contained_type);
+    m_builder.CreateStore(begin, variable);
+
+    m_builder.CreateCondBr(
+        is_sint(*value->type) ? m_builder.CreateICmpSLT(begin, end)
+                              : m_builder.CreateICmpULT(begin, end),
+        m_loop_body, m_loop_end);
+
+    m_builder.SetInsertPoint(m_loop_body);
+
+    auto current_scope = *m_current_scope;
+
+    m_current_scope->names[stmt.name.value] = {range_type->type, variable};
+    stmt.body->codegen(*this);
+
+    *m_current_scope = current_scope;
+
+    auto* incremented = m_builder.CreateAdd(
+        m_builder.CreateLoad(llvm_contained_type, variable),
+        llvm::ConstantInt::get(llvm_contained_type, 1));
+
+    m_builder.CreateStore(incremented, variable);
+
+    m_builder.CreateCondBr(
+        is_sint(*value->type) ? m_builder.CreateICmpSLT(incremented, end)
+                              : m_builder.CreateICmpULT(incremented, end),
+        m_loop_body, m_loop_end);
 
     m_builder.SetInsertPoint(m_loop_end);
 

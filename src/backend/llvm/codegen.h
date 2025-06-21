@@ -39,6 +39,7 @@ struct IfElse;
 struct Switch;
 struct ReturnStmt;
 struct WhileLoop;
+struct ForLoop;
 struct BreakStmt;
 struct ContinueStmt;
 struct Unreachable;
@@ -193,6 +194,7 @@ public:
     std::optional<Value> generate(ast::Switch& stmt);
     std::optional<Value> generate(ast::ReturnStmt& stmt);
     std::optional<Value> generate(ast::WhileLoop& stmt);
+    std::optional<Value> generate(ast::ForLoop& stmt);
     std::optional<Value> generate(ast::BreakStmt& stmt);
     std::optional<Value> generate(ast::ContinueStmt& stmt);
     std::optional<Value> generate(ast::Unreachable& stmt);
