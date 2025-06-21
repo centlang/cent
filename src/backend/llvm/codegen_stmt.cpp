@@ -303,6 +303,9 @@ std::optional<Value> Codegen::generate(ast::WhileLoop& stmt) {
 
     auto* function = m_builder.GetInsertBlock()->getParent();
 
+    auto* loop_body = m_loop_body;
+    auto* loop_end = m_loop_end;
+
     m_loop_body = llvm::BasicBlock::Create(m_context, "", function);
     m_loop_end = llvm::BasicBlock::Create(m_context, "", function);
 
@@ -319,8 +322,8 @@ std::optional<Value> Codegen::generate(ast::WhileLoop& stmt) {
 
     m_builder.SetInsertPoint(m_loop_end);
 
-    m_loop_body = nullptr;
-    m_loop_end = nullptr;
+    m_loop_body = loop_body;
+    m_loop_end = loop_end;
 
     return std::nullopt;
 }
@@ -369,6 +372,9 @@ std::optional<Value> Codegen::generate(ast::ForLoop& stmt) {
 
     auto* function = m_builder.GetInsertBlock()->getParent();
 
+    auto* loop_body = m_loop_body;
+    auto* loop_end = m_loop_end;
+
     m_loop_body = llvm::BasicBlock::Create(m_context, "", function);
     m_loop_end = llvm::BasicBlock::Create(m_context, "", function);
 
@@ -402,8 +408,8 @@ std::optional<Value> Codegen::generate(ast::ForLoop& stmt) {
 
     m_builder.SetInsertPoint(m_loop_end);
 
-    m_loop_body = nullptr;
-    m_loop_end = nullptr;
+    m_loop_body = loop_body;
+    m_loop_end = loop_end;
 
     return std::nullopt;
 }
