@@ -375,9 +375,58 @@ std::optional<Value> Codegen::generate(ast::ForLoop& stmt) {
 
         m_current_scope->names[stmt.name.value] = {
             type->type, m_builder.CreateLoad(
-                            llvm_contained_type, m_builder.CreateGEP(
-                                                     type->type->codegen(*this),
-                                                     ptr_value, index_value))};
+                            llvm_contained_type,
+                            m_builder.CreateGEP(
+                                llvm_contained_type, ptr_value, index_value))};
+
+        stmt.body->codegen(*this);
+
+        *m_current_scope = current_scope;
+
+        auto* incremented =
+            m_builder.CreateAdd(index_value, llvm::ConstantInt::get(usize, 1));
+
+        m_builder.CreateStore(incremented, index);
+
+        m_builder.CreateCondBr(
+            m_builder.CreateICmpULT(incremented, length), m_loop_body,
+            m_loop_end);
+
+        m_builder.SetInsertPoint(m_loop_end);
+
+        m_loop_body = loop_body;
+        m_loop_end = loop_end;
+
+        return std::nullopt;
+    }
+
+    if (auto* type = dyn_cast<types::Array>(*value->type)) {
+        auto* llvm_contained_type = type->type->codegen(*this);
+
+        auto* usize = m_module->getDataLayout().getIntPtrType(m_context);
+        auto* usize_null = llvm::ConstantInt::get(usize, 0);
+
+        auto* index = create_alloca(usize);
+        m_builder.CreateStore(usize_null, index);
+
+        auto* length = llvm::ConstantInt::get(usize, type->size);
+
+        m_builder.CreateCondBr(
+            m_builder.CreateICmpULT(usize_null, length), m_loop_body,
+            m_loop_end);
+
+        m_builder.SetInsertPoint(m_loop_body);
+
+        auto current_scope = *m_current_scope;
+
+        auto* index_value = m_builder.CreateLoad(usize, index);
+
+        m_current_scope->names[stmt.name.value] = {
+            type->type,
+            m_builder.CreateLoad(
+                llvm_contained_type,
+                m_builder.CreateGEP(
+                    llvm_contained_type, value->value, index_value))};
 
         stmt.body->codegen(*this);
 
