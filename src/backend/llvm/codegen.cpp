@@ -173,6 +173,10 @@ Codegen::cast(std::shared_ptr<Type>& type, Value& value, bool implicit) {
         return value;
     }
 
+    if (is<types::Void>(*type)) {
+        return std::nullopt;
+    }
+
     auto* llvm_type = type->codegen(*this);
 
     if (auto* optional = dyn_cast<types::Optional>(*type)) {
