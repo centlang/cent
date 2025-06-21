@@ -335,16 +335,80 @@ std::optional<Value> Codegen::generate(ast::ForLoop& stmt) {
         return std::nullopt;
     }
 
-    auto* range_type = dyn_cast<types::Range>(*value->type);
+    auto* function = m_builder.GetInsertBlock()->getParent();
 
-    if (!range_type) {
-        error(stmt.value->offset, "not a range");
+    auto* loop_body = m_loop_body;
+    auto* loop_end = m_loop_end;
+
+    m_loop_body = llvm::BasicBlock::Create(m_context, "", function);
+    m_loop_end = llvm::BasicBlock::Create(m_context, "", function);
+
+    auto* llvm_type = value->type->codegen(*this);
+
+    if (auto* type = dyn_cast<types::Slice>(*value->type)) {
+        auto* llvm_contained_type = type->type->codegen(*this);
+
+        auto* usize = m_module->getDataLayout().getIntPtrType(m_context);
+        auto* usize_null = llvm::ConstantInt::get(usize, 0);
+
+        auto* index = create_alloca(usize);
+        m_builder.CreateStore(usize_null, index);
+
+        auto* length = m_builder.CreateLoad(
+            usize, m_builder.CreateStructGEP(
+                       llvm_type, value->value, slice_member_len));
+
+        m_builder.CreateCondBr(
+            m_builder.CreateICmpULT(usize_null, length), m_loop_body,
+            m_loop_end);
+
+        m_builder.SetInsertPoint(m_loop_body);
+
+        auto current_scope = *m_current_scope;
+
+        auto* ptr_value = m_builder.CreateLoad(
+            llvm::PointerType::get(m_context, 0),
+            m_builder.CreateStructGEP(
+                type->codegen(*this), value->value, slice_member_ptr));
+
+        auto* index_value = m_builder.CreateLoad(usize, index);
+
+        m_current_scope->names[stmt.name.value] = {
+            type->type, m_builder.CreateLoad(
+                            llvm_contained_type, m_builder.CreateGEP(
+                                                     type->type->codegen(*this),
+                                                     ptr_value, index_value))};
+
+        stmt.body->codegen(*this);
+
+        *m_current_scope = current_scope;
+
+        auto* incremented =
+            m_builder.CreateAdd(index_value, llvm::ConstantInt::get(usize, 1));
+
+        m_builder.CreateStore(incremented, index);
+
+        m_builder.CreateCondBr(
+            m_builder.CreateICmpULT(incremented, length), m_loop_body,
+            m_loop_end);
+
+        m_builder.SetInsertPoint(m_loop_end);
+
+        m_loop_body = loop_body;
+        m_loop_end = loop_end;
 
         return std::nullopt;
     }
 
-    auto* llvm_type = range_type->codegen(*this);
-    auto* llvm_contained_type = range_type->type->codegen(*this);
+    auto* type = dyn_cast<types::Range>(*value->type);
+
+    if (!type) {
+        error(stmt.value->offset, "not iterable");
+
+        return std::nullopt;
+    }
+
+    auto* llvm_contained_type = type->type->codegen(*this);
 
     llvm::Value* begin = nullptr;
     llvm::Value* end = nullptr;
@@ -364,19 +428,11 @@ std::optional<Value> Codegen::generate(ast::ForLoop& stmt) {
                 llvm_type, value->value, range_member_end));
     }
 
-    if (!is_sint(*range_type->type) && !is_uint(*range_type->type)) {
+    if (!is_sint(*type->type) && !is_uint(*type->type)) {
         error(stmt.value->offset, "type mismatch");
 
         return std::nullopt;
     }
-
-    auto* function = m_builder.GetInsertBlock()->getParent();
-
-    auto* loop_body = m_loop_body;
-    auto* loop_end = m_loop_end;
-
-    m_loop_body = llvm::BasicBlock::Create(m_context, "", function);
-    m_loop_end = llvm::BasicBlock::Create(m_context, "", function);
 
     auto* variable = create_alloca(llvm_contained_type);
     m_builder.CreateStore(begin, variable);
@@ -390,7 +446,7 @@ std::optional<Value> Codegen::generate(ast::ForLoop& stmt) {
 
     auto current_scope = *m_current_scope;
 
-    m_current_scope->names[stmt.name.value] = {range_type->type, variable};
+    m_current_scope->names[stmt.name.value] = {type->type, variable};
     stmt.body->codegen(*this);
 
     *m_current_scope = current_scope;
