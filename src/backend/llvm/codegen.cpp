@@ -515,6 +515,26 @@ llvm::Value* Codegen::create_alloca(llvm::Type* type) {
     return result;
 }
 
+llvm::Value* Codegen::load_struct_member(
+    llvm::Type* struct_type, llvm::Type* member_type, llvm::Value* value,
+    std::uint32_t index) {
+    if (value->getType()->isStructTy()) {
+        return m_builder.CreateExtractValue(value, index);
+    }
+
+    return m_builder.CreateLoad(
+        member_type, m_builder.CreateStructGEP(struct_type, value, index));
+}
+
+llvm::Value* Codegen::create_gep_or_extract(
+    llvm::Type* struct_type, llvm::Value* value, std::uint32_t index) {
+    if (value->getType()->isStructTy()) {
+        return m_builder.CreateExtractValue(value, index);
+    }
+
+    return m_builder.CreateStructGEP(struct_type, value, index);
+}
+
 std::shared_ptr<Type>
 Codegen::get_type(std::size_t offset, std::string_view name, Scope& parent) {
     auto primitive = m_primitive_types.find(name);

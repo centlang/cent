@@ -183,14 +183,9 @@ std::optional<Value> Codegen::generate(ast::Switch& stmt) {
             return std::nullopt;
         }
 
-        auto* tag_member =
-            value->value->getType()->isStructTy()
-                ? m_builder.CreateExtractValue(value->value, union_member_tag)
-                : m_builder.CreateLoad(
-                      union_type->tag_type->codegen(*this),
-                      m_builder.CreateStructGEP(
-                          union_type->codegen(*this), value->value,
-                          union_member_tag));
+        auto* tag_member = load_struct_member(
+            union_type->codegen(*this), union_type->tag_type->codegen(*this),
+            value->value, union_member_tag);
 
         value = {union_type->tag_type, tag_member};
     } else {
@@ -354,9 +349,8 @@ std::optional<Value> Codegen::generate(ast::ForLoop& stmt) {
         auto* index = create_alloca(usize);
         m_builder.CreateStore(usize_null, index);
 
-        auto* length = m_builder.CreateLoad(
-            usize, m_builder.CreateStructGEP(
-                       llvm_type, value->value, slice_member_len));
+        auto* length = load_struct_member(
+            llvm_type, usize, value->value, slice_member_len);
 
         m_builder.CreateCondBr(
             m_builder.CreateICmpULT(usize_null, length), m_loop_body,
@@ -366,10 +360,9 @@ std::optional<Value> Codegen::generate(ast::ForLoop& stmt) {
 
         auto current_scope = *m_current_scope;
 
-        auto* ptr_value = m_builder.CreateLoad(
-            llvm::PointerType::get(m_context, 0),
-            m_builder.CreateStructGEP(
-                type->codegen(*this), value->value, slice_member_ptr));
+        auto* ptr_value = load_struct_member(
+            type->codegen(*this), llvm::PointerType::get(m_context, 0),
+            value->value, slice_member_ptr);
 
         auto* index_value = m_builder.CreateLoad(usize, index);
 
@@ -459,23 +452,11 @@ std::optional<Value> Codegen::generate(ast::ForLoop& stmt) {
 
     auto* llvm_contained_type = type->type->codegen(*this);
 
-    llvm::Value* begin = nullptr;
-    llvm::Value* end = nullptr;
+    llvm::Value* begin = load_struct_member(
+        llvm_type, llvm_contained_type, value->value, range_member_begin);
 
-    if (value->value->getType()->isStructTy()) {
-        begin = m_builder.CreateExtractValue(value->value, range_member_begin);
-        end = m_builder.CreateExtractValue(value->value, range_member_end);
-    } else {
-        begin = m_builder.CreateLoad(
-            llvm_contained_type,
-            m_builder.CreateStructGEP(
-                llvm_type, value->value, range_member_begin));
-
-        end = m_builder.CreateLoad(
-            llvm_contained_type,
-            m_builder.CreateStructGEP(
-                llvm_type, value->value, range_member_end));
-    }
+    llvm::Value* end = load_struct_member(
+        llvm_type, llvm_contained_type, value->value, range_member_end);
 
     if (!is_sint(*type->type) && !is_uint(*type->type)) {
         error(stmt.value->offset, "type mismatch");

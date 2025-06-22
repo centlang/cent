@@ -251,6 +251,13 @@ private:
 
     llvm::Value* create_alloca(llvm::Type* type);
 
+    llvm::Value* load_struct_member(
+        llvm::Type* struct_type, llvm::Type* member_type, llvm::Value* value,
+        std::uint32_t index);
+
+    llvm::Value* create_gep_or_extract(
+        llvm::Type* struct_type, llvm::Value* value, std::uint32_t index);
+
     std::shared_ptr<Type>
     get_type(std::size_t offset, std::string_view name, Scope& parent);
 

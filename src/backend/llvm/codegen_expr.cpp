@@ -968,9 +968,7 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) {
 
         return Value{
             tuple->types[value],
-            parent->value->getType()->isStructTy()
-                ? m_builder.CreateExtractValue(parent->value, value)
-                : m_builder.CreateStructGEP(tuple->type, parent->value, value),
+            create_gep_or_extract(tuple->type, parent->value, value),
             parent->is_mutable};
     }
 
@@ -1007,11 +1005,8 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) {
 
         return Value{
             union_type->fields[*index],
-            parent->value->getType()->isStructTy()
-                ? m_builder.CreateExtractValue(
-                      parent->value, union_member_value)
-                : m_builder.CreateStructGEP(
-                      union_type->type, parent->value, union_member_value)};
+            create_gep_or_extract(
+                union_type->type, parent->value, union_member_value)};
     }
 
     if (parent->value->getType()->isStructTy()) {
@@ -1096,11 +1091,9 @@ std::optional<Value> Codegen::generate(ast::IndexExpr& expr) {
     }
 
     if (auto* type = dyn_cast<types::Slice>(*value->type)) {
-        auto* ptr_member = m_builder.CreateStructGEP(
-            type->codegen(*this), value->value, slice_member_ptr);
-
-        auto* ptr_value = m_builder.CreateLoad(
-            llvm::PointerType::get(m_context, 0), ptr_member);
+        auto* ptr_value = load_struct_member(
+            type->codegen(*this), llvm::PointerType::get(m_context, 0),
+            value->value, slice_member_ptr);
 
         return Value{
             type->type,
@@ -1202,11 +1195,9 @@ std::optional<Value> Codegen::generate(ast::SliceExpr& expr) {
                 len_member)};
     }
 
-    auto* ptr_member =
-        m_builder.CreateStructGEP(llvm_type, value->value, slice_member_ptr);
-
-    auto* ptr_value =
-        m_builder.CreateLoad(llvm::PointerType::get(m_context, 0), ptr_member);
+    auto* ptr_value = load_struct_member(
+        llvm_type, llvm::PointerType::get(m_context, 0), value->value,
+        slice_member_ptr);
 
     auto* new_ptr_value =
         m_builder.CreateGEP(type->type->codegen(*this), ptr_value, low->value);
@@ -1290,18 +1281,9 @@ std::optional<Value> Codegen::generate_bin_expr(
                 return Value{m_primitive_types["bool"], val};
             }
 
-            llvm::Value* val = nullptr;
-
-            if (value->value->getType()->isStructTy()) {
-                val = m_builder.CreateExtractValue(
-                    value->value, optional_member_bool);
-            } else {
-                auto* bool_ptr = m_builder.CreateStructGEP(
-                    type.codegen(*this), value->value, optional_member_bool);
-
-                val = m_builder.CreateLoad(
-                    llvm::Type::getInt1Ty(m_context), bool_ptr);
-            }
+            llvm::Value* val = load_struct_member(
+                type.codegen(*this), llvm::Type::getInt1Ty(m_context),
+                value->value, optional_member_bool);
 
             if (oper.value == EqualEqual) {
                 val = m_builder.CreateNot(val);
