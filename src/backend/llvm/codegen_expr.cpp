@@ -344,7 +344,9 @@ std::optional<Value> Codegen::generate(ast::FloatLiteral& expr) {
 
 std::optional<Value> Codegen::generate(ast::StrLiteral& expr) {
     return Value{
-        m_primitive_types["str"], m_builder.CreateGlobalString(expr.value)};
+        std::make_shared<types::Array>(
+            m_primitive_types["u8"], expr.value.size() + 1),
+        m_builder.CreateGlobalString(expr.value)};
 }
 
 std::optional<Value> Codegen::generate(ast::BoolLiteral& expr) {
