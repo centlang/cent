@@ -546,9 +546,7 @@ Codegen::get_type(std::size_t offset, std::string_view name, Scope& parent) {
     auto user = parent.types.find(name);
 
     if (user == parent.types.end()) {
-        error(
-            offset,
-            fmt::format("undeclared type: {}", log::bold(log::quoted(name))));
+        error(offset, fmt::format("undeclared type: {}", log::quoted(name)));
 
         return nullptr;
     }
@@ -563,8 +561,7 @@ Codegen::get_name(std::size_t offset, std::string_view name, Scope& parent) {
     if (iterator == parent.names.end()) {
         error(
             offset,
-            fmt::format(
-                "undeclared identifier: {}", log::bold(log::quoted(name))));
+            fmt::format("undeclared identifier: {}", log::quoted(name)));
 
         return std::nullopt;
     }
@@ -577,9 +574,7 @@ Codegen::get_scope(std::size_t offset, std::string_view name, Scope& parent) {
     auto iterator = parent.scopes.find(name);
 
     if (iterator == parent.scopes.end()) {
-        error(
-            offset,
-            fmt::format("could not find {}", log::bold(log::quoted(name))));
+        error(offset, fmt::format("could not find {}", log::quoted(name)));
 
         return nullptr;
     }
@@ -635,9 +630,8 @@ void Codegen::create_panic_fn() {
 void Codegen::type_mismatch(std::size_t offset, Type& expected, Type& got) {
     error(
         offset, fmt::format(
-                    "expected {} but got {}",
-                    log::bold(log::quoted(expected.to_string())),
-                    log::bold(log::quoted(got.to_string()))));
+                    "expected {} but got {}", log::quoted(expected.to_string()),
+                    log::quoted(got.to_string())));
 }
 
 Attributes Codegen::parse_attrs(
@@ -652,8 +646,7 @@ Attributes Codegen::parse_attrs(
 
         error(
             attr.offset,
-            fmt::format(
-                "unexpected attribute {}", log::bold(log::quoted(attr.name))));
+            fmt::format("unexpected attribute {}", log::quoted(attr.name)));
     }
 
     return result;

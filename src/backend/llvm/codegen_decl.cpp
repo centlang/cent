@@ -322,7 +322,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
         error(
             decl.name.offset, fmt::format(
                                   "immutable variable {} must be initialized",
-                                  log::quoted(log::bold(decl.name.value))));
+                                  log::quoted(decl.name.value)));
         return std::nullopt;
     }
 
@@ -330,7 +330,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
         error(
             decl.value->offset, fmt::format(
                                     "global variable {} cannot be initialized",
-                                    log::quoted(log::bold(decl.name.value))));
+                                    log::quoted(decl.name.value)));
     };
 
     std::optional<Value> value = std::nullopt;
@@ -359,10 +359,9 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
             if (is<types::Null>(*value->type) ||
                 is<types::Undefined>(*value->type)) {
                 error(
-                    decl.name.offset,
-                    fmt::format(
-                        "cannot infer type for {}",
-                        log::bold(log::quoted(decl.name.value))));
+                    decl.name.offset, fmt::format(
+                                          "cannot infer type for {}",
+                                          log::quoted(decl.name.value)));
 
                 return std::nullopt;
             }
@@ -457,8 +456,7 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) {
     if (!is_extern && !decl.block) {
         error(
             decl.name.offset,
-            fmt::format(
-                "{} has no body", log::bold(log::quoted(decl.name.value))));
+            fmt::format("{} has no body", log::quoted(decl.name.value)));
 
         return;
     }
@@ -468,9 +466,8 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) {
 
     if (scope.names.contains(decl.name.value)) {
         error(
-            decl.name.offset, fmt::format(
-                                  "{} is already defined",
-                                  log::bold(log::quoted(decl.name.value))));
+            decl.name.offset,
+            fmt::format("{} is already defined", log::quoted(decl.name.value)));
 
         return;
     }
@@ -515,9 +512,8 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) {
 void Codegen::generate_struct(ast::Struct& decl) {
     if (llvm::StructType::getTypeByName(m_context, decl.name.value)) {
         error(
-            decl.name.offset, fmt::format(
-                                  "{} is already defined",
-                                  log::bold(log::quoted(decl.name.value))));
+            decl.name.offset,
+            fmt::format("{} is already defined", log::quoted(decl.name.value)));
 
         return;
     }
@@ -528,9 +524,8 @@ void Codegen::generate_struct(ast::Struct& decl) {
 void Codegen::generate_union(ast::Union& decl) {
     if (llvm::StructType::getTypeByName(m_context, decl.name.value)) {
         error(
-            decl.name.offset, fmt::format(
-                                  "{} is already defined",
-                                  log::bold(log::quoted(decl.name.value))));
+            decl.name.offset,
+            fmt::format("{} is already defined", log::quoted(decl.name.value)));
 
         return;
     }
@@ -541,9 +536,8 @@ void Codegen::generate_union(ast::Union& decl) {
 void Codegen::generate_enum(ast::EnumDecl& decl) {
     if (m_current_scope->types.contains(decl.name.value)) {
         error(
-            decl.name.offset, fmt::format(
-                                  "{} is already defined",
-                                  log::bold(log::quoted(decl.name.value))));
+            decl.name.offset,
+            fmt::format("{} is already defined", log::quoted(decl.name.value)));
 
         return;
     }

@@ -66,10 +66,7 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) {
         }
 
         if (!is_sint(*value->type) && !is_uint(*value->type)) {
-            error(
-                expr.offset,
-                fmt::format(
-                    "cannot apply {} to a non-number type", log::bold("'-'")));
+            error(expr.offset, "cannot apply '-' to a non-number type");
 
             return std::nullopt;
         }
@@ -78,10 +75,7 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) {
             value->type, m_builder.CreateNeg(load_value(*value).value)};
     case Bang:
         if (!is<types::Bool>(*value->type)) {
-            error(
-                expr.offset,
-                fmt::format(
-                    "cannot apply {} to a non-boolean type", log::bold("'!'")));
+            error(expr.offset, "cannot apply '!' to a non-boolean type");
 
             return std::nullopt;
         }
@@ -119,10 +113,7 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) {
             value->value, false, true};
     case Not:
         if (!is_sint(*value->type) && !is_uint(*value->type)) {
-            error(
-                expr.offset,
-                fmt::format(
-                    "cannot apply {} to a non-integer type", log::bold("'~'")));
+            error(expr.offset, "cannot apply '~' to a non-integer type");
 
             return std::nullopt;
         }
@@ -456,8 +447,7 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
             error(
                 field.name.offset,
                 fmt::format(
-                    "no such member: {}",
-                    log::bold(log::quoted(field.name.value))));
+                    "no such member: {}", log::quoted(field.name.value)));
 
             return std::nullopt;
         }
@@ -552,8 +542,7 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
             error(
                 field.name.offset,
                 fmt::format(
-                    "no such member: {}",
-                    log::bold(log::quoted(field.name.value))));
+                    "no such member: {}", log::quoted(field.name.value)));
 
             return std::nullopt;
         }
@@ -830,8 +819,7 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) {
     auto no_such_method = [&] {
         error(
             expr.name.offset,
-            fmt::format(
-                "no such method: {}", log::bold(log::quoted(expr.name.value))));
+            fmt::format("no such method: {}", log::quoted(expr.name.value)));
     };
 
     if (iterator == m_methods[value->type].end()) {
@@ -870,7 +858,7 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) {
                 expr.name.offset,
                 fmt::format(
                     "cannot call method {} on an immutable value",
-                    log::bold(log::quoted(expr.name.value))));
+                    log::quoted(expr.name.value)));
 
             return std::nullopt;
         }
@@ -930,9 +918,8 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) {
 
     auto no_such_member = [&] {
         error(
-            expr.member.offset, fmt::format(
-                                    "no such member: {}",
-                                    log::bold(log::quoted(expr.member.value))));
+            expr.member.offset,
+            fmt::format("no such member: {}", log::quoted(expr.member.value)));
     };
 
     auto get_member =

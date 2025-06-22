@@ -502,7 +502,7 @@ std::optional<Value> Codegen::generate(ast::ForLoop& stmt) {
 
 std::optional<Value> Codegen::generate(ast::BreakStmt& stmt) {
     if (!m_loop_end) {
-        error(stmt.offset, fmt::format("{} not in loop", log::bold("'break'")));
+        error(stmt.offset, "'break' not in loop");
 
         return std::nullopt;
     }
@@ -514,9 +514,7 @@ std::optional<Value> Codegen::generate(ast::BreakStmt& stmt) {
 
 std::optional<Value> Codegen::generate(ast::ContinueStmt& stmt) {
     if (!m_loop_body) {
-        error(
-            stmt.offset,
-            fmt::format("{} not in loop", log::bold("'continue'")));
+        error(stmt.offset, "'continue' not in loop");
 
         return std::nullopt;
     }

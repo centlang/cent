@@ -89,7 +89,7 @@ private:
     }
 
     void expected(std::string_view what) {
-        error(fmt::format("expected {}", log::bold(what)));
+        error(fmt::format("expected {}", what));
     }
 
     std::optional<Token> expect(std::string_view what, auto... types) {

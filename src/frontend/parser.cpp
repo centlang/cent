@@ -747,7 +747,7 @@ std::unique_ptr<ast::BlockStmt> Parser::expect_block() {
 
     while (true) {
         if (match(Token::Type::Eof)) {
-            expected(fmt::format("{}", log::bold("'}'")));
+            expected("'}'");
             return result;
         }
 
@@ -1191,8 +1191,7 @@ Parser::parse_var(std::vector<ast::Attribute> attrs, bool is_public) {
 
     if (!match_next(Token::Type::Equal)) {
         if (!type) {
-            expected(
-                fmt::format("{} or {}", log::bold("'='"), log::bold("':'")));
+            expected("'=' or ':'");
 
             return nullptr;
         }
@@ -1252,7 +1251,7 @@ Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
     if (match(Token::Type::LeftBrace)) {
         body = expect_block();
     } else if (!match_next(Token::Type::Semicolon)) {
-        expected(fmt::format("{} or {}", log::bold("'{'"), log::bold("';'")));
+        expected("'{' or ';'");
 
         return nullptr;
     }
@@ -1457,9 +1456,8 @@ bool Parser::parse_with(ast::Module& module) {
 
     if (module_paths.empty()) {
         error(
-            name->offset, fmt::format(
-                              "could not find module {}",
-                              log::bold(log::quoted(name->value))));
+            name->offset,
+            fmt::format("could not find module {}", log::quoted(name->value)));
 
         return false;
     }
