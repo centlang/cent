@@ -192,10 +192,6 @@ llvm::Type* Codegen::generate([[maybe_unused]] types::F64& type) {
     return llvm::Type::getDoubleTy(m_context);
 }
 
-llvm::Type* Codegen::generate([[maybe_unused]] types::Str& type) {
-    return llvm::Type::getInt8Ty(m_context)->getPointerTo();
-}
-
 llvm::Type* Codegen::generate([[maybe_unused]] types::Bool& type) {
     return llvm::Type::getInt1Ty(m_context);
 }

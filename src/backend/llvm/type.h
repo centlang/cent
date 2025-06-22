@@ -24,7 +24,6 @@ struct Type {
         USize,
         F32,
         F64,
-        Str,
         Bool,
         Null,
         Undefined,

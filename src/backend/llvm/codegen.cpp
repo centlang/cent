@@ -32,7 +32,6 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
         {"usize", std::make_shared<types::USize>()},
         {"f32", std::make_shared<types::F32>()},
         {"f64", std::make_shared<types::F64>()},
-        {"str", std::make_shared<types::Str>()},
         {"bool", std::make_shared<types::Bool>()}};
 
     m_null_type = std::make_shared<types::Null>();
@@ -472,11 +471,9 @@ Value Codegen::load_value(Value& value) {
 
     if (auto* variable =
             llvm::dyn_cast_or_null<llvm::GlobalVariable>(value.value)) {
-        if (!(variable->isConstant() && is<types::Str>(*value.type))) {
-            return Value{
-                value.type,
-                m_builder.CreateLoad(value.type->codegen(*this), variable)};
-        }
+        return Value{
+            value.type,
+            m_builder.CreateLoad(value.type->codegen(*this), variable)};
     }
 
     if (auto* val = llvm::dyn_cast_or_null<llvm::LoadInst>(value.value)) {

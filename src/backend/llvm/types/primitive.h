@@ -60,10 +60,6 @@ struct F64 : detail::Type<F64, Type::Kind::F64> {
     std::string to_string() override { return "f64"; }
 };
 
-struct Str : detail::Type<Str, Type::Kind::Str> {
-    std::string to_string() override { return "str"; }
-};
-
 struct Bool : detail::Type<Bool, Type::Kind::Bool> {
     std::string to_string() override { return "bool"; }
 };

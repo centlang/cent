@@ -98,8 +98,6 @@ struct USize;
 struct F32;
 struct F64;
 
-struct Str;
-
 struct Bool;
 struct Null;
 struct Undefined;
@@ -166,8 +164,6 @@ public:
 
     llvm::Type* generate(types::F32& type);
     llvm::Type* generate(types::F64& type);
-
-    llvm::Type* generate(types::Str& type);
 
     llvm::Type* generate(types::Bool& type);
     llvm::Type* generate(types::Null& type);
