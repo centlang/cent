@@ -102,7 +102,7 @@ int main(int argc, char** argv) {
     }
 
     if (output && source_files.size() > 1 && (compile_only || emit_llvm)) {
-        cent::log::error("cannot specify '-o' with multiple output files");
+        cent::log::error("cannot specify `-o` with multiple output files");
         return 1;
     }
 

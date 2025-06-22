@@ -66,7 +66,7 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) {
         }
 
         if (!is_sint(*value->type) && !is_uint(*value->type)) {
-            error(expr.offset, "cannot apply '-' to a non-number type");
+            error(expr.offset, "cannot apply `-` to a non-number type");
 
             return std::nullopt;
         }
@@ -75,7 +75,7 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) {
             value->type, m_builder.CreateNeg(load_value(*value).value)};
     case Bang:
         if (!is<types::Bool>(*value->type)) {
-            error(expr.offset, "cannot apply '!' to a non-boolean type");
+            error(expr.offset, "cannot apply `!` to a non-boolean type");
 
             return std::nullopt;
         }
@@ -113,7 +113,7 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) {
             value->value, false, true};
     case Not:
         if (!is_sint(*value->type) && !is_uint(*value->type)) {
-            error(expr.offset, "cannot apply '~' to a non-integer type");
+            error(expr.offset, "cannot apply `~` to a non-integer type");
 
             return std::nullopt;
         }

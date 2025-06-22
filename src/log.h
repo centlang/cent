@@ -176,7 +176,7 @@ inline auto strikethrough(Styled<ValueType> value) {
 }
 
 template <typename ValueType> inline auto quoted(ValueType value) {
-    return fmt::format("'{}'", value);
+    return fmt::format("`{}`", value);
 }
 
 inline void

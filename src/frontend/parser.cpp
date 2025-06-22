@@ -81,7 +81,7 @@ std::unique_ptr<ast::Module> Parser::parse() {
                 continue;
             }
 
-            expect("';'", Token::Type::Semicolon);
+            expect("`;`", Token::Type::Semicolon);
 
             continue;
         }
@@ -101,7 +101,7 @@ std::unique_ptr<ast::Module> Parser::parse() {
                 continue;
             }
 
-            expect("';'", Token::Type::Semicolon);
+            expect("`;`", Token::Type::Semicolon);
 
             result->variables.push_back(std::move(variable));
 
@@ -162,7 +162,7 @@ std::unique_ptr<ast::Module> Parser::parse() {
 void Parser::expect_stmt(ast::BlockStmt& block) {
     using enum Token::Type;
 
-    auto expect_semicolon = [&] { expect("';'", Token::Type::Semicolon); };
+    auto expect_semicolon = [&] { expect("`;`", Token::Type::Semicolon); };
 
     switch (peek().type) {
     case LeftBrace:
@@ -280,7 +280,7 @@ std::vector<ast::Attribute> Parser::parse_attrs() {
         return {};
     }
 
-    if (!expect("'('", Token::Type::LeftParen)) {
+    if (!expect("`(`", Token::Type::LeftParen)) {
         return {};
     }
 
@@ -302,7 +302,7 @@ std::vector<ast::Attribute> Parser::parse_attrs() {
         result.emplace_back(attribute->offset, attribute->value);
     }
 
-    if (!expect("')'", Token::Type::RightParen)) {
+    if (!expect("`)`", Token::Type::RightParen)) {
         return {};
     }
 
@@ -329,7 +329,7 @@ std::vector<ast::StructLiteral::Field> Parser::parse_field_values() {
     auto parse_field = [&] {
         auto name = get();
 
-        expect("':'", Token::Type::Colon);
+        expect("`:`", Token::Type::Colon);
 
         if (auto value = expect_expr(false)) {
             result.emplace_back(
@@ -344,7 +344,7 @@ std::vector<ast::StructLiteral::Field> Parser::parse_field_values() {
             break;
         }
 
-        expect("','", Token::Type::Comma);
+        expect("`,`", Token::Type::Comma);
     }
 
     return result;
@@ -407,13 +407,13 @@ std::optional<ast::FnProto> Parser::parse_fn_proto() {
         }
     };
 
-    if (!expect("'('", LeftParen)) {
+    if (!expect("`(`", LeftParen)) {
         return std::nullopt;
     }
 
     parse_params();
 
-    if (!expect("')'", RightParen)) {
+    if (!expect("`)`", RightParen)) {
         return std::nullopt;
     }
 
@@ -443,7 +443,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
 
         std::vector<std::unique_ptr<ast::Expression>> elements;
 
-        if (!expect("'{'", LeftBrace)) {
+        if (!expect("`{`", LeftBrace)) {
             return nullptr;
         }
 
@@ -457,7 +457,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
                     offset, std::move(type), std::move(elements));
             }
 
-            expect("','", Token::Type::Comma);
+            expect("`,`", Token::Type::Comma);
         }
     }
 
@@ -501,7 +501,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
         if (!is_condition && match_next(LeftBrace)) {
             auto fields = parse_field_values();
 
-            if (!expect("',' or '}'", RightBrace)) {
+            if (!expect("`,` or `}`", RightBrace)) {
                 return nullptr;
             }
 
@@ -534,7 +534,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
             return value;
         }
 
-        if (!expect("')' or ','", Comma)) {
+        if (!expect("`)` or `,`", Comma)) {
             return nullptr;
         }
 
@@ -551,7 +551,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
                     token->offset, std::move(elements));
             }
 
-            expect("','", Token::Type::Comma);
+            expect("`,`", Token::Type::Comma);
         }
     }
     default:
@@ -573,7 +573,7 @@ Parser::expect_access_or_call_expr(bool is_condition) {
         if (match_next(LeftParen)) {
             auto args = parse_args();
 
-            if (!expect("')'", RightParen)) {
+            if (!expect("`)`", RightParen)) {
                 return nullptr;
             }
 
@@ -603,7 +603,7 @@ Parser::expect_access_or_call_expr(bool is_condition) {
                 continue;
             }
 
-            if (!expect("']' or ':'", Colon)) {
+            if (!expect("`]` or `:`", Colon)) {
                 return nullptr;
             }
 
@@ -617,7 +617,7 @@ Parser::expect_access_or_call_expr(bool is_condition) {
                 }
             }
 
-            if (!expect("']'", RightBracket)) {
+            if (!expect("`]`", RightBracket)) {
                 return nullptr;
             }
 
@@ -647,7 +647,7 @@ Parser::expect_access_or_call_expr(bool is_condition) {
         if (match_next(LeftParen)) {
             auto args = parse_args();
 
-            if (!expect("')'", RightParen)) {
+            if (!expect("`)`", RightParen)) {
                 return nullptr;
             }
 
@@ -741,13 +741,13 @@ std::unique_ptr<ast::Expression> Parser::expect_expr(bool is_condition) {
 std::unique_ptr<ast::BlockStmt> Parser::expect_block() {
     auto result = std::make_unique<ast::BlockStmt>(peek().offset);
 
-    if (!expect("'{'", Token::Type::LeftBrace)) {
+    if (!expect("`{`", Token::Type::LeftBrace)) {
         return nullptr;
     }
 
     while (true) {
         if (match(Token::Type::Eof)) {
-            expected("'}'");
+            expected("`}`");
             return result;
         }
 
@@ -809,7 +809,7 @@ std::unique_ptr<ast::IfElse> Parser::parse_if_else() {
 }
 
 std::unique_ptr<ast::Type> Parser::expect_var_type() {
-    if (!expect("':'", Token::Type::Colon)) {
+    if (!expect("`:`", Token::Type::Colon)) {
         return nullptr;
     }
 
@@ -838,7 +838,7 @@ std::unique_ptr<ast::Type> Parser::parse_array_type() {
             offset, std::move(type), is_mutable);
     }
 
-    if (!expect("',' or ']'", Token::Type::Comma)) {
+    if (!expect("`,` or `]`", Token::Type::Comma)) {
         return nullptr;
     }
 
@@ -848,7 +848,7 @@ std::unique_ptr<ast::Type> Parser::parse_array_type() {
         return nullptr;
     }
 
-    if (!expect("']'", Token::Type::RightBracket)) {
+    if (!expect("`]`", Token::Type::RightBracket)) {
         return nullptr;
     }
 
@@ -917,7 +917,7 @@ std::unique_ptr<ast::Type> Parser::expect_type() {
             }
         }
 
-        if (!expect("')'", RightParen)) {
+        if (!expect("`)`", RightParen)) {
             return nullptr;
         }
 
@@ -978,7 +978,7 @@ void Parser::parse_switch(ast::BlockStmt& block) {
         return;
     }
 
-    if (!expect("'{'", Token::Type::LeftBrace)) {
+    if (!expect("`{`", Token::Type::LeftBrace)) {
         return;
     }
 
@@ -1020,7 +1020,7 @@ void Parser::parse_switch(ast::BlockStmt& block) {
         else_block = std::move(body);
     }
 
-    if (!expect("'}'", Token::Type::RightBrace)) {
+    if (!expect("`}`", Token::Type::RightBrace)) {
         return;
     }
 
@@ -1054,7 +1054,7 @@ void Parser::parse_for(ast::BlockStmt& block) {
         return;
     }
 
-    if (!expect("'in'", Token::Type::In)) {
+    if (!expect("`in`", Token::Type::In)) {
         return;
     }
 
@@ -1121,7 +1121,7 @@ std::vector<ast::Struct::Field> Parser::parse_fields() {
             break;
         }
 
-        expect("','", Token::Type::Comma);
+        expect("`,`", Token::Type::Comma);
     }
 
     return result;
@@ -1150,7 +1150,7 @@ std::vector<ast::EnumDecl::Field> Parser::parse_enum_fields() {
             break;
         }
 
-        expect("','", Token::Type::Comma);
+        expect("`,`", Token::Type::Comma);
     }
 
     return result;
@@ -1191,7 +1191,7 @@ Parser::parse_var(std::vector<ast::Attribute> attrs, bool is_public) {
 
     if (!match_next(Token::Type::Equal)) {
         if (!type) {
-            expected("'=' or ':'");
+            expected("`=` or `:`");
 
             return nullptr;
         }
@@ -1251,7 +1251,7 @@ Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
     if (match(Token::Type::LeftBrace)) {
         body = expect_block();
     } else if (!match_next(Token::Type::Semicolon)) {
-        expected("'{' or ';'");
+        expected("`{` or `;`");
 
         return nullptr;
     }
@@ -1270,13 +1270,13 @@ Parser::parse_struct(std::vector<ast::Attribute> attrs, bool is_public) {
         return nullptr;
     }
 
-    if (!expect("'{'", Token::Type::LeftBrace)) {
+    if (!expect("`{`", Token::Type::LeftBrace)) {
         return nullptr;
     }
 
     auto fields = parse_fields();
 
-    if (!expect("'}'", Token::Type::RightBrace)) {
+    if (!expect("`}`", Token::Type::RightBrace)) {
         return nullptr;
     }
 
@@ -1293,13 +1293,13 @@ Parser::parse_union(std::vector<ast::Attribute> attrs, bool is_public) {
         return nullptr;
     }
 
-    if (!expect("'{'", Token::Type::LeftBrace)) {
+    if (!expect("`{`", Token::Type::LeftBrace)) {
         return nullptr;
     }
 
     auto fields = parse_fields();
 
-    if (!expect("'}'", Token::Type::RightBrace)) {
+    if (!expect("`}`", Token::Type::RightBrace)) {
         return nullptr;
     }
 
@@ -1316,7 +1316,7 @@ Parser::parse_type_alias(std::vector<ast::Attribute> attrs, bool is_public) {
         return nullptr;
     }
 
-    if (!expect("'='", Token::Type::Equal)) {
+    if (!expect("`=`", Token::Type::Equal)) {
         return nullptr;
     }
 
@@ -1349,13 +1349,13 @@ Parser::parse_enum(std::vector<ast::Attribute> attrs, bool is_public) {
         }
     }
 
-    if (!expect("'{'", Token::Type::LeftBrace)) {
+    if (!expect("`{`", Token::Type::LeftBrace)) {
         return nullptr;
     }
 
     auto fields = parse_enum_fields();
 
-    if (!expect("'}'", Token::Type::RightBrace)) {
+    if (!expect("`}`", Token::Type::RightBrace)) {
         return nullptr;
     }
 
