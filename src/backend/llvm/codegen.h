@@ -140,109 +140,109 @@ public:
 
     [[nodiscard]] bool had_error() const { return m_had_error; }
 
-    std::shared_ptr<Type> generate(ast::NamedType& type);
-    std::shared_ptr<Type> generate(ast::Pointer& type);
-    std::shared_ptr<Type> generate(ast::Optional& type);
-    std::shared_ptr<Type> generate(ast::ArrayType& type);
-    std::shared_ptr<Type> generate(ast::SliceType& type);
-    std::shared_ptr<Type> generate(ast::TupleType& type);
-    std::shared_ptr<Type> generate(ast::RangeType& type);
-    std::shared_ptr<Type> generate(ast::FnPointer& type);
+    std::shared_ptr<Type> generate(const ast::NamedType& type);
+    std::shared_ptr<Type> generate(const ast::Pointer& type);
+    std::shared_ptr<Type> generate(const ast::Optional& type);
+    std::shared_ptr<Type> generate(const ast::ArrayType& type);
+    std::shared_ptr<Type> generate(const ast::SliceType& type);
+    std::shared_ptr<Type> generate(const ast::TupleType& type);
+    std::shared_ptr<Type> generate(const ast::RangeType& type);
+    std::shared_ptr<Type> generate(const ast::FnPointer& type);
 
-    llvm::Type* generate(types::I8& type);
-    llvm::Type* generate(types::I16& type);
-    llvm::Type* generate(types::I32& type);
-    llvm::Type* generate(types::I64& type);
-    llvm::Type* generate(types::ISize& type);
+    llvm::Type* generate(const types::I8& type);
+    llvm::Type* generate(const types::I16& type);
+    llvm::Type* generate(const types::I32& type);
+    llvm::Type* generate(const types::I64& type);
+    llvm::Type* generate(const types::ISize& type);
 
-    llvm::Type* generate(types::U8& type);
-    llvm::Type* generate(types::U16& type);
-    llvm::Type* generate(types::U32& type);
-    llvm::Type* generate(types::U64& type);
-    llvm::Type* generate(types::USize& type);
+    llvm::Type* generate(const types::U8& type);
+    llvm::Type* generate(const types::U16& type);
+    llvm::Type* generate(const types::U32& type);
+    llvm::Type* generate(const types::U64& type);
+    llvm::Type* generate(const types::USize& type);
 
-    llvm::Type* generate(types::F32& type);
-    llvm::Type* generate(types::F64& type);
+    llvm::Type* generate(const types::F32& type);
+    llvm::Type* generate(const types::F64& type);
 
-    llvm::Type* generate(types::Bool& type);
-    llvm::Type* generate(types::Null& type);
-    llvm::Type* generate(types::Undefined& type);
-    llvm::Type* generate(types::Void& type);
+    llvm::Type* generate(const types::Bool& type);
+    llvm::Type* generate(const types::Null& type);
+    llvm::Type* generate(const types::Undefined& type);
+    llvm::Type* generate(const types::Void& type);
 
-    llvm::Type* generate(types::Pointer& type);
-    llvm::Type* generate(types::Optional& type);
-    llvm::Type* generate(types::Range& type);
+    llvm::Type* generate(const types::Pointer& type);
+    llvm::Type* generate(const types::Optional& type);
+    llvm::Type* generate(const types::Range& type);
 
-    llvm::Type* generate(types::Array& type);
-    llvm::Type* generate(types::Slice& type);
-    llvm::Type* generate(types::Tuple& type);
+    llvm::Type* generate(const types::Array& type);
+    llvm::Type* generate(const types::Slice& type);
+    llvm::Type* generate(const types::Tuple& type);
 
-    llvm::Type* generate(types::Struct& type);
-    llvm::Type* generate(types::Union& type);
-    llvm::Type* generate(types::Enum& type);
-    llvm::Type* generate(types::Alias& type);
-    llvm::Type* generate(types::Function& type);
+    llvm::Type* generate(const types::Struct& type);
+    llvm::Type* generate(const types::Union& type);
+    llvm::Type* generate(const types::Enum& type);
+    llvm::Type* generate(const types::Alias& type);
+    llvm::Type* generate(const types::Function& type);
 
-    std::optional<Value> generate(ast::Assignment& stmt);
-    std::optional<Value> generate(ast::BlockStmt& stmt);
-    std::optional<Value> generate(ast::IfElse& stmt);
-    std::optional<Value> generate(ast::Switch& stmt);
-    std::optional<Value> generate(ast::ReturnStmt& stmt);
-    std::optional<Value> generate(ast::WhileLoop& stmt);
-    std::optional<Value> generate(ast::ForLoop& stmt);
-    std::optional<Value> generate(ast::BreakStmt& stmt);
-    std::optional<Value> generate(ast::ContinueStmt& stmt);
-    std::optional<Value> generate(ast::Unreachable& stmt);
-    std::optional<Value> generate(ast::AssertStmt& stmt);
+    std::optional<Value> generate(const ast::Assignment& stmt);
+    std::optional<Value> generate(const ast::BlockStmt& stmt);
+    std::optional<Value> generate(const ast::IfElse& stmt);
+    std::optional<Value> generate(const ast::Switch& stmt);
+    std::optional<Value> generate(const ast::ReturnStmt& stmt);
+    std::optional<Value> generate(const ast::WhileLoop& stmt);
+    std::optional<Value> generate(const ast::ForLoop& stmt);
+    std::optional<Value> generate(const ast::BreakStmt& stmt);
+    std::optional<Value> generate(const ast::ContinueStmt& stmt);
+    std::optional<Value> generate(const ast::Unreachable& stmt);
+    std::optional<Value> generate(const ast::AssertStmt& stmt);
 
-    std::optional<Value> generate(ast::BinaryExpr& expr);
-    std::optional<Value> generate(ast::UnaryExpr& expr);
-    std::optional<Value> generate(ast::IntLiteral& expr);
-    std::optional<Value> generate(ast::FloatLiteral& expr);
-    std::optional<Value> generate(ast::StrLiteral& expr);
-    std::optional<Value> generate(ast::BoolLiteral& expr);
-    std::optional<Value> generate(ast::NullLiteral& expr);
-    std::optional<Value> generate(ast::Undefined& expr);
-    std::optional<Value> generate(ast::RangeLiteral& expr);
-    std::optional<Value> generate(ast::StructLiteral& expr);
-    std::optional<Value> generate(ast::ArrayLiteral& expr);
-    std::optional<Value> generate(ast::TupleLiteral& expr);
-    std::optional<Value> generate(ast::Identifier& expr);
-    std::optional<Value> generate(ast::CallExpr& expr);
-    std::optional<Value> generate(ast::MethodExpr& expr);
-    std::optional<Value> generate(ast::MemberExpr& expr);
-    std::optional<Value> generate(ast::IndexExpr& expr);
-    std::optional<Value> generate(ast::SliceExpr& expr);
-    std::optional<Value> generate(ast::AsExpr& expr);
+    std::optional<Value> generate(const ast::BinaryExpr& expr);
+    std::optional<Value> generate(const ast::UnaryExpr& expr);
+    std::optional<Value> generate(const ast::IntLiteral& expr);
+    std::optional<Value> generate(const ast::FloatLiteral& expr);
+    std::optional<Value> generate(const ast::StrLiteral& expr);
+    std::optional<Value> generate(const ast::BoolLiteral& expr);
+    std::optional<Value> generate(const ast::NullLiteral& expr);
+    std::optional<Value> generate(const ast::Undefined& expr);
+    std::optional<Value> generate(const ast::RangeLiteral& expr);
+    std::optional<Value> generate(const ast::StructLiteral& expr);
+    std::optional<Value> generate(const ast::ArrayLiteral& expr);
+    std::optional<Value> generate(const ast::TupleLiteral& expr);
+    std::optional<Value> generate(const ast::Identifier& expr);
+    std::optional<Value> generate(const ast::CallExpr& expr);
+    std::optional<Value> generate(const ast::MethodExpr& expr);
+    std::optional<Value> generate(const ast::MemberExpr& expr);
+    std::optional<Value> generate(const ast::IndexExpr& expr);
+    std::optional<Value> generate(const ast::SliceExpr& expr);
+    std::optional<Value> generate(const ast::AsExpr& expr);
 
-    std::optional<Value> generate(ast::FnDecl& decl);
-    std::optional<Value> generate(ast::Struct& decl);
-    std::optional<Value> generate(ast::Union& decl);
-    std::optional<Value> generate(ast::EnumDecl& decl);
-    std::optional<Value> generate(ast::TypeAlias& decl);
+    std::optional<Value> generate(const ast::FnDecl& decl);
+    std::optional<Value> generate(const ast::Struct& decl);
+    std::optional<Value> generate(const ast::Union& decl);
+    std::optional<Value> generate(const ast::EnumDecl& decl);
+    std::optional<Value> generate(const ast::TypeAlias& decl);
 
-    std::optional<Value> generate(ast::VarDecl& decl);
+    std::optional<Value> generate(const ast::VarDecl& decl);
 
 private:
-    void generate(ast::Module& module, bool is_submodule = false);
+    void generate(const ast::Module& module, bool is_submodule = false);
 
-    [[nodiscard]] bool types_equal(Type& lhs, Type& rhs);
+    [[nodiscard]] bool types_equal(const Type& lhs, const Type& rhs) const;
 
     [[nodiscard]] std::optional<Value>
-    cast(std::shared_ptr<Type>& type, Value& value, bool implicit = true);
+    cast(std::shared_ptr<Type> type, const Value& value, bool implicit = true);
 
     [[nodiscard]] std::optional<Value> primitive_cast(
-        std::shared_ptr<Type>& type, llvm::Type* llvm_type, Value& value,
+        std::shared_ptr<Type> type, llvm::Type* llvm_type, const Value& value,
         bool implicit = true);
 
     bool cast_to_result(
-        std::shared_ptr<Type>& type, Value& value, bool implicit = true);
+        std::shared_ptr<Type> type, const Value& value, bool implicit = true);
 
     std::optional<Value> generate_bin_expr(
-        ast::OffsetValue<Value&> lhs, ast::OffsetValue<Value&> rhs,
+        ast::OffsetValue<const Value&> lhs, ast::OffsetValue<const Value&> rhs,
         ast::OffsetValue<frontend::Token::Type> oper);
 
-    Value load_value(Value& value);
+    Value load_value(const Value& value);
 
     llvm::Value* create_alloca(llvm::Type* type);
 
@@ -256,22 +256,22 @@ private:
     std::shared_ptr<Type>
     get_type(std::size_t offset, std::string_view name, Scope& parent);
 
-    std::optional<Value>
-    get_name(std::size_t offset, std::string_view name, Scope& parent);
+    Value* get_name(std::size_t offset, std::string_view name, Scope& parent);
 
     Scope* get_scope(std::size_t offset, std::string_view name, Scope& parent);
 
     [[nodiscard]] std::shared_ptr<types::Function>
-    generate_fn_type(ast::FnProto& proto);
+    generate_fn_type(const ast::FnProto& proto);
 
     void create_panic_fn();
 
-    void generate_fn_proto(ast::FnDecl& decl);
-    void generate_struct(ast::Struct& decl);
-    void generate_union(ast::Union& decl);
-    void generate_enum(ast::EnumDecl& decl);
+    void generate_fn_proto(const ast::FnDecl& decl);
+    void generate_struct(const ast::Struct& decl);
+    void generate_union(const ast::Union& decl);
+    void generate_enum(const ast::EnumDecl& decl);
 
-    void type_mismatch(std::size_t offset, Type& expected, Type& got);
+    void
+    type_mismatch(std::size_t offset, const Type& expected, const Type& got);
 
     void error(std::size_t offset, std::string_view message) {
         auto src = read_file(m_filename);
@@ -282,7 +282,8 @@ private:
     }
 
     [[nodiscard]] Attributes parse_attrs(
-        ast::Declaration& decl, const std::set<std::string_view>& allowed);
+        const ast::Declaration& decl,
+        const std::set<std::string_view>& allowed);
 
     [[nodiscard]] static bool is_float(const Type& type);
     [[nodiscard]] static bool is_sint(const Type& type);
@@ -325,8 +326,7 @@ private:
         llvm::Function* function;
     };
 
-    std::map<std::shared_ptr<Type>, std::map<std::string_view, Method>>
-        m_methods;
+    std::map<Type*, std::map<std::string_view, Method>> m_methods;
 
     std::map<std::filesystem::path, Scope> m_generated_modules;
 

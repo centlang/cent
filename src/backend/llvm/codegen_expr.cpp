@@ -34,7 +34,7 @@
 
 namespace cent::backend {
 
-std::optional<Value> Codegen::generate(ast::BinaryExpr& expr) {
+std::optional<Value> Codegen::generate(const ast::BinaryExpr& expr) {
     using enum frontend::Token::Type;
 
     auto lhs = expr.lhs->codegen(*this);
@@ -45,11 +45,11 @@ std::optional<Value> Codegen::generate(ast::BinaryExpr& expr) {
     }
 
     return generate_bin_expr(
-        ast::OffsetValue<Value&>{*lhs, expr.lhs->offset},
-        ast::OffsetValue<Value&>{*rhs, expr.rhs->offset}, expr.oper);
+        ast::OffsetValue<const Value&>{*lhs, expr.lhs->offset},
+        ast::OffsetValue<const Value&>{*rhs, expr.rhs->offset}, expr.oper);
 }
 
-std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) {
+std::optional<Value> Codegen::generate(const ast::UnaryExpr& expr) {
     using enum frontend::Token::Type;
 
     auto value = expr.value->codegen(*this);
@@ -125,7 +125,7 @@ std::optional<Value> Codegen::generate(ast::UnaryExpr& expr) {
     }
 }
 
-std::optional<Value> Codegen::generate(ast::IntLiteral& expr) {
+std::optional<Value> Codegen::generate(const ast::IntLiteral& expr) {
     bool failed = false;
     std::string_view literal = expr.value;
 
@@ -279,7 +279,7 @@ std::optional<Value> Codegen::generate(ast::IntLiteral& expr) {
         llvm::ConstantInt::getSigned(llvm::Type::getInt32Ty(m_context), value)};
 }
 
-std::optional<Value> Codegen::generate(ast::FloatLiteral& expr) {
+std::optional<Value> Codegen::generate(const ast::FloatLiteral& expr) {
     bool failed = false;
 
     std::string_view literal = expr.value;
@@ -342,29 +342,30 @@ std::optional<Value> Codegen::generate(ast::FloatLiteral& expr) {
         llvm::ConstantFP::get(llvm::Type::getFloatTy(m_context), value)};
 }
 
-std::optional<Value> Codegen::generate(ast::StrLiteral& expr) {
+std::optional<Value> Codegen::generate(const ast::StrLiteral& expr) {
     return Value{
         std::make_shared<types::Array>(
             m_primitive_types["u8"], expr.value.size() + 1),
         m_builder.CreateGlobalString(expr.value)};
 }
 
-std::optional<Value> Codegen::generate(ast::BoolLiteral& expr) {
+std::optional<Value> Codegen::generate(const ast::BoolLiteral& expr) {
     return Value{
         m_primitive_types["bool"],
         llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), expr.value)};
 }
 
 std::optional<Value>
-Codegen::generate([[maybe_unused]] ast::NullLiteral& expr) {
+Codegen::generate([[maybe_unused]] const ast::NullLiteral& expr) {
     return Value{m_null_type, nullptr};
 }
 
-std::optional<Value> Codegen::generate([[maybe_unused]] ast::Undefined& expr) {
+std::optional<Value>
+Codegen::generate([[maybe_unused]] const ast::Undefined& expr) {
     return Value{m_undefined_type, nullptr};
 }
 
-std::optional<Value> Codegen::generate(ast::RangeLiteral& expr) {
+std::optional<Value> Codegen::generate(const ast::RangeLiteral& expr) {
     auto begin = expr.begin->codegen(*this);
     auto end = expr.end->codegen(*this);
 
@@ -414,7 +415,7 @@ std::optional<Value> Codegen::generate(ast::RangeLiteral& expr) {
     return Value{type, variable, false, false, false, stack_allocated};
 }
 
-std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
+std::optional<Value> Codegen::generate(const ast::StructLiteral& expr) {
     auto type = expr.type->codegen(*this);
 
     if (!type) {
@@ -433,7 +434,7 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
             return std::nullopt;
         }
 
-        auto& field = expr.fields[0];
+        const auto& field = expr.fields[0];
         auto value = field.value->codegen(*this);
 
         if (!value) {
@@ -505,7 +506,7 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
     std::vector<Value> values;
     values.reserve(expr.fields.size());
 
-    for (auto& field : expr.fields) {
+    for (const auto& field : expr.fields) {
         auto value = field.value->codegen(*this);
 
         if (!value) {
@@ -535,7 +536,7 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
         m_current_result ? m_current_result : create_alloca(struct_type->type);
 
     for (std::size_t i = 0; i < expr.fields.size(); ++i) {
-        auto& field = expr.fields[i];
+        const auto& field = expr.fields[i];
         auto& value = values[i];
 
         auto iterator = members.find(field.name.value);
@@ -569,7 +570,7 @@ std::optional<Value> Codegen::generate(ast::StructLiteral& expr) {
     return Value{type, variable, false, false, false, stack_allocated};
 }
 
-std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) {
+std::optional<Value> Codegen::generate(const ast::ArrayLiteral& expr) {
     auto type = expr.type->codegen(*this);
 
     if (!type) {
@@ -592,7 +593,7 @@ std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) {
     std::vector<Value> values;
     values.reserve(expr.elements.size());
 
-    for (auto& element : expr.elements) {
+    for (const auto& element : expr.elements) {
         auto value = element->codegen(*this);
 
         if (!value) {
@@ -645,13 +646,13 @@ std::optional<Value> Codegen::generate(ast::ArrayLiteral& expr) {
     return Value{type, variable, false, false, false, stack_allocated};
 }
 
-std::optional<Value> Codegen::generate(ast::TupleLiteral& expr) {
+std::optional<Value> Codegen::generate(const ast::TupleLiteral& expr) {
     bool is_const = true;
 
     std::vector<Value> values;
     values.reserve(expr.elements.size());
 
-    for (auto& element : expr.elements) {
+    for (const auto& element : expr.elements) {
         auto value = element->codegen(*this);
 
         if (!value) {
@@ -714,7 +715,7 @@ std::optional<Value> Codegen::generate(ast::TupleLiteral& expr) {
         stack_allocated};
 }
 
-std::optional<Value> Codegen::generate(ast::Identifier& expr) {
+std::optional<Value> Codegen::generate(const ast::Identifier& expr) {
     auto* scope = m_current_scope;
     std::size_t last_index = expr.value.size() - 1;
 
@@ -726,11 +727,11 @@ std::optional<Value> Codegen::generate(ast::Identifier& expr) {
         }
     }
 
-    return get_name(
+    return *get_name(
         expr.value[last_index].offset, expr.value[last_index].value, *scope);
 }
 
-std::optional<Value> Codegen::generate(ast::CallExpr& expr) {
+std::optional<Value> Codegen::generate(const ast::CallExpr& expr) {
     auto value = expr.identifier->codegen(*this);
 
     if (!value) {
@@ -809,14 +810,14 @@ std::optional<Value> Codegen::generate(ast::CallExpr& expr) {
             value->value, arguments)};
 }
 
-std::optional<Value> Codegen::generate(ast::MethodExpr& expr) {
+std::optional<Value> Codegen::generate(const ast::MethodExpr& expr) {
     auto value = expr.value->codegen(*this);
 
     if (!value) {
         return std::nullopt;
     }
 
-    auto iterator = m_methods[value->type].find(expr.name.value);
+    auto iterator = m_methods[value->type.get()].find(expr.name.value);
 
     auto no_such_method = [&] {
         error(
@@ -824,7 +825,7 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) {
             fmt::format("no such method: {}", log::quoted(expr.name.value)));
     };
 
-    if (iterator == m_methods[value->type].end()) {
+    if (iterator == m_methods[value->type.get()].end()) {
         auto* type = dyn_cast<types::Pointer>(*value->type);
 
         if (!type) {
@@ -833,9 +834,9 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) {
             return std::nullopt;
         }
 
-        iterator = m_methods[type->type].find(expr.name.value);
+        iterator = m_methods[type->type.get()].find(expr.name.value);
 
-        if (iterator == m_methods[type->type].end()) {
+        if (iterator == m_methods[type->type.get()].end()) {
             no_such_method();
 
             return std::nullopt;
@@ -911,7 +912,7 @@ std::optional<Value> Codegen::generate(ast::MethodExpr& expr) {
         m_builder.CreateCall(iterator->second.function, arguments)};
 }
 
-std::optional<Value> Codegen::generate(ast::MemberExpr& expr) {
+std::optional<Value> Codegen::generate(const ast::MemberExpr& expr) {
     auto parent = expr.parent->codegen(*this);
 
     if (!parent) {
@@ -1056,7 +1057,7 @@ std::optional<Value> Codegen::generate(ast::MemberExpr& expr) {
         m_builder.CreateStructGEP(type->type, value, *index), is_mutable};
 }
 
-std::optional<Value> Codegen::generate(ast::IndexExpr& expr) {
+std::optional<Value> Codegen::generate(const ast::IndexExpr& expr) {
     auto value = expr.value->codegen(*this);
 
     if (!value) {
@@ -1109,7 +1110,7 @@ std::optional<Value> Codegen::generate(ast::IndexExpr& expr) {
         value->is_mutable};
 }
 
-std::optional<Value> Codegen::generate(ast::SliceExpr& expr) {
+std::optional<Value> Codegen::generate(const ast::SliceExpr& expr) {
     auto value = expr.value->codegen(*this);
 
     if (!value) {
@@ -1209,7 +1210,7 @@ std::optional<Value> Codegen::generate(ast::SliceExpr& expr) {
                  false,       false,    m_current_result == nullptr};
 }
 
-std::optional<Value> Codegen::generate(ast::AsExpr& expr) {
+std::optional<Value> Codegen::generate(const ast::AsExpr& expr) {
     using enum llvm::Instruction::CastOps;
 
     auto value = expr.value->codegen(*this);
@@ -1238,7 +1239,7 @@ std::optional<Value> Codegen::generate(ast::AsExpr& expr) {
 }
 
 std::optional<Value> Codegen::generate_bin_expr(
-    ast::OffsetValue<Value&> lhs, ast::OffsetValue<Value&> rhs,
+    ast::OffsetValue<const Value&> lhs, ast::OffsetValue<const Value&> rhs,
     ast::OffsetValue<frontend::Token::Type> oper) {
     using enum frontend::Token::Type;
 

@@ -25,7 +25,8 @@
 
 namespace cent::backend {
 
-std::optional<Value> Codegen::generate([[maybe_unused]] ast::Assignment& stmt) {
+std::optional<Value>
+Codegen::generate([[maybe_unused]] const ast::Assignment& stmt) {
     auto var = stmt.variable->codegen(*this);
 
     if (!var) {
@@ -61,8 +62,8 @@ std::optional<Value> Codegen::generate([[maybe_unused]] ast::Assignment& stmt) {
 
     if (stmt.oper.value != frontend::Token::Type::Equal) {
         value = generate_bin_expr(
-            ast::OffsetValue<Value&>{*var, stmt.variable->offset},
-            ast::OffsetValue<Value&>{*value, stmt.value->offset},
+            ast::OffsetValue<const Value&>{*var, stmt.variable->offset},
+            ast::OffsetValue<const Value&>{*value, stmt.value->offset},
             ast::OffsetValue{without_equal(stmt.oper.value), stmt.oper.offset});
     }
 
@@ -96,10 +97,10 @@ std::optional<Value> Codegen::generate([[maybe_unused]] ast::Assignment& stmt) {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::BlockStmt& stmt) {
+std::optional<Value> Codegen::generate(const ast::BlockStmt& stmt) {
     auto scope = m_scope;
 
-    for (auto& statement : stmt.body) {
+    for (const auto& statement : stmt.body) {
         statement->codegen(*this);
     }
 
@@ -108,7 +109,7 @@ std::optional<Value> Codegen::generate(ast::BlockStmt& stmt) {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::IfElse& stmt) {
+std::optional<Value> Codegen::generate(const ast::IfElse& stmt) {
     auto condition = stmt.condition->codegen(*this);
 
     if (!condition) {
@@ -170,7 +171,7 @@ std::optional<Value> Codegen::generate(ast::IfElse& stmt) {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::Switch& stmt) {
+std::optional<Value> Codegen::generate(const ast::Switch& stmt) {
     auto value = stmt.value->codegen(*this);
 
     if (!value) {
@@ -205,7 +206,7 @@ std::optional<Value> Codegen::generate(ast::Switch& stmt) {
 
     bool all_terminate = stmt.else_block != nullptr;
 
-    for (auto& case_stmt : stmt.cases) {
+    for (const auto& case_stmt : stmt.cases) {
         auto* block = llvm::BasicBlock::Create(m_context, "", function);
 
         m_builder.SetInsertPoint(block);
@@ -216,7 +217,7 @@ std::optional<Value> Codegen::generate(ast::Switch& stmt) {
             all_terminate = false;
         }
 
-        for (auto& case_value : case_stmt.values) {
+        for (const auto& case_value : case_stmt.values) {
             auto case_val = case_value->codegen(*this);
             auto val = cast(value->type, *case_val);
 
@@ -254,7 +255,7 @@ std::optional<Value> Codegen::generate(ast::Switch& stmt) {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::ReturnStmt& stmt) {
+std::optional<Value> Codegen::generate(const ast::ReturnStmt& stmt) {
     auto* function = m_builder.GetInsertBlock()->getParent();
 
     if (!stmt.value) {
@@ -289,7 +290,7 @@ std::optional<Value> Codegen::generate(ast::ReturnStmt& stmt) {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::WhileLoop& stmt) {
+std::optional<Value> Codegen::generate(const ast::WhileLoop& stmt) {
     auto condition = stmt.condition->codegen(*this);
 
     if (!condition) {
@@ -323,7 +324,7 @@ std::optional<Value> Codegen::generate(ast::WhileLoop& stmt) {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::ForLoop& stmt) {
+std::optional<Value> Codegen::generate(const ast::ForLoop& stmt) {
     auto value = stmt.value->codegen(*this);
 
     if (!value) {
@@ -500,7 +501,7 @@ std::optional<Value> Codegen::generate(ast::ForLoop& stmt) {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::BreakStmt& stmt) {
+std::optional<Value> Codegen::generate(const ast::BreakStmt& stmt) {
     if (!m_loop_end) {
         error(stmt.offset, "`break` not in loop");
 
@@ -512,7 +513,7 @@ std::optional<Value> Codegen::generate(ast::BreakStmt& stmt) {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::ContinueStmt& stmt) {
+std::optional<Value> Codegen::generate(const ast::ContinueStmt& stmt) {
     if (!m_loop_body) {
         error(stmt.offset, "`continue` not in loop");
 
@@ -525,13 +526,13 @@ std::optional<Value> Codegen::generate(ast::ContinueStmt& stmt) {
 }
 
 std::optional<Value>
-Codegen::generate([[maybe_unused]] ast::Unreachable& stmt) {
+Codegen::generate([[maybe_unused]] const ast::Unreachable& stmt) {
     m_builder.CreateUnreachable();
 
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::AssertStmt& stmt) {
+std::optional<Value> Codegen::generate(const ast::AssertStmt& stmt) {
     auto condition = stmt.condition->codegen(*this);
 
     if (!condition) {

@@ -49,8 +49,8 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
     return std::move(m_module);
 }
 
-void Codegen::generate(ast::Module& module, bool is_submodule) {
-    auto iterator = m_generated_modules.find(module.path);
+void Codegen::generate(const ast::Module& module, bool is_submodule) {
+    const auto iterator = m_generated_modules.find(module.path);
 
     if (iterator != m_generated_modules.end()) {
         *m_current_scope = iterator->second;
@@ -61,7 +61,7 @@ void Codegen::generate(ast::Module& module, bool is_submodule) {
     auto* scope = m_current_scope;
     auto scope_prefix = m_current_scope_prefix;
 
-    for (auto& submodule : module.submodules) {
+    for (const auto& submodule : module.submodules) {
         m_filename = submodule->path.string();
         m_current_scope = &scope->scopes[*submodule->name];
         m_current_scope_prefix += *submodule->name + "::";
@@ -73,7 +73,7 @@ void Codegen::generate(ast::Module& module, bool is_submodule) {
     m_current_scope = scope;
     m_current_scope_prefix = scope_prefix;
 
-    for (auto& enum_decl : module.enums) {
+    for (const auto& enum_decl : module.enums) {
         if (is_submodule && !enum_decl->is_public) {
             continue;
         }
@@ -81,7 +81,7 @@ void Codegen::generate(ast::Module& module, bool is_submodule) {
         generate_enum(*enum_decl);
     }
 
-    for (auto& struct_decl : module.structs) {
+    for (const auto& struct_decl : module.structs) {
         if (is_submodule && !struct_decl->is_public) {
             continue;
         }
@@ -89,7 +89,7 @@ void Codegen::generate(ast::Module& module, bool is_submodule) {
         generate_struct(*struct_decl);
     }
 
-    for (auto& union_decl : module.unions) {
+    for (const auto& union_decl : module.unions) {
         if (is_submodule && !union_decl->is_public) {
             continue;
         }
@@ -97,7 +97,7 @@ void Codegen::generate(ast::Module& module, bool is_submodule) {
         generate_union(*union_decl);
     }
 
-    for (auto& enum_decl : module.enums) {
+    for (const auto& enum_decl : module.enums) {
         if (is_submodule && !enum_decl->is_public) {
             continue;
         }
@@ -105,7 +105,7 @@ void Codegen::generate(ast::Module& module, bool is_submodule) {
         enum_decl->codegen(*this);
     }
 
-    for (auto& type : module.aliases) {
+    for (const auto& type : module.aliases) {
         if (is_submodule && !type->is_public) {
             continue;
         }
@@ -113,7 +113,7 @@ void Codegen::generate(ast::Module& module, bool is_submodule) {
         type->codegen(*this);
     }
 
-    for (auto& struct_decl : module.structs) {
+    for (const auto& struct_decl : module.structs) {
         if (is_submodule && !struct_decl->is_public) {
             continue;
         }
@@ -121,7 +121,7 @@ void Codegen::generate(ast::Module& module, bool is_submodule) {
         struct_decl->codegen(*this);
     }
 
-    for (auto& union_decl : module.unions) {
+    for (const auto& union_decl : module.unions) {
         if (is_submodule && !union_decl->is_public) {
             continue;
         }
@@ -129,7 +129,7 @@ void Codegen::generate(ast::Module& module, bool is_submodule) {
         union_decl->codegen(*this);
     }
 
-    for (auto& variable : module.variables) {
+    for (const auto& variable : module.variables) {
         if (is_submodule && !variable->is_public) {
             continue;
         }
@@ -137,7 +137,7 @@ void Codegen::generate(ast::Module& module, bool is_submodule) {
         variable->codegen(*this);
     }
 
-    for (auto& function : module.functions) {
+    for (const auto& function : module.functions) {
         if (is_submodule && !function->is_public) {
             continue;
         }
@@ -145,7 +145,7 @@ void Codegen::generate(ast::Module& module, bool is_submodule) {
         generate_fn_proto(*function);
     }
 
-    for (auto& function : module.functions) {
+    for (const auto& function : module.functions) {
         if (function->block && !is_submodule) {
             function->codegen(*this);
         }
@@ -155,7 +155,7 @@ void Codegen::generate(ast::Module& module, bool is_submodule) {
 }
 
 std::optional<Value>
-Codegen::cast(std::shared_ptr<Type>& type, Value& value, bool implicit) {
+Codegen::cast(std::shared_ptr<Type> type, const Value& value, bool implicit) {
     if (types_equal(*type, *value.type)) {
         return value;
     }
@@ -166,9 +166,10 @@ Codegen::cast(std::shared_ptr<Type>& type, Value& value, bool implicit) {
 
     auto* llvm_type = type->codegen(*this);
 
-    if (auto* optional = dyn_cast<types::Optional>(*type)) {
+    if (const auto* optional = dyn_cast<types::Optional>(*type)) {
         if (is<types::Null>(*value.type)) {
-            return Value{type, llvm::Constant::getNullValue(llvm_type)};
+            return Value{
+                std::move(type), llvm::Constant::getNullValue(llvm_type)};
         }
 
         if (!types_equal(*optional->type, *value.type)) {
@@ -177,20 +178,22 @@ Codegen::cast(std::shared_ptr<Type>& type, Value& value, bool implicit) {
 
         if (is<types::Pointer>(*optional->type)) {
             return Value{
-                type, is<types::Null>(*value.type)
-                          ? llvm::Constant::getNullValue(llvm_type)
-                          : value.value};
+                std::move(type), is<types::Null>(*value.type)
+                                     ? llvm::Constant::getNullValue(llvm_type)
+                                     : value.value};
         }
 
         if (auto* val = llvm::dyn_cast<llvm::Constant>(value.value)) {
             return Value{
-                type, llvm::ConstantStruct::get(
-                          static_cast<llvm::StructType*>(llvm_type),
-                          {val, llvm::ConstantInt::get(
-                                    llvm::Type::getInt1Ty(m_context), true)})};
+                std::move(type),
+                llvm::ConstantStruct::get(
+                    static_cast<llvm::StructType*>(llvm_type),
+                    {val, llvm::ConstantInt::get(
+                              llvm::Type::getInt1Ty(m_context), true)})};
         }
 
         auto* variable = create_alloca(llvm_type);
+
         auto* bool_ptr = m_builder.CreateStructGEP(
             llvm_type, variable, optional_member_bool);
 
@@ -203,11 +206,11 @@ Codegen::cast(std::shared_ptr<Type>& type, Value& value, bool implicit) {
             llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), true),
             bool_ptr);
 
-        return Value{type, variable, false, false, false, true};
+        return Value{std::move(type), variable, false, false, false, true};
     }
 
-    if (auto* slice = dyn_cast<types::Slice>(*type)) {
-        auto* array_type = dyn_cast<types::Array>(*value.type);
+    if (const auto* slice = dyn_cast<types::Slice>(*type)) {
+        const auto* array_type = dyn_cast<types::Array>(*value.type);
 
         if (!array_type) {
             return std::nullopt;
@@ -236,14 +239,14 @@ Codegen::cast(std::shared_ptr<Type>& type, Value& value, bool implicit) {
         m_builder.CreateStore(
             llvm::ConstantInt::get(intptr, array_type->size), len_member);
 
-        return Value{type, variable, false, false, false, true};
+        return Value{std::move(type), variable, false, false, false, true};
     }
 
-    return primitive_cast(type, llvm_type, value, implicit);
+    return primitive_cast(std::move(type), llvm_type, value, implicit);
 }
 
 std::optional<Value> Codegen::primitive_cast(
-    std::shared_ptr<Type>& type, llvm::Type* llvm_type, Value& value,
+    std::shared_ptr<Type> type, llvm::Type* llvm_type, const Value& value,
     bool implicit) {
     using enum llvm::Instruction::CastOps;
 
@@ -320,7 +323,7 @@ std::optional<Value> Codegen::primitive_cast(
             cast_op = PtrToInt;
         } else if (type_is_ptr) {
             if (!implicit) {
-                return Value{type, value.value, false, value.is_ref};
+                return Value{std::move(type), value.value, false, value.is_ref};
             }
 
             auto& value_ptr = static_cast<types::Pointer&>(*value.type);
@@ -328,7 +331,7 @@ std::optional<Value> Codegen::primitive_cast(
 
             if (types_equal(*value_ptr.type, *type_ptr.type) &&
                 (value_ptr.is_mutable || !type_ptr.is_mutable)) {
-                return Value{type, value.value, false, value.is_ref};
+                return Value{std::move(type), value.value, false, value.is_ref};
             }
         }
     }
@@ -338,12 +341,12 @@ std::optional<Value> Codegen::primitive_cast(
     }
 
     return Value{
-        type,
+        std::move(type),
         m_builder.CreateCast(cast_op, load_value(value).value, llvm_type)};
 }
 
 bool Codegen::cast_to_result(
-    std::shared_ptr<Type>& type, Value& value, bool implicit) {
+    std::shared_ptr<Type> type, const Value& value, bool implicit) {
     if (types_equal(*type, *value.type)) {
         m_builder.CreateStore(load_value(value).value, m_current_result);
 
@@ -352,7 +355,7 @@ bool Codegen::cast_to_result(
 
     auto* llvm_type = type->codegen(*this);
 
-    if (auto* optional = dyn_cast<types::Optional>(*type)) {
+    if (const auto* optional = dyn_cast<types::Optional>(*type)) {
         if (is<types::Null>(*value.type)) {
             m_builder.CreateStore(
                 llvm::Constant::getNullValue(llvm_type), m_current_result);
@@ -400,8 +403,8 @@ bool Codegen::cast_to_result(
         return true;
     }
 
-    if (auto* slice = dyn_cast<types::Slice>(*type)) {
-        auto* array_type = dyn_cast<types::Array>(*value.type);
+    if (const auto* slice = dyn_cast<types::Slice>(*type)) {
+        const auto* array_type = dyn_cast<types::Array>(*value.type);
 
         if (!array_type) {
             return false;
@@ -431,7 +434,8 @@ bool Codegen::cast_to_result(
         return true;
     }
 
-    if (auto val = primitive_cast(type, llvm_type, value, implicit)) {
+    if (auto val =
+            primitive_cast(std::move(type), llvm_type, value, implicit)) {
         m_builder.CreateStore(val->value, m_current_result);
         return true;
     }
@@ -439,7 +443,7 @@ bool Codegen::cast_to_result(
     return false;
 }
 
-Value Codegen::load_value(Value& value) {
+Value Codegen::load_value(const Value& value) {
     if (value.is_ref) {
         return value;
     }
@@ -539,7 +543,7 @@ Codegen::get_type(std::size_t offset, std::string_view name, Scope& parent) {
     return user->second;
 }
 
-std::optional<Value>
+Value*
 Codegen::get_name(std::size_t offset, std::string_view name, Scope& parent) {
     auto iterator = parent.names.find(name);
 
@@ -548,10 +552,10 @@ Codegen::get_name(std::size_t offset, std::string_view name, Scope& parent) {
             offset,
             fmt::format("undeclared identifier: {}", log::quoted(name)));
 
-        return std::nullopt;
+        return nullptr;
     }
 
-    return iterator->second;
+    return &iterator->second;
 }
 
 Scope*
@@ -612,7 +616,8 @@ void Codegen::create_panic_fn() {
     m_builder.CreateUnreachable();
 }
 
-void Codegen::type_mismatch(std::size_t offset, Type& expected, Type& got) {
+void Codegen::type_mismatch(
+    std::size_t offset, const Type& expected, const Type& got) {
     error(
         offset, fmt::format(
                     "expected {} but got {}", log::quoted(expected.to_string()),
@@ -620,10 +625,10 @@ void Codegen::type_mismatch(std::size_t offset, Type& expected, Type& got) {
 }
 
 Attributes Codegen::parse_attrs(
-    ast::Declaration& decl, const std::set<std::string_view>& allowed) {
+    const ast::Declaration& decl, const std::set<std::string_view>& allowed) {
     Attributes result;
 
-    for (auto& attr : decl.attributes) {
+    for (const auto& attr : decl.attributes) {
         if (allowed.contains(attr.name)) {
             result.insert(attr.name);
             continue;

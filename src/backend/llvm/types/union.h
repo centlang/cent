@@ -18,7 +18,7 @@ struct Union : detail::Type<Union, Type::Kind::Union> {
     : name{std::move(name)}, type{type}, fields{std::move(fields)},
       tag_type{std::move(tag_type)} {}
 
-    std::string to_string() override { return name; }
+    std::string to_string() const override { return name; }
 
     std::string name;
 

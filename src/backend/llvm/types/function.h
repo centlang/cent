@@ -19,7 +19,7 @@ struct Function : detail::Type<Function, Type::Kind::Function> {
     : return_type{std::move(return_type)}, param_types{std::move(param_types)},
       default_args{std::move(default_args)}, variadic{variadic} {}
 
-    std::string to_string() override {
+    std::string to_string() const override {
         std::string result = "fn(";
 
         for (std::size_t i = 0; i < param_types.size(); ++i) {

@@ -52,8 +52,8 @@ struct Type {
     auto operator=(const Type&) = delete;
     auto operator=(Type&&) = delete;
 
-    virtual llvm::Type* codegen(backend::Codegen& codegen) = 0;
-    virtual std::string to_string() = 0;
+    virtual llvm::Type* codegen(backend::Codegen& codegen) const = 0;
+    virtual std::string to_string() const = 0;
 
     const Kind kind;
 };
@@ -92,8 +92,9 @@ template <typename Derived, Type::Kind DerivedKind>
 struct Type : backend::Type {
     [[nodiscard]] Type() : backend::Type{DerivedKind} {};
 
-    [[nodiscard]] llvm::Type* codegen(backend::Codegen& codegen) override {
-        return codegen.generate(static_cast<Derived&>(*this));
+    [[nodiscard]] llvm::Type*
+    codegen(backend::Codegen& codegen) const override {
+        return codegen.generate(static_cast<const Derived&>(*this));
     }
 
     [[nodiscard]] static bool class_of(const backend::Type& type) {

@@ -25,7 +25,7 @@
 
 namespace cent::backend {
 
-std::optional<Value> Codegen::generate(ast::FnDecl& decl) {
+std::optional<Value> Codegen::generate(const ast::FnDecl& decl) {
     if (m_current_function) {
         generate_fn_proto(decl);
     }
@@ -40,9 +40,9 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) {
             return m_scope.names[decl.name.value].type;
         }
 
-        auto method = m_methods[type].find(decl.name.value);
+        auto method = m_methods[type.get()].find(decl.name.value);
 
-        if (method != m_methods[type].end()) {
+        if (method != m_methods[type.get()].end()) {
             return method->second.type;
         }
 
@@ -55,9 +55,9 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) {
                 m_scope.names[decl.name.value].value);
         }
 
-        auto method = m_methods[type].find(decl.name.value);
+        auto method = m_methods[type.get()].find(decl.name.value);
 
-        if (method != m_methods[type].end()) {
+        if (method != m_methods[type.get()].end()) {
             return method->second.function;
         }
 
@@ -77,7 +77,7 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) {
     m_current_function = static_cast<types::Function*>(function_type.get());
 
     for (std::size_t i = 0; i < decl.proto.params.size(); ++i) {
-        auto& param = decl.proto.params[i];
+        const auto& param = decl.proto.params[i];
 
         auto* value = function->getArg(i);
         auto* variable = create_alloca(value->getType());
@@ -114,7 +114,7 @@ std::optional<Value> Codegen::generate(ast::FnDecl& decl) {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::Struct& decl) {
+std::optional<Value> Codegen::generate(const ast::Struct& decl) {
     if (m_current_function) {
         generate_struct(decl);
     }
@@ -129,7 +129,7 @@ std::optional<Value> Codegen::generate(ast::Struct& decl) {
     fields.reserve(decl.fields.size());
 
     for (std::size_t i = 0; i < decl.fields.size(); ++i) {
-        auto& field = decl.fields[i];
+        const auto& field = decl.fields[i];
 
         auto type = field.type->codegen(*this);
 
@@ -154,7 +154,7 @@ std::optional<Value> Codegen::generate(ast::Struct& decl) {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::Union& decl) {
+std::optional<Value> Codegen::generate(const ast::Union& decl) {
     auto attrs = parse_attrs(decl, {"untagged"});
     bool untagged = attrs.contains("untagged");
 
@@ -169,7 +169,7 @@ std::optional<Value> Codegen::generate(ast::Union& decl) {
     fields.reserve(decl.fields.size());
 
     for (std::size_t i = 0; i < decl.fields.size(); ++i) {
-        auto& field = decl.fields[i];
+        const auto& field = decl.fields[i];
 
         auto type = field.type->codegen(*this);
 
@@ -186,7 +186,7 @@ std::optional<Value> Codegen::generate(ast::Union& decl) {
 
     auto layout = m_module->getDataLayout();
 
-    for (auto& field : decl.fields) {
+    for (const auto& field : decl.fields) {
         auto* type = field.type->codegen(*this)->codegen(*this);
         auto size = layout.getTypeAllocSize(type);
 
@@ -226,7 +226,7 @@ std::optional<Value> Codegen::generate(ast::Union& decl) {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::EnumDecl& decl) {
+std::optional<Value> Codegen::generate(const ast::EnumDecl& decl) {
     if (m_current_function) {
         generate_enum(decl);
     }
@@ -239,7 +239,7 @@ std::optional<Value> Codegen::generate(ast::EnumDecl& decl) {
     std::uint64_t number = 0;
 
     for (std::size_t i = 0; i < decl.fields.size(); ++i) {
-        auto& field = decl.fields[i];
+        const auto& field = decl.fields[i];
 
         if (!field.value) {
             m_current_scope->scopes[decl.name.value].names[field.name.value] =
@@ -281,7 +281,7 @@ std::optional<Value> Codegen::generate(ast::EnumDecl& decl) {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::TypeAlias& decl) {
+std::optional<Value> Codegen::generate(const ast::TypeAlias& decl) {
     auto type = decl.type->codegen(*this);
 
     m_current_scope->types[decl.name.value] = std::make_shared<types::Alias>(
@@ -290,7 +290,7 @@ std::optional<Value> Codegen::generate(ast::TypeAlias& decl) {
     return std::nullopt;
 }
 
-std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
+std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
     if (decl.mutability == ast::VarDecl::Mut::Const) {
         if (!decl.value) {
             error(decl.name.offset, "constant has no value");
@@ -449,7 +449,7 @@ std::optional<Value> Codegen::generate(ast::VarDecl& decl) {
     return std::nullopt;
 }
 
-void Codegen::generate_fn_proto(ast::FnDecl& decl) {
+void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
     auto attrs = parse_attrs(decl, {"extern"});
     bool is_extern = attrs.contains("extern");
 
@@ -496,7 +496,7 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) {
         auto param_type = decl.proto.params[0].type->codegen(*this);
 
         if (types_equal(*param_type, *type)) {
-            m_methods[type][decl.name.value] = {fn_type, function};
+            m_methods[type.get()][decl.name.value] = {fn_type, function};
 
             return;
         }
@@ -504,12 +504,12 @@ void Codegen::generate_fn_proto(ast::FnDecl& decl) {
         if (is<types::Pointer>(*param_type) &&
             types_equal(
                 *static_cast<types::Pointer&>(*param_type).type, *type)) {
-            m_methods[type][decl.name.value] = {fn_type, function};
+            m_methods[type.get()][decl.name.value] = {fn_type, function};
         }
     }
 }
 
-void Codegen::generate_struct(ast::Struct& decl) {
+void Codegen::generate_struct(const ast::Struct& decl) {
     if (llvm::StructType::getTypeByName(m_context, decl.name.value)) {
         error(
             decl.name.offset,
@@ -521,7 +521,7 @@ void Codegen::generate_struct(ast::Struct& decl) {
     llvm::StructType::create(m_context, decl.name.value);
 }
 
-void Codegen::generate_union(ast::Union& decl) {
+void Codegen::generate_union(const ast::Union& decl) {
     if (llvm::StructType::getTypeByName(m_context, decl.name.value)) {
         error(
             decl.name.offset,
@@ -533,7 +533,7 @@ void Codegen::generate_union(ast::Union& decl) {
     llvm::StructType::create(m_context, decl.name.value);
 }
 
-void Codegen::generate_enum(ast::EnumDecl& decl) {
+void Codegen::generate_enum(const ast::EnumDecl& decl) {
     if (m_current_scope->types.contains(decl.name.value)) {
         error(
             decl.name.offset,
