@@ -111,7 +111,7 @@ struct Array : detail::Type<Array, Type::Kind::Array> {
     : type{std::move(type)}, size{size} {}
 
     std::string to_string() override {
-        return fmt::format("[{}, {}]", type->to_string(), size);
+        return fmt::format("[{}]{}", size, type->to_string());
     }
 
     std::shared_ptr<backend::Type> type;
@@ -123,7 +123,8 @@ struct Slice : detail::Type<Slice, Type::Kind::Slice> {
     : type{std::move(type)}, is_mutable{is_mutable} {}
 
     std::string to_string() override {
-        return fmt::format("[{}]", type->to_string());
+        return fmt::format(
+            "[]{}{}", is_mutable ? "mut " : "", type->to_string());
     }
 
     std::shared_ptr<backend::Type> type;

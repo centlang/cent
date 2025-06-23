@@ -819,6 +819,20 @@ std::unique_ptr<ast::Type> Parser::expect_var_type() {
 std::unique_ptr<ast::Type> Parser::parse_array_type() {
     auto offset = get().offset;
 
+    std::unique_ptr<ast::Expression> size = nullptr;
+
+    if (!match(Token::Type::RightBracket)) {
+        size = expect_expr(false);
+
+        if (!size) {
+            return nullptr;
+        }
+    }
+
+    if (!expect("`]`", Token::Type::RightBracket)) {
+        return nullptr;
+    }
+
     std::size_t is_mutable_offset = 0;
     bool is_mutable = false;
 
@@ -833,31 +847,17 @@ std::unique_ptr<ast::Type> Parser::parse_array_type() {
         return nullptr;
     }
 
-    if (match_next(Token::Type::RightBracket)) {
-        return std::make_unique<ast::SliceType>(
-            offset, std::move(type), is_mutable);
+    if (size) {
+        if (is_mutable) {
+            error(is_mutable_offset, "array type cannot be mutable");
+        }
+
+        return std::make_unique<ast::ArrayType>(
+            offset, std::move(type), std::move(size));
     }
 
-    if (!expect("`,` or `]`", Token::Type::Comma)) {
-        return nullptr;
-    }
-
-    auto size = expect_expr(false);
-
-    if (!size) {
-        return nullptr;
-    }
-
-    if (!expect("`]`", Token::Type::RightBracket)) {
-        return nullptr;
-    }
-
-    if (is_mutable) {
-        error(is_mutable_offset, "array type cannot be mutable");
-    }
-
-    return std::make_unique<ast::ArrayType>(
-        offset, std::move(type), std::move(size));
+    return std::make_unique<ast::SliceType>(
+        offset, std::move(type), is_mutable);
 }
 
 std::unique_ptr<ast::Type> Parser::expect_type() {
