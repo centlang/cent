@@ -62,7 +62,7 @@ namespace detail {
 template <typename Derived> struct Type : ast::Type {
     using ast::Type::Type;
 
-    std::shared_ptr<backend::Type>
+    [[nodiscard]] std::shared_ptr<backend::Type>
     codegen(backend::Codegen& codegen) const override {
         return codegen.generate(static_cast<const Derived&>(*this));
     }

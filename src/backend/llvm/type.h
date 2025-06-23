@@ -52,8 +52,10 @@ struct Type {
     auto operator=(const Type&) = delete;
     auto operator=(Type&&) = delete;
 
-    virtual llvm::Type* codegen(backend::Codegen& codegen) const = 0;
-    virtual std::string to_string() const = 0;
+    [[nodiscard]] virtual llvm::Type*
+    codegen(backend::Codegen& codegen) const = 0;
+
+    [[nodiscard]] virtual std::string to_string() const = 0;
 
     const Kind kind;
 };

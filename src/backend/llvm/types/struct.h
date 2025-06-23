@@ -16,7 +16,7 @@ struct Struct : detail::Type<Struct, Type::Kind::Struct> {
         std::vector<std::shared_ptr<backend::Type>> fields)
     : name{std::move(name)}, type{type}, fields{std::move(fields)} {}
 
-    std::string to_string() const override { return name; }
+    [[nodiscard]] std::string to_string() const override { return name; }
 
     std::string name;
 
