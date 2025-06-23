@@ -547,7 +547,8 @@ std::optional<Value> Codegen::generate(ast::AssertStmt& stmt) {
 
     m_builder.SetInsertPoint(failure);
 
-    auto [line, column] = cent::offset_to_pos(m_source, stmt.condition->offset);
+    auto src = read_file(m_filename);
+    auto [line, column] = cent::offset_to_pos(*src, stmt.condition->offset);
 
     m_builder.CreateCall(
         m_panic_fn,

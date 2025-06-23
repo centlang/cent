@@ -127,11 +127,10 @@ using Attributes = std::set<std::string_view>;
 class Codegen {
 public:
     [[nodiscard]] Codegen(
-        std::unique_ptr<ast::Module> program, std::string_view source,
-        std::string_view filename, const llvm::DataLayout& layout,
-        const std::string& triple)
+        std::unique_ptr<ast::Module> program, std::string_view filename,
+        const llvm::DataLayout& layout, const std::string& triple)
     : m_module{std::make_unique<llvm::Module>("", m_context)},
-      m_builder{m_context}, m_program{std::move(program)}, m_source{source},
+      m_builder{m_context}, m_program{std::move(program)},
       m_filename{filename} {
         m_module->setDataLayout(layout);
         m_module->setTargetTriple(triple);
@@ -275,9 +274,10 @@ private:
     void type_mismatch(std::size_t offset, Type& expected, Type& got);
 
     void error(std::size_t offset, std::string_view message) {
-        auto [line, column] = cent::offset_to_pos(m_source, offset);
-        log::error(line, column, m_filename, message);
+        auto src = read_file(m_filename);
+        auto [line, column] = cent::offset_to_pos(*src, offset);
 
+        log::error(line, column, m_filename, message);
         m_had_error = true;
     }
 
@@ -341,8 +341,6 @@ private:
     std::map<llvm::Type*, llvm::StructType*> m_range_types;
 
     std::unique_ptr<ast::Module> m_program;
-
-    std::string_view m_source;
     std::string m_filename;
 
     bool m_had_error{false};

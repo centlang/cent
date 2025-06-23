@@ -147,8 +147,7 @@ int main(int argc, char** argv) {
         }
 
         cent::backend::Codegen codegen{
-            std::move(program), *code, filename, machine->createDataLayout(),
-            triple};
+            std::move(program), filename, machine->createDataLayout(), triple};
 
         auto module = codegen.generate();
 
