@@ -151,8 +151,6 @@ std::unique_ptr<ast::Module> Parser::parse() {
         }
 
         error("expected declaration");
-        next();
-
         skip_until_decl();
     }
 
@@ -166,10 +164,16 @@ void Parser::expect_stmt(ast::BlockStmt& block) {
 
     switch (peek().type) {
     case LeftBrace:
-        block.body.push_back(expect_block());
+        if (auto stmt = expect_block()) {
+            block.body.push_back(std::move(stmt));
+        }
+
         return;
     case If:
-        block.body.push_back(parse_if_else());
+        if (auto stmt = parse_if_else()) {
+            block.body.push_back(std::move(stmt));
+        }
+
         return;
     case Switch:
         parse_switch(block);
@@ -246,26 +250,39 @@ void Parser::expect_stmt(ast::BlockStmt& block) {
     switch (peek().type) {
     case Fn:
         next();
-        block.body.push_back(parse_fn(std::move(attrs)));
+
+        if (auto decl = parse_fn(std::move(attrs))) {
+            block.body.push_back(std::move(decl));
+        }
+
         return;
     case Type:
         next();
 
         if (match(1, Equal)) {
-            block.body.push_back(parse_type_alias(std::move(attrs)));
-        } else {
-            block.body.push_back(parse_struct(std::move(attrs)));
+            if (auto decl = parse_type_alias(std::move(attrs))) {
+                block.body.push_back(std::move(decl));
+            }
+        } else if (auto decl = parse_struct(std::move(attrs))) {
+            block.body.push_back(std::move(decl));
         }
 
         return;
     case Enum:
         next();
-        block.body.push_back(parse_enum(std::move(attrs)));
+
+        if (auto decl = parse_enum(std::move(attrs))) {
+            block.body.push_back(std::move(decl));
+        }
+
         return;
     case Let:
     case Mut:
     case Const:
-        block.body.push_back(parse_var(std::move(attrs)));
+        if (auto decl = parse_var(std::move(attrs))) {
+            block.body.push_back(std::move(decl));
+        }
+
         expect_semicolon();
         return;
     default:
@@ -313,10 +330,22 @@ std::vector<std::unique_ptr<ast::Expression>> Parser::parse_args() {
     std::vector<std::unique_ptr<ast::Expression>> result;
 
     if (!match(Token::Type::RightParen)) {
-        result.push_back(expect_expr(false));
+        auto expr = expect_expr(false);
+
+        if (!expr) {
+            return {};
+        }
+
+        result.push_back(std::move(expr));
 
         while (match_next(Token::Type::Comma)) {
-            result.push_back(expect_expr(false));
+            expr = expect_expr(false);
+
+            if (!expr) {
+                return {};
+            }
+
+            result.push_back(std::move(expr));
         }
     }
 
@@ -387,9 +416,13 @@ std::optional<ast::FnProto> Parser::parse_fn_proto() {
         if (match_next(Equal)) {
             had_default = true;
             value = expect_expr(false);
+
+            if (!value) {
+                return;
+            }
         } else if (had_default) {
-            return;
             error(name->offset, "default parameters must be at the end");
+            return;
         }
 
         params.emplace_back(
@@ -419,7 +452,7 @@ std::optional<ast::FnProto> Parser::parse_fn_proto() {
 
     std::unique_ptr<ast::Type> return_type = nullptr;
 
-    if (match(Star, QuestionMark, LeftParen, Fn, LeftBracket, Identifier)) {
+    if (!match(Semicolon, LeftBrace)) {
         return_type = expect_type();
 
         if (!return_type) {
@@ -530,6 +563,10 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
     case LeftParen: {
         auto value = expect_expr(false);
 
+        if (!value) {
+            return nullptr;
+        }
+
         if (match_next(RightParen)) {
             return value;
         }
@@ -597,6 +634,10 @@ Parser::expect_access_or_call_expr(bool is_condition) {
             }
 
             if (match_next(RightBracket)) {
+                if (!low) {
+                    return nullptr;
+                }
+
                 expression = std::make_unique<ast::IndexExpr>(
                     expression->offset, std::move(expression), std::move(low));
 
@@ -667,6 +708,10 @@ Parser::expect_access_or_call_expr(bool is_condition) {
 [[nodiscard]] std::unique_ptr<ast::Expression>
 Parser::expect_as_expr(bool is_condition) {
     auto expression = expect_access_or_call_expr(is_condition);
+
+    if (!expression) {
+        return nullptr;
+    }
 
     if (!match_next(Token::Type::As)) {
         return expression;
@@ -1007,17 +1052,20 @@ void Parser::parse_switch(ast::BlockStmt& block) {
         }
 
         auto body = expect_block();
-        cases.emplace_back(std::move(values), std::move(body));
-    }
-
-    if (match_next(Token::Type::Else)) {
-        auto body = expect_block();
 
         if (!body) {
             return;
         }
 
-        else_block = std::move(body);
+        cases.emplace_back(std::move(values), std::move(body));
+    }
+
+    if (match_next(Token::Type::Else)) {
+        else_block = expect_block();
+
+        if (!else_block) {
+            return;
+        }
     }
 
     if (!expect("`}`", Token::Type::RightBrace)) {
@@ -1082,6 +1130,10 @@ void Parser::parse_return(ast::BlockStmt& block) {
 
     if (!match(Token::Type::Semicolon)) {
         value = expect_expr(false);
+
+        if (!value) {
+            return;
+        }
     }
 
     block.body.push_back(
@@ -1135,6 +1187,10 @@ std::vector<ast::EnumDecl::Field> Parser::parse_enum_fields() {
 
         if (match_next(Token::Type::Equal)) {
             auto value = expect_expr(false);
+
+            if (!value) {
+                return;
+            }
 
             result.emplace_back(
                 ast::OffsetValue{name.value, name.offset}, std::move(value));
@@ -1250,6 +1306,10 @@ Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
 
     if (match(Token::Type::LeftBrace)) {
         body = expect_block();
+
+        if (!body) {
+            return nullptr;
+        }
     } else if (!match_next(Token::Type::Semicolon)) {
         expected("`{` or `;`");
 
