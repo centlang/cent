@@ -265,20 +265,10 @@ llvm::Type* Codegen::generate(const types::Range& type) {
 llvm::Type* Codegen::generate(const types::Array& type) {
     auto* llvm_type = type.type->codegen(*this);
 
-    if (!llvm_type) {
-        return nullptr;
-    }
-
     return llvm::ArrayType::get(llvm_type, type.size);
 }
 
-llvm::Type* Codegen::generate(const types::Slice& type) {
-    if (!type.type->codegen(*this)) {
-        return nullptr;
-    }
-
-    return m_slice_type;
-}
+llvm::Type* Codegen::generate(const types::Slice& type) { return m_slice_type; }
 
 llvm::Type* Codegen::generate(const types::Tuple& type) { return type.type; }
 
@@ -365,11 +355,14 @@ bool Codegen::types_equal(const Type& lhs, const Type& rhs) const {
 
 std::shared_ptr<types::Function>
 Codegen::generate_fn_type(const ast::FnProto& proto) {
-    auto return_type =
-        proto.return_type ? proto.return_type->codegen(*this) : m_void_type;
+    std::shared_ptr<Type> return_type = m_void_type;
 
-    if (!return_type) {
-        return nullptr;
+    if (proto.return_type) {
+        return_type = proto.return_type->codegen(*this);
+
+        if (!return_type) {
+            return nullptr;
+        }
     }
 
     std::vector<std::shared_ptr<Type>> param_types;
@@ -397,6 +390,11 @@ Codegen::generate_fn_type(const ast::FnProto& proto) {
         }
 
         auto val = cast(type, *value);
+
+        if (!val) {
+            type_mismatch(parameter.value->offset, *type, *value->type);
+            return nullptr;
+        }
 
         if (!llvm::isa<llvm::Constant>(val->value)) {
             error(parameter.value->offset, "not a constant");

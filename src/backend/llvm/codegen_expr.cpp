@@ -83,16 +83,16 @@ std::optional<Value> Codegen::generate(const ast::UnaryExpr& expr) {
         return Value{
             value->type, m_builder.CreateNot(load_value(*value).value)};
     case Star: {
-        if (!is<types::Pointer>(*value->type)) {
+        auto* pointer = dyn_cast<types::Pointer>(*value->type);
+
+        if (!pointer) {
             error(expr.offset, "dereference of a non-pointer type");
 
             return std::nullopt;
         }
 
-        auto& pointer = static_cast<types::Pointer&>(*value->type);
-
         return Value{
-            pointer.type, value->value, pointer.is_mutable, false, true};
+            pointer->type, value->value, pointer->is_mutable, false, true};
     }
     case And:
         if (llvm::isa<llvm::Function>(value->value)) {
@@ -176,10 +176,12 @@ std::optional<Value> Codegen::generate(const ast::IntLiteral& expr) {
             return std::nullopt;
         }
 
-        auto& type = m_primitive_types[suffix];
+        auto type = m_primitive_types[suffix];
         auto* llvm_type = type->codegen(*this);
 
-        return Value{type, llvm::ConstantInt::get(llvm_type, value, is_signed)};
+        return Value{
+            std::move(type),
+            llvm::ConstantInt::get(llvm_type, value, is_signed)};
     };
 
     if (auto value = with_type_suffix.operator()<std::int8_t>("i8", true)) {
@@ -304,10 +306,10 @@ std::optional<Value> Codegen::generate(const ast::FloatLiteral& expr) {
             return std::nullopt;
         }
 
-        auto& type = m_primitive_types[suffix];
+        auto type = m_primitive_types[suffix];
         auto* llvm_type = type->codegen(*this);
 
-        return Value{type, llvm::ConstantFP::get(llvm_type, value)};
+        return Value{std::move(type), llvm::ConstantFP::get(llvm_type, value)};
     };
 
     if (auto value = with_type_suffix.operator()<float>("f32")) {
@@ -577,14 +579,21 @@ std::optional<Value> Codegen::generate(const ast::ArrayLiteral& expr) {
         return std::nullopt;
     }
 
-    auto& array_type = static_cast<types::Array&>(*type);
+    auto* array_type = dyn_cast<types::Array>(*type);
+
+    if (!array_type) {
+        error(expr.type->offset, "not an array type");
+
+        return std::nullopt;
+    }
+
     auto* llvm_type = static_cast<llvm::ArrayType*>(type->codegen(*this));
 
     bool stack_allocated = m_current_result == nullptr;
 
     bool is_const = true;
 
-    if (expr.elements.size() != array_type.size) {
+    if (expr.elements.size() != array_type->size) {
         error(expr.type->offset, "incorrect number of elements");
 
         return std::nullopt;
@@ -631,9 +640,9 @@ std::optional<Value> Codegen::generate(const ast::ArrayLiteral& expr) {
             {llvm::ConstantInt::get(intptr, 0),
              llvm::ConstantInt::get(intptr, i)});
 
-        if (!cast_to_result(array_type.type, value)) {
+        if (!cast_to_result(array_type->type, value)) {
             type_mismatch(
-                expr.elements[i]->offset, *array_type.type, *value.type);
+                expr.elements[i]->offset, *array_type->type, *value.type);
 
             m_current_result = nullptr;
 
@@ -727,8 +736,14 @@ std::optional<Value> Codegen::generate(const ast::Identifier& expr) {
         }
     }
 
-    return *get_name(
+    auto* result = get_name(
         expr.value[last_index].offset, expr.value[last_index].value, *scope);
+
+    if (!result) {
+        return std::nullopt;
+    }
+
+    return *result;
 }
 
 std::optional<Value> Codegen::generate(const ast::CallExpr& expr) {

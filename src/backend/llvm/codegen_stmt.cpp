@@ -35,6 +35,10 @@ Codegen::generate([[maybe_unused]] const ast::Assignment& stmt) {
 
     auto value = stmt.value->codegen(*this);
 
+    if (!value) {
+        return std::nullopt;
+    }
+
     auto without_equal = [](frontend::Token::Type type) {
         using enum frontend::Token::Type;
 
@@ -65,10 +69,10 @@ Codegen::generate([[maybe_unused]] const ast::Assignment& stmt) {
             ast::OffsetValue<const Value&>{*var, stmt.variable->offset},
             ast::OffsetValue<const Value&>{*value, stmt.value->offset},
             ast::OffsetValue{without_equal(stmt.oper.value), stmt.oper.offset});
-    }
 
-    if (!value) {
-        return std::nullopt;
+        if (!value) {
+            return std::nullopt;
+        }
     }
 
     if (!var->is_deref && !llvm::isa<llvm::AllocaInst>(var->value) &&
