@@ -1117,16 +1117,6 @@ std::optional<Value> Codegen::generate(const ast::SliceExpr& expr) {
         return std::nullopt;
     }
 
-    auto* type = dyn_cast<types::Slice>(*value->type);
-
-    if (!type) {
-        error(expr.value->offset, "slice expression of a non-slice type");
-
-        return std::nullopt;
-    }
-
-    auto* llvm_type = type->codegen(*this);
-
     std::optional<Value> low = std::nullopt;
 
     if (expr.low) {
@@ -1174,7 +1164,54 @@ std::optional<Value> Codegen::generate(const ast::SliceExpr& expr) {
         }
 
         high = high_val;
-    } else {
+    }
+
+    if (auto* type = dyn_cast<types::Array>(*value->type)) {
+        if (!high) {
+            high = {
+                m_primitive_types["usize"],
+                llvm::ConstantInt::get(
+                    m_module->getDataLayout().getIntPtrType(m_context),
+                    type->size)};
+        }
+
+        auto* ptr_value = m_builder.CreateGEP(
+            type->type->codegen(*this), value->value, low->value);
+
+        auto* len_value = m_builder.CreateSub(high->value, low->value);
+
+        auto* variable =
+            m_current_result ? m_current_result : create_alloca(m_slice_type);
+
+        auto* ptr_member =
+            m_builder.CreateStructGEP(m_slice_type, variable, slice_member_ptr);
+
+        auto* len_member =
+            m_builder.CreateStructGEP(m_slice_type, variable, slice_member_len);
+
+        m_builder.CreateStore(ptr_value, ptr_member);
+        m_builder.CreateStore(len_value, len_member);
+
+        return Value{
+            std::make_shared<types::Slice>(type->type, value->is_mutable),
+            variable,
+            false,
+            false,
+            false,
+            m_current_result == nullptr};
+    }
+
+    auto* type = dyn_cast<types::Slice>(*value->type);
+
+    if (!type) {
+        error(expr.value->offset, "slice expression of a non-slice type");
+
+        return std::nullopt;
+    }
+
+    auto* llvm_type = type->codegen(*this);
+
+    if (!high) {
         auto* len_member = m_builder.CreateStructGEP(
             llvm_type, value->value, slice_member_len);
 
