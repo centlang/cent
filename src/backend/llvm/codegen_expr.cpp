@@ -424,8 +424,24 @@ std::optional<Value> Codegen::generate(const ast::StructLiteral& expr) {
         return std::nullopt;
     }
 
+    auto get_index = [&](const std::map<std::string_view, std::size_t>& members,
+                         const ast::StructLiteral::Field& field)
+        -> std::optional<std::size_t> {
+        auto iterator = members.find(field.name.value);
+
+        if (iterator == members.end()) {
+            error(
+                field.name.offset,
+                fmt::format(
+                    "no such member: {}", log::quoted(field.name.value)));
+
+            return std::nullopt;
+        }
+
+        return iterator->second;
+    };
+
     if (auto* union_type = dyn_cast<types::Union>(*type)) {
-        auto& members = m_members[union_type->type];
         bool stack_allocated = m_current_result == nullptr;
 
         if (expr.fields.size() != 1) {
@@ -446,25 +462,18 @@ std::optional<Value> Codegen::generate(const ast::StructLiteral& expr) {
         auto* variable = m_current_result ? m_current_result
                                           : create_alloca(union_type->type);
 
-        auto iterator = members.find(field.name.value);
+        auto index = get_index(m_members[union_type->type], field);
 
-        if (iterator == members.end()) {
-            error(
-                field.name.offset,
-                fmt::format(
-                    "no such member: {}", log::quoted(field.name.value)));
-
+        if (!index) {
             return std::nullopt;
         }
-
-        auto index = iterator->second;
 
         m_current_result = m_builder.CreateStructGEP(
             union_type->type, variable, union_member_value);
 
-        if (!cast_to_result(union_type->fields[index], *value)) {
+        if (!cast_to_result(union_type->fields[*index], *value)) {
             type_mismatch(
-                field.value->offset, *union_type->fields[index], *value->type);
+                field.value->offset, *union_type->fields[*index], *value->type);
 
             m_current_result = nullptr;
 
@@ -477,7 +486,7 @@ std::optional<Value> Codegen::generate(const ast::StructLiteral& expr) {
 
             m_builder.CreateStore(
                 llvm::ConstantInt::get(
-                    union_type->tag_type->codegen(*this), index),
+                    union_type->tag_type->codegen(*this), *index),
                 tag_member);
         }
 
@@ -494,7 +503,6 @@ std::optional<Value> Codegen::generate(const ast::StructLiteral& expr) {
         return std::nullopt;
     }
 
-    auto& members = m_members[struct_type->type];
     bool is_const = true;
 
     bool stack_allocated = m_current_result == nullptr;
@@ -517,6 +525,16 @@ std::optional<Value> Codegen::generate(const ast::StructLiteral& expr) {
 
         if (!llvm::isa<llvm::Constant>(value->value)) {
             is_const = false;
+        } else {
+            auto index = get_index(m_members[struct_type->type], field);
+
+            if (!index) {
+                return std::nullopt;
+            }
+
+            if (!types_equal(*struct_type->fields[*index], *value->type)) {
+                is_const = false;
+            }
         }
 
         values.push_back(std::move(*value));
@@ -541,25 +559,18 @@ std::optional<Value> Codegen::generate(const ast::StructLiteral& expr) {
         const auto& field = expr.fields[i];
         auto& value = values[i];
 
-        auto iterator = members.find(field.name.value);
+        auto index = get_index(m_members[struct_type->type], field);
 
-        if (iterator == members.end()) {
-            error(
-                field.name.offset,
-                fmt::format(
-                    "no such member: {}", log::quoted(field.name.value)));
-
+        if (!index) {
             return std::nullopt;
         }
 
-        auto index = iterator->second;
-
         m_current_result =
-            m_builder.CreateStructGEP(struct_type->type, variable, index);
+            m_builder.CreateStructGEP(struct_type->type, variable, *index);
 
-        if (!cast_to_result(struct_type->fields[index], value)) {
+        if (!cast_to_result(struct_type->fields[*index], value)) {
             type_mismatch(
-                field.value->offset, *struct_type->fields[index], *value.type);
+                field.value->offset, *struct_type->fields[*index], *value.type);
 
             m_current_result = nullptr;
 
