@@ -40,7 +40,8 @@ bool emit_obj(
     llvm::raw_fd_ostream file{path.string(), code, llvm::sys::fs::OF_None};
 
     if (code) {
-        log::error(fmt::format("could not open file: {}", code.message()));
+        log::error(fmt::format(
+            "could not open file `{}`: {}", path.string(), code.message()));
 
         return false;
     }
@@ -60,7 +61,8 @@ bool emit_llvm(llvm::Module& module, const std::filesystem::path& path) {
     llvm::raw_fd_ostream file{path.string(), code, llvm::sys::fs::OF_None};
 
     if (code) {
-        log::error(fmt::format("could not open file: {}", code.message()));
+        log::error(fmt::format(
+            "could not open file `{}`: {}", path.string(), code.message()));
 
         return false;
     }

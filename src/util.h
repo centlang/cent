@@ -17,8 +17,8 @@ read_file(const std::string& filename) {
     std::ifstream file{filename};
 
     if (!file) {
-        log::error(
-            fmt::format("could not open file: {}", std::strerror(errno)));
+        log::error(fmt::format(
+            "could not open file `{}`: {}", filename, std::strerror(errno)));
 
         return std::nullopt;
     }
