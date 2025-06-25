@@ -16,12 +16,13 @@
 #include "ast/stmt/unreachable.h"
 #include "ast/stmt/while_loop.h"
 
-#include "backend/llvm/codegen.h"
 #include "backend/llvm/types/enum.h"
 #include "backend/llvm/types/function.h"
 #include "backend/llvm/types/primitive.h"
 #include "backend/llvm/types/union.h"
 #include "backend/llvm/value.h"
+
+#include "backend/llvm/codegen.h"
 
 namespace cent::backend {
 
@@ -93,7 +94,7 @@ Codegen::generate([[maybe_unused]] const ast::Assignment& stmt) {
     m_current_result = var->value;
 
     if (!cast_to_result(var->type, *value)) {
-        type_mismatch(stmt.value->offset, *var->type, *value->type);
+        type_mismatch(stmt.value->offset, var->type, value->type);
     }
 
     m_current_result = nullptr;
@@ -182,17 +183,17 @@ std::optional<Value> Codegen::generate(const ast::Switch& stmt) {
         return std::nullopt;
     }
 
-    if (auto* union_type = dyn_cast<types::Union>(*value->type)) {
+    if (auto* union_type = dyn_cast<types::Union>(value->type)) {
         if (!union_type->tag_type) {
             error(stmt.value->offset, "switch on an untagged union");
             return std::nullopt;
         }
 
         auto* tag_member = load_struct_member(
-            union_type->codegen(*this), union_type->tag_type->codegen(*this),
+            union_type->llvm_type, union_type->tag_type->llvm_type,
             value->value, union_member_tag);
 
-        value = {union_type->tag_type, tag_member};
+        value = {union_type->tag_type.get(), tag_member};
     } else {
         value = load_value(*value);
     }
@@ -226,7 +227,7 @@ std::optional<Value> Codegen::generate(const ast::Switch& stmt) {
             auto val = cast(value->type, *case_val);
 
             if (!val) {
-                type_mismatch(stmt.offset, *value->type, *case_val->type);
+                type_mismatch(stmt.offset, value->type, case_val->type);
                 return std::nullopt;
             }
 
@@ -288,7 +289,7 @@ std::optional<Value> Codegen::generate(const ast::ReturnStmt& stmt) {
         }
     } else {
         type_mismatch(
-            stmt.offset, *m_current_function->return_type, *value->type);
+            stmt.offset, m_current_function->return_type, value->type);
     }
 
     return std::nullopt;
@@ -343,10 +344,8 @@ std::optional<Value> Codegen::generate(const ast::ForLoop& stmt) {
     m_loop_body = llvm::BasicBlock::Create(m_context, "", function);
     m_loop_end = llvm::BasicBlock::Create(m_context, "", function);
 
-    auto* llvm_type = value->type->codegen(*this);
-
-    if (auto* type = dyn_cast<types::Slice>(*value->type)) {
-        auto* llvm_contained_type = type->type->codegen(*this);
+    if (auto* type = dyn_cast<types::Slice>(value->type)) {
+        auto* llvm_contained_type = type->type->llvm_type;
 
         auto* usize = m_module->getDataLayout().getIntPtrType(m_context);
         auto* usize_null = llvm::ConstantInt::get(usize, 0);
@@ -355,7 +354,7 @@ std::optional<Value> Codegen::generate(const ast::ForLoop& stmt) {
         m_builder.CreateStore(usize_null, index);
 
         auto* length = load_struct_member(
-            llvm_type, usize, value->value, slice_member_len);
+            value->type->llvm_type, usize, value->value, slice_member_len);
 
         m_builder.CreateCondBr(
             m_builder.CreateICmpULT(usize_null, length), m_loop_body,
@@ -366,8 +365,8 @@ std::optional<Value> Codegen::generate(const ast::ForLoop& stmt) {
         auto current_scope = *m_current_scope;
 
         auto* ptr_value = load_struct_member(
-            type->codegen(*this), llvm::PointerType::get(m_context, 0),
-            value->value, slice_member_ptr);
+            type->llvm_type, llvm::PointerType::get(m_context, 0), value->value,
+            slice_member_ptr);
 
         auto* index_value = m_builder.CreateLoad(usize, index);
 
@@ -398,8 +397,8 @@ std::optional<Value> Codegen::generate(const ast::ForLoop& stmt) {
         return std::nullopt;
     }
 
-    if (auto* type = dyn_cast<types::Array>(*value->type)) {
-        auto* llvm_contained_type = type->type->codegen(*this);
+    if (auto* type = dyn_cast<types::Array>(value->type)) {
+        auto* llvm_contained_type = type->type->llvm_type;
 
         auto* usize = m_module->getDataLayout().getIntPtrType(m_context);
         auto* usize_null = llvm::ConstantInt::get(usize, 0);
@@ -447,7 +446,7 @@ std::optional<Value> Codegen::generate(const ast::ForLoop& stmt) {
         return std::nullopt;
     }
 
-    auto* type = dyn_cast<types::Range>(*value->type);
+    auto* type = dyn_cast<types::Range>(value->type);
 
     if (!type) {
         error(stmt.value->offset, "not iterable");
@@ -455,15 +454,17 @@ std::optional<Value> Codegen::generate(const ast::ForLoop& stmt) {
         return std::nullopt;
     }
 
-    auto* llvm_contained_type = type->type->codegen(*this);
+    auto* llvm_contained_type = type->type->llvm_type;
 
     llvm::Value* begin = load_struct_member(
-        llvm_type, llvm_contained_type, value->value, range_member_begin);
+        value->type->llvm_type, llvm_contained_type, value->value,
+        range_member_begin);
 
     llvm::Value* end = load_struct_member(
-        llvm_type, llvm_contained_type, value->value, range_member_end);
+        value->type->llvm_type, llvm_contained_type, value->value,
+        range_member_end);
 
-    if (!is_sint(*type->type) && !is_uint(*type->type)) {
+    if (!is_sint(type->type) && !is_uint(type->type)) {
         error(stmt.value->offset, "type mismatch");
 
         return std::nullopt;
@@ -473,8 +474,8 @@ std::optional<Value> Codegen::generate(const ast::ForLoop& stmt) {
     m_builder.CreateStore(begin, variable);
 
     m_builder.CreateCondBr(
-        is_sint(*value->type) ? m_builder.CreateICmpSLT(begin, end)
-                              : m_builder.CreateICmpULT(begin, end),
+        is_sint(value->type) ? m_builder.CreateICmpSLT(begin, end)
+                             : m_builder.CreateICmpULT(begin, end),
         m_loop_body, m_loop_end);
 
     m_builder.SetInsertPoint(m_loop_body);
@@ -493,8 +494,8 @@ std::optional<Value> Codegen::generate(const ast::ForLoop& stmt) {
     m_builder.CreateStore(incremented, variable);
 
     m_builder.CreateCondBr(
-        is_sint(*value->type) ? m_builder.CreateICmpSLT(incremented, end)
-                              : m_builder.CreateICmpULT(incremented, end),
+        is_sint(value->type) ? m_builder.CreateICmpSLT(incremented, end)
+                             : m_builder.CreateICmpULT(incremented, end),
         m_loop_body, m_loop_end);
 
     m_builder.SetInsertPoint(m_loop_end);

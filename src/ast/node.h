@@ -1,7 +1,6 @@
 #ifndef CENT_AST_NODE_H
 #define CENT_AST_NODE_H
 
-#include <memory>
 #include <optional>
 #include <vector>
 
@@ -27,8 +26,7 @@ struct Node {
 struct Type : Node {
     [[nodiscard]] Type(std::size_t offset) : offset{offset} {}
 
-    virtual std::shared_ptr<backend::Type>
-    codegen(backend::Codegen& codegen) const = 0;
+    virtual backend::Type* codegen(backend::Codegen& codegen) const = 0;
 
     std::size_t offset;
 };
@@ -62,7 +60,7 @@ namespace detail {
 template <typename Derived> struct Type : ast::Type {
     using ast::Type::Type;
 
-    [[nodiscard]] std::shared_ptr<backend::Type>
+    [[nodiscard]] backend::Type*
     codegen(backend::Codegen& codegen) const override {
         return codegen.generate(static_cast<const Derived&>(*this));
     }

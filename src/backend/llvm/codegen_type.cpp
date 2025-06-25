@@ -29,7 +29,7 @@
 
 namespace cent::backend {
 
-std::shared_ptr<Type> Codegen::generate(const ast::NamedType& type) {
+Type* Codegen::generate(const ast::NamedType& type) {
     auto* scope = m_current_scope;
     std::size_t last_index = type.value.size() - 1;
 
@@ -45,28 +45,28 @@ std::shared_ptr<Type> Codegen::generate(const ast::NamedType& type) {
         type.value[last_index].offset, type.value[last_index].value, *scope);
 }
 
-std::shared_ptr<Type> Codegen::generate(const ast::Pointer& type) {
-    auto points_to = type.type->codegen(*this);
+Type* Codegen::generate(const ast::Pointer& type) {
+    auto* points_to = type.type->codegen(*this);
 
     if (!points_to) {
         return nullptr;
     }
 
-    return std::make_shared<types::Pointer>(points_to, type.is_mutable);
+    return get_ptr_type(points_to, type.is_mutable);
 }
 
-std::shared_ptr<Type> Codegen::generate(const ast::Optional& type) {
-    auto contained = type.type->codegen(*this);
+Type* Codegen::generate(const ast::Optional& type) {
+    auto* contained = type.type->codegen(*this);
 
     if (!contained) {
         return nullptr;
     }
 
-    return std::make_shared<types::Optional>(contained);
+    return get_optional_type(contained);
 }
 
-std::shared_ptr<Type> Codegen::generate(const ast::ArrayType& type) {
-    auto contained = type.type->codegen(*this);
+Type* Codegen::generate(const ast::ArrayType& type) {
+    auto* contained = type.type->codegen(*this);
 
     if (!contained) {
         return nullptr;
@@ -78,15 +78,14 @@ std::shared_ptr<Type> Codegen::generate(const ast::ArrayType& type) {
         return nullptr;
     }
 
-    auto value = cast(m_primitive_types["usize"], *size);
+    auto value = cast(m_primitive_types["usize"].get(), *size);
 
     if (!value) {
         return nullptr;
     }
 
     if (auto* constant = llvm::dyn_cast<llvm::ConstantInt>(value->value)) {
-        return std::make_shared<types::Array>(
-            contained, constant->getZExtValue());
+        return get_array_type(contained, constant->getZExtValue());
     }
 
     error(type.offset, "not a constant");
@@ -94,268 +93,49 @@ std::shared_ptr<Type> Codegen::generate(const ast::ArrayType& type) {
     return nullptr;
 }
 
-std::shared_ptr<Type> Codegen::generate(const ast::SliceType& type) {
-    auto contained = type.type->codegen(*this);
+Type* Codegen::generate(const ast::SliceType& type) {
+    auto* contained = type.type->codegen(*this);
 
     if (!contained) {
         return nullptr;
     }
 
-    return std::make_shared<types::Slice>(contained, type.is_mutable);
+    return get_slice_type(contained, type.is_mutable);
 }
 
-std::shared_ptr<Type> Codegen::generate(const ast::TupleType& type) {
-    std::vector<std::shared_ptr<backend::Type>> types;
-    std::vector<llvm::Type*> llvm_types;
-
+Type* Codegen::generate(const ast::TupleType& type) {
+    std::vector<Type*> types;
     types.reserve(type.types.size());
-    llvm_types.reserve(type.types.size());
 
     for (const auto& element_type : type.types) {
-        auto el_type = element_type->codegen(*this);
+        auto* el_type = element_type->codegen(*this);
 
         if (!el_type) {
             return nullptr;
         }
 
-        types.push_back(std::move(el_type));
+        types.push_back(el_type);
     }
 
-    for (auto& element_type : types) {
-        llvm_types.push_back(element_type->codegen(*this));
-    }
-
-    return std::make_shared<types::Tuple>(
-        llvm::StructType::create(llvm_types), std::move(types));
+    return get_tuple_type(types);
 }
 
-std::shared_ptr<Type> Codegen::generate(const ast::RangeType& type) {
-    auto contained = type.type->codegen(*this);
+Type* Codegen::generate(const ast::RangeType& type) {
+    auto* contained = type.type->codegen(*this);
 
     if (!contained) {
         return nullptr;
     }
 
-    return std::make_shared<types::Range>(contained);
+    return get_range_type(contained);
 }
 
-std::shared_ptr<Type> Codegen::generate(const ast::FnPointer& type) {
+Type* Codegen::generate(const ast::FnPointer& type) {
     return generate_fn_type(type.proto);
 }
 
-llvm::Type* Codegen::generate([[maybe_unused]] const types::I8& type) {
-    return llvm::Type::getInt8Ty(m_context);
-}
-
-llvm::Type* Codegen::generate([[maybe_unused]] const types::I16& type) {
-    return llvm::Type::getInt16Ty(m_context);
-}
-
-llvm::Type* Codegen::generate([[maybe_unused]] const types::I32& type) {
-    return llvm::Type::getInt32Ty(m_context);
-}
-
-llvm::Type* Codegen::generate([[maybe_unused]] const types::I64& type) {
-    return llvm::Type::getInt64Ty(m_context);
-}
-
-llvm::Type* Codegen::generate([[maybe_unused]] const types::ISize& type) {
-    return m_module->getDataLayout().getIntPtrType(m_context);
-}
-
-llvm::Type* Codegen::generate([[maybe_unused]] const types::U8& type) {
-    return llvm::Type::getInt8Ty(m_context);
-}
-
-llvm::Type* Codegen::generate([[maybe_unused]] const types::U16& type) {
-    return llvm::Type::getInt16Ty(m_context);
-}
-
-llvm::Type* Codegen::generate([[maybe_unused]] const types::U32& type) {
-    return llvm::Type::getInt32Ty(m_context);
-}
-
-llvm::Type* Codegen::generate([[maybe_unused]] const types::U64& type) {
-    return llvm::Type::getInt64Ty(m_context);
-}
-
-llvm::Type* Codegen::generate([[maybe_unused]] const types::USize& type) {
-    return m_module->getDataLayout().getIntPtrType(m_context);
-}
-
-llvm::Type* Codegen::generate([[maybe_unused]] const types::F32& type) {
-    return llvm::Type::getFloatTy(m_context);
-}
-
-llvm::Type* Codegen::generate([[maybe_unused]] const types::F64& type) {
-    return llvm::Type::getDoubleTy(m_context);
-}
-
-llvm::Type* Codegen::generate([[maybe_unused]] const types::Bool& type) {
-    return llvm::Type::getInt1Ty(m_context);
-}
-
-llvm::Type* Codegen::generate([[maybe_unused]] const types::Null& type) {
-    return nullptr;
-}
-
-llvm::Type* Codegen::generate([[maybe_unused]] const types::Undefined& type) {
-    return nullptr;
-}
-
-llvm::Type* Codegen::generate([[maybe_unused]] const types::Void& type) {
-    return llvm::Type::getVoidTy(m_context);
-}
-
-llvm::Type* Codegen::generate(const types::Pointer& type) {
-    auto* llvm_type = type.type->codegen(*this);
-
-    return llvm_type->getPointerTo();
-}
-
-llvm::Type* Codegen::generate(const types::Struct& type) { return type.type; }
-
-llvm::Type* Codegen::generate(const types::Union& type) { return type.type; }
-
-llvm::Type* Codegen::generate(const types::Enum& type) {
-    return type.type->codegen(*this);
-}
-
-llvm::Type* Codegen::generate(const types::Alias& type) {
-    return type.type->codegen(*this);
-}
-
-llvm::Type* Codegen::generate(const types::Optional& type) {
-    auto* contained = type.type->codegen(*this);
-
-    if (is<types::Pointer>(*type.type)) {
-        return contained;
-    }
-
-    auto iterator = m_optional_types.find(contained);
-
-    if (iterator != m_optional_types.end()) {
-        return iterator->second;
-    }
-
-    auto* llvm_type =
-        llvm::StructType::create({contained, llvm::Type::getInt1Ty(m_context)});
-
-    m_optional_types[contained] = llvm_type;
-
-    return llvm_type;
-}
-
-llvm::Type* Codegen::generate(const types::Range& type) {
-    auto* contained = type.type->codegen(*this);
-
-    auto iterator = m_range_types.find(contained);
-
-    if (iterator != m_range_types.end()) {
-        return iterator->second;
-    }
-
-    auto* llvm_type = llvm::StructType::create({contained, contained});
-
-    m_range_types[contained] = llvm_type;
-
-    return llvm_type;
-}
-
-llvm::Type* Codegen::generate(const types::Array& type) {
-    auto* llvm_type = type.type->codegen(*this);
-
-    return llvm::ArrayType::get(llvm_type, type.size);
-}
-
-llvm::Type* Codegen::generate(const types::Slice& type) { return m_slice_type; }
-
-llvm::Type* Codegen::generate(const types::Tuple& type) { return type.type; }
-
-llvm::Type* Codegen::generate(const types::Function& type) {
-    std::vector<llvm::Type*> llvm_param_types;
-    llvm_param_types.reserve(type.param_types.size());
-
-    for (const auto& parameter : type.param_types) {
-        llvm_param_types.push_back(parameter->codegen(*this));
-    }
-
-    return llvm::FunctionType::get(
-        type.return_type->codegen(*this), llvm_param_types, type.variadic);
-}
-
-bool Codegen::types_equal(const Type& lhs, const Type& rhs) const {
-    if (&lhs == &rhs) {
-        return true;
-    }
-
-    if (const auto* lhs_pointer = dyn_cast<types::Pointer>(lhs)) {
-        if (const auto* rhs_pointer = dyn_cast<types::Pointer>(rhs)) {
-            return lhs_pointer->is_mutable == rhs_pointer->is_mutable &&
-                   types_equal(*lhs_pointer->type, *rhs_pointer->type);
-        }
-    }
-
-    if (const auto* lhs_optional = dyn_cast<types::Optional>(lhs)) {
-        if (const auto* rhs_optional = dyn_cast<types::Optional>(rhs)) {
-            return types_equal(*lhs_optional->type, *rhs_optional->type);
-        }
-    }
-
-    if (const auto* lhs_range = dyn_cast<types::Range>(lhs)) {
-        if (const auto* rhs_range = dyn_cast<types::Range>(rhs)) {
-            return types_equal(*lhs_range->type, *rhs_range->type);
-        }
-    }
-
-    if (const auto* lhs_array = dyn_cast<types::Array>(lhs)) {
-        if (const auto* rhs_array = dyn_cast<types::Array>(rhs)) {
-            return lhs_array->size == rhs_array->size &&
-                   types_equal(*lhs_array->type, *rhs_array->type);
-        }
-    }
-
-    if (const auto* lhs_slice = dyn_cast<types::Slice>(lhs)) {
-        if (const auto* rhs_slice = dyn_cast<types::Slice>(rhs)) {
-            return types_equal(*lhs_slice->type, *rhs_slice->type);
-        }
-    }
-
-    if (const auto* lhs_func = dyn_cast<types::Function>(lhs)) {
-        const auto* rhs_func = dyn_cast<types::Function>(rhs);
-
-        if (!rhs_func) {
-            return false;
-        }
-
-        if (lhs_func->variadic != rhs_func->variadic) {
-            return false;
-        }
-
-        if (lhs_func->param_types.size() != rhs_func->param_types.size()) {
-            return false;
-        }
-
-        if (!types_equal(*lhs_func->return_type, *rhs_func->return_type)) {
-            return false;
-        }
-
-        for (std::size_t i = 0; i < lhs_func->param_types.size(); ++i) {
-            if (!types_equal(
-                    *lhs_func->param_types[i], *rhs_func->param_types[i])) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    return false;
-}
-
-std::shared_ptr<types::Function>
-Codegen::generate_fn_type(const ast::FnProto& proto) {
-    std::shared_ptr<Type> return_type = m_void_type;
+types::Function* Codegen::generate_fn_type(const ast::FnProto& proto) {
+    Type* return_type = m_void_type.get();
 
     if (proto.return_type) {
         return_type = proto.return_type->codegen(*this);
@@ -365,13 +145,13 @@ Codegen::generate_fn_type(const ast::FnProto& proto) {
         }
     }
 
-    std::vector<std::shared_ptr<Type>> param_types;
+    std::vector<Type*> param_types;
     std::vector<llvm::Constant*> default_args;
 
     param_types.reserve(proto.params.size());
 
     for (const auto& parameter : proto.params) {
-        auto type = parameter.type->codegen(*this);
+        auto* type = parameter.type->codegen(*this);
 
         if (!type) {
             return nullptr;
@@ -392,7 +172,7 @@ Codegen::generate_fn_type(const ast::FnProto& proto) {
         auto val = cast(type, *value);
 
         if (!val) {
-            type_mismatch(parameter.value->offset, *type, *value->type);
+            type_mismatch(parameter.value->offset, type, value->type);
             return nullptr;
         }
 
@@ -404,9 +184,116 @@ Codegen::generate_fn_type(const ast::FnProto& proto) {
         default_args.push_back(static_cast<llvm::Constant*>(val->value));
     }
 
-    return std::make_shared<types::Function>(
+    return get_fn_type(
         return_type, std::move(param_types), std::move(default_args),
         proto.variadic);
+}
+
+types::Function* Codegen::get_fn_type(
+    Type* return_type, std::vector<Type*> param_types,
+    std::vector<llvm::Constant*> default_args, bool variadic) {
+    auto& result = m_fn_types[std::make_tuple(
+        return_type, param_types, default_args, variadic)];
+
+    if (result) {
+        return result.get();
+    }
+
+    std::vector<llvm::Type*> llvm_param_types;
+    llvm_param_types.reserve(param_types.size());
+
+    for (const auto& parameter : param_types) {
+        llvm_param_types.push_back(parameter->llvm_type);
+    }
+
+    auto* llvm_type = llvm::FunctionType::get(
+        return_type->llvm_type, llvm_param_types, variadic);
+
+    result = std::make_unique<types::Function>(
+        llvm_type, return_type, std::move(param_types), std::move(default_args),
+        variadic);
+
+    return result.get();
+}
+
+types::Pointer* Codegen::get_ptr_type(Type* type, bool is_mutable) {
+    auto& result = m_ptr_types[std::make_pair(type, is_mutable)];
+
+    if (!result) {
+        result = std::make_unique<types::Pointer>(
+            llvm::PointerType::get(m_context, 0), type, is_mutable);
+    }
+
+    return result.get();
+}
+
+types::Slice* Codegen::get_slice_type(Type* type, bool is_mutable) {
+    auto& result = m_slice_types[std::make_pair(type, is_mutable)];
+
+    if (!result) {
+        result = std::make_unique<types::Slice>(m_slice_type, type, is_mutable);
+    }
+
+    return result.get();
+}
+
+types::Array* Codegen::get_array_type(Type* type, std::size_t size) {
+    auto& result = m_array_types[std::make_pair(type, size)];
+
+    if (!result) {
+        result = std::make_unique<types::Array>(
+            llvm::ArrayType::get(type->llvm_type, size), type, size);
+    }
+
+    return result.get();
+}
+
+types::Tuple* Codegen::get_tuple_type(const std::vector<Type*>& types) {
+    auto& result = m_tuple_types[types];
+
+    if (!result) {
+        std::vector<llvm::Type*> llvm_types;
+        llvm_types.reserve(types.size());
+
+        for (auto* element_type : types) {
+            llvm_types.push_back(element_type->llvm_type);
+        }
+
+        result = std::make_unique<types::Tuple>(
+            llvm::StructType::create(llvm_types), types);
+    }
+
+    return result.get();
+}
+
+types::Optional* Codegen::get_optional_type(Type* type) {
+    auto& result = m_optional_types[type];
+
+    if (!result) {
+        if (is<types::Pointer>(type)) {
+            result = std::make_unique<types::Optional>(type->llvm_type, type);
+        } else {
+            auto* llvm_type = llvm::StructType::create(
+                {type->llvm_type, llvm::Type::getInt1Ty(m_context)});
+
+            result = std::make_unique<types::Optional>(llvm_type, type);
+        }
+    }
+
+    return result.get();
+}
+
+types::Range* Codegen::get_range_type(Type* type) {
+    auto& result = m_range_types[type];
+
+    if (!result) {
+        auto* llvm_type =
+            llvm::StructType::create({type->llvm_type, type->llvm_type});
+
+        result = std::make_unique<types::Range>(llvm_type, type);
+    }
+
+    return result.get();
 }
 
 } // namespace cent::backend

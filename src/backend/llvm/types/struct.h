@@ -1,7 +1,6 @@
 #ifndef CENT_BACKEND_TYPES_STRUCT_H
 #define CENT_BACKEND_TYPES_STRUCT_H
 
-#include <memory>
 #include <vector>
 
 #include <llvm/IR/DerivedTypes.h>
@@ -12,16 +11,14 @@ namespace cent::backend::types {
 
 struct Struct : detail::Type<Struct, Type::Kind::Struct> {
     [[nodiscard]] Struct(
-        std::string name, llvm::StructType* type,
-        std::vector<std::shared_ptr<backend::Type>> fields)
-    : name{std::move(name)}, type{type}, fields{std::move(fields)} {}
+        llvm::Type* llvm_type, std::string name,
+        std::vector<backend::Type*> fields)
+    : Type{llvm_type}, name{std::move(name)}, fields{std::move(fields)} {}
 
     [[nodiscard]] std::string to_string() const override { return name; }
 
     std::string name;
-
-    llvm::StructType* type;
-    std::vector<std::shared_ptr<backend::Type>> fields;
+    std::vector<backend::Type*> fields;
 };
 
 } // namespace cent::backend::types

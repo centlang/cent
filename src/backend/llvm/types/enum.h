@@ -6,13 +6,14 @@
 namespace cent::backend::types {
 
 struct Enum : detail::Type<Enum, Type::Kind::Enum> {
-    [[nodiscard]] Enum(std::string name, std::shared_ptr<backend::Type> type)
-    : name{std::move(name)}, type{std::move(type)} {}
+    [[nodiscard]] Enum(
+        llvm::Type* llvm_type, std::string name, backend::Type* type)
+    : Type{llvm_type}, name{std::move(name)}, type{type} {}
 
     [[nodiscard]] std::string to_string() const override { return name; }
 
     std::string name;
-    std::shared_ptr<backend::Type> type;
+    backend::Type* type;
 };
 
 } // namespace cent::backend::types

@@ -19,24 +19,37 @@
 namespace cent::backend {
 
 std::unique_ptr<llvm::Module> Codegen::generate() {
-    m_primitive_types = {
-        {"i8", std::make_shared<types::I8>()},
-        {"i16", std::make_shared<types::I16>()},
-        {"i32", std::make_shared<types::I32>()},
-        {"i64", std::make_shared<types::I64>()},
-        {"isize", std::make_shared<types::ISize>()},
-        {"u8", std::make_shared<types::U8>()},
-        {"u16", std::make_shared<types::U16>()},
-        {"u32", std::make_shared<types::U32>()},
-        {"u64", std::make_shared<types::U64>()},
-        {"usize", std::make_shared<types::USize>()},
-        {"f32", std::make_shared<types::F32>()},
-        {"f64", std::make_shared<types::F64>()},
-        {"bool", std::make_shared<types::Bool>()}};
+    auto* int8 = llvm::Type::getInt8Ty(m_context);
+    auto* int16 = llvm::Type::getInt16Ty(m_context);
+    auto* int32 = llvm::Type::getInt32Ty(m_context);
+    auto* int64 = llvm::Type::getInt64Ty(m_context);
+    auto* size = m_module->getDataLayout().getIntPtrType(m_context);
 
-    m_null_type = std::make_shared<types::Null>();
-    m_undefined_type = std::make_shared<types::Undefined>();
-    m_void_type = std::make_shared<types::Void>();
+    m_primitive_types["i8"] = std::make_unique<types::I8>(int8);
+    m_primitive_types["i16"] = std::make_unique<types::I16>(int16);
+    m_primitive_types["i32"] = std::make_unique<types::I32>(int32);
+    m_primitive_types["i64"] = std::make_unique<types::I64>(int64);
+    m_primitive_types["isize"] = std::make_unique<types::ISize>(size);
+    m_primitive_types["u8"] = std::make_unique<types::U8>(int8);
+    m_primitive_types["u16"] = std::make_unique<types::U16>(int16);
+    m_primitive_types["u32"] = std::make_unique<types::U32>(int32);
+    m_primitive_types["u64"] = std::make_unique<types::U64>(int64);
+    m_primitive_types["usize"] = std::make_unique<types::USize>(size);
+
+    m_primitive_types["f32"] =
+        std::make_unique<types::F32>(llvm::Type::getFloatTy(m_context));
+
+    m_primitive_types["f64"] =
+        std::make_unique<types::F64>(llvm::Type::getDoubleTy(m_context));
+
+    m_primitive_types["bool"] =
+        std::make_unique<types::Bool>(llvm::Type::getInt1Ty(m_context));
+
+    m_null_type = std::make_unique<types::Null>(nullptr);
+    m_undefined_type = std::make_unique<types::Undefined>(nullptr);
+
+    m_void_type =
+        std::make_unique<types::Void>(llvm::Type::getVoidTy(m_context));
 
     m_slice_type = llvm::StructType::create(
         {llvm::PointerType::get(m_context, 0),
@@ -155,50 +168,46 @@ void Codegen::generate(const ast::Module& module, bool is_submodule) {
 }
 
 std::optional<Value>
-Codegen::cast(std::shared_ptr<Type> type, const Value& value, bool implicit) {
-    if (types_equal(*type, *value.type)) {
+Codegen::cast(Type* type, const Value& value, bool implicit) {
+    if (type == value.type) {
         return value;
     }
 
-    if (is<types::Void>(*type)) {
+    if (is<types::Void>(type)) {
         return std::nullopt;
     }
 
-    auto* llvm_type = type->codegen(*this);
-
-    if (const auto* optional = dyn_cast<types::Optional>(*type)) {
-        if (is<types::Null>(*value.type)) {
-            return Value{
-                std::move(type), llvm::Constant::getNullValue(llvm_type)};
+    if (const auto* optional = dyn_cast<types::Optional>(type)) {
+        if (is<types::Null>(value.type)) {
+            return Value{type, llvm::Constant::getNullValue(type->llvm_type)};
         }
 
-        if (!types_equal(*optional->type, *value.type)) {
+        if (optional->type != value.type) {
             return std::nullopt;
         }
 
-        if (is<types::Pointer>(*optional->type)) {
+        if (is<types::Pointer>(optional->type)) {
             return Value{
-                std::move(type), is<types::Null>(*value.type)
-                                     ? llvm::Constant::getNullValue(llvm_type)
-                                     : value.value};
+                type, is<types::Null>(value.type)
+                          ? llvm::Constant::getNullValue(type->llvm_type)
+                          : value.value};
         }
 
         if (auto* val = llvm::dyn_cast<llvm::Constant>(value.value)) {
             return Value{
-                std::move(type),
-                llvm::ConstantStruct::get(
-                    static_cast<llvm::StructType*>(llvm_type),
-                    {val, llvm::ConstantInt::get(
-                              llvm::Type::getInt1Ty(m_context), true)})};
+                type, llvm::ConstantStruct::get(
+                          static_cast<llvm::StructType*>(type->llvm_type),
+                          {val, llvm::ConstantInt::get(
+                                    llvm::Type::getInt1Ty(m_context), true)})};
         }
 
-        auto* variable = create_alloca(llvm_type);
+        auto* variable = create_alloca(type->llvm_type);
 
         auto* bool_ptr = m_builder.CreateStructGEP(
-            llvm_type, variable, optional_member_bool);
+            type->llvm_type, variable, optional_member_bool);
 
         auto* value_ptr = m_builder.CreateStructGEP(
-            llvm_type, variable, optional_member_value);
+            type->llvm_type, variable, optional_member_value);
 
         m_builder.CreateStore(load_value(value).value, value_ptr);
 
@@ -206,32 +215,32 @@ Codegen::cast(std::shared_ptr<Type> type, const Value& value, bool implicit) {
             llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), true),
             bool_ptr);
 
-        return Value{std::move(type), variable, false, false, false, true};
+        return Value{type, variable, false, false, false, true};
     }
 
-    if (const auto* slice = dyn_cast<types::Slice>(*type)) {
-        const auto* array_type = dyn_cast<types::Array>(*value.type);
+    if (const auto* slice = dyn_cast<types::Slice>(type)) {
+        const auto* array_type = dyn_cast<types::Array>(value.type);
 
         if (!array_type) {
             return std::nullopt;
         }
 
-        auto* variable = create_alloca(llvm_type);
+        auto* variable = create_alloca(type->llvm_type);
 
-        if (!types_equal(*slice->type, *array_type->type)) {
+        if (slice->type != array_type->type) {
             return std::nullopt;
         }
 
-        auto* ptr_member =
-            m_builder.CreateStructGEP(llvm_type, variable, slice_member_ptr);
+        auto* ptr_member = m_builder.CreateStructGEP(
+            type->llvm_type, variable, slice_member_ptr);
 
-        auto* len_member =
-            m_builder.CreateStructGEP(llvm_type, variable, slice_member_len);
+        auto* len_member = m_builder.CreateStructGEP(
+            type->llvm_type, variable, slice_member_len);
 
         auto* intptr = m_module->getDataLayout().getIntPtrType(m_context);
 
         auto* ptr_value = m_builder.CreateGEP(
-            slice->type->codegen(*this), value.value,
+            slice->type->llvm_type, value.value,
             llvm::ConstantInt::get(intptr, 0));
 
         m_builder.CreateStore(ptr_value, ptr_member);
@@ -239,22 +248,21 @@ Codegen::cast(std::shared_ptr<Type> type, const Value& value, bool implicit) {
         m_builder.CreateStore(
             llvm::ConstantInt::get(intptr, array_type->size), len_member);
 
-        return Value{std::move(type), variable, false, false, false, true};
+        return Value{type, variable, false, false, false, true};
     }
 
-    return primitive_cast(std::move(type), llvm_type, value, implicit);
+    return primitive_cast(type, value, implicit);
 }
 
-std::optional<Value> Codegen::primitive_cast(
-    std::shared_ptr<Type> type, llvm::Type* llvm_type, const Value& value,
-    bool implicit) {
+std::optional<Value>
+Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
     using enum llvm::Instruction::CastOps;
 
-    bool value_is_float = is_float(*value.type);
-    bool value_is_sint = is_sint(*value.type);
-    bool value_is_uint = is_uint(*value.type);
-    bool value_is_ptr = is<types::Pointer>(*value.type);
-    bool value_is_enum = is<types::Enum>(*value.type);
+    bool value_is_float = is_float(value.type);
+    bool value_is_sint = is_sint(value.type);
+    bool value_is_uint = is_uint(value.type);
+    bool value_is_ptr = is<types::Pointer>(value.type);
+    bool value_is_enum = is<types::Enum>(value.type);
 
     if (!value_is_float && !value_is_sint && !value_is_uint && !value_is_ptr &&
         !value_is_enum) {
@@ -263,14 +271,14 @@ std::optional<Value> Codegen::primitive_cast(
 
     auto layout = m_module->getDataLayout();
 
-    std::size_t from_size = layout.getTypeAllocSize(value.type->codegen(*this));
-    std::size_t to_size = layout.getTypeAllocSize(llvm_type);
+    std::size_t from_size = layout.getTypeAllocSize(value.type->llvm_type);
+    std::size_t to_size = layout.getTypeAllocSize(type->llvm_type);
 
-    bool type_is_float = is_float(*type);
-    bool type_is_sint = is_sint(*type);
-    bool type_is_uint = is_uint(*type);
-    bool type_is_ptr = is<types::Pointer>(*type);
-    bool type_is_enum = is<types::Enum>(*type);
+    bool type_is_float = is_float(type);
+    bool type_is_sint = is_sint(type);
+    bool type_is_uint = is_uint(type);
+    bool type_is_ptr = is<types::Pointer>(type);
+    bool type_is_enum = is<types::Enum>(type);
 
     llvm::Instruction::CastOps cast_op = CastOpsEnd;
 
@@ -291,7 +299,7 @@ std::optional<Value> Codegen::primitive_cast(
     } else if (
         value_is_sint ||
         (!implicit && value_is_enum &&
-         is_sint(*static_cast<types::Enum&>(*value.type).type))) {
+         is_sint(static_cast<types::Enum&>(*value.type).type))) {
         if (type_is_float) {
             cast_op = SIToFP;
         } else if (type_is_sint || type_is_uint || type_is_enum) {
@@ -306,7 +314,7 @@ std::optional<Value> Codegen::primitive_cast(
     } else if (
         value_is_uint ||
         (!implicit && value_is_enum &&
-         is_uint(*static_cast<types::Enum&>(*value.type).type))) {
+         is_uint(static_cast<types::Enum&>(*value.type).type))) {
         if (type_is_float) {
             cast_op = UIToFP;
         } else if (type_is_sint || type_is_uint || type_is_enum) {
@@ -323,15 +331,15 @@ std::optional<Value> Codegen::primitive_cast(
             cast_op = PtrToInt;
         } else if (type_is_ptr) {
             if (!implicit) {
-                return Value{std::move(type), value.value, false, value.is_ref};
+                return Value{type, value.value, false, value.is_ref};
             }
 
-            auto& value_ptr = static_cast<types::Pointer&>(*value.type);
-            auto& type_ptr = static_cast<types::Pointer&>(*type);
+            auto* value_ptr = static_cast<types::Pointer*>(value.type);
+            auto* type_ptr = static_cast<types::Pointer*>(type);
 
-            if (types_equal(*value_ptr.type, *type_ptr.type) &&
-                (value_ptr.is_mutable || !type_ptr.is_mutable)) {
-                return Value{std::move(type), value.value, false, value.is_ref};
+            if (value_ptr->type == type_ptr->type &&
+                (value_ptr->is_mutable || !type_ptr->is_mutable)) {
+                return Value{type, value.value, false, value.is_ref};
             }
         }
     }
@@ -341,36 +349,34 @@ std::optional<Value> Codegen::primitive_cast(
     }
 
     return Value{
-        std::move(type),
-        m_builder.CreateCast(cast_op, load_value(value).value, llvm_type)};
+        type, m_builder.CreateCast(
+                  cast_op, load_value(value).value, type->llvm_type)};
 }
 
-bool Codegen::cast_to_result(
-    std::shared_ptr<Type> type, const Value& value, bool implicit) {
-    if (types_equal(*type, *value.type)) {
+bool Codegen::cast_to_result(Type* type, const Value& value, bool implicit) {
+    if (type == value.type) {
         m_builder.CreateStore(load_value(value).value, m_current_result);
 
         return true;
     }
 
-    auto* llvm_type = type->codegen(*this);
-
-    if (const auto* optional = dyn_cast<types::Optional>(*type)) {
-        if (is<types::Null>(*value.type)) {
+    if (const auto* optional = dyn_cast<types::Optional>(type)) {
+        if (is<types::Null>(value.type)) {
             m_builder.CreateStore(
-                llvm::Constant::getNullValue(llvm_type), m_current_result);
+                llvm::Constant::getNullValue(type->llvm_type),
+                m_current_result);
 
             return true;
         }
 
-        if (!types_equal(*optional->type, *value.type)) {
+        if (optional->type != value.type) {
             return false;
         }
 
-        if (is<types::Pointer>(*optional->type)) {
+        if (is<types::Pointer>(optional->type)) {
             m_builder.CreateStore(
-                is<types::Null>(*value.type)
-                    ? llvm::Constant::getNullValue(llvm_type)
+                is<types::Null>(value.type)
+                    ? llvm::Constant::getNullValue(type->llvm_type)
                     : value.value,
                 m_current_result);
 
@@ -380,7 +386,7 @@ bool Codegen::cast_to_result(
         if (auto* val = llvm::dyn_cast<llvm::Constant>(value.value)) {
             m_builder.CreateStore(
                 llvm::ConstantStruct::get(
-                    static_cast<llvm::StructType*>(llvm_type),
+                    static_cast<llvm::StructType*>(type->llvm_type),
                     {val, llvm::ConstantInt::get(
                               llvm::Type::getInt1Ty(m_context), true)}),
                 m_current_result);
@@ -389,10 +395,10 @@ bool Codegen::cast_to_result(
         }
 
         auto* bool_ptr = m_builder.CreateStructGEP(
-            llvm_type, m_current_result, optional_member_bool);
+            type->llvm_type, m_current_result, optional_member_bool);
 
         auto* value_ptr = m_builder.CreateStructGEP(
-            llvm_type, m_current_result, optional_member_value);
+            type->llvm_type, m_current_result, optional_member_value);
 
         m_builder.CreateStore(load_value(value).value, value_ptr);
 
@@ -403,27 +409,27 @@ bool Codegen::cast_to_result(
         return true;
     }
 
-    if (const auto* slice = dyn_cast<types::Slice>(*type)) {
-        const auto* array_type = dyn_cast<types::Array>(*value.type);
+    if (const auto* slice = dyn_cast<types::Slice>(type)) {
+        const auto* array_type = dyn_cast<types::Array>(value.type);
 
         if (!array_type) {
             return false;
         }
 
-        if (!types_equal(*slice->type, *array_type->type)) {
+        if (slice->type != array_type->type) {
             return false;
         }
 
         auto* ptr_member = m_builder.CreateStructGEP(
-            llvm_type, m_current_result, slice_member_ptr);
+            type->llvm_type, m_current_result, slice_member_ptr);
 
         auto* len_member = m_builder.CreateStructGEP(
-            llvm_type, m_current_result, slice_member_len);
+            type->llvm_type, m_current_result, slice_member_len);
 
         auto* intptr = m_module->getDataLayout().getIntPtrType(m_context);
 
         auto* ptr_value = m_builder.CreateGEP(
-            slice->type->codegen(*this), value.value,
+            slice->type->llvm_type, value.value,
             llvm::ConstantInt::get(intptr, 0));
 
         m_builder.CreateStore(ptr_value, ptr_member);
@@ -434,8 +440,7 @@ bool Codegen::cast_to_result(
         return true;
     }
 
-    if (auto val =
-            primitive_cast(std::move(type), llvm_type, value, implicit)) {
+    if (auto val = primitive_cast(type, value, implicit)) {
         m_builder.CreateStore(val->value, m_current_result);
         return true;
     }
@@ -451,35 +456,32 @@ Value Codegen::load_value(const Value& value) {
     if (value.is_deref) {
         return Value{
             value.type,
-            m_builder.CreateLoad(value.type->codegen(*this), value.value)};
+            m_builder.CreateLoad(value.type->llvm_type, value.value)};
     }
 
     if (auto* variable =
             llvm::dyn_cast_or_null<llvm::AllocaInst>(value.value)) {
         return Value{
-            value.type,
-            m_builder.CreateLoad(value.type->codegen(*this), variable)};
+            value.type, m_builder.CreateLoad(value.type->llvm_type, variable)};
     }
 
     if (auto* variable =
             llvm::dyn_cast_or_null<llvm::GlobalVariable>(value.value)) {
         return Value{
-            value.type,
-            m_builder.CreateLoad(value.type->codegen(*this), variable)};
+            value.type, m_builder.CreateLoad(value.type->llvm_type, variable)};
     }
 
     if (auto* val = llvm::dyn_cast_or_null<llvm::LoadInst>(value.value)) {
-        auto* type = value.type->codegen(*this);
-
-        if (val->getType()->isPointerTy() && !is<types::Pointer>(*value.type)) {
-            return Value{value.type, m_builder.CreateLoad(type, val)};
+        if (val->getType()->isPointerTy() && !is<types::Pointer>(value.type)) {
+            return Value{
+                value.type, m_builder.CreateLoad(value.type->llvm_type, val)};
         }
     }
 
     if (auto* ptr =
             llvm::dyn_cast_or_null<llvm::GetElementPtrInst>(value.value)) {
         return Value{
-            value.type, m_builder.CreateLoad(value.type->codegen(*this), ptr)};
+            value.type, m_builder.CreateLoad(value.type->llvm_type, ptr)};
     }
 
     if (auto* constant =
@@ -487,7 +489,7 @@ Value Codegen::load_value(const Value& value) {
         if (constant->getOpcode() == llvm::Instruction::GetElementPtr) {
             return Value{
                 value.type,
-                m_builder.CreateLoad(value.type->codegen(*this), constant)};
+                m_builder.CreateLoad(value.type->llvm_type, constant)};
         }
     }
 
@@ -524,12 +526,12 @@ llvm::Value* Codegen::create_gep_or_extract(
     return m_builder.CreateStructGEP(struct_type, value, index);
 }
 
-std::shared_ptr<Type>
-Codegen::get_type(std::size_t offset, std::string_view name, Scope& parent) {
+Type* Codegen::get_type(
+    std::size_t offset, std::string_view name, Scope& parent) {
     auto primitive = m_primitive_types.find(name);
 
     if (primitive != m_primitive_types.end()) {
-        return primitive->second;
+        return primitive->second.get();
     }
 
     auto user = parent.types.find(name);
@@ -617,11 +619,12 @@ void Codegen::create_panic_fn() {
 }
 
 void Codegen::type_mismatch(
-    std::size_t offset, const Type& expected, const Type& got) {
+    std::size_t offset, const Type* expected, const Type* got) {
     error(
-        offset, fmt::format(
-                    "expected {} but got {}", log::quoted(expected.to_string()),
-                    log::quoted(got.to_string())));
+        offset,
+        fmt::format(
+            "expected {} but got {}", log::quoted(expected->to_string()),
+            log::quoted(got->to_string())));
 }
 
 Attributes Codegen::parse_attrs(
@@ -642,16 +645,16 @@ Attributes Codegen::parse_attrs(
     return result;
 }
 
-bool Codegen::is_float(const Type& type) {
+bool Codegen::is_float(const Type* type) {
     return is<types::F32, types::F64>(type);
 };
 
-bool Codegen::is_sint(const Type& type) {
+bool Codegen::is_sint(const Type* type) {
     return is<types::I8, types::I16, types::I32, types::I64, types::ISize>(
         type);
 };
 
-bool Codegen::is_uint(const Type& type) {
+bool Codegen::is_uint(const Type* type) {
     return is<types::U8, types::U16, types::U32, types::U64, types::USize>(
         type);
 };

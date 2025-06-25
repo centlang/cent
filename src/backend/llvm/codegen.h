@@ -6,6 +6,7 @@
 #include <memory>
 #include <optional>
 #include <set>
+#include <tuple>
 #include <utility>
 
 #include <fmt/core.h>
@@ -17,6 +18,9 @@
 #include "frontend/token.h"
 #include "offset_value.h"
 #include "util.h"
+
+#include "backend/llvm/types/function.h"
+#include "backend/llvm/types/primitive.h"
 
 #include "backend/llvm/scope.h"
 
@@ -81,44 +85,6 @@ struct Declaration;
 
 namespace cent::backend {
 
-namespace types {
-
-struct I8;
-struct I16;
-struct I32;
-struct I64;
-struct ISize;
-
-struct U8;
-struct U16;
-struct U32;
-struct U64;
-struct USize;
-
-struct F32;
-struct F64;
-
-struct Bool;
-struct Null;
-struct Undefined;
-struct Void;
-
-struct Pointer;
-struct Optional;
-struct Range;
-
-struct Array;
-struct Slice;
-struct Tuple;
-
-struct Struct;
-struct Union;
-struct Enum;
-struct Alias;
-struct Function;
-
-} // namespace types
-
 struct Value;
 struct Type;
 
@@ -140,48 +106,14 @@ public:
 
     [[nodiscard]] bool had_error() const { return m_had_error; }
 
-    [[nodiscard]] std::shared_ptr<Type> generate(const ast::NamedType& type);
-    [[nodiscard]] std::shared_ptr<Type> generate(const ast::Pointer& type);
-    [[nodiscard]] std::shared_ptr<Type> generate(const ast::Optional& type);
-    [[nodiscard]] std::shared_ptr<Type> generate(const ast::ArrayType& type);
-    [[nodiscard]] std::shared_ptr<Type> generate(const ast::SliceType& type);
-    [[nodiscard]] std::shared_ptr<Type> generate(const ast::TupleType& type);
-    [[nodiscard]] std::shared_ptr<Type> generate(const ast::RangeType& type);
-    [[nodiscard]] std::shared_ptr<Type> generate(const ast::FnPointer& type);
-
-    [[nodiscard]] llvm::Type* generate(const types::I8& type);
-    [[nodiscard]] llvm::Type* generate(const types::I16& type);
-    [[nodiscard]] llvm::Type* generate(const types::I32& type);
-    [[nodiscard]] llvm::Type* generate(const types::I64& type);
-    [[nodiscard]] llvm::Type* generate(const types::ISize& type);
-
-    [[nodiscard]] llvm::Type* generate(const types::U8& type);
-    [[nodiscard]] llvm::Type* generate(const types::U16& type);
-    [[nodiscard]] llvm::Type* generate(const types::U32& type);
-    [[nodiscard]] llvm::Type* generate(const types::U64& type);
-    [[nodiscard]] llvm::Type* generate(const types::USize& type);
-
-    [[nodiscard]] llvm::Type* generate(const types::F32& type);
-    [[nodiscard]] llvm::Type* generate(const types::F64& type);
-
-    [[nodiscard]] llvm::Type* generate(const types::Bool& type);
-    [[nodiscard]] llvm::Type* generate(const types::Null& type);
-    [[nodiscard]] llvm::Type* generate(const types::Undefined& type);
-    [[nodiscard]] llvm::Type* generate(const types::Void& type);
-
-    [[nodiscard]] llvm::Type* generate(const types::Pointer& type);
-    [[nodiscard]] llvm::Type* generate(const types::Optional& type);
-    [[nodiscard]] llvm::Type* generate(const types::Range& type);
-
-    [[nodiscard]] llvm::Type* generate(const types::Array& type);
-    [[nodiscard]] llvm::Type* generate(const types::Slice& type);
-    [[nodiscard]] llvm::Type* generate(const types::Tuple& type);
-
-    [[nodiscard]] llvm::Type* generate(const types::Struct& type);
-    [[nodiscard]] llvm::Type* generate(const types::Union& type);
-    [[nodiscard]] llvm::Type* generate(const types::Enum& type);
-    [[nodiscard]] llvm::Type* generate(const types::Alias& type);
-    [[nodiscard]] llvm::Type* generate(const types::Function& type);
+    [[nodiscard]] Type* generate(const ast::NamedType& type);
+    [[nodiscard]] Type* generate(const ast::Pointer& type);
+    [[nodiscard]] Type* generate(const ast::Optional& type);
+    [[nodiscard]] Type* generate(const ast::ArrayType& type);
+    [[nodiscard]] Type* generate(const ast::SliceType& type);
+    [[nodiscard]] Type* generate(const ast::TupleType& type);
+    [[nodiscard]] Type* generate(const ast::RangeType& type);
+    [[nodiscard]] Type* generate(const ast::FnPointer& type);
 
     std::optional<Value> generate(const ast::Assignment& stmt);
     std::optional<Value> generate(const ast::BlockStmt& stmt);
@@ -226,17 +158,14 @@ public:
 private:
     void generate(const ast::Module& module, bool is_submodule = false);
 
-    [[nodiscard]] bool types_equal(const Type& lhs, const Type& rhs) const;
+    [[nodiscard]] std::optional<Value>
+    cast(Type* type, const Value& value, bool implicit = true);
 
     [[nodiscard]] std::optional<Value>
-    cast(std::shared_ptr<Type> type, const Value& value, bool implicit = true);
+    primitive_cast(Type* type, const Value& value, bool implicit = true);
 
-    [[nodiscard]] std::optional<Value> primitive_cast(
-        std::shared_ptr<Type> type, llvm::Type* llvm_type, const Value& value,
-        bool implicit = true);
-
-    [[nodiscard]] bool cast_to_result(
-        std::shared_ptr<Type> type, const Value& value, bool implicit = true);
+    [[nodiscard]] bool
+    cast_to_result(Type* type, const Value& value, bool implicit = true);
 
     [[nodiscard]] std::optional<Value> generate_bin_expr(
         ast::OffsetValue<const Value&> lhs, ast::OffsetValue<const Value&> rhs,
@@ -253,7 +182,7 @@ private:
     [[nodiscard]] llvm::Value* create_gep_or_extract(
         llvm::Type* struct_type, llvm::Value* value, std::uint32_t index);
 
-    [[nodiscard]] std::shared_ptr<Type>
+    [[nodiscard]] Type*
     get_type(std::size_t offset, std::string_view name, Scope& parent);
 
     [[nodiscard]] Value*
@@ -262,8 +191,18 @@ private:
     [[nodiscard]] Scope*
     get_scope(std::size_t offset, std::string_view name, Scope& parent);
 
-    [[nodiscard]] std::shared_ptr<types::Function>
-    generate_fn_type(const ast::FnProto& proto);
+    [[nodiscard]] types::Function* generate_fn_type(const ast::FnProto& proto);
+
+    [[nodiscard]] types::Function* get_fn_type(
+        Type* return_type, std::vector<Type*> param_types,
+        std::vector<llvm::Constant*> default_args, bool variadic);
+
+    [[nodiscard]] types::Pointer* get_ptr_type(Type* type, bool is_mutable);
+    [[nodiscard]] types::Slice* get_slice_type(Type* type, bool is_mutable);
+    [[nodiscard]] types::Array* get_array_type(Type* type, std::size_t size);
+    [[nodiscard]] types::Tuple* get_tuple_type(const std::vector<Type*>& types);
+    [[nodiscard]] types::Optional* get_optional_type(Type* type);
+    [[nodiscard]] types::Range* get_range_type(Type* type);
 
     void create_panic_fn();
 
@@ -273,7 +212,7 @@ private:
     void generate_enum(const ast::EnumDecl& decl);
 
     void
-    type_mismatch(std::size_t offset, const Type& expected, const Type& got);
+    type_mismatch(std::size_t offset, const Type* expected, const Type* got);
 
     void error(std::size_t offset, std::string_view message) {
         auto src = read_file(m_filename);
@@ -287,9 +226,9 @@ private:
         const ast::Declaration& decl,
         const std::set<std::string_view>& allowed);
 
-    [[nodiscard]] static bool is_float(const Type& type);
-    [[nodiscard]] static bool is_sint(const Type& type);
-    [[nodiscard]] static bool is_uint(const Type& type);
+    [[nodiscard]] static bool is_float(const Type* type);
+    [[nodiscard]] static bool is_sint(const Type* type);
+    [[nodiscard]] static bool is_uint(const Type* type);
 
     static constexpr auto optional_member_value = 0;
     static constexpr auto optional_member_bool = 1;
@@ -309,7 +248,7 @@ private:
 
     Scope m_scope;
 
-    std::map<std::string_view, std::shared_ptr<Type>> m_primitive_types;
+    std::map<std::string_view, std::unique_ptr<Type>> m_primitive_types;
 
     Scope* m_current_scope{&m_scope};
     types::Function* m_current_function{nullptr};
@@ -324,7 +263,7 @@ private:
         m_members;
 
     struct Method {
-        std::shared_ptr<types::Function> type;
+        types::Function* type;
         llvm::Function* function;
     };
 
@@ -332,18 +271,36 @@ private:
 
     std::map<std::filesystem::path, Scope> m_generated_modules;
 
-    std::shared_ptr<types::Null> m_null_type;
-    std::shared_ptr<types::Undefined> m_undefined_type;
-    std::shared_ptr<types::Void> m_void_type;
+    std::unique_ptr<types::Null> m_null_type;
+    std::unique_ptr<types::Undefined> m_undefined_type;
+    std::unique_ptr<types::Void> m_void_type;
 
     llvm::StructType* m_slice_type{};
     llvm::Function* m_panic_fn{};
 
-    std::map<llvm::Type*, llvm::StructType*> m_optional_types;
-    std::map<llvm::Type*, llvm::StructType*> m_range_types;
-
     std::unique_ptr<ast::Module> m_program;
     std::string m_filename;
+
+    std::map<std::pair<Type*, bool>, std::unique_ptr<types::Pointer>>
+        m_ptr_types;
+
+    std::map<std::pair<Type*, std::size_t>, std::unique_ptr<types::Array>>
+        m_array_types;
+
+    std::map<std::pair<Type*, bool>, std::unique_ptr<types::Slice>>
+        m_slice_types;
+
+    std::map<std::vector<Type*>, std::unique_ptr<types::Tuple>> m_tuple_types;
+
+    std::map<Type*, std::unique_ptr<types::Optional>> m_optional_types;
+    std::map<Type*, std::unique_ptr<types::Range>> m_range_types;
+
+    using FnTypeKey = std::tuple<
+        Type*, std::vector<Type*>, std::vector<llvm::Constant*>, bool>;
+
+    std::map<FnTypeKey, std::unique_ptr<types::Function>> m_fn_types;
+
+    std::vector<std::unique_ptr<Type>> m_named_types;
 
     bool m_had_error{false};
 };

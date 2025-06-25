@@ -6,8 +6,6 @@
 
 #include <llvm/IR/Type.h>
 
-#include "backend/llvm/codegen.h"
-
 namespace cent::backend {
 
 struct Type {
@@ -43,7 +41,8 @@ struct Type {
         Alias
     };
 
-    [[nodiscard]] Type(Kind kind) : kind{kind} {};
+    [[nodiscard]] Type(Kind kind, llvm::Type* llvm_type)
+    : kind{kind}, llvm_type{llvm_type} {};
     virtual ~Type() = default;
 
     Type(const Type&) = delete;
@@ -52,37 +51,35 @@ struct Type {
     auto operator=(const Type&) = delete;
     auto operator=(Type&&) = delete;
 
-    [[nodiscard]] virtual llvm::Type*
-    codegen(backend::Codegen& codegen) const = 0;
-
     [[nodiscard]] virtual std::string to_string() const = 0;
 
     const Kind kind;
+    llvm::Type* const llvm_type;
 };
 
-template <typename Derived> [[nodiscard]] inline bool is(const Type& value) {
+template <typename Derived> [[nodiscard]] inline bool is(const Type* value) {
     return Derived::class_of(value);
 }
 
 template <typename DerivedFirst, typename DerivedSecond, typename... Derived>
-[[nodiscard]] inline bool is(const Type& value) {
+[[nodiscard]] inline bool is(const Type* value) {
     return DerivedFirst::class_of(value) ||
            is<DerivedSecond, Derived...>(value);
 }
 
 template <typename Derived>
-[[nodiscard]] inline const Derived* dyn_cast(const Type& value) {
+[[nodiscard]] inline const Derived* dyn_cast(const Type* value) {
     if (Derived::class_of(value)) {
-        return static_cast<const Derived*>(&value);
+        return static_cast<const Derived*>(value);
     }
 
     return nullptr;
 }
 
 template <typename Derived>
-[[nodiscard]] inline Derived* dyn_cast(Type& value) {
+[[nodiscard]] inline Derived* dyn_cast(Type* value) {
     if (Derived::class_of(value)) {
-        return static_cast<Derived*>(&value);
+        return static_cast<Derived*>(value);
     }
 
     return nullptr;
@@ -92,15 +89,11 @@ namespace detail {
 
 template <typename Derived, Type::Kind DerivedKind>
 struct Type : backend::Type {
-    [[nodiscard]] Type() : backend::Type{DerivedKind} {};
+    [[nodiscard]] Type(llvm::Type* llvm_type)
+    : backend::Type{DerivedKind, llvm_type} {};
 
-    [[nodiscard]] llvm::Type*
-    codegen(backend::Codegen& codegen) const override {
-        return codegen.generate(static_cast<const Derived&>(*this));
-    }
-
-    [[nodiscard]] static bool class_of(const backend::Type& type) {
-        return type.kind == DerivedKind;
+    [[nodiscard]] static bool class_of(const backend::Type* type) {
+        return type->kind == DerivedKind;
     }
 };
 

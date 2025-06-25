@@ -33,15 +33,14 @@ std::optional<Value> Codegen::generate(const ast::FnDecl& decl) {
     Type* type = nullptr;
 
     if (decl.type) {
-        type = get_type(decl.type->offset, decl.type->value, *m_current_scope)
-                   .get();
+        type = get_type(decl.type->offset, decl.type->value, *m_current_scope);
 
         if (!type) {
             return std::nullopt;
         }
     }
 
-    auto get_fn_type = [&]() -> std::shared_ptr<Type> {
+    auto get_fn_type = [&]() -> Type* {
         if (!decl.type) {
             auto iterator = m_scope.names.find(decl.name.value);
 
@@ -72,7 +71,7 @@ std::optional<Value> Codegen::generate(const ast::FnDecl& decl) {
             m_scope.scopes[decl.type->value].names[decl.name.value].value);
     };
 
-    auto function_type = get_fn_type();
+    auto* function_type = get_fn_type();
 
     if (!function_type) {
         return std::nullopt;
@@ -86,7 +85,7 @@ std::optional<Value> Codegen::generate(const ast::FnDecl& decl) {
     auto* insert_point = m_builder.GetInsertBlock();
     m_builder.SetInsertPoint(entry);
 
-    m_current_function = static_cast<types::Function*>(function_type.get());
+    m_current_function = static_cast<types::Function*>(function_type);
 
     for (std::size_t i = 0; i < decl.proto.params.size(); ++i) {
         const auto& param = decl.proto.params[i];
@@ -139,7 +138,7 @@ std::optional<Value> Codegen::generate(const ast::Struct& decl) {
     }
 
     std::vector<llvm::Type*> llvm_fields;
-    std::vector<std::shared_ptr<Type>> fields;
+    std::vector<Type*> fields;
 
     llvm_fields.reserve(decl.fields.size());
     fields.reserve(decl.fields.size());
@@ -147,15 +146,13 @@ std::optional<Value> Codegen::generate(const ast::Struct& decl) {
     for (std::size_t i = 0; i < decl.fields.size(); ++i) {
         const auto& field = decl.fields[i];
 
-        auto type = field.type->codegen(*this);
+        auto* type = field.type->codegen(*this);
 
         if (!type) {
             return std::nullopt;
         }
 
-        auto* llvm_type = type->codegen(*this);
-
-        llvm_fields.push_back(llvm_type);
+        llvm_fields.push_back(type->llvm_type);
         fields.push_back(type);
 
         m_members[struct_type][field.name.value] = i;
@@ -163,9 +160,11 @@ std::optional<Value> Codegen::generate(const ast::Struct& decl) {
 
     struct_type->setBody(llvm_fields);
 
-    m_current_scope->types[decl.name.value] = std::make_shared<types::Struct>(
-        m_current_scope_prefix + decl.name.value, struct_type,
-        std::move(fields));
+    m_named_types.push_back(std::make_unique<types::Struct>(
+        struct_type, m_current_scope_prefix + decl.name.value,
+        std::move(fields)));
+
+    m_current_scope->types[decl.name.value] = m_named_types.back().get();
 
     return std::nullopt;
 }
@@ -185,13 +184,13 @@ std::optional<Value> Codegen::generate(const ast::Union& decl) {
         return std::nullopt;
     }
 
-    std::vector<std::shared_ptr<Type>> fields;
+    std::vector<Type*> fields;
     fields.reserve(decl.fields.size());
 
     for (std::size_t i = 0; i < decl.fields.size(); ++i) {
         const auto& field = decl.fields[i];
 
-        auto type = field.type->codegen(*this);
+        auto* type = field.type->codegen(*this);
 
         if (!type) {
             return std::nullopt;
@@ -207,40 +206,43 @@ std::optional<Value> Codegen::generate(const ast::Union& decl) {
     auto layout = m_module->getDataLayout();
 
     for (const auto& field : fields) {
-        auto* type = field->codegen(*this);
-        auto size = layout.getTypeAllocSize(type);
+        auto size = layout.getTypeAllocSize(field->llvm_type);
 
         if (size > max) {
             max = size;
-            max_type = type;
+            max_type = field->llvm_type;
         }
     }
 
     if (untagged) {
         struct_type->setBody(max_type);
 
-        m_current_scope->types[decl.name.value] =
-            std::make_shared<types::Union>(
-                m_current_scope_prefix + decl.name.value, struct_type,
-                std::move(fields));
+        m_named_types.push_back(std::make_unique<types::Union>(
+            struct_type, m_current_scope_prefix + decl.name.value,
+            std::move(fields)));
+
+        m_current_scope->types[decl.name.value] = m_named_types.back().get();
     } else {
-        auto tag_type = std::make_shared<types::Enum>(
-            m_current_scope_prefix + decl.name.value + "(tag)",
-            m_primitive_types["i32"]);
+        auto* underlying = m_primitive_types["i32"].get();
+
+        auto tag_type = std::make_unique<types::Enum>(
+            underlying->llvm_type,
+            m_current_scope_prefix + decl.name.value + "(tag)", underlying);
 
         for (std::size_t i = 0; i < decl.fields.size(); ++i) {
             m_current_scope->scopes[decl.name.value]
                 .names[decl.fields[i].name.value] = {
-                tag_type,
-                llvm::ConstantInt::get(llvm::Type::getInt32Ty(m_context), i)};
+                tag_type.get(),
+                llvm::ConstantInt::get(underlying->llvm_type, i)};
         }
 
-        struct_type->setBody({max_type, tag_type->codegen(*this)});
+        struct_type->setBody({max_type, underlying->llvm_type});
 
-        m_current_scope->types[decl.name.value] =
-            std::make_shared<types::Union>(
-                m_current_scope_prefix + decl.name.value, struct_type,
-                std::move(fields), tag_type);
+        m_named_types.push_back(std::make_unique<types::Union>(
+            struct_type, m_current_scope_prefix + decl.name.value,
+            std::move(fields), std::move(tag_type)));
+
+        m_current_scope->types[decl.name.value] = m_named_types.back().get();
     }
 
     return std::nullopt;
@@ -257,10 +259,7 @@ std::optional<Value> Codegen::generate(const ast::EnumDecl& decl) {
         return std::nullopt;
     }
 
-    auto type = iterator->second;
-    auto& enum_type = static_cast<types::Enum&>(*type);
-
-    auto* llvm_type = type->codegen(*this);
+    auto* type = static_cast<types::Enum*>(iterator->second);
 
     std::uint64_t number = 0;
 
@@ -271,7 +270,7 @@ std::optional<Value> Codegen::generate(const ast::EnumDecl& decl) {
             m_current_scope->scopes[decl.name.value].names[field.name.value] =
                 Value{
                     type, llvm::ConstantInt::get(
-                              llvm_type, number++, is_sint(*type))};
+                              type->llvm_type, number++, is_sint(type))};
 
             continue;
         }
@@ -282,21 +281,21 @@ std::optional<Value> Codegen::generate(const ast::EnumDecl& decl) {
             return std::nullopt;
         }
 
-        if (auto val = cast(enum_type.type, *value)) {
+        if (auto val = cast(type->type, *value)) {
             m_current_scope->scopes[decl.name.value].names[field.name.value] =
                 *val;
 
             if (auto* constant =
                     llvm::dyn_cast<llvm::ConstantInt>(val->value)) {
-                number = is_sint(enum_type) ? constant->getSExtValue()
-                                            : constant->getZExtValue();
+                number = is_sint(type) ? constant->getSExtValue()
+                                       : constant->getZExtValue();
             } else {
                 error(field.value->offset, "not a constant");
 
                 return std::nullopt;
             }
         } else {
-            type_mismatch(field.value->offset, *enum_type.type, *value->type);
+            type_mismatch(field.value->offset, type->type, value->type);
 
             return std::nullopt;
         }
@@ -308,14 +307,16 @@ std::optional<Value> Codegen::generate(const ast::EnumDecl& decl) {
 }
 
 std::optional<Value> Codegen::generate(const ast::TypeAlias& decl) {
-    auto type = decl.type->codegen(*this);
+    auto* type = decl.type->codegen(*this);
 
     if (!type) {
         return std::nullopt;
     }
 
-    m_current_scope->types[decl.name.value] = std::make_shared<types::Alias>(
-        m_current_scope_prefix + decl.name.value, type);
+    m_named_types.push_back(std::make_unique<types::Alias>(
+        type->llvm_type, m_current_scope_prefix + decl.name.value, type));
+
+    m_current_scope->types[decl.name.value] = m_named_types.back().get();
 
     return std::nullopt;
 }
@@ -334,17 +335,17 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
         }
 
         if (decl.type) {
-            auto type = decl.type->codegen(*this);
+            auto* type = decl.type->codegen(*this);
 
             if (!type) {
                 return std::nullopt;
             }
 
-            auto value_type = value->type;
+            auto* value_type = value->type;
             value = cast(type, *value);
 
             if (!value) {
-                type_mismatch(decl.value->offset, *type, *value_type);
+                type_mismatch(decl.value->offset, type, value_type);
                 return std::nullopt;
             }
         }
@@ -375,7 +376,7 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
     };
 
     std::optional<Value> value = std::nullopt;
-    std::shared_ptr<Type> type = nullptr;
+    Type* type = nullptr;
 
     llvm::Type* llvm_type = nullptr;
 
@@ -386,7 +387,7 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
             return std::nullopt;
         }
 
-        llvm_type = type->codegen(*this);
+        llvm_type = type->llvm_type;
     }
 
     if (decl.value) {
@@ -397,8 +398,8 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
         }
 
         if (!type) {
-            if (is<types::Null>(*value->type) ||
-                is<types::Undefined>(*value->type)) {
+            if (is<types::Null>(value->type) ||
+                is<types::Undefined>(value->type)) {
                 error(
                     decl.name.offset, fmt::format(
                                           "cannot infer type for {}",
@@ -408,14 +409,14 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
             }
 
             type = value->type;
-            llvm_type = value->type->codegen(*this);
+            llvm_type = value->type->llvm_type;
         } else {
             if (!m_current_function) {
                 global_var_init();
                 return std::nullopt;
             }
 
-            if (is<types::Undefined>(*value->type)) {
+            if (is<types::Undefined>(value->type)) {
                 m_current_scope->names[decl.name.value] = {
                     type, create_alloca(llvm_type),
                     decl.mutability == ast::VarDecl::Mut::Mut};
@@ -426,7 +427,7 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
             m_current_result = create_alloca(llvm_type);
 
             if (!cast_to_result(type, *value)) {
-                type_mismatch(decl.value->offset, *type, *value->type);
+                type_mismatch(decl.value->offset, type, value->type);
             } else {
                 m_current_scope->names[decl.name.value] = {
                     type, m_current_result,
@@ -454,7 +455,7 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
             return std::nullopt;
         }
 
-        if (!is<types::Undefined>(*value->type)) {
+        if (!is<types::Undefined>(value->type)) {
             m_builder.CreateStore(load_value(*value).value, m_current_result);
         }
 
@@ -513,14 +514,13 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
         return;
     }
 
-    auto fn_type = generate_fn_type(decl.proto);
+    auto* fn_type = generate_fn_type(decl.proto);
 
     if (!fn_type) {
         return;
     }
 
-    auto* llvm_fn_type =
-        static_cast<llvm::FunctionType*>(fn_type->codegen(*this));
+    auto* llvm_fn_type = static_cast<llvm::FunctionType*>(fn_type->llvm_type);
 
     auto* function = llvm::Function::Create(
         llvm_fn_type,
@@ -534,7 +534,7 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
     }
 
     auto* type =
-        get_type(decl.type->offset, decl.type->value, *m_current_scope).get();
+        get_type(decl.type->offset, decl.type->value, *m_current_scope);
 
     if (!type) {
         return;
@@ -543,20 +543,20 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
     scope.names[decl.name.value] = {fn_type, function};
 
     if (!decl.proto.params.empty()) {
-        auto param_type = decl.proto.params[0].type->codegen(*this);
+        auto* param_type = decl.proto.params[0].type->codegen(*this);
 
         if (!param_type) {
             return;
         }
 
-        if (types_equal(*param_type, *type)) {
+        if (param_type == type) {
             m_methods[type][decl.name.value] = {fn_type, function};
 
             return;
         }
 
-        if (auto* pointer_type = dyn_cast<types::Pointer>(*param_type)) {
-            if (types_equal(*pointer_type->type, *type)) {
+        if (auto* pointer_type = dyn_cast<types::Pointer>(param_type)) {
+            if (pointer_type->type == type) {
                 m_methods[type][decl.name.value] = {fn_type, function};
             }
         }
@@ -597,25 +597,32 @@ void Codegen::generate_enum(const ast::EnumDecl& decl) {
     }
 
     if (decl.type) {
-        auto type = decl.type->codegen(*this);
+        auto* type = decl.type->codegen(*this);
 
         if (!type) {
             return;
         }
 
-        if (!is_sint(*type) && !is_uint(*type) && !is<types::Bool>(*type)) {
+        if (!is_sint(type) && !is_uint(type) && !is<types::Bool>(type)) {
             error(decl.type->offset, "type mismatch");
             return;
         }
 
-        m_current_scope->types[decl.name.value] = std::make_shared<types::Enum>(
-            m_current_scope_prefix + decl.name.value, type);
+        m_named_types.push_back(std::make_unique<types::Enum>(
+            type->llvm_type, m_current_scope_prefix + decl.name.value, type));
+
+        m_current_scope->types[decl.name.value] = m_named_types.back().get();
 
         return;
     }
 
-    m_current_scope->types[decl.name.value] = std::make_shared<types::Enum>(
-        m_current_scope_prefix + decl.name.value, m_primitive_types["i32"]);
+    auto* underlying = m_primitive_types["i32"].get();
+
+    m_named_types.push_back(std::make_unique<types::Enum>(
+        underlying->llvm_type, m_current_scope_prefix + decl.name.value,
+        underlying));
+
+    m_current_scope->types[decl.name.value] = m_named_types.back().get();
 }
 
 } // namespace cent::backend
