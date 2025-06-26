@@ -7,6 +7,8 @@
 #include <llvm/Analysis/CGSCCPassManager.h>
 #include <llvm/Analysis/LoopAnalysisManager.h>
 
+#include <llvm/Bitcode/BitcodeWriter.h>
+
 #include "log.h"
 
 #include "backend/llvm/emit.h"
@@ -56,7 +58,7 @@ bool emit_obj(
     return true;
 }
 
-bool emit_llvm(llvm::Module& module, const std::filesystem::path& path) {
+bool emit_llvm_ir(llvm::Module& module, const std::filesystem::path& path) {
     std::error_code code;
     llvm::raw_fd_ostream file{path.string(), code, llvm::sys::fs::OF_None};
 
@@ -68,6 +70,22 @@ bool emit_llvm(llvm::Module& module, const std::filesystem::path& path) {
     }
 
     module.print(file, nullptr);
+
+    return true;
+}
+
+bool emit_llvm_bc(llvm::Module& module, const std::filesystem::path& path) {
+    std::error_code code;
+    llvm::raw_fd_ostream file{path.string(), code, llvm::sys::fs::OF_None};
+
+    if (code) {
+        log::error(fmt::format(
+            "could not open file `{}`: {}", path.string(), code.message()));
+
+        return false;
+    }
+
+    llvm::WriteBitcodeToFile(module, file);
 
     return true;
 }

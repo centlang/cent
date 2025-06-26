@@ -16,7 +16,10 @@ void optimize_module(llvm::Module& module, llvm::OptimizationLevel opt_level);
     const std::filesystem::path& path);
 
 [[nodiscard]] bool
-emit_llvm(llvm::Module& module, const std::filesystem::path& path);
+emit_llvm_ir(llvm::Module& module, const std::filesystem::path& path);
+
+[[nodiscard]] bool
+emit_llvm_bc(llvm::Module& module, const std::filesystem::path& path);
 
 } // namespace cent::backend
 

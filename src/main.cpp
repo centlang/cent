@@ -43,7 +43,8 @@ int main(int argc, char** argv) {
 
     bool compile_only = false;
     bool optimize = false;
-    bool emit_llvm = false;
+    bool emit_llvm_ir = false;
+    bool emit_llvm_bc = false;
 
     bool expecting_output = false;
     bool expecting_target = false;
@@ -73,8 +74,13 @@ int main(int argc, char** argv) {
             continue;
         }
 
-        if (arg == "--emit-llvm") {
-            emit_llvm = true;
+        if (arg == "--emit-llvm-ir") {
+            emit_llvm_ir = true;
+            continue;
+        }
+
+        if (arg == "--emit-llvm-bc") {
+            emit_llvm_bc = true;
             continue;
         }
 
@@ -101,7 +107,8 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    if (output && source_files.size() > 1 && (compile_only || emit_llvm)) {
+    if (output && source_files.size() > 1 &&
+        (compile_only || emit_llvm_ir || emit_llvm_bc)) {
         cent::log::error("cannot specify `-o` with multiple output files");
         return 1;
     }
@@ -176,8 +183,16 @@ int main(int argc, char** argv) {
             return result;
         };
 
-        if (emit_llvm) {
-            if (!cent::backend::emit_llvm(*module, get_output_file(".ll"))) {
+        if (emit_llvm_ir) {
+            if (!cent::backend::emit_llvm_ir(*module, get_output_file(".ll"))) {
+                return 1;
+            }
+
+            continue;
+        }
+
+        if (emit_llvm_bc) {
+            if (!cent::backend::emit_llvm_bc(*module, get_output_file(".bc"))) {
                 return 1;
             }
 
@@ -198,7 +213,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    if (!compile_only && !emit_llvm) {
+    if (!compile_only && !emit_llvm_ir && !emit_llvm_bc) {
         std::string command = "gcc -o " + (output ? output->string() : "main");
 
         for (auto& file : object_files) {
