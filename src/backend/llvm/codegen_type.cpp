@@ -296,4 +296,24 @@ types::Range* Codegen::get_range_type(Type* type) {
     return result.get();
 }
 
+Type* Codegen::unwrap_type(Type* type) {
+    auto* result = type;
+
+    while (auto* alias = dyn_cast<types::Alias>(result)) {
+        result = alias->type;
+    }
+
+    return result;
+}
+
+const Type* Codegen::unwrap_type(const Type* type) {
+    const auto* result = type;
+
+    while (const auto* alias = dyn_cast<types::Alias>(result)) {
+        result = alias->type;
+    }
+
+    return result;
+}
+
 } // namespace cent::backend
