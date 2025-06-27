@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "log.h"
 
@@ -45,6 +46,9 @@ offset_to_pos(std::string_view source, std::size_t offset) {
 
     return {line, column};
 }
+
+[[nodiscard]] int
+exec_command(std::string program, std::vector<std::string> args);
 
 } // namespace cent
 

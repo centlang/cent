@@ -214,14 +214,14 @@ int main(int argc, char** argv) {
     }
 
     if (!compile_only && !emit_llvm_ir && !emit_llvm_bc) {
-        std::string command = "gcc -o " + (output ? output->string() : "main");
+        std::vector<std::string> args = {
+            "-o", output ? output->string() : "main"};
 
         for (auto& file : object_files) {
-            command += ' ';
-            command += file;
+            args.push_back(file);
         }
 
-        auto exit_code = std::system(command.c_str());
+        int exit_code = cent::exec_command("gcc", args);
 
         for (auto& file : object_files) {
             std::filesystem::remove(file);
