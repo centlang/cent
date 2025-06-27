@@ -21,12 +21,6 @@
 
 #include "ast/type/named_type.h"
 
-#include "backend/llvm/type.h"
-#include "backend/llvm/value.h"
-
-#include "backend/llvm/types/enum.h"
-#include "backend/llvm/types/function.h"
-#include "backend/llvm/types/primitive.h"
 #include "backend/llvm/types/struct.h"
 #include "backend/llvm/types/union.h"
 

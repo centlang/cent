@@ -2,7 +2,6 @@
 #define CENT_BACKEND_SCOPE_H
 
 #include <map>
-#include <memory>
 #include <string_view>
 
 namespace cent::backend {

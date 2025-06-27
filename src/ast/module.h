@@ -1,6 +1,7 @@
 #ifndef CENT_AST_MODULE_H
 #define CENT_AST_MODULE_H
 
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <string>

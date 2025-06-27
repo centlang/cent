@@ -8,11 +8,7 @@
 #include "ast/decl/type_alias.h"
 #include "ast/decl/var_decl.h"
 
-#include "backend/llvm/type.h"
-#include "backend/llvm/value.h"
-
 #include "backend/llvm/types/enum.h"
-#include "backend/llvm/types/primitive.h"
 
 #include "backend/llvm/codegen.h"
 

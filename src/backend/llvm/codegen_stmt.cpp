@@ -16,11 +16,7 @@
 #include "ast/stmt/unreachable.h"
 #include "ast/stmt/while_loop.h"
 
-#include "backend/llvm/types/enum.h"
-#include "backend/llvm/types/function.h"
-#include "backend/llvm/types/primitive.h"
 #include "backend/llvm/types/union.h"
-#include "backend/llvm/value.h"
 
 #include "backend/llvm/codegen.h"
 

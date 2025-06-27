@@ -15,15 +15,7 @@
 #include "ast/type/slice_type.h"
 #include "ast/type/tuple_type.h"
 
-#include "backend/llvm/type.h"
-#include "backend/llvm/value.h"
-
 #include "backend/llvm/types/alias.h"
-#include "backend/llvm/types/enum.h"
-#include "backend/llvm/types/function.h"
-#include "backend/llvm/types/primitive.h"
-#include "backend/llvm/types/struct.h"
-#include "backend/llvm/types/union.h"
 
 #include "backend/llvm/codegen.h"
 
