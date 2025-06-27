@@ -52,14 +52,16 @@ std::optional<Value> Codegen::generate(const ast::UnaryExpr& expr) {
         return std::nullopt;
     }
 
+    auto* base_type = unwrap_type(value->type);
+
     switch (expr.oper.value) {
     case Minus:
-        if (is_float(value->type)) {
+        if (is_float(base_type)) {
             return Value{
                 value->type, m_builder.CreateFNeg(load_value(*value).value)};
         }
 
-        if (!is_sint(value->type) && !is_uint(value->type)) {
+        if (!is_sint(base_type) && !is_uint(base_type)) {
             error(expr.offset, "cannot apply `-` to a non-number type");
 
             return std::nullopt;
@@ -68,7 +70,7 @@ std::optional<Value> Codegen::generate(const ast::UnaryExpr& expr) {
         return Value{
             value->type, m_builder.CreateNeg(load_value(*value).value)};
     case Bang:
-        if (!is<types::Bool>(value->type)) {
+        if (!is<types::Bool>(base_type)) {
             error(expr.offset, "cannot apply `!` to a non-boolean type");
 
             return std::nullopt;
@@ -104,7 +106,7 @@ std::optional<Value> Codegen::generate(const ast::UnaryExpr& expr) {
             get_ptr_type(value->type, value->is_mutable), value->value, false,
             true};
     case Not:
-        if (!is_sint(value->type) && !is_uint(value->type)) {
+        if (!is_sint(base_type) && !is_uint(base_type)) {
             error(expr.offset, "cannot apply `~` to a non-integer type");
 
             return std::nullopt;
