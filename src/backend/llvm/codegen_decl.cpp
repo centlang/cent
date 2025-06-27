@@ -301,6 +301,9 @@ std::optional<Value> Codegen::generate(const ast::EnumDecl& decl) {
 }
 
 std::optional<Value> Codegen::generate(const ast::TypeAlias& decl) {
+    auto attrs = parse_attrs(decl, {"distinct"});
+    bool distinct = attrs.contains("distinct");
+
     auto* type = decl.type->codegen(*this);
 
     if (!type) {
@@ -308,7 +311,8 @@ std::optional<Value> Codegen::generate(const ast::TypeAlias& decl) {
     }
 
     m_named_types.push_back(std::make_unique<types::Alias>(
-        type->llvm_type, m_current_scope_prefix + decl.name.value, type));
+        type->llvm_type, m_current_scope_prefix + decl.name.value, type,
+        distinct));
 
     m_current_scope->types[decl.name.value] = m_named_types.back().get();
 

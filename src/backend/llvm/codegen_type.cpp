@@ -292,6 +292,10 @@ Type* Codegen::unwrap_type(Type* type) {
     auto* result = type;
 
     while (auto* alias = dyn_cast<types::Alias>(result)) {
+        if (alias->distinct) {
+            return result;
+        }
+
         result = alias->type;
     }
 
@@ -302,6 +306,10 @@ const Type* Codegen::unwrap_type(const Type* type) {
     const auto* result = type;
 
     while (const auto* alias = dyn_cast<types::Alias>(result)) {
+        if (alias->distinct) {
+            return result;
+        }
+
         result = alias->type;
     }
 
