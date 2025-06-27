@@ -1300,22 +1300,28 @@ std::optional<Value> Codegen::generate_bin_expr(
     ast::OffsetValue<frontend::Token::Type> oper) {
     using enum frontend::Token::Type;
 
+    auto* lhs_base_type = unwrap_type(lhs.value.type);
+    auto* rhs_base_type = unwrap_type(rhs.value.type);
+
     if (oper.value == EqualEqual || oper.value == BangEqual) {
         std::optional<Value> value = std::nullopt;
+        backend::Type* base_type = nullptr;
 
-        if (is<types::Optional>(lhs.value.type) &&
-            is<types::Null>(rhs.value.type)) {
+        if (is<types::Optional>(lhs_base_type) &&
+            is<types::Null>(rhs_base_type)) {
             value = lhs.value;
+            base_type = lhs_base_type;
         } else if (
-            is<types::Optional>(rhs.value.type) &&
-            is<types::Null>(lhs.value.type)) {
+            is<types::Optional>(rhs_base_type) &&
+            is<types::Null>(lhs_base_type)) {
             value = rhs.value;
+            base_type = rhs_base_type;
         }
 
         if (value) {
-            auto& type = static_cast<types::Optional&>(*value->type);
+            auto* type = static_cast<types::Optional*>(base_type);
 
-            if (is<types::Pointer>(type.type)) {
+            if (is<types::Pointer>(type->type)) {
                 auto* null =
                     llvm::Constant::getNullValue(value->value->getType());
 
@@ -1329,7 +1335,7 @@ std::optional<Value> Codegen::generate_bin_expr(
             }
 
             llvm::Value* val = load_struct_member(
-                type.llvm_type, llvm::Type::getInt1Ty(m_context), value->value,
+                type->llvm_type, llvm::Type::getInt1Ty(m_context), value->value,
                 optional_member_bool);
 
             if (oper.value == EqualEqual) {
@@ -1343,7 +1349,7 @@ std::optional<Value> Codegen::generate_bin_expr(
     auto lhs_value = load_value(lhs.value);
     auto rhs_value = load_value(rhs.value);
 
-    auto right = cast(lhs_value.type, rhs_value);
+    auto right = cast(lhs_base_type, rhs_value);
 
     if (!right) {
         type_mismatch(lhs.offset, lhs_value.type, rhs_value.type);
@@ -1360,9 +1366,8 @@ std::optional<Value> Codegen::generate_bin_expr(
     case Greater:
     case GreaterEqual:
     case LessEqual: {
-        auto* type = lhs_value.type;
-
-        if (!is_sint(type) && !is_uint(type) && !is_float(type)) {
+        if (!is_sint(lhs_base_type) && !is_uint(lhs_base_type) &&
+            !is_float(lhs_base_type)) {
             error(lhs.offset, "type mismatch");
 
             return std::nullopt;
@@ -1374,7 +1379,7 @@ std::optional<Value> Codegen::generate_bin_expr(
     case And:
     case Or:
     case Xor:
-        if (!is_sint(lhs_value.type) && !is_uint(lhs_value.type)) {
+        if (!is_sint(lhs_base_type) && !is_uint(lhs_base_type)) {
             error(lhs.offset, "type mismatch");
 
             return std::nullopt;
@@ -1383,7 +1388,7 @@ std::optional<Value> Codegen::generate_bin_expr(
         break;
     case AndAnd:
     case OrOr:
-        if (!is<types::Bool>(lhs_value.type)) {
+        if (!is<types::Bool>(lhs_base_type)) {
             error(lhs.offset, "type mismatch");
 
             return std::nullopt;
@@ -1398,23 +1403,23 @@ std::optional<Value> Codegen::generate_bin_expr(
     case Plus:
         return Value{
             lhs_value.type,
-            is_float(lhs_value.type)
+            is_float(lhs_base_type)
                 ? m_builder.CreateFAdd(lhs_value.value, right->value)
                 : m_builder.CreateAdd(lhs_value.value, right->value)};
     case Minus:
         return Value{
             lhs_value.type,
-            is_float(lhs_value.type)
+            is_float(lhs_base_type)
                 ? m_builder.CreateFSub(lhs_value.value, right->value)
                 : m_builder.CreateSub(lhs_value.value, right->value)};
     case Star:
         return Value{
             lhs_value.type,
-            is_float(lhs_value.type)
+            is_float(lhs_base_type)
                 ? m_builder.CreateFMul(lhs_value.value, right->value)
                 : m_builder.CreateMul(lhs_value.value, right->value)};
     case Slash:
-        if (is_float(lhs_value.type)) {
+        if (is_float(lhs_base_type)) {
             return Value{
                 lhs_value.type,
                 m_builder.CreateFDiv(lhs_value.value, right->value)};
@@ -1422,13 +1427,13 @@ std::optional<Value> Codegen::generate_bin_expr(
 
         return Value{
             lhs_value.type,
-            is_sint(lhs_value.type)
+            is_sint(lhs_base_type)
                 ? m_builder.CreateSDiv(lhs_value.value, right->value)
                 : m_builder.CreateUDiv(lhs_value.value, right->value)};
     case Percent:
         return Value{
             lhs_value.type,
-            is_sint(lhs_value.type)
+            is_sint(lhs_base_type)
                 ? m_builder.CreateSRem(lhs_value.value, right->value)
                 : m_builder.CreateURem(lhs_value.value, right->value)};
     case And:
@@ -1449,7 +1454,7 @@ std::optional<Value> Codegen::generate_bin_expr(
             m_primitive_types["bool"].get(),
             m_builder.CreateLogicalOr(lhs_value.value, right->value)};
     case Less:
-        if (is_float(lhs_value.type)) {
+        if (is_float(lhs_base_type)) {
             return Value{
                 m_primitive_types["bool"].get(),
                 m_builder.CreateFCmpULT(lhs_value.value, right->value)};
@@ -1457,11 +1462,11 @@ std::optional<Value> Codegen::generate_bin_expr(
 
         return Value{
             m_primitive_types["bool"].get(),
-            is_sint(lhs_value.type)
+            is_sint(lhs_base_type)
                 ? m_builder.CreateICmpSLT(lhs_value.value, right->value)
                 : m_builder.CreateICmpULT(lhs_value.value, right->value)};
     case Greater:
-        if (is_float(lhs_value.type)) {
+        if (is_float(lhs_base_type)) {
             return Value{
                 m_primitive_types["bool"].get(),
                 m_builder.CreateFCmpUGT(lhs_value.value, right->value)};
@@ -1469,23 +1474,23 @@ std::optional<Value> Codegen::generate_bin_expr(
 
         return Value{
             m_primitive_types["bool"].get(),
-            is_sint(lhs_value.type)
+            is_sint(lhs_base_type)
                 ? m_builder.CreateICmpSGT(lhs_value.value, right->value)
                 : m_builder.CreateICmpUGT(lhs_value.value, right->value)};
     case EqualEqual:
         return Value{
             m_primitive_types["bool"].get(),
-            is_float(lhs_value.type)
+            is_float(lhs_base_type)
                 ? m_builder.CreateFCmpUEQ(lhs_value.value, right->value)
                 : m_builder.CreateICmpEQ(lhs_value.value, right->value)};
     case BangEqual:
         return Value{
             m_primitive_types["bool"].get(),
-            is_float(lhs_value.type)
+            is_float(lhs_base_type)
                 ? m_builder.CreateFCmpUNE(lhs_value.value, right->value)
                 : m_builder.CreateICmpNE(lhs_value.value, right->value)};
     case GreaterEqual:
-        if (is_float(lhs_value.type)) {
+        if (is_float(lhs_base_type)) {
             return Value{
                 m_primitive_types["bool"].get(),
                 m_builder.CreateFCmpUGE(lhs_value.value, right->value)};
@@ -1493,11 +1498,11 @@ std::optional<Value> Codegen::generate_bin_expr(
 
         return Value{
             m_primitive_types["bool"].get(),
-            is_sint(lhs_value.type)
+            is_sint(lhs_base_type)
                 ? m_builder.CreateICmpSGE(lhs_value.value, right->value)
                 : m_builder.CreateICmpUGE(lhs_value.value, right->value)};
     case LessEqual:
-        if (is_float(lhs_value.type)) {
+        if (is_float(lhs_base_type)) {
             return Value{
                 m_primitive_types["bool"].get(),
                 m_builder.CreateFCmpULE(lhs_value.value, right->value)};
@@ -1505,7 +1510,7 @@ std::optional<Value> Codegen::generate_bin_expr(
 
         return Value{
             m_primitive_types["bool"].get(),
-            is_sint(lhs_value.type)
+            is_sint(lhs_base_type)
                 ? m_builder.CreateICmpSLE(lhs_value.value, right->value)
                 : m_builder.CreateICmpULE(lhs_value.value, right->value)};
     default:
