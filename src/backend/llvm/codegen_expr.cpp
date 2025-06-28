@@ -1349,12 +1349,24 @@ std::optional<Value> Codegen::generate_bin_expr(
     auto lhs_value = load_value(lhs.value);
     auto rhs_value = load_value(rhs.value);
 
-    auto right = cast(lhs_base_type, rhs_value);
+    auto* value_base_type = lhs_base_type;
+    auto* value_type = lhs.value.type;
 
-    if (!right) {
-        type_mismatch(lhs.offset, lhs_value.type, rhs_value.type);
+    auto value_x = lhs_value;
+    auto value_y = cast(lhs_base_type, rhs_value);
 
-        return std::nullopt;
+    if (!value_y) {
+        value_y = cast(rhs_base_type, lhs_value);
+
+        if (!value_y) {
+            type_mismatch(lhs.offset, lhs_value.type, rhs_value.type);
+
+            return std::nullopt;
+        }
+
+        value_x = rhs_value;
+        value_base_type = rhs_base_type;
+        value_type = rhs.value.type;
     }
 
     switch (oper.value) {
@@ -1366,8 +1378,8 @@ std::optional<Value> Codegen::generate_bin_expr(
     case Greater:
     case GreaterEqual:
     case LessEqual: {
-        if (!is_sint(lhs_base_type) && !is_uint(lhs_base_type) &&
-            !is_float(lhs_base_type)) {
+        if (!is_sint(value_base_type) && !is_uint(value_base_type) &&
+            !is_float(value_base_type)) {
             error(lhs.offset, "type mismatch");
 
             return std::nullopt;
@@ -1379,7 +1391,7 @@ std::optional<Value> Codegen::generate_bin_expr(
     case And:
     case Or:
     case Xor:
-        if (!is_sint(lhs_base_type) && !is_uint(lhs_base_type)) {
+        if (!is_sint(value_base_type) && !is_uint(value_base_type)) {
             error(lhs.offset, "type mismatch");
 
             return std::nullopt;
@@ -1388,7 +1400,7 @@ std::optional<Value> Codegen::generate_bin_expr(
         break;
     case AndAnd:
     case OrOr:
-        if (!is<types::Bool>(lhs_base_type)) {
+        if (!is<types::Bool>(value_base_type)) {
             error(lhs.offset, "type mismatch");
 
             return std::nullopt;
@@ -1402,117 +1414,117 @@ std::optional<Value> Codegen::generate_bin_expr(
     switch (oper.value) {
     case Plus:
         return Value{
-            lhs_value.type,
-            is_float(lhs_base_type)
-                ? m_builder.CreateFAdd(lhs_value.value, right->value)
-                : m_builder.CreateAdd(lhs_value.value, right->value)};
+            value_type,
+            is_float(value_base_type)
+                ? m_builder.CreateFAdd(value_x.value, value_y->value)
+                : m_builder.CreateAdd(value_x.value, value_y->value)};
     case Minus:
         return Value{
-            lhs_value.type,
-            is_float(lhs_base_type)
-                ? m_builder.CreateFSub(lhs_value.value, right->value)
-                : m_builder.CreateSub(lhs_value.value, right->value)};
+            value_type,
+            is_float(value_base_type)
+                ? m_builder.CreateFSub(value_x.value, value_y->value)
+                : m_builder.CreateSub(value_x.value, value_y->value)};
     case Star:
         return Value{
-            lhs_value.type,
-            is_float(lhs_base_type)
-                ? m_builder.CreateFMul(lhs_value.value, right->value)
-                : m_builder.CreateMul(lhs_value.value, right->value)};
+            value_type,
+            is_float(value_base_type)
+                ? m_builder.CreateFMul(value_x.value, value_y->value)
+                : m_builder.CreateMul(value_x.value, value_y->value)};
     case Slash:
-        if (is_float(lhs_base_type)) {
+        if (is_float(value_base_type)) {
             return Value{
-                lhs_value.type,
-                m_builder.CreateFDiv(lhs_value.value, right->value)};
+                value_type,
+                m_builder.CreateFDiv(value_x.value, value_y->value)};
         }
 
         return Value{
-            lhs_value.type,
-            is_sint(lhs_base_type)
-                ? m_builder.CreateSDiv(lhs_value.value, right->value)
-                : m_builder.CreateUDiv(lhs_value.value, right->value)};
+            value_type,
+            is_sint(value_base_type)
+                ? m_builder.CreateSDiv(value_x.value, value_y->value)
+                : m_builder.CreateUDiv(value_x.value, value_y->value)};
     case Percent:
         return Value{
-            lhs_value.type,
-            is_sint(lhs_base_type)
-                ? m_builder.CreateSRem(lhs_value.value, right->value)
-                : m_builder.CreateURem(lhs_value.value, right->value)};
+            value_type,
+            is_sint(value_base_type)
+                ? m_builder.CreateSRem(value_x.value, value_y->value)
+                : m_builder.CreateURem(value_x.value, value_y->value)};
     case And:
         return Value{
-            lhs_value.type, m_builder.CreateAnd(lhs_value.value, right->value)};
+            value_type, m_builder.CreateAnd(value_x.value, value_y->value)};
     case Or:
         return Value{
-            lhs_value.type, m_builder.CreateOr(lhs_value.value, right->value)};
+            value_type, m_builder.CreateOr(value_x.value, value_y->value)};
     case Xor:
         return Value{
-            lhs_value.type, m_builder.CreateXor(lhs_value.value, right->value)};
+            value_type, m_builder.CreateXor(value_x.value, value_y->value)};
     case AndAnd:
         return Value{
             m_primitive_types["bool"].get(),
-            m_builder.CreateLogicalAnd(lhs_value.value, right->value)};
+            m_builder.CreateLogicalAnd(value_x.value, value_y->value)};
     case OrOr:
         return Value{
             m_primitive_types["bool"].get(),
-            m_builder.CreateLogicalOr(lhs_value.value, right->value)};
+            m_builder.CreateLogicalOr(value_x.value, value_y->value)};
     case Less:
-        if (is_float(lhs_base_type)) {
+        if (is_float(value_base_type)) {
             return Value{
                 m_primitive_types["bool"].get(),
-                m_builder.CreateFCmpULT(lhs_value.value, right->value)};
+                m_builder.CreateFCmpULT(value_x.value, value_y->value)};
         }
 
         return Value{
             m_primitive_types["bool"].get(),
-            is_sint(lhs_base_type)
-                ? m_builder.CreateICmpSLT(lhs_value.value, right->value)
-                : m_builder.CreateICmpULT(lhs_value.value, right->value)};
+            is_sint(value_base_type)
+                ? m_builder.CreateICmpSLT(value_x.value, value_y->value)
+                : m_builder.CreateICmpULT(value_x.value, value_y->value)};
     case Greater:
-        if (is_float(lhs_base_type)) {
+        if (is_float(value_base_type)) {
             return Value{
                 m_primitive_types["bool"].get(),
-                m_builder.CreateFCmpUGT(lhs_value.value, right->value)};
+                m_builder.CreateFCmpUGT(value_x.value, value_y->value)};
         }
 
         return Value{
             m_primitive_types["bool"].get(),
-            is_sint(lhs_base_type)
-                ? m_builder.CreateICmpSGT(lhs_value.value, right->value)
-                : m_builder.CreateICmpUGT(lhs_value.value, right->value)};
+            is_sint(value_base_type)
+                ? m_builder.CreateICmpSGT(value_x.value, value_y->value)
+                : m_builder.CreateICmpUGT(value_x.value, value_y->value)};
     case EqualEqual:
         return Value{
             m_primitive_types["bool"].get(),
-            is_float(lhs_base_type)
-                ? m_builder.CreateFCmpUEQ(lhs_value.value, right->value)
-                : m_builder.CreateICmpEQ(lhs_value.value, right->value)};
+            is_float(value_base_type)
+                ? m_builder.CreateFCmpUEQ(value_x.value, value_y->value)
+                : m_builder.CreateICmpEQ(value_x.value, value_y->value)};
     case BangEqual:
         return Value{
             m_primitive_types["bool"].get(),
-            is_float(lhs_base_type)
-                ? m_builder.CreateFCmpUNE(lhs_value.value, right->value)
-                : m_builder.CreateICmpNE(lhs_value.value, right->value)};
+            is_float(value_base_type)
+                ? m_builder.CreateFCmpUNE(value_x.value, value_y->value)
+                : m_builder.CreateICmpNE(value_x.value, value_y->value)};
     case GreaterEqual:
-        if (is_float(lhs_base_type)) {
+        if (is_float(value_base_type)) {
             return Value{
                 m_primitive_types["bool"].get(),
-                m_builder.CreateFCmpUGE(lhs_value.value, right->value)};
+                m_builder.CreateFCmpUGE(value_x.value, value_y->value)};
         }
 
         return Value{
             m_primitive_types["bool"].get(),
-            is_sint(lhs_base_type)
-                ? m_builder.CreateICmpSGE(lhs_value.value, right->value)
-                : m_builder.CreateICmpUGE(lhs_value.value, right->value)};
+            is_sint(value_base_type)
+                ? m_builder.CreateICmpSGE(value_x.value, value_y->value)
+                : m_builder.CreateICmpUGE(value_x.value, value_y->value)};
     case LessEqual:
-        if (is_float(lhs_base_type)) {
+        if (is_float(value_base_type)) {
             return Value{
                 m_primitive_types["bool"].get(),
-                m_builder.CreateFCmpULE(lhs_value.value, right->value)};
+                m_builder.CreateFCmpULE(value_x.value, value_y->value)};
         }
 
         return Value{
             m_primitive_types["bool"].get(),
-            is_sint(lhs_base_type)
-                ? m_builder.CreateICmpSLE(lhs_value.value, right->value)
-                : m_builder.CreateICmpULE(lhs_value.value, right->value)};
+            is_sint(value_base_type)
+                ? m_builder.CreateICmpSLE(value_x.value, value_y->value)
+                : m_builder.CreateICmpULE(value_x.value, value_y->value)};
     default:
         return std::nullopt;
     }
