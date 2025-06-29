@@ -37,8 +37,8 @@ namespace cent::frontend {
 
 class Parser {
 public:
-    [[nodiscard]] Parser(std::string_view source, std::string_view filename)
-    : m_lexer{source}, m_source{source}, m_filename{filename} {
+    [[nodiscard]] Parser(std::string_view source, std::string filename)
+    : m_lexer{source}, m_source{source}, m_filename{std::move(filename)} {
         for (auto& token : m_buffer) {
             token = m_lexer.token();
             m_lexer.next_token();
@@ -250,7 +250,7 @@ private:
     std::uint8_t m_buffer_index = 0;
 
     std::string_view m_source;
-    std::string_view m_filename;
+    std::string m_filename;
 
     bool m_had_error{false};
 };

@@ -8,6 +8,10 @@ std::vector<std::filesystem::path> find_module(
     std::vector<std::filesystem::path> result;
 
     for (const auto& search_path : search_paths) {
+        if (!std::filesystem::is_directory(search_path)) {
+            continue;
+        }
+
         std::filesystem::path fs_path = search_path;
 
         for (auto& name : path) {

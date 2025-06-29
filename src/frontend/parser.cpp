@@ -1432,7 +1432,7 @@ std::unique_ptr<ast::Module> Parser::parse_submodule(
         return nullptr;
     }
 
-    Parser parser{*code, path.relative_path().string()};
+    Parser parser{*code, path.string()};
     auto submodule = parser.parse();
 
     if (!submodule) {
@@ -1509,8 +1509,10 @@ bool Parser::parse_with(ast::Module& module) {
         module_name = token->value;
     }
 
-    std::array<std::filesystem::path, 1> search_paths = {
-        std::filesystem::path{m_filename}.parent_path()};
+    std::array search_paths = {
+        std::filesystem::path{m_filename}.parent_path(),
+        std::filesystem::path{"/usr/local/lib/cent"},
+        std::filesystem::path{"/usr/lib/cent"}};
 
     auto module_paths = cent::find_module(path, search_paths);
 
