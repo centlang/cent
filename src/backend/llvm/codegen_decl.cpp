@@ -120,16 +120,16 @@ std::optional<Value> Codegen::generate(const ast::FnDecl& decl) {
 }
 
 std::optional<Value> Codegen::generate(const ast::Struct& decl) {
-    if (m_current_function) {
-        generate_struct(decl);
-    }
+    if (m_current_scope->types.contains(decl.name.value)) {
+        error(
+            decl.name.offset,
+            fmt::format("{} is already defined", log::quoted(decl.name.value)));
 
-    auto* struct_type =
-        llvm::StructType::getTypeByName(m_context, decl.name.value);
-
-    if (!struct_type) {
         return std::nullopt;
     }
+
+    auto* struct_type = llvm::StructType::create(
+        m_context, m_current_scope_prefix + decl.name.value);
 
     std::vector<llvm::Type*> llvm_fields;
     std::vector<Type*> fields;
@@ -167,16 +167,16 @@ std::optional<Value> Codegen::generate(const ast::Union& decl) {
     auto attrs = parse_attrs(decl, {"untagged"});
     bool untagged = attrs.contains("untagged");
 
-    if (m_current_function) {
-        generate_union(decl);
-    }
+    if (m_current_scope->types.contains(decl.name.value)) {
+        error(
+            decl.name.offset,
+            fmt::format("{} is already defined", log::quoted(decl.name.value)));
 
-    auto* struct_type =
-        llvm::StructType::getTypeByName(m_context, decl.name.value);
-
-    if (!struct_type) {
         return std::nullopt;
     }
+
+    auto* struct_type = llvm::StructType::create(
+        m_context, m_current_scope_prefix + decl.name.value);
 
     std::vector<Type*> fields;
     fields.reserve(decl.fields.size());
@@ -559,30 +559,6 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
             }
         }
     }
-}
-
-void Codegen::generate_struct(const ast::Struct& decl) {
-    if (llvm::StructType::getTypeByName(m_context, decl.name.value)) {
-        error(
-            decl.name.offset,
-            fmt::format("{} is already defined", log::quoted(decl.name.value)));
-
-        return;
-    }
-
-    llvm::StructType::create(m_context, decl.name.value);
-}
-
-void Codegen::generate_union(const ast::Union& decl) {
-    if (llvm::StructType::getTypeByName(m_context, decl.name.value)) {
-        error(
-            decl.name.offset,
-            fmt::format("{} is already defined", log::quoted(decl.name.value)));
-
-        return;
-    }
-
-    llvm::StructType::create(m_context, decl.name.value);
 }
 
 void Codegen::generate_enum(const ast::EnumDecl& decl) {

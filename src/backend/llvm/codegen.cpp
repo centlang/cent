@@ -90,22 +90,6 @@ void Codegen::generate(const ast::Module& module, bool is_submodule) {
         generate_enum(*enum_decl);
     }
 
-    for (const auto& struct_decl : module.structs) {
-        if (is_submodule && !struct_decl->is_public) {
-            continue;
-        }
-
-        generate_struct(*struct_decl);
-    }
-
-    for (const auto& union_decl : module.unions) {
-        if (is_submodule && !union_decl->is_public) {
-            continue;
-        }
-
-        generate_union(*union_decl);
-    }
-
     for (const auto& enum_decl : module.enums) {
         if (is_submodule && !enum_decl->is_public) {
             continue;

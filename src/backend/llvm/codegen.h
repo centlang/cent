@@ -207,8 +207,6 @@ private:
     void create_panic_fn();
 
     void generate_fn_proto(const ast::FnDecl& decl);
-    void generate_struct(const ast::Struct& decl);
-    void generate_union(const ast::Union& decl);
     void generate_enum(const ast::EnumDecl& decl);
 
     void
