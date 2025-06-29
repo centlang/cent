@@ -1510,7 +1510,7 @@ bool Parser::parse_with(ast::Module& module) {
     }
 
     std::array search_paths = {
-        std::filesystem::path{m_filename}.parent_path(),
+        std::filesystem::absolute(m_filename).parent_path(),
         std::filesystem::path{"/usr/local/lib/cent"},
         std::filesystem::path{"/usr/lib/cent"}};
 
