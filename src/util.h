@@ -30,21 +30,37 @@ read_file(const std::string& filename) {
     return buffer.str();
 }
 
-[[nodiscard]] inline std::pair<std::uint32_t, std::uint32_t>
-offset_to_pos(std::string_view source, std::size_t offset) {
+struct Location {
     std::uint32_t line = 1;
     std::uint32_t column = 1;
 
+    std::string code;
+};
+
+[[nodiscard]] inline Location
+offset_to_loc(std::string_view source, std::size_t offset) {
+    Location location;
+    std::size_t line_begin = 0;
+
     for (std::size_t i = 0; i < offset; ++i) {
         if (source[i] == '\n') {
-            ++line;
-            column = 1;
+            ++location.line;
+            line_begin = i + 1;
+            location.column = 1;
         } else {
-            ++column;
+            ++location.column;
         }
     }
 
-    return {line, column};
+    std::size_t line_end = source.find('\n', line_begin);
+
+    if (line_end == std::string_view::npos) {
+        location.code = source.substr(line_begin);
+        return location;
+    }
+
+    location.code = source.substr(line_begin, line_end - line_begin);
+    return location;
 }
 
 [[nodiscard]] int

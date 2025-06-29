@@ -550,12 +550,12 @@ std::optional<Value> Codegen::generate(const ast::AssertStmt& stmt) {
     m_builder.SetInsertPoint(failure);
 
     auto src = read_file(m_filename);
-    auto [line, column] = cent::offset_to_pos(*src, stmt.condition->offset);
+    auto loc = cent::offset_to_loc(*src, stmt.condition->offset);
 
     m_builder.CreateCall(
-        m_panic_fn,
-        {m_builder.CreateGlobalString(fmt::format(
-            "Assertion failed at {}:{}:{}\n", m_filename, line, column))});
+        m_panic_fn, {m_builder.CreateGlobalString(fmt::format(
+                        "Assertion failed at {}:{}:{}\n", m_filename, loc.line,
+                        loc.column))});
 
     m_builder.CreateUnreachable();
 

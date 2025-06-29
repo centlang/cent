@@ -229,15 +229,15 @@ private:
     }
 
     void error(std::string_view message) {
-        auto [line, column] = cent::offset_to_pos(m_source, peek().offset);
-        log::error(line, column, m_filename, message);
+        auto loc = cent::offset_to_loc(m_source, peek().offset);
+        log::error(loc.line, loc.column, m_filename, message, loc.code);
 
         m_had_error = true;
     }
 
     void error(std::size_t offset, std::string_view message) {
-        auto [line, column] = cent::offset_to_pos(m_source, offset);
-        log::error(line, column, m_filename, message);
+        auto loc = cent::offset_to_loc(m_source, offset);
+        log::error(loc.line, loc.column, m_filename, message, loc.code);
 
         m_had_error = true;
     }

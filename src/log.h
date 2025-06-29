@@ -181,11 +181,16 @@ template <typename ValueType> inline auto quoted(ValueType value) {
 
 inline void
 log(std::string_view type, Color type_fg, std::uint32_t line,
-    std::uint32_t column, std::string_view filename, std::string_view message) {
+    std::uint32_t column, std::string_view filename, std::string_view message,
+    std::string_view code) {
     fmt::print(
-        stderr, "{} {} {}\n",
-        bold(fmt::format("{}:{}:{}:", filename, line, column)),
+        stderr, "{}:{}:{}: {} {}\n", filename, line, column,
         bold(fg(fmt::format("{}:", type), type_fg)), message);
+
+    fmt::print(stderr, " {} | {}\n", line, code);
+    fmt::print(
+        stderr, " {:{}} |{:{}}^\n", "", fmt::formatted_size("{}", line), "",
+        column);
 }
 
 inline void
@@ -197,16 +202,16 @@ log(std::string_view type, Color type_fg, std::string_view message) {
 
 inline void error(
     std::uint32_t line, std::uint32_t column, std::string_view filename,
-    std::string_view message) {
-    log("error", Red, line, column, filename, message);
+    std::string_view message, std::string_view code) {
+    log("error", Red, line, column, filename, message, code);
 }
 
 inline void error(std::string_view message) { log("error", Red, message); }
 
 inline void warning(
     std::uint32_t line, std::uint32_t column, std::string_view filename,
-    std::string_view message) {
-    log("warning", Yellow, line, column, filename, message);
+    std::string_view message, std::string_view code) {
+    log("warning", Yellow, line, column, filename, message, code);
 }
 
 inline void warning(std::string_view message) {
@@ -215,8 +220,8 @@ inline void warning(std::string_view message) {
 
 inline void note(
     std::uint32_t line, std::uint32_t column, std::string_view filename,
-    std::string_view message) {
-    log("note", Cyan, line, column, filename, message);
+    std::string_view message, std::string_view code) {
+    log("note", Cyan, line, column, filename, message, code);
 }
 
 inline void note(std::string_view message) { log("note", Cyan, message); }

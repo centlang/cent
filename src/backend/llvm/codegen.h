@@ -216,9 +216,10 @@ private:
 
     void error(std::size_t offset, std::string_view message) {
         auto src = read_file(m_filename);
-        auto [line, column] = cent::offset_to_pos(*src, offset);
 
-        log::error(line, column, m_filename, message);
+        auto loc = cent::offset_to_loc(*src, offset);
+        log::error(loc.line, loc.column, m_filename, message, loc.code);
+
         m_had_error = true;
     }
 
