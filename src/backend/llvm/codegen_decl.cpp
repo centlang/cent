@@ -524,7 +524,8 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
         llvm_fn_type,
         (decl.is_public || is_extern) ? llvm::Function::ExternalLinkage
                                       : llvm::Function::PrivateLinkage,
-        m_current_scope_prefix + decl.name.value, *m_module);
+        is_extern ? decl.name.value : m_current_scope_prefix + decl.name.value,
+        *m_module);
 
     if (!decl.type) {
         scope.names[decl.name.value] = Value{fn_type, function};
