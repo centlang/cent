@@ -120,10 +120,50 @@ std::optional<Value> Codegen::generate(const ast::FnDecl& decl) {
 }
 
 std::optional<Value> Codegen::generate(const ast::Struct& decl) {
-    if (m_current_scope->types.contains(decl.name.value)) {
+    if (m_current_scope->types.contains(decl.name.value) ||
+        m_current_scope->generic_structs.contains(decl.name.value) ||
+        m_current_scope->generic_unions.contains(decl.name.value)) {
         error(
             decl.name.offset,
             fmt::format("{} is already defined", log::quoted(decl.name.value)));
+
+        return std::nullopt;
+    }
+
+    if (!decl.template_params.empty()) {
+        auto& generic_struct =
+            m_current_scope->generic_structs[decl.name.value];
+
+        auto current_scope_types = m_current_scope->types;
+
+        for (const auto& param : decl.template_params) {
+            m_named_types.push_back(
+                std::make_unique<types::TemplateParam>(param.value));
+
+            generic_struct.params[param.value] =
+                static_cast<types::TemplateParam*>(m_named_types.back().get());
+
+            m_current_scope->types[param.value] =
+                generic_struct.params[param.value];
+        }
+
+        std::vector<Type*> fields;
+        fields.reserve(decl.fields.size());
+
+        for (const auto& field : decl.fields) {
+            auto* type = field.type->codegen(*this);
+
+            if (!type) {
+                return std::nullopt;
+            }
+
+            fields.push_back(type);
+        }
+
+        m_current_scope->types = current_scope_types;
+
+        generic_struct.name = decl.name.value;
+        generic_struct.fields = std::move(fields);
 
         return std::nullopt;
     }
@@ -167,10 +207,48 @@ std::optional<Value> Codegen::generate(const ast::Union& decl) {
     auto attrs = parse_attrs(decl, {"untagged"});
     bool untagged = attrs.contains("untagged");
 
-    if (m_current_scope->types.contains(decl.name.value)) {
+    if (m_current_scope->types.contains(decl.name.value) ||
+        m_current_scope->generic_structs.contains(decl.name.value) ||
+        m_current_scope->generic_unions.contains(decl.name.value)) {
         error(
             decl.name.offset,
             fmt::format("{} is already defined", log::quoted(decl.name.value)));
+
+        return std::nullopt;
+    }
+
+    if (!decl.template_params.empty()) {
+        auto& generic_union = m_current_scope->generic_unions[decl.name.value];
+        auto current_scope_types = m_current_scope->types;
+
+        for (const auto& param : decl.template_params) {
+            m_named_types.push_back(
+                std::make_unique<types::TemplateParam>(param.value));
+
+            generic_union.params[param.value] =
+                static_cast<types::TemplateParam*>(m_named_types.back().get());
+
+            m_current_scope->types[param.value] =
+                generic_union.params[param.value];
+        }
+
+        std::vector<Type*> fields;
+        fields.reserve(decl.fields.size());
+
+        for (const auto& field : decl.fields) {
+            auto* type = field.type->codegen(*this);
+
+            if (!type) {
+                return std::nullopt;
+            }
+
+            fields.push_back(type);
+        }
+
+        m_current_scope->types = current_scope_types;
+
+        generic_union.name = decl.name.value;
+        generic_union.fields = std::move(fields);
 
         return std::nullopt;
     }

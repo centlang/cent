@@ -38,11 +38,14 @@ struct Type {
         Struct,
         Union,
         Function,
-        Alias
+        Alias,
+
+        TemplateParam
     };
 
     [[nodiscard]] Type(Kind kind, llvm::Type* llvm_type)
     : kind{kind}, llvm_type{llvm_type} {};
+
     virtual ~Type() = default;
 
     Type(const Type&) = delete;
