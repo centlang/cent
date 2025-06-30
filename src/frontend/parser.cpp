@@ -1179,6 +1179,34 @@ std::vector<ast::Struct::Field> Parser::parse_fields() {
     return result;
 }
 
+std::vector<ast::OffsetValue<std::string>> Parser::parse_template_params() {
+    std::vector<ast::OffsetValue<std::string>> result;
+
+    if (!match_next(Token::Type::LeftParen)) {
+        return result;
+    }
+
+    if (!expect("`<`", Token::Type::Less)) {
+        return result;
+    }
+
+    while (match(Token::Type::Identifier)) {
+        auto param = get();
+        result.emplace_back(param.value, param.offset);
+
+        if (match(Token::Type::Greater)) {
+            break;
+        }
+
+        expect("`,`", Token::Type::Comma);
+    }
+
+    next();
+    expect("`)`", Token::Type::RightParen);
+
+    return result;
+}
+
 std::vector<ast::EnumDecl::Field> Parser::parse_enum_fields() {
     std::vector<ast::EnumDecl::Field> result;
 
@@ -1330,6 +1358,8 @@ Parser::parse_struct(std::vector<ast::Attribute> attrs, bool is_public) {
         return nullptr;
     }
 
+    auto template_params = parse_template_params();
+
     if (!expect("`{`", Token::Type::LeftBrace)) {
         return nullptr;
     }
@@ -1342,7 +1372,8 @@ Parser::parse_struct(std::vector<ast::Attribute> attrs, bool is_public) {
 
     return std::make_unique<ast::Struct>(
         name->offset, ast::OffsetValue{name->value, name->offset},
-        std::move(fields), std::move(attrs), is_public);
+        std::move(fields), std::move(template_params), std::move(attrs),
+        is_public);
 }
 
 std::unique_ptr<ast::Union>
@@ -1352,6 +1383,8 @@ Parser::parse_union(std::vector<ast::Attribute> attrs, bool is_public) {
     if (!name) {
         return nullptr;
     }
+
+    auto template_params = parse_template_params();
 
     if (!expect("`{`", Token::Type::LeftBrace)) {
         return nullptr;
@@ -1365,7 +1398,8 @@ Parser::parse_union(std::vector<ast::Attribute> attrs, bool is_public) {
 
     return std::make_unique<ast::Union>(
         name->offset, ast::OffsetValue{name->value, name->offset},
-        std::move(fields), std::move(attrs), is_public);
+        std::move(fields), std::move(template_params), std::move(attrs),
+        is_public);
 }
 
 std::unique_ptr<ast::TypeAlias>

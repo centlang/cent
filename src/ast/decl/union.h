@@ -16,13 +16,16 @@ struct Union : detail::Decl<Union> {
 
     [[nodiscard]] Union(
         std::size_t offset, OffsetValue<std::string> name,
-        std::vector<Field> fields, std::vector<Attribute> attributes,
-        bool is_public = false)
+        std::vector<Field> fields,
+        std::vector<OffsetValue<std::string>> template_params,
+        std::vector<Attribute> attributes, bool is_public = false)
     : Decl{offset, std::move(attributes), is_public}, name{std::move(name)},
-      fields{std::move(fields)} {}
+      fields{std::move(fields)}, template_params{std::move(template_params)} {}
 
     OffsetValue<std::string> name;
     std::vector<Field> fields;
+
+    std::vector<OffsetValue<std::string>> template_params;
 };
 
 } // namespace cent::ast
