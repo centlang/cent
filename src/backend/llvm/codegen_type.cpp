@@ -439,7 +439,8 @@ types::Pointer* Codegen::get_ptr_type(Type* type, bool is_mutable) {
 
     if (!result) {
         result = std::make_unique<types::Pointer>(
-            llvm::PointerType::get(m_context, 0), type, is_mutable);
+            type->llvm_type ? llvm::PointerType::get(m_context, 0) : nullptr,
+            type, is_mutable);
     }
 
     return result.get();
@@ -449,7 +450,8 @@ types::Slice* Codegen::get_slice_type(Type* type, bool is_mutable) {
     auto& result = m_slice_types[std::make_pair(type, is_mutable)];
 
     if (!result) {
-        result = std::make_unique<types::Slice>(m_slice_type, type, is_mutable);
+        result = std::make_unique<types::Slice>(
+            type->llvm_type ? m_slice_type : nullptr, type, is_mutable);
     }
 
     return result.get();
@@ -460,7 +462,9 @@ types::Array* Codegen::get_array_type(Type* type, std::size_t size) {
 
     if (!result) {
         result = std::make_unique<types::Array>(
-            llvm::ArrayType::get(type->llvm_type, size), type, size);
+            type->llvm_type ? llvm::ArrayType::get(type->llvm_type, size)
+                            : nullptr,
+            type, size);
     }
 
     return result.get();
@@ -473,12 +477,20 @@ types::Tuple* Codegen::get_tuple_type(const std::vector<Type*>& types) {
         std::vector<llvm::Type*> llvm_types;
         llvm_types.reserve(types.size());
 
+        bool has_nullptr = false;
+
         for (auto* element_type : types) {
+            if (!element_type->llvm_type) {
+                has_nullptr = true;
+                break;
+            }
+
             llvm_types.push_back(element_type->llvm_type);
         }
 
         result = std::make_unique<types::Tuple>(
-            llvm::StructType::create(llvm_types), types);
+            has_nullptr ? nullptr : llvm::StructType::create(llvm_types),
+            types);
     }
 
     return result.get();
@@ -491,10 +503,12 @@ types::Optional* Codegen::get_optional_type(Type* type) {
         if (is<types::Pointer>(type)) {
             result = std::make_unique<types::Optional>(type->llvm_type, type);
         } else {
-            auto* llvm_type = llvm::StructType::create(
-                {type->llvm_type, llvm::Type::getInt1Ty(m_context)});
-
-            result = std::make_unique<types::Optional>(llvm_type, type);
+            result = std::make_unique<types::Optional>(
+                type->llvm_type
+                    ? llvm::StructType::create(
+                          {type->llvm_type, llvm::Type::getInt1Ty(m_context)})
+                    : nullptr,
+                type);
         }
     }
 
@@ -505,10 +519,11 @@ types::Range* Codegen::get_range_type(Type* type) {
     auto& result = m_range_types[type];
 
     if (!result) {
-        auto* llvm_type =
-            llvm::StructType::create({type->llvm_type, type->llvm_type});
-
-        result = std::make_unique<types::Range>(llvm_type, type);
+        result = std::make_unique<types::Range>(
+            type->llvm_type
+                ? llvm::StructType::create({type->llvm_type, type->llvm_type})
+                : nullptr,
+            type);
     }
 
     return result.get();
