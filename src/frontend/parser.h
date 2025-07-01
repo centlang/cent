@@ -155,6 +155,8 @@ private:
 
     [[nodiscard]] std::vector<ast::Struct::Field> parse_fields();
 
+    [[nodiscard]] std::vector<std::unique_ptr<ast::Type>> parse_template_args();
+
     [[nodiscard]] std::vector<ast::OffsetValue<std::string>>
     parse_template_params();
 

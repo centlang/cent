@@ -10,10 +10,13 @@ namespace cent::ast {
 
 struct NamedType : detail::Type<NamedType> {
     [[nodiscard]] NamedType(
-        std::size_t offset, std::vector<OffsetValue<std::string>> value)
-    : Type{offset}, value{std::move(value)} {}
+        std::size_t offset, std::vector<OffsetValue<std::string>> value,
+        std::vector<std::unique_ptr<ast::Type>> template_args)
+    : Type{offset}, value{std::move(value)},
+      template_args{std::move(template_args)} {}
 
     std::vector<OffsetValue<std::string>> value;
+    std::vector<std::unique_ptr<ast::Type>> template_args;
 };
 
 } // namespace cent::ast

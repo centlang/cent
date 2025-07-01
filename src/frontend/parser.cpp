@@ -541,7 +541,28 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
             return std::make_unique<ast::StructLiteral>(
                 token->offset,
                 std::make_unique<ast::NamedType>(
-                    token->offset, std::move(value)),
+                    token->offset, std::move(value),
+                    std::vector<std::unique_ptr<ast::Type>>()),
+                std::move(fields));
+        }
+
+        if (!is_condition && match(LeftParen) && match(1, Less)) {
+            auto template_args = parse_template_args();
+
+            if (!expect("`{`", LeftBrace)) {
+                return nullptr;
+            }
+
+            auto fields = parse_field_values();
+
+            if (!expect("`,` or `}`", RightBrace)) {
+                return nullptr;
+            }
+
+            return std::make_unique<ast::StructLiteral>(
+                token->offset,
+                std::make_unique<ast::NamedType>(
+                    token->offset, std::move(value), std::move(template_args)),
                 std::move(fields));
         }
 
@@ -1012,7 +1033,10 @@ std::unique_ptr<ast::Type> Parser::expect_type() {
         value.push_back(ast::OffsetValue{name->value, name->offset});
     }
 
-    return std::make_unique<ast::NamedType>(offset, std::move(value));
+    auto template_args = parse_template_args();
+
+    return std::make_unique<ast::NamedType>(
+        offset, std::move(value), std::move(template_args));
 }
 
 void Parser::parse_switch(ast::BlockStmt& block) {
@@ -1176,6 +1200,48 @@ std::vector<ast::Struct::Field> Parser::parse_fields() {
         expect("`,`", Token::Type::Comma);
     }
 
+    return result;
+}
+
+std::vector<std::unique_ptr<ast::Type>> Parser::parse_template_args() {
+    std::vector<std::unique_ptr<ast::Type>> result;
+
+    if (!match(Token::Type::LeftParen) || !match(1, Token::Type::Less)) {
+        return result;
+    }
+
+    next();
+    next();
+
+    if (match_next(Token::Type::Greater)) {
+        expect("`)`", Token::Type::RightParen);
+
+        return result;
+    }
+
+    auto type = expect_type();
+
+    if (!type) {
+        return {};
+    }
+
+    result.push_back(std::move(type));
+
+    while (match_next(Token::Type::Comma)) {
+        type = expect_type();
+
+        if (!type) {
+            return {};
+        }
+
+        result.push_back(std::move(type));
+    }
+
+    if (!expect("`>`", Token::Type::Greater)) {
+        return result;
+    }
+
+    expect("`)`", Token::Type::RightParen);
     return result;
 }
 
