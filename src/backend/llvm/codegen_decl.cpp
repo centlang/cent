@@ -12,6 +12,7 @@
 #include "ast/decl/var_decl.h"
 
 #include "backend/llvm/types/alias.h"
+#include "backend/llvm/types/generic.h"
 #include "backend/llvm/types/struct.h"
 #include "backend/llvm/types/union.h"
 

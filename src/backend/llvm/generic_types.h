@@ -6,9 +6,14 @@
 #include "backend/llvm/type.h"
 
 #include "backend/llvm/types/enum.h"
-#include "backend/llvm/types/template_param.h"
 
 namespace cent::backend {
+
+namespace types {
+
+struct TemplateParam;
+
+}
 
 struct GenericStruct {
     struct Field {
