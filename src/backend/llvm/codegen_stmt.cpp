@@ -189,7 +189,7 @@ std::optional<Value> Codegen::generate(const ast::Switch& stmt) {
             union_type->llvm_type, union_type->tag_type->llvm_type,
             value->value, union_member_tag);
 
-        value = {union_type->tag_type.get(), tag_member};
+        value = {union_type->tag_type, tag_member};
     } else {
         value = load_value(*value);
     }

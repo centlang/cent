@@ -140,14 +140,13 @@ std::optional<Value> Codegen::generate(const ast::Struct& decl) {
             m_named_types.push_back(
                 std::make_unique<types::TemplateParam>(param.value));
 
-            generic_struct.params[param.value] =
-                static_cast<types::TemplateParam*>(m_named_types.back().get());
+            generic_struct.params.push_back(
+                static_cast<types::TemplateParam*>(m_named_types.back().get()));
 
-            m_current_scope->types[param.value] =
-                generic_struct.params[param.value];
+            m_current_scope->types[param.value] = generic_struct.params.back();
         }
 
-        std::vector<Type*> fields;
+        std::vector<GenericStruct::Field> fields;
         fields.reserve(decl.fields.size());
 
         for (const auto& field : decl.fields) {
@@ -157,7 +156,7 @@ std::optional<Value> Codegen::generate(const ast::Struct& decl) {
                 return std::nullopt;
             }
 
-            fields.push_back(type);
+            fields.emplace_back(field.name.value, type);
         }
 
         m_current_scope->types = current_scope_types;
@@ -225,14 +224,13 @@ std::optional<Value> Codegen::generate(const ast::Union& decl) {
             m_named_types.push_back(
                 std::make_unique<types::TemplateParam>(param.value));
 
-            generic_union.params[param.value] =
-                static_cast<types::TemplateParam*>(m_named_types.back().get());
+            generic_union.params.push_back(
+                static_cast<types::TemplateParam*>(m_named_types.back().get()));
 
-            m_current_scope->types[param.value] =
-                generic_union.params[param.value];
+            m_current_scope->types[param.value] = generic_union.params.back();
         }
 
-        std::vector<Type*> fields;
+        std::vector<GenericUnion::Field> fields;
         fields.reserve(decl.fields.size());
 
         for (const auto& field : decl.fields) {
@@ -242,13 +240,35 @@ std::optional<Value> Codegen::generate(const ast::Union& decl) {
                 return std::nullopt;
             }
 
-            fields.push_back(type);
+            fields.emplace_back(field.name.value, type);
         }
 
         m_current_scope->types = current_scope_types;
 
         generic_union.name = decl.name.value;
         generic_union.fields = std::move(fields);
+
+        if (untagged) {
+            generic_union.tag_type = nullptr;
+        } else {
+            auto* underlying = m_primitive_types["i32"].get();
+
+            m_named_types.push_back(std::make_unique<types::Enum>(
+                underlying->llvm_type,
+                m_current_scope_prefix + decl.name.value + "(tag)",
+                underlying));
+
+            auto* tag_type =
+                static_cast<types::Enum*>(m_named_types.back().get());
+
+            for (std::size_t i = 0; i < decl.fields.size(); ++i) {
+                m_current_scope->scopes[decl.name.value]
+                    .names[decl.fields[i].name.value] = {
+                    tag_type, llvm::ConstantInt::get(underlying->llvm_type, i)};
+            }
+
+            generic_union.tag_type = tag_type;
+        }
 
         return std::nullopt;
     }
@@ -297,22 +317,23 @@ std::optional<Value> Codegen::generate(const ast::Union& decl) {
     } else {
         auto* underlying = m_primitive_types["i32"].get();
 
-        auto tag_type = std::make_unique<types::Enum>(
+        m_named_types.push_back(std::make_unique<types::Enum>(
             underlying->llvm_type,
-            m_current_scope_prefix + decl.name.value + "(tag)", underlying);
+            m_current_scope_prefix + decl.name.value + "(tag)", underlying));
+
+        auto* tag_type = static_cast<types::Enum*>(m_named_types.back().get());
 
         for (std::size_t i = 0; i < decl.fields.size(); ++i) {
             m_current_scope->scopes[decl.name.value]
                 .names[decl.fields[i].name.value] = {
-                tag_type.get(),
-                llvm::ConstantInt::get(underlying->llvm_type, i)};
+                tag_type, llvm::ConstantInt::get(underlying->llvm_type, i)};
         }
 
         struct_type->setBody({max_type, underlying->llvm_type});
 
         m_named_types.push_back(std::make_unique<types::Union>(
             struct_type, m_current_scope_prefix + decl.name.value,
-            std::move(fields), std::move(tag_type)));
+            std::move(fields), tag_type));
 
         m_current_scope->types[decl.name.value] = m_named_types.back().get();
     }

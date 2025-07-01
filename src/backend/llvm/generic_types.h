@@ -1,28 +1,38 @@
 #ifndef CENT_BACKEND_GENERIC_TYPES_H
 #define CENT_BACKEND_GENERIC_TYPES_H
 
-#include <map>
-#include <memory>
 #include <string>
-#include <vector>
 
 #include "backend/llvm/type.h"
+
+#include "backend/llvm/types/enum.h"
 #include "backend/llvm/types/template_param.h"
 
 namespace cent::backend {
 
 struct GenericStruct {
-    std::string name;
-    std::vector<Type*> fields;
+    struct Field {
+        std::string name;
+        Type* type;
+    };
 
-    std::map<std::string, types::TemplateParam*> params;
+    std::string name;
+    std::vector<Field> fields;
+
+    std::vector<types::TemplateParam*> params;
 };
 
 struct GenericUnion {
-    std::string name;
-    std::vector<Type*> fields;
+    struct Field {
+        std::string name;
+        Type* type;
+    };
 
-    std::map<std::string, types::TemplateParam*> params;
+    std::string name;
+    std::vector<Field> fields;
+
+    std::vector<types::TemplateParam*> params;
+    types::Enum* tag_type;
 };
 
 } // namespace cent::backend

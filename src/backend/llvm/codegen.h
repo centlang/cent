@@ -21,7 +21,10 @@
 
 #include "backend/llvm/types/function.h"
 #include "backend/llvm/types/primitive.h"
+#include "backend/llvm/types/struct.h"
+#include "backend/llvm/types/union.h"
 
+#include "backend/llvm/generic_types.h"
 #include "backend/llvm/scope.h"
 
 namespace cent::ast {
@@ -197,6 +200,16 @@ private:
         Type* return_type, std::vector<Type*> param_types,
         std::vector<llvm::Constant*> default_args, bool variadic);
 
+    [[nodiscard]] types::Struct*
+    inst_generic_struct(GenericStruct* type, const std::vector<Type*>& types);
+
+    [[nodiscard]] types::Union*
+    inst_generic_union(GenericUnion* type, const std::vector<Type*>& types);
+
+    [[nodiscard]] Type* inst_template_param(
+        const std::vector<types::TemplateParam*>& params,
+        const std::vector<Type*>& args, Type* type);
+
     [[nodiscard]] types::Pointer* get_ptr_type(Type* type, bool is_mutable);
     [[nodiscard]] types::Slice* get_slice_type(Type* type, bool is_mutable);
     [[nodiscard]] types::Array* get_array_type(Type* type, std::size_t size);
@@ -282,6 +295,16 @@ private:
 
     std::unique_ptr<ast::Module> m_program;
     std::string m_filename;
+
+    std::map<
+        GenericStruct*,
+        std::map<std::vector<Type*>, std::unique_ptr<types::Struct>>>
+        m_generic_struct_inst;
+
+    std::map<
+        GenericUnion*,
+        std::map<std::vector<Type*>, std::unique_ptr<types::Union>>>
+        m_generic_union_inst;
 
     std::map<std::pair<Type*, bool>, std::unique_ptr<types::Pointer>>
         m_ptr_types;
