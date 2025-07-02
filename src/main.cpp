@@ -23,7 +23,7 @@
 #include "log.h"
 #include "util.h"
 
-void help() { fmt::print("Usage: centc [options] FILE...\n"); }
+void help() { fmt::print("Usage: centc [options] FILE\n"); }
 
 int main(int argc, char** argv) {
     std::span args{argv, static_cast<std::size_t>(argc)};
@@ -36,12 +36,9 @@ int main(int argc, char** argv) {
 
     std::string triple = llvm::sys::getDefaultTargetTriple();
 
-    std::vector<std::filesystem::path> source_files;
-    source_files.reserve(args.size());
-
+    std::optional<std::filesystem::path> source_file;
     std::optional<std::filesystem::path> output = std::nullopt;
 
-    bool compile_only = false;
     bool optimize = false;
     bool emit_llvm_ir = false;
     bool emit_llvm_bc = false;
@@ -61,11 +58,6 @@ int main(int argc, char** argv) {
         if (expecting_target) {
             triple = arg;
             expecting_target = false;
-            continue;
-        }
-
-        if (arg == "-c") {
-            compile_only = true;
             continue;
         }
 
@@ -94,7 +86,12 @@ int main(int argc, char** argv) {
             continue;
         }
 
-        source_files.emplace_back(arg);
+        if (source_file) {
+            cent::log::error("multiple input files provided");
+            return 1;
+        }
+
+        source_file = arg;
     }
 
     if (expecting_output) {
@@ -107,9 +104,8 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    if (output && source_files.size() > 1 &&
-        (compile_only || emit_llvm_ir || emit_llvm_bc)) {
-        cent::log::error("cannot specify `-o` with multiple output files");
+    if (!source_file) {
+        cent::log::error("no input file provided");
         return 1;
     }
 
@@ -125,108 +121,84 @@ int main(int argc, char** argv) {
 
     if (!target) {
         cent::log::error(message);
-
         return 1;
     }
 
     auto* machine = target->createTargetMachine(
         triple, "generic", "", llvm::TargetOptions{}, llvm::Reloc::PIC_);
 
-    std::vector<std::filesystem::path> object_files;
-    object_files.reserve(args.size());
+    auto code = cent::read_file(*source_file);
 
-    bool had_error = false;
-
-    for (auto& file : source_files) {
-        auto code = cent::read_file(file);
-
-        if (!code) {
-            return 1;
-        }
-
-        std::string filename = file.string();
-
-        cent::frontend::Parser parser{*code, filename};
-        auto program = parser.parse();
-
-        if (!program) {
-            return 1;
-        }
-
-        cent::backend::Codegen codegen{
-            std::move(program), filename, machine->createDataLayout(), triple};
-
-        auto module = codegen.generate();
-
-        if (!module) {
-            return 1;
-        }
-
-        if (parser.had_error() || codegen.had_error()) {
-            had_error = true;
-            continue;
-        }
-
-        if (optimize) {
-            cent::backend::optimize_module(
-                *module, llvm::OptimizationLevel::O3);
-        }
-
-        auto get_output_file = [&](std::string_view extension) {
-            if (output) {
-                return *output;
-            }
-
-            auto result = file;
-            result.replace_extension(extension);
-
-            return result;
-        };
-
-        if (emit_llvm_ir) {
-            if (!cent::backend::emit_llvm_ir(*module, get_output_file(".ll"))) {
-                return 1;
-            }
-
-            continue;
-        }
-
-        if (emit_llvm_bc) {
-            if (!cent::backend::emit_llvm_bc(*module, get_output_file(".bc"))) {
-                return 1;
-            }
-
-            continue;
-        }
-
-        std::filesystem::path object_file =
-            compile_only ? get_output_file(".o") : std::tmpnam(nullptr);
-
-        if (!cent::backend::emit_obj(*module, *machine, object_file)) {
-            return 1;
-        }
-
-        object_files.push_back(object_file);
-    }
-
-    if (had_error) {
+    if (!code) {
         return 1;
     }
 
-    if (!compile_only && !emit_llvm_ir && !emit_llvm_bc) {
-        std::vector<std::string> args = {
-            "-o", output ? output->string() : "main"};
+    std::string filename = source_file->string();
 
-        for (auto& file : object_files) {
-            args.push_back(file);
+    cent::frontend::Parser parser{*code, filename};
+    auto program = parser.parse();
+
+    if (!program) {
+        return 1;
+    }
+
+    cent::backend::Codegen codegen{
+        std::move(program), filename, machine->createDataLayout(), triple};
+
+    auto module = codegen.generate();
+
+    if (!module) {
+        return 1;
+    }
+
+    if (parser.had_error() || codegen.had_error()) {
+        return 1;
+    }
+
+    if (optimize) {
+        cent::backend::optimize_module(*module, llvm::OptimizationLevel::O3);
+    }
+
+    auto get_output_file = [&](std::string_view extension) {
+        if (output) {
+            return *output;
         }
+
+        auto result = *source_file;
+        result.replace_extension(extension);
+
+        return result;
+    };
+
+    if (emit_llvm_ir) {
+        if (!cent::backend::emit_llvm_ir(*module, get_output_file(".ll"))) {
+            return 1;
+        }
+
+        return 0;
+    }
+
+    if (emit_llvm_bc) {
+        if (!cent::backend::emit_llvm_bc(*module, get_output_file(".bc"))) {
+            return 1;
+        }
+
+        return 0;
+    }
+
+    std::filesystem::path object_file = std::tmpnam(nullptr);
+
+    if (!cent::backend::emit_obj(*module, *machine, object_file)) {
+        return 1;
+    }
+
+    if (!emit_llvm_ir && !emit_llvm_bc) {
+        std::vector<std::string> args = {
+            "-o", get_output_file(""), object_file};
 
         int exit_code = cent::exec_command("gcc", args);
 
-        for (auto& file : object_files) {
-            std::filesystem::remove(file);
-        }
-
+        std::filesystem::remove(object_file);
         return exit_code;
     }
 

@@ -157,7 +157,7 @@ public:
     std::optional<Value> generate(const ast::VarDecl& decl);
 
 private:
-    void generate(const ast::Module& module, bool is_submodule = false);
+    void generate(const ast::Module& module);
 
     [[nodiscard]] std::optional<Value>
     cast(Type* type, const Value& value, bool implicit = true);

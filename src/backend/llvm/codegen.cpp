@@ -58,7 +58,7 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
     return std::move(m_module);
 }
 
-void Codegen::generate(const ast::Module& module, bool is_submodule) {
+void Codegen::generate(const ast::Module& module) {
     const auto iterator = m_generated_modules.find(module.path);
 
     if (iterator != m_generated_modules.end()) {
@@ -75,7 +75,7 @@ void Codegen::generate(const ast::Module& module, bool is_submodule) {
         m_current_scope = &scope->scopes[*submodule->name];
         m_current_scope_prefix += *submodule->name + "::";
 
-        generate(*submodule, true);
+        generate(*submodule);
     }
 
     m_filename = filename;
@@ -83,63 +83,35 @@ void Codegen::generate(const ast::Module& module, bool is_submodule) {
     m_current_scope_prefix = scope_prefix;
 
     for (const auto& enum_decl : module.enums) {
-        if (is_submodule && !enum_decl->is_public) {
-            continue;
-        }
-
         generate_enum(*enum_decl);
     }
 
     for (const auto& enum_decl : module.enums) {
-        if (is_submodule && !enum_decl->is_public) {
-            continue;
-        }
-
         enum_decl->codegen(*this);
     }
 
     for (const auto& type : module.aliases) {
-        if (is_submodule && !type->is_public) {
-            continue;
-        }
-
         type->codegen(*this);
     }
 
     for (const auto& struct_decl : module.structs) {
-        if (is_submodule && !struct_decl->is_public) {
-            continue;
-        }
-
         struct_decl->codegen(*this);
     }
 
     for (const auto& union_decl : module.unions) {
-        if (is_submodule && !union_decl->is_public) {
-            continue;
-        }
-
         union_decl->codegen(*this);
     }
 
     for (const auto& variable : module.variables) {
-        if (is_submodule && !variable->is_public) {
-            continue;
-        }
-
         variable->codegen(*this);
     }
 
     for (const auto& function : module.functions) {
-        if (is_submodule && !function->is_public) {
-            continue;
-        }
-
         generate_fn_proto(*function);
     }
 
     for (const auto& function : module.functions) {
-        if (function->block && !is_submodule) {
+        if (function->block) {
             function->codegen(*this);
         }
     }
