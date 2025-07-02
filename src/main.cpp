@@ -86,6 +86,13 @@ int main(int argc, char** argv) {
             continue;
         }
 
+        if (arg.starts_with('-')) {
+            cent::log::error(
+                fmt::format("unrecognized option: {}", cent::log::quoted(arg)));
+
+            return 1;
+        }
+
         if (source_file) {
             cent::log::error("multiple input files provided");
             return 1;
