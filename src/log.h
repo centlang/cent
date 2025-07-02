@@ -188,9 +188,10 @@ log(std::string_view type, Color type_fg, std::uint32_t line,
         bold(fg(fmt::format("{}:", type), type_fg)), message);
 
     fmt::print(stderr, " {} | {}\n", line, code);
+
     fmt::print(
-        stderr, " {:{}} |{:{}}^\n", "", fmt::formatted_size("{}", line), "",
-        column);
+        stderr, " {:{}} |{:{}}{}\n", "", fmt::formatted_size("{}", line), "",
+        column, fg("^", Green));
 }
 
 inline void
