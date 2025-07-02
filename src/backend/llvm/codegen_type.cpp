@@ -11,7 +11,6 @@
 #include "ast/type/named_type.h"
 #include "ast/type/optional.h"
 #include "ast/type/pointer.h"
-#include "ast/type/range_type.h"
 #include "ast/type/slice_type.h"
 #include "ast/type/tuple_type.h"
 
@@ -203,16 +202,6 @@ Type* Codegen::generate(const ast::TupleType& type) {
     }
 
     return get_tuple_type(types);
-}
-
-Type* Codegen::generate(const ast::RangeType& type) {
-    auto* contained = type.type->codegen(*this);
-
-    if (!contained) {
-        return nullptr;
-    }
-
-    return get_range_type(contained);
 }
 
 Type* Codegen::generate(const ast::FnPointer& type) {

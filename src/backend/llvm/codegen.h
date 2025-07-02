@@ -35,7 +35,6 @@ struct Optional;
 struct ArrayType;
 struct SliceType;
 struct TupleType;
-struct RangeType;
 struct FnPointer;
 
 struct Module;
@@ -115,7 +114,6 @@ public:
     [[nodiscard]] Type* generate(const ast::ArrayType& type);
     [[nodiscard]] Type* generate(const ast::SliceType& type);
     [[nodiscard]] Type* generate(const ast::TupleType& type);
-    [[nodiscard]] Type* generate(const ast::RangeType& type);
     [[nodiscard]] Type* generate(const ast::FnPointer& type);
 
     std::optional<Value> generate(const ast::Assignment& stmt);
