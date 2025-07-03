@@ -1359,7 +1359,7 @@ std::optional<Value> Codegen::generate_bin_expr(
         value_y = cast(rhs_base_type, lhs_value);
 
         if (!value_y) {
-            type_mismatch(lhs.offset, lhs_value.type, rhs_value.type);
+            type_mismatch(rhs.offset, lhs_value.type, rhs_value.type);
 
             return std::nullopt;
         }
