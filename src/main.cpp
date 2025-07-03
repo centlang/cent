@@ -39,15 +39,23 @@ int main(int argc, char** argv) {
     std::optional<std::filesystem::path> source_file;
     std::optional<std::filesystem::path> output = std::nullopt;
 
+    std::vector<std::string> gcc_args;
+
     bool optimize = false;
     bool emit_llvm_ir = false;
     bool emit_llvm_bc = false;
 
     bool expecting_output = false;
     bool expecting_target = false;
+    bool parsing_gcc_args = false;
 
     for (const char* arg_cstr : args.subspan(1)) {
         std::string arg = arg_cstr;
+
+        if (parsing_gcc_args) {
+            gcc_args.push_back(arg);
+            continue;
+        }
 
         if (expecting_output) {
             output = arg;
@@ -83,6 +91,11 @@ int main(int argc, char** argv) {
 
         if (arg == "--target") {
             expecting_target = true;
+            continue;
+        }
+
+        if (arg == "--") {
+            parsing_gcc_args = true;
             continue;
         }
 
@@ -202,6 +215,8 @@ int main(int argc, char** argv) {
     if (!emit_llvm_ir && !emit_llvm_bc) {
         std::vector<std::string> args = {
             "-o", get_output_file(""), object_file};
+
+        args.insert(args.end(), gcc_args.begin(), gcc_args.end());
 
         int exit_code = cent::exec_command("gcc", args);
 
