@@ -618,7 +618,8 @@ std::optional<Value> Codegen::generate(const ast::ArrayLiteral& expr) {
             return std::nullopt;
         }
 
-        if (!llvm::isa<llvm::Constant>(value->value)) {
+        if (!llvm::isa<llvm::Constant>(value->value) ||
+            array_type != value->type) {
             is_const = false;
         }
 
