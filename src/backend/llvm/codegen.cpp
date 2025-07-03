@@ -234,16 +234,49 @@ Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
         return std::nullopt;
     }
 
-    auto layout = m_module->getDataLayout();
-
-    std::size_t from_size = layout.getTypeAllocSize(base_value_type->llvm_type);
-    std::size_t to_size = layout.getTypeAllocSize(base_type->llvm_type);
-
     bool type_is_float = is_float(base_type);
     bool type_is_sint = is_sint(base_type);
     bool type_is_uint = is_uint(base_type);
     bool type_is_ptr = is<types::Pointer>(base_type);
     bool type_is_enum = is<types::Enum>(base_type);
+
+    if (auto* constant = llvm::dyn_cast<llvm::ConstantInt>(value.value)) {
+        if (type_is_sint || type_is_uint) {
+            auto size_bits = base_type->llvm_type->getIntegerBitWidth();
+
+            const auto& val = constant->getValue();
+
+            bool non_lossy = [&] {
+                if (value_is_uint && type_is_uint && val.isIntN(size_bits)) {
+                    return true;
+                }
+
+                if (value_is_sint && type_is_sint &&
+                    val.isSignedIntN(size_bits)) {
+                    return true;
+                }
+
+                if (value_is_sint && type_is_uint && val.isNonNegative() &&
+                    val.isIntN(size_bits)) {
+                    return true;
+                }
+
+                return value_is_uint && type_is_sint &&
+                       val.isSignedIntN(size_bits);
+            }();
+
+            if (non_lossy) {
+                return Value{
+                    type, llvm::ConstantInt::get(
+                              base_type->llvm_type, val.getZExtValue())};
+            }
+        }
+    }
+
+    auto layout = m_module->getDataLayout();
+
+    std::size_t from_size = layout.getTypeAllocSize(base_value_type->llvm_type);
+    std::size_t to_size = layout.getTypeAllocSize(base_type->llvm_type);
 
     llvm::Instruction::CastOps cast_op = CastOpsEnd;
 
