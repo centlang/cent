@@ -9,16 +9,15 @@
 
 namespace cent::backend::types {
 
-struct Struct : detail::Type<Struct, Type::Kind::Struct> {
+struct Struct : detail::Ty<Struct, Type::Kind::Struct> {
     [[nodiscard]] Struct(
-        llvm::Type* llvm_type, std::string name,
-        std::vector<backend::Type*> fields)
-    : Type{llvm_type}, name{std::move(name)}, fields{std::move(fields)} {}
+        llvm::Type* llvm_type, std::string name, std::vector<Type*> fields)
+    : Ty{llvm_type}, name{std::move(name)}, fields{std::move(fields)} {}
 
     [[nodiscard]] std::string to_string() const override { return name; }
 
     std::string name;
-    std::vector<backend::Type*> fields;
+    std::vector<Type*> fields;
 };
 
 } // namespace cent::backend::types

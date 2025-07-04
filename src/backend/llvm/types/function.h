@@ -10,12 +10,12 @@
 
 namespace cent::backend::types {
 
-struct Function : detail::Type<Function, Type::Kind::Function> {
+struct Function : detail::Ty<Function, Type::Kind::Function> {
     [[nodiscard]] Function(
-        llvm::Type* llvm_type, backend::Type* return_type,
-        std::vector<backend::Type*> param_types,
+        llvm::Type* llvm_type, Type* return_type,
+        std::vector<Type*> param_types,
         std::vector<llvm::Constant*> default_args, bool variadic)
-    : Type{llvm_type}, return_type{return_type},
+    : Ty{llvm_type}, return_type{return_type},
       param_types{std::move(param_types)},
       default_args{std::move(default_args)}, variadic{variadic} {}
 
@@ -33,8 +33,8 @@ struct Function : detail::Type<Function, Type::Kind::Function> {
         return result + ") " + return_type->to_string();
     }
 
-    backend::Type* return_type;
-    std::vector<backend::Type*> param_types;
+    Type* return_type;
+    std::vector<Type*> param_types;
 
     std::vector<llvm::Constant*> default_args;
     bool variadic;

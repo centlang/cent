@@ -92,12 +92,10 @@ template <typename Derived>
 
 namespace detail {
 
-template <typename Derived, Type::Kind DerivedKind>
-struct Type : backend::Type {
-    [[nodiscard]] Type(llvm::Type* llvm_type)
-    : backend::Type{DerivedKind, llvm_type} {};
+template <typename Derived, Type::Kind DerivedKind> struct Ty : Type {
+    [[nodiscard]] Ty(llvm::Type* llvm_type) : Type{DerivedKind, llvm_type} {};
 
-    [[nodiscard]] static bool class_of(const backend::Type* type) {
+    [[nodiscard]] static bool class_of(const Type* type) {
         return type->kind == DerivedKind;
     }
 };

@@ -10,17 +10,17 @@
 
 namespace cent::backend::types {
 
-struct Union : detail::Type<Union, Type::Kind::Union> {
+struct Union : detail::Ty<Union, Type::Kind::Union> {
     [[nodiscard]] Union(
-        llvm::Type* llvm_type, std::string name,
-        std::vector<backend::Type*> fields, Enum* tag_type = nullptr)
-    : Type{llvm_type}, name{std::move(name)}, fields{std::move(fields)},
+        llvm::Type* llvm_type, std::string name, std::vector<Type*> fields,
+        Enum* tag_type = nullptr)
+    : Ty{llvm_type}, name{std::move(name)}, fields{std::move(fields)},
       tag_type{tag_type} {}
 
     [[nodiscard]] std::string to_string() const override { return name; }
 
     std::string name;
-    std::vector<backend::Type*> fields;
+    std::vector<Type*> fields;
 
     Enum* tag_type;
 };
