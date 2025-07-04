@@ -257,6 +257,8 @@ private:
     std::string_view m_source;
     std::string m_filename;
 
+    std::map<std::filesystem::path, bool> m_submodules_visiting;
+
     bool m_had_error{false};
 };
 

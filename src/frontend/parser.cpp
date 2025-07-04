@@ -45,6 +45,8 @@ std::unique_ptr<ast::Module> Parser::parse() {
 
     auto result = std::make_unique<ast::Module>(m_filename);
 
+    m_submodules_visiting[m_filename] = true;
+
     auto handle_type = [&](std::vector<ast::Attribute> attrs, bool is_public) {
         if (match(1, Equal)) {
             auto type = parse_type_alias(std::move(attrs), is_public);
@@ -1515,6 +1517,15 @@ Parser::parse_enum(std::vector<ast::Attribute> attrs, bool is_public) {
 
 std::unique_ptr<ast::Module> Parser::parse_submodule(
     const std::filesystem::path& path, std::string_view name) {
+    auto& submodule_visiting = m_submodules_visiting[path];
+
+    if (submodule_visiting) {
+        error("recursive import");
+        return nullptr;
+    }
+
+    submodule_visiting = true;
+
     auto code = cent::read_file(path);
 
     if (!code) {
@@ -1522,11 +1533,15 @@ std::unique_ptr<ast::Module> Parser::parse_submodule(
     }
 
     Parser parser{*code, path.string()};
+    parser.m_submodules_visiting = m_submodules_visiting;
+
     auto submodule = parser.parse();
 
     if (!submodule) {
         return nullptr;
     }
+
+    submodule_visiting = false;
 
     submodule->name = name;
     return submodule;
