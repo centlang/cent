@@ -148,7 +148,7 @@ Codegen::cast(Type* type, const Value& value, bool implicit) {
             return Value{
                 type, is<types::Null>(base_value_type)
                           ? llvm::Constant::getNullValue(base_type->llvm_type)
-                          : value.value};
+                          : load_value(value).value};
         }
 
         if (auto* val = llvm::dyn_cast<llvm::Constant>(value.value)) {
@@ -384,7 +384,7 @@ bool Codegen::cast_to_result(Type* type, const Value& value, bool implicit) {
             m_builder.CreateStore(
                 is<types::Null>(base_value_type)
                     ? llvm::Constant::getNullValue(base_type->llvm_type)
-                    : value.value,
+                    : load_value(value).value,
                 m_current_result);
 
             return true;
