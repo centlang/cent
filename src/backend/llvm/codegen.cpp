@@ -275,8 +275,8 @@ Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
 
     auto layout = m_module->getDataLayout();
 
-    std::size_t from_size = layout.getTypeAllocSize(base_value_type->llvm_type);
-    std::size_t to_size = layout.getTypeAllocSize(base_type->llvm_type);
+    auto from_size = layout.getTypeAllocSize(base_value_type->llvm_type);
+    auto to_size = layout.getTypeAllocSize(base_type->llvm_type);
 
     llvm::Instruction::CastOps cast_op = CastOpsEnd;
 
