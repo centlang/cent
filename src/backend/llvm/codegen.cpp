@@ -568,7 +568,7 @@ Codegen::get_name(std::size_t offset, std::string_view name, Scope& parent) {
         return nullptr;
     }
 
-    return &iterator->second;
+    return iterator->second.is_poisoned() ? nullptr : &iterator->second;
 }
 
 Scope*

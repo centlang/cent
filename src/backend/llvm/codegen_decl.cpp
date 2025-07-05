@@ -420,6 +420,9 @@ std::optional<Value> Codegen::generate(const ast::TypeAlias& decl) {
 }
 
 std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
+    auto& result = m_current_scope->names[decl.name.value];
+    result = Value::poisoned();
+
     if (decl.mutability == ast::VarDecl::Mut::Const) {
         if (!decl.value) {
             error(decl.name.offset, "constant has no value");
@@ -453,7 +456,7 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
             return std::nullopt;
         }
 
-        m_current_scope->names[decl.name.value] = *value;
+        result = *value;
         return std::nullopt;
     }
 
@@ -515,7 +518,7 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
             }
 
             if (is<types::Undefined>(value->type)) {
-                m_current_scope->names[decl.name.value] = {
+                result = {
                     type, create_alloca(llvm_type),
                     decl.mutability == ast::VarDecl::Mut::Mut};
 
@@ -527,7 +530,7 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
             if (!cast_to_result(type, *value)) {
                 type_mismatch(decl.value->offset, type, value->type);
             } else {
-                m_current_scope->names[decl.name.value] = {
+                result = {
                     type, m_current_result,
                     decl.mutability == ast::VarDecl::Mut::Mut};
             }
@@ -540,7 +543,7 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
 
     if (value) {
         if (value->stack_allocated) {
-            m_current_scope->names[decl.name.value] = {
+            result = {
                 type, value->value, decl.mutability == ast::VarDecl::Mut::Mut};
 
             return std::nullopt;
@@ -557,7 +560,7 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
             m_builder.CreateStore(load_value(*value).value, m_current_result);
         }
 
-        m_current_scope->names[decl.name.value] = {
+        result = {
             type, m_current_result, decl.mutability == ast::VarDecl::Mut::Mut};
     } else {
         if (m_current_function) {
@@ -566,7 +569,7 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
             m_builder.CreateStore(
                 llvm::Constant::getNullValue(llvm_type), m_current_result);
 
-            m_current_scope->names[decl.name.value] = {
+            result = {
                 type, m_current_result,
                 decl.mutability == ast::VarDecl::Mut::Mut};
         } else {
@@ -579,8 +582,7 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
 
             m_current_result = global;
 
-            m_current_scope->names[decl.name.value] = {
-                type, m_current_result, true};
+            result = {type, m_current_result, true};
         }
     }
 

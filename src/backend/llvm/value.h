@@ -15,6 +15,10 @@ struct Value {
     bool is_ref = false;
     bool is_deref = false;
     bool stack_allocated = false;
+
+    [[nodiscard]] bool is_poisoned() const { return !type; }
+
+    [[nodiscard]] static Value poisoned() { return {.type = nullptr}; }
 };
 
 } // namespace cent::backend
