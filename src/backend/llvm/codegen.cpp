@@ -73,7 +73,7 @@ void Codegen::generate(const ast::Module& module) {
     for (const auto& submodule : module.submodules) {
         m_filename = submodule->path.string();
         m_current_scope = &scope->scopes[*submodule->name];
-        m_current_scope_prefix += *submodule->name + "::";
+        m_current_scope_prefix = *submodule->name + "::";
 
         generate(*submodule);
     }
