@@ -230,6 +230,10 @@ private:
         log::error(loc.line, loc.column, m_filename, message, loc.code);
 
         m_had_error = true;
+
+        if (m_current_function) {
+            m_current_fn_had_error = true;
+        }
     }
 
     [[nodiscard]] Attributes parse_attrs(
@@ -266,6 +270,7 @@ private:
     Scope* m_current_scope{&m_scope};
     types::Function* m_current_function{nullptr};
     llvm::Value* m_current_result{nullptr};
+    bool m_current_fn_had_error{false};
 
     llvm::BasicBlock* m_loop_body{nullptr};
     llvm::BasicBlock* m_loop_end{nullptr};

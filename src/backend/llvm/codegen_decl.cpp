@@ -80,6 +80,7 @@ std::optional<Value> Codegen::generate(const ast::FnDecl& decl) {
     auto* insert_point = m_builder.GetInsertBlock();
     m_builder.SetInsertPoint(entry);
 
+    auto* current_function = m_current_function;
     m_current_function = static_cast<types::Function*>(function_type);
 
     for (std::size_t i = 0; i < decl.proto.params.size(); ++i) {
@@ -96,26 +97,22 @@ std::optional<Value> Codegen::generate(const ast::FnDecl& decl) {
 
     decl.block->codegen(*this);
 
+    m_current_function = current_function;
+
     if (m_builder.GetInsertBlock()->getTerminator()) {
         m_builder.SetInsertPoint(insert_point);
-        m_current_function = nullptr;
-
         return std::nullopt;
     }
 
-    if (!function->getReturnType()->isVoidTy()) {
+    if (!m_current_fn_had_error && !function->getReturnType()->isVoidTy()) {
         error(decl.name.offset, "non-void function does not return a value");
-
         m_builder.SetInsertPoint(insert_point);
-        m_current_function = nullptr;
 
         return std::nullopt;
     }
 
     m_builder.CreateRetVoid();
-
     m_builder.SetInsertPoint(insert_point);
-    m_current_function = nullptr;
 
     return std::nullopt;
 }
