@@ -1283,10 +1283,6 @@ std::optional<Value> Codegen::generate(const ast::AsExpr& expr) {
         return std::nullopt;
     }
 
-    if (is<types::Pointer>(value->type) && is<types::Pointer>(type)) {
-        return Value{type, value->value};
-    }
-
     if (auto val = cast(type, *value, false)) {
         return val;
     }
