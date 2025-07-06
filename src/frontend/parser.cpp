@@ -1629,11 +1629,9 @@ bool Parser::parse_with(ast::Module& module) {
     }
 
     for (const auto& module_path : module_paths) {
-        auto name = module_path.stem().string();
-
         auto submodule = std::filesystem::is_directory(module_path)
-                             ? parse_submodule_dir(module_path, name)
-                             : parse_submodule(module_path, name);
+                             ? parse_submodule_dir(module_path, module_name)
+                             : parse_submodule(module_path, module_name);
 
         if (!submodule) {
             return false;
