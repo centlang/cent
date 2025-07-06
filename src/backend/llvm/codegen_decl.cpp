@@ -37,19 +37,19 @@ std::optional<Value> Codegen::generate(const ast::FnDecl& decl) {
 
     auto get_fn_type = [&]() -> Type* {
         if (!decl.type) {
-            auto iterator = m_scope.names.find(decl.name.value);
+            auto iterator = m_current_scope->names.find(decl.name.value);
 
-            if (iterator != m_scope.names.end()) {
+            if (iterator != m_current_scope->names.end()) {
                 return iterator->second.type;
             }
 
             return nullptr;
         }
 
-        auto iterator =
-            m_scope.scopes[decl.type->value].names.find(decl.name.value);
+        auto iterator = m_current_scope->scopes[decl.type->value].names.find(
+            decl.name.value);
 
-        if (iterator != m_scope.scopes[decl.type->value].names.end()) {
+        if (iterator != m_current_scope->scopes[decl.type->value].names.end()) {
             return iterator->second.type;
         }
 
@@ -59,11 +59,13 @@ std::optional<Value> Codegen::generate(const ast::FnDecl& decl) {
     auto get_llvm_fn = [&]() {
         if (!decl.type) {
             return static_cast<llvm::Function*>(
-                m_scope.names[decl.name.value].value);
+                m_current_scope->names[decl.name.value].value);
         }
 
         return static_cast<llvm::Function*>(
-            m_scope.scopes[decl.type->value].names[decl.name.value].value);
+            m_current_scope->scopes[decl.type->value]
+                .names[decl.name.value]
+                .value);
     };
 
     auto* function_type = get_fn_type();
@@ -91,7 +93,7 @@ std::optional<Value> Codegen::generate(const ast::FnDecl& decl) {
 
         m_builder.CreateStore(value, variable);
 
-        m_scope.names[param.name.value] = {
+        m_current_scope->names[param.name.value] = {
             m_current_function->param_types[i], variable, param.is_mutable};
     }
 

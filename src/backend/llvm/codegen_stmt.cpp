@@ -99,13 +99,13 @@ Codegen::generate([[maybe_unused]] const ast::Assignment& stmt) {
 }
 
 std::optional<Value> Codegen::generate(const ast::BlockStmt& stmt) {
-    auto scope = m_scope;
+    auto current_scope = *m_current_scope;
 
     for (const auto& statement : stmt.body) {
         statement->codegen(*this);
     }
 
-    m_scope = std::move(scope);
+    *m_current_scope = std::move(current_scope);
 
     return std::nullopt;
 }
