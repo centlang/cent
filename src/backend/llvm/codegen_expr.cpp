@@ -987,13 +987,6 @@ std::optional<Value> Codegen::generate(const ast::MemberExpr& expr) {
     };
 
     if (auto* slice = dyn_cast<types::Slice>(parent->type)) {
-        if (expr.member.value == "ptr") {
-            return Value{
-                get_ptr_type(slice->type, slice->is_mutable),
-                m_builder.CreateStructGEP(
-                    m_slice_type, parent->value, slice_member_ptr)};
-        }
-
         if (expr.member.value == "len") {
             return Value{
                 m_primitive_types["usize"].get(),
