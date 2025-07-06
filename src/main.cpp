@@ -23,7 +23,17 @@
 #include "log.h"
 #include "util.h"
 
-void help() { fmt::print("Usage: centc [options] FILE\n"); }
+void help() {
+    fmt::print(R"(USAGE: centc [options] file... [-- linker_options]
+
+OPTIONS:
+  -O                    Enable optimizations
+  -o <file>             Place the output into <file>
+  --emit-llvm-ir        Produce LLVM IR
+  --emit-llvm-bc        Produce LLVM bitcode
+  --target <triple>     Specify the target triple
+)");
+}
 
 int main(int argc, char** argv) {
     std::span args{argv, static_cast<std::size_t>(argc)};
