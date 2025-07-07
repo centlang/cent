@@ -146,9 +146,11 @@ Codegen::cast(Type* type, const Value& value, bool implicit) {
 
         if (is<types::Pointer>(base_contained_type)) {
             return Value{
-                type, is<types::Null>(base_value_type)
-                          ? llvm::Constant::getNullValue(base_type->llvm_type)
-                          : load_value(value).value};
+                type,
+                is<types::Null>(base_value_type)
+                    ? llvm::Constant::getNullValue(base_type->llvm_type)
+                    : value.value,
+                false, value.is_ref};
         }
 
         if (auto* val = llvm::dyn_cast<llvm::Constant>(value.value)) {
