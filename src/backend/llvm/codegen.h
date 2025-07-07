@@ -168,6 +168,10 @@ private:
     [[nodiscard]] bool
     cast_to_result(Type* type, const Value& value, bool implicit = true);
 
+    [[nodiscard]] std::optional<Value> generate_bin_logical_expr(
+        const ast::Expression& lhs, const ast::Expression& rhs,
+        ast::OffsetValue<frontend::Token::Type> oper);
+
     [[nodiscard]] std::optional<Value> generate_bin_expr(
         ast::OffsetValue<const Value&> lhs, ast::OffsetValue<const Value&> rhs,
         ast::OffsetValue<frontend::Token::Type> oper);

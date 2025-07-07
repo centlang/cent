@@ -29,18 +29,7 @@
 namespace cent::backend {
 
 std::optional<Value> Codegen::generate(const ast::BinaryExpr& expr) {
-    using enum frontend::Token::Type;
-
-    auto lhs = expr.lhs->codegen(*this);
-    auto rhs = expr.rhs->codegen(*this);
-
-    if (!lhs || !rhs) {
-        return std::nullopt;
-    }
-
-    return generate_bin_expr(
-        ast::OffsetValue<const Value&>{*lhs, expr.lhs->offset},
-        ast::OffsetValue<const Value&>{*rhs, expr.rhs->offset}, expr.oper);
+    return generate_bin_logical_expr(*expr.lhs, *expr.rhs, expr.oper);
 }
 
 std::optional<Value> Codegen::generate(const ast::UnaryExpr& expr) {
@@ -1285,6 +1274,74 @@ std::optional<Value> Codegen::generate(const ast::AsExpr& expr) {
     return std::nullopt;
 }
 
+std::optional<Value> Codegen::generate_bin_logical_expr(
+    const ast::Expression& lhs, const ast::Expression& rhs,
+    ast::OffsetValue<frontend::Token::Type> oper) {
+    using enum frontend::Token::Type;
+
+    auto lhs_value = lhs.codegen(*this);
+
+    if (!lhs_value) {
+        return std::nullopt;
+    }
+
+    auto* lhs_base_type = unwrap_type(lhs_value->type);
+
+    if (oper.value == AndAnd || oper.value == OrOr) {
+        if (!is<types::Bool>(lhs_base_type)) {
+            error(lhs.offset, "type mismatch");
+
+            return std::nullopt;
+        }
+
+        auto* root = m_builder.GetInsertBlock();
+        auto* function = root->getParent();
+
+        auto* next = llvm::BasicBlock::Create(m_context, "", function);
+        auto* end = llvm::BasicBlock::Create(m_context, "", function);
+
+        if (oper.value == AndAnd) {
+            m_builder.CreateCondBr(load_value(*lhs_value).value, next, end);
+        } else {
+            m_builder.CreateCondBr(load_value(*lhs_value).value, end, next);
+        }
+
+        m_builder.SetInsertPoint(next);
+
+        auto rhs_value = rhs.codegen(*this);
+
+        if (!rhs_value) {
+            return std::nullopt;
+        }
+
+        auto value_y = cast(lhs_base_type, load_value(*rhs_value));
+        m_builder.CreateBr(end);
+
+        m_builder.SetInsertPoint(end);
+
+        auto* phi = m_builder.CreatePHI(lhs_base_type->llvm_type, 2);
+
+        phi->addIncoming(
+            llvm::ConstantInt::get(
+                lhs_base_type->llvm_type, oper.value == OrOr),
+            root);
+
+        phi->addIncoming(value_y->value, next);
+
+        return Value{lhs_base_type, phi};
+    }
+
+    auto rhs_value = rhs.codegen(*this);
+
+    if (!rhs_value) {
+        return std::nullopt;
+    }
+
+    return generate_bin_expr(
+        ast::OffsetValue<const Value&>{*lhs_value, lhs.offset},
+        ast::OffsetValue<const Value&>{*rhs_value, rhs.offset}, oper);
+}
+
 std::optional<Value> Codegen::generate_bin_expr(
     ast::OffsetValue<const Value&> lhs, ast::OffsetValue<const Value&> rhs,
     ast::OffsetValue<frontend::Token::Type> oper) {
@@ -1388,15 +1445,6 @@ std::optional<Value> Codegen::generate_bin_expr(
         }
 
         break;
-    case AndAnd:
-    case OrOr:
-        if (!is<types::Bool>(value_base_type)) {
-            error(lhs.offset, "type mismatch");
-
-            return std::nullopt;
-        }
-
-        break;
     default:
         break;
     };
@@ -1447,14 +1495,6 @@ std::optional<Value> Codegen::generate_bin_expr(
     case Xor:
         return Value{
             value_type, m_builder.CreateXor(value_x.value, value_y->value)};
-    case AndAnd:
-        return Value{
-            m_primitive_types["bool"].get(),
-            m_builder.CreateLogicalAnd(value_x.value, value_y->value)};
-    case OrOr:
-        return Value{
-            m_primitive_types["bool"].get(),
-            m_builder.CreateLogicalOr(value_x.value, value_y->value)};
     case Less:
         if (is_float(value_base_type)) {
             return Value{
