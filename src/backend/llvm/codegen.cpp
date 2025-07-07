@@ -289,12 +289,10 @@ Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
             } else if (!implicit) {
                 cast_op = FPTrunc;
             }
-        } else if (!implicit) {
-            if (type_is_sint) {
-                cast_op = FPToSI;
-            } else if (type_is_uint) {
-                cast_op = FPToUI;
-            }
+        } else if (!implicit && type_is_sint) {
+            cast_op = FPToSI;
+        } else if (!implicit && type_is_uint) {
+            cast_op = FPToUI;
         }
     } else if (
         value_is_sint ||
@@ -302,11 +300,26 @@ Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
          is_sint(static_cast<types::Enum*>(base_value_type)->type))) {
         if (type_is_float) {
             cast_op = SIToFP;
-        } else if (type_is_sint || type_is_uint || type_is_enum) {
+        } else if (
+            type_is_sint ||
+            (!implicit && type_is_enum &&
+             is_sint(static_cast<types::Enum*>(base_type)->type))) {
             if (to_size > from_size) {
                 cast_op = SExt;
             } else if (!implicit) {
                 cast_op = Trunc;
+            }
+        } else if (
+            !implicit &&
+            (type_is_uint ||
+             (type_is_enum &&
+              is_uint(static_cast<types::Enum*>(base_type)->type)))) {
+            if (to_size > from_size) {
+                cast_op = SExt;
+            } else if (to_size < from_size) {
+                cast_op = Trunc;
+            } else {
+                return Value{type, load_value(value).value};
             }
         } else if (!implicit && type_is_ptr) {
             cast_op = IntToPtr;
@@ -317,11 +330,27 @@ Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
          is_uint(static_cast<types::Enum*>(base_value_type)->type))) {
         if (type_is_float) {
             cast_op = UIToFP;
-        } else if (type_is_sint || type_is_uint || type_is_enum) {
+        } else if (
+            type_is_uint ||
+            (!implicit && type_is_enum &&
+             is_uint(static_cast<types::Enum*>(base_type)->type))) {
             if (to_size > from_size) {
                 cast_op = ZExt;
             } else if (!implicit) {
                 cast_op = Trunc;
+            }
+        } else if (
+            type_is_sint ||
+            (type_is_enum &&
+             is_sint(static_cast<types::Enum*>(base_type)->type))) {
+            if (to_size > from_size) {
+                cast_op = ZExt;
+            } else if (!implicit) {
+                if (to_size < from_size) {
+                    cast_op = Trunc;
+                } else {
+                    return Value{type, load_value(value).value};
+                }
             }
         } else if (!implicit && type_is_ptr) {
             cast_op = IntToPtr;
