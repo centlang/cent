@@ -32,6 +32,7 @@ OPTIONS:
   --emit-llvm-ir        Produce LLVM IR
   --emit-llvm-bc        Produce LLVM bitcode
   --target <triple>     Specify the target triple
+  --help                Print this help message and exit
 )");
 }
 
@@ -40,7 +41,6 @@ int main(int argc, char** argv) {
 
     if (args.size() < 2) {
         help();
-
         return 0;
     }
 
@@ -77,6 +77,11 @@ int main(int argc, char** argv) {
             triple = arg;
             expecting_target = false;
             continue;
+        }
+
+        if (arg == "--help") {
+            help();
+            return 0;
         }
 
         if (arg == "-O") {
