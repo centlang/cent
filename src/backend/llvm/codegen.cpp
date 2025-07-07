@@ -125,7 +125,7 @@ Codegen::cast(Type* type, const Value& value, bool implicit) {
     auto* base_value_type = unwrap_type(value.type);
 
     if (base_type == base_value_type) {
-        return value;
+        return Value{type, value.value, false, value.is_ref};
     }
 
     if (is<types::Void>(base_type)) {
