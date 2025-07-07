@@ -79,7 +79,7 @@ std::optional<Value> Codegen::generate(const ast::UnaryExpr& expr) {
         return Value{
             value->type, m_builder.CreateNot(load_value(*value).value)};
     case Star: {
-        auto* pointer = dyn_cast<types::Pointer>(value->type);
+        auto* pointer = dyn_cast<types::Pointer>(base_type);
 
         if (!pointer) {
             error(expr.offset, "dereference of a non-pointer type");
