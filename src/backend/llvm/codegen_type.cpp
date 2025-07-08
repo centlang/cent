@@ -22,19 +22,8 @@
 namespace cent::backend {
 
 Type* Codegen::generate(const ast::NamedType& type) {
-    auto* scope = m_current_scope;
-    std::size_t last_index = type.value.size() - 1;
-
-    for (std::size_t i = 0; i < last_index; ++i) {
-        scope = get_scope(type.value[i].offset, type.value[i].value, *scope);
-
-        if (!scope) {
-            return nullptr;
-        }
-    }
-
-    auto name = type.value[last_index].value;
-    auto offset = type.value[last_index].offset;
+    auto* scope = resolve_scope(type.value);
+    auto [name, offset] = type.value.back();
 
     if (!type.template_args.empty()) {
         std::vector<Type*> args;

@@ -615,6 +615,21 @@ Codegen::get_scope(std::size_t offset, std::string_view name, Scope& parent) {
     return &iterator->second;
 }
 
+Scope* Codegen::resolve_scope(
+    const std::vector<ast::OffsetValue<std::string>>& value) {
+    auto* scope = m_current_scope;
+
+    for (std::size_t i = 0; i < value.size() - 1; ++i) {
+        scope = get_scope(value[i].offset, value[i].value, *scope);
+
+        if (!scope) {
+            return nullptr;
+        }
+    }
+
+    return scope;
+}
+
 void Codegen::create_panic_fn() {
     auto* panic_type = llvm::FunctionType::get(
         llvm::Type::getVoidTy(m_context),

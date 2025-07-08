@@ -561,19 +561,10 @@ std::optional<Value> Codegen::generate(const ast::TupleLiteral& expr) {
 }
 
 std::optional<Value> Codegen::generate(const ast::Identifier& expr) {
-    auto* scope = m_current_scope;
-    std::size_t last_index = expr.value.size() - 1;
+    auto* scope = resolve_scope(expr.value);
+    auto [name, offset] = expr.value.back();
 
-    for (std::size_t i = 0; i < last_index; ++i) {
-        scope = get_scope(expr.value[i].offset, expr.value[i].value, *scope);
-
-        if (!scope) {
-            return std::nullopt;
-        }
-    }
-
-    auto* result = get_name(
-        expr.value[last_index].offset, expr.value[last_index].value, *scope);
+    auto* result = get_name(offset, name, *scope);
 
     if (!result) {
         return std::nullopt;
@@ -662,21 +653,8 @@ std::optional<Value> Codegen::generate(const ast::CallExpr& expr) {
 }
 
 std::optional<Value> Codegen::generate(const ast::CallExprGeneric& expr) {
-    auto* scope = m_current_scope;
-    std::size_t last_index = expr.identifier->value.size() - 1;
-
-    for (std::size_t i = 0; i < last_index; ++i) {
-        scope = get_scope(
-            expr.identifier->value[i].offset, expr.identifier->value[i].value,
-            *scope);
-
-        if (!scope) {
-            return std::nullopt;
-        }
-    }
-
-    auto name = expr.identifier->value[last_index].value;
-    auto offset = expr.identifier->value[last_index].offset;
+    auto* scope = resolve_scope(expr.identifier->value);
+    auto [name, offset] = expr.identifier->value.back();
 
     auto generic_fn = scope->generic_fns.find(name);
 

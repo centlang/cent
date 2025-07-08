@@ -201,6 +201,9 @@ private:
     [[nodiscard]] Scope*
     get_scope(std::size_t offset, std::string_view name, Scope& parent);
 
+    [[nodiscard]] Scope*
+    resolve_scope(const std::vector<ast::OffsetValue<std::string>>& value);
+
     [[nodiscard]] types::Function* generate_fn_type(const ast::FnProto& proto);
 
     [[nodiscard]] types::Function* get_fn_type(
