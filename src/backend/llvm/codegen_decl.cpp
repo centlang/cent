@@ -167,7 +167,7 @@ std::optional<Value> Codegen::generate(const ast::Struct& decl) {
 
         m_current_scope->types = current_scope_types;
 
-        generic_struct.name = decl.name.value;
+        generic_struct.mangled_name = m_current_scope_prefix + decl.name.value;
         generic_struct.fields = std::move(fields);
 
         return std::nullopt;
@@ -252,7 +252,7 @@ std::optional<Value> Codegen::generate(const ast::Union& decl) {
 
         m_current_scope->types = current_scope_types;
 
-        generic_union.name = decl.name.value;
+        generic_union.mangled_name = m_current_scope_prefix + decl.name.value;
         generic_union.fields = std::move(fields);
 
         if (untagged) {
@@ -666,7 +666,8 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
 
         m_current_scope->types = current_scope_types;
 
-        generic_fn.name = decl.name;
+        generic_fn.mangled_name = m_current_scope_prefix + decl.name.value;
+        generic_fn.name_offset = decl.name.offset;
         generic_fn.return_type = return_type;
         generic_fn.block = decl.block.get();
 

@@ -3,8 +3,6 @@
 
 #include <string>
 
-#include "offset_value.h"
-
 #include "backend/llvm/type.h"
 #include "backend/llvm/types/enum.h"
 
@@ -29,7 +27,7 @@ struct GenericStruct {
         Type* type;
     };
 
-    std::string name;
+    std::string mangled_name;
     std::vector<Field> fields;
 
     std::vector<types::TemplateParam*> template_params;
@@ -41,7 +39,7 @@ struct GenericUnion {
         Type* type;
     };
 
-    std::string name;
+    std::string mangled_name;
     std::vector<Field> fields;
 
     std::vector<types::TemplateParam*> template_params;
@@ -55,7 +53,8 @@ struct GenericFunction {
         bool is_mutable;
     };
 
-    ast::OffsetValue<std::string> name;
+    std::string mangled_name;
+    std::size_t name_offset;
 
     Type* return_type;
     std::vector<Param> params;

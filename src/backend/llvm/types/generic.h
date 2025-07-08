@@ -21,7 +21,9 @@ struct TemplateStructInst
         GenericStruct* type, std::vector<Type*> args)
     : Ty{nullptr}, type{type}, args{std::move(args)} {}
 
-    [[nodiscard]] std::string to_string() const override { return type->name; }
+    [[nodiscard]] std::string to_string() const override {
+        return type->mangled_name;
+    }
 
     GenericStruct* type;
     std::vector<Type*> args;
@@ -32,7 +34,9 @@ struct TemplateUnionInst
     [[nodiscard]] TemplateUnionInst(GenericUnion* type, std::vector<Type*> args)
     : Ty{nullptr}, type{type}, args{std::move(args)} {}
 
-    [[nodiscard]] std::string to_string() const override { return type->name; }
+    [[nodiscard]] std::string to_string() const override {
+        return type->mangled_name;
+    }
 
     GenericUnion* type;
     std::vector<Type*> args;

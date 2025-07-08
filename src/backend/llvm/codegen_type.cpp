@@ -289,7 +289,7 @@ types::Struct* Codegen::inst_generic_struct(
         return result.get();
     }
 
-    std::string name = m_current_scope_prefix + type->name + "(<";
+    std::string name = type->mangled_name + "(<";
 
     for (std::size_t i = 0; i < types.size(); ++i) {
         name += types[i]->to_string();
@@ -337,7 +337,7 @@ types::Union* Codegen::inst_generic_union(
         return result.get();
     }
 
-    std::string name = m_current_scope_prefix + type->name + "(<";
+    std::string name = type->mangled_name + "(<";
 
     for (std::size_t i = 0; i < types.size(); ++i) {
         name += types[i]->to_string();
@@ -443,7 +443,7 @@ std::optional<Value> Codegen::inst_generic_fn(
         default_args.push_back(static_cast<llvm::Constant*>(val->value));
     }
 
-    std::string name = m_current_scope_prefix + function->name.value + "(<";
+    std::string name = function->mangled_name + "(<";
 
     for (std::size_t i = 0; i < types.size(); ++i) {
         name += types[i]->to_string();
@@ -513,7 +513,7 @@ std::optional<Value> Codegen::inst_generic_fn(
     if (!m_current_fn_had_error &&
         !llvm_function->getReturnType()->isVoidTy()) {
         error(
-            function->name.offset, "non-void function does not return a value");
+            function->name_offset, "non-void function does not return a value");
 
         m_builder.SetInsertPoint(insert_point);
 
