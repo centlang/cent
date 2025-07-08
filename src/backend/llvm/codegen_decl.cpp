@@ -97,7 +97,12 @@ std::optional<Value> Codegen::generate(const ast::FnDecl& decl) {
             m_current_function->param_types[i], variable, param.is_mutable};
     }
 
+    auto scope_prefix = m_current_scope_prefix;
+    m_current_scope_prefix += decl.name.value + "::__";
+
     decl.block->codegen(*this);
+
+    m_current_scope_prefix = scope_prefix;
 
     m_current_function = current_function;
 
