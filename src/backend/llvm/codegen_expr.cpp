@@ -109,142 +109,31 @@ std::optional<Value> Codegen::generate(const ast::UnaryExpr& expr) {
 }
 
 std::optional<Value> Codegen::generate(const ast::IntLiteral& expr) {
-    bool failed = false;
     std::string_view literal = expr.value;
 
     std::uint8_t base = [&] {
-        static constexpr auto hex = 16;
-        static constexpr auto oct = 8;
-        static constexpr auto bin = 2;
-        static constexpr auto dec = 10;
+        enum { Bin = 2, Dec = 10, Oct = 8, Hex = 16 };
 
         if (literal.starts_with("0x")) {
             literal = literal.substr(2);
 
-            return hex;
-        }
-
-        if (literal.starts_with("0o")) {
-            literal = literal.substr(2);
-
-            return oct;
+            return Hex;
         }
 
         if (literal.starts_with("0b")) {
             literal = literal.substr(2);
 
-            return bin;
+            return Bin;
         }
 
-        return dec;
+        if (literal.starts_with("0o")) {
+            literal = literal.substr(2);
+
+            return Oct;
+        }
+
+        return Dec;
     }();
-
-    auto with_type_suffix = [&]<typename Type>(
-                                std::string_view suffix,
-                                bool is_signed) -> std::optional<Value> {
-        if (!literal.ends_with(suffix)) {
-            return std::nullopt;
-        }
-
-        Type value{};
-        literal = literal.substr(0, literal.size() - suffix.size());
-
-        auto [pointer, result] =
-            std::from_chars(literal.cbegin(), literal.cend(), value, base);
-
-        if (result == std::errc::result_out_of_range) {
-            error(expr.offset, "integer out of range");
-
-            failed = true;
-            return std::nullopt;
-        }
-
-        auto* type = m_primitive_types[suffix].get();
-
-        return Value{
-            type, llvm::ConstantInt::get(type->llvm_type, value, is_signed)};
-    };
-
-    if (auto value = with_type_suffix.operator()<std::int8_t>("i8", true)) {
-        return value;
-    }
-
-    if (failed) {
-        return std::nullopt;
-    }
-
-    if (auto value = with_type_suffix.operator()<std::int16_t>("i16", true)) {
-        return value;
-    }
-
-    if (failed) {
-        return std::nullopt;
-    }
-
-    if (auto value = with_type_suffix.operator()<std::int32_t>("i32", true)) {
-        return value;
-    }
-
-    if (failed) {
-        return std::nullopt;
-    }
-
-    if (auto value = with_type_suffix.operator()<std::int64_t>("i64", true)) {
-        return value;
-    }
-
-    if (failed) {
-        return std::nullopt;
-    }
-
-    if (auto value =
-            with_type_suffix.operator()<std::ptrdiff_t>("isize", true)) {
-        return value;
-    }
-
-    if (failed) {
-        return std::nullopt;
-    }
-
-    if (auto value = with_type_suffix.operator()<std::uint8_t>("u8", false)) {
-        return value;
-    }
-
-    if (failed) {
-        return std::nullopt;
-    }
-
-    if (auto value = with_type_suffix.operator()<std::uint16_t>("u16", false)) {
-        return value;
-    }
-
-    if (failed) {
-        return std::nullopt;
-    }
-
-    if (auto value = with_type_suffix.operator()<std::uint32_t>("u32", false)) {
-        return value;
-    }
-
-    if (failed) {
-        return std::nullopt;
-    }
-
-    if (auto value = with_type_suffix.operator()<std::uint64_t>("u64", false)) {
-        return value;
-    }
-
-    if (failed) {
-        return std::nullopt;
-    }
-
-    if (auto value = with_type_suffix.operator()<std::size_t>("usize", false)) {
-        return value;
-    }
-
-    if (failed) {
-        return std::nullopt;
-    }
 
     std::int32_t value{};
 
@@ -253,7 +142,6 @@ std::optional<Value> Codegen::generate(const ast::IntLiteral& expr) {
 
     if (result == std::errc::result_out_of_range) {
         error(expr.offset, "integer out of range");
-
         return std::nullopt;
     }
 
@@ -263,59 +151,13 @@ std::optional<Value> Codegen::generate(const ast::IntLiteral& expr) {
 }
 
 std::optional<Value> Codegen::generate(const ast::FloatLiteral& expr) {
-    bool failed = false;
-
-    std::string_view literal = expr.value;
-
-    auto with_type_suffix =
-        [&]<typename Type>(std::string_view suffix) -> std::optional<Value> {
-        if (!expr.value.ends_with(suffix)) {
-            return std::nullopt;
-        }
-
-        Type value{};
-
-        literal = literal.substr(0, literal.size() - suffix.size());
-
-        auto [pointer, result] =
-            std::from_chars(literal.cbegin(), literal.cend(), value);
-
-        if (result == std::errc::result_out_of_range) {
-            error(expr.offset, "float out of range");
-
-            failed = true;
-            return std::nullopt;
-        }
-
-        auto* type = m_primitive_types[suffix].get();
-
-        return Value{type, llvm::ConstantFP::get(type->llvm_type, value)};
-    };
-
-    if (auto value = with_type_suffix.operator()<float>("f32")) {
-        return value;
-    }
-
-    if (failed) {
-        return std::nullopt;
-    }
-
-    if (auto value = with_type_suffix.operator()<double>("f64")) {
-        return value;
-    }
-
-    if (failed) {
-        return std::nullopt;
-    }
-
     float value{};
 
-    auto [pointer, result] =
-        std::from_chars(literal.cbegin(), literal.cend(), value);
+    auto [pointer, result] = std::from_chars(
+        expr.value.data(), expr.value.data() + expr.value.size(), value);
 
     if (result == std::errc::result_out_of_range) {
         error(expr.offset, "float out of range");
-
         return std::nullopt;
     }
 

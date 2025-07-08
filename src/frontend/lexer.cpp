@@ -216,12 +216,6 @@ void Lexer::next_token() {
     }
 }
 
-void Lexer::get_ident() {
-    while (!eof() && is_ident(peek())) {
-        m_token.value += get();
-    }
-}
-
 void Lexer::number() {
     m_token = {Token::Type::IntLiteral, {}, m_offset};
 
@@ -287,11 +281,6 @@ void Lexer::number() {
         return;
     }
 
-    if (is_ident(peek())) {
-        get_ident();
-        return;
-    }
-
     if (peek() != '.') {
         return;
     }
@@ -310,10 +299,6 @@ void Lexer::number() {
     m_token.type = Token::Type::FloatLiteral;
 
     get_int();
-
-    if (!eof() && is_ident(peek())) {
-        get_ident();
-    }
 }
 
 void Lexer::string() {

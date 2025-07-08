@@ -31,8 +31,6 @@ private:
         }
     }
 
-    void get_ident();
-
     void number();
     void string();
     void ident();
