@@ -1,7 +1,7 @@
 #ifndef CENT_BACKEND_TYPES_TEMPLATE_PARAM_H
 #define CENT_BACKEND_TYPES_TEMPLATE_PARAM_H
 
-#include "backend/llvm/generic_types.h"
+#include "backend/llvm/generics.h"
 #include "backend/llvm/type.h"
 
 namespace cent::backend::types {

@@ -550,7 +550,21 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
         if (!is_condition && match(LeftParen) && match(1, Less)) {
             auto template_args = parse_template_args();
 
-            if (!expect("`{`", LeftBrace)) {
+            if (match_next(LeftParen)) {
+                auto args = parse_args();
+
+                if (!expect("`)`", RightParen)) {
+                    return nullptr;
+                }
+
+                return std::make_unique<ast::CallExprGeneric>(
+                    token->offset,
+                    std::make_unique<ast::Identifier>(
+                        token->offset, std::move(value)),
+                    std::move(template_args), std::move(args));
+            }
+
+            if (!expect("`{` or `(`", LeftBrace)) {
                 return nullptr;
             }
 
@@ -1355,7 +1369,9 @@ Parser::parse_var(std::vector<ast::Attribute> attrs, bool is_public) {
 
 std::unique_ptr<ast::FnDecl>
 Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
+    auto template_params = parse_template_params();
     auto name = expect("function name", Token::Type::Identifier);
+
     std::optional<ast::OffsetValue<std::string>> type = std::nullopt;
 
     if (!name) {
@@ -1404,7 +1420,8 @@ Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
     return std::make_unique<ast::FnDecl>(
         name->offset, std::move(type),
         ast::OffsetValue{name->value, name->offset}, std::move(*proto),
-        std::move(body), std::move(attrs), is_public);
+        std::move(body), std::move(template_params), std::move(attrs),
+        is_public);
 }
 
 std::unique_ptr<ast::Struct>

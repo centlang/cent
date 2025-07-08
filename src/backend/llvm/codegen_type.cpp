@@ -60,7 +60,7 @@ Type* Codegen::generate(const ast::NamedType& type) {
             auto generic = scope->generic_structs.find(name);
 
             if (generic != scope->generic_structs.end()) {
-                if (generic->second.params.size() !=
+                if (generic->second.template_params.size() !=
                     type.template_args.size()) {
                     error(
                         offset,
@@ -86,7 +86,7 @@ Type* Codegen::generate(const ast::NamedType& type) {
                 return nullptr;
             }
 
-            if (generic_union->second.params.size() !=
+            if (generic_union->second.template_params.size() !=
                 type.template_args.size()) {
                 error(offset, "incorrect number of template arguments passed");
                 return nullptr;
@@ -101,7 +101,8 @@ Type* Codegen::generate(const ast::NamedType& type) {
         auto generic = scope->generic_structs.find(name);
 
         if (generic != scope->generic_structs.end()) {
-            if (generic->second.params.size() != type.template_args.size()) {
+            if (generic->second.template_params.size() !=
+                type.template_args.size()) {
                 error(offset, "incorrect number of template arguments passed");
                 return nullptr;
             }
@@ -118,7 +119,8 @@ Type* Codegen::generate(const ast::NamedType& type) {
             return nullptr;
         }
 
-        if (generic_union->second.params.size() != type.template_args.size()) {
+        if (generic_union->second.template_params.size() !=
+            type.template_args.size()) {
             error(offset, "incorrect number of template arguments passed");
             return nullptr;
         }
@@ -321,7 +323,8 @@ types::Struct* Codegen::inst_generic_struct(
     for (std::size_t i = 0; i < type->fields.size(); ++i) {
         const auto& field = type->fields[i];
 
-        auto* field_type = inst_template_param(type->params, types, field.type);
+        auto* field_type =
+            inst_template_param(type->template_params, types, field.type);
 
         llvm_fields.push_back(field_type->llvm_type);
         fields.push_back(field_type);
@@ -365,7 +368,8 @@ types::Union* Codegen::inst_generic_union(
     for (std::size_t i = 0; i < type->fields.size(); ++i) {
         const auto& field = type->fields[i];
 
-        auto* field_type = inst_template_param(type->params, types, field.type);
+        auto* field_type =
+            inst_template_param(type->template_params, types, field.type);
 
         fields.push_back(field_type);
         m_members[struct_type][field.name] = i;
@@ -402,6 +406,135 @@ types::Union* Codegen::inst_generic_union(
         struct_type, name, std::move(fields), tag_type);
 
     return result.get();
+}
+
+std::optional<Value> Codegen::inst_generic_fn(
+    GenericFunction* function, const std::vector<Type*>& types) {
+    auto generic_fn_inst = m_generic_fns_inst[function];
+
+    if (auto result = generic_fn_inst.find(types);
+        result != generic_fn_inst.end()) {
+        return result->second;
+    }
+
+    std::vector<Type*> param_types;
+    param_types.reserve(function->params.size());
+
+    for (const auto& param : function->params) {
+        param_types.push_back(
+            inst_template_param(function->template_params, types, param.type));
+    }
+
+    std::vector<llvm::Constant*> default_args;
+    default_args.reserve(function->default_args.size());
+
+    for (std::size_t i = 0; i < function->default_args.size(); ++i) {
+        const auto* arg = function->default_args[i];
+        auto value = arg->codegen(*this);
+
+        if (!value) {
+            return std::nullopt;
+        }
+
+        auto* type =
+            param_types[i + param_types.size() - function->default_args.size()];
+
+        auto val = cast(type, *value);
+
+        if (!val) {
+            type_mismatch(arg->offset, type, value->type);
+            return std::nullopt;
+        }
+
+        if (!llvm::isa<llvm::Constant>(val->value)) {
+            error(arg->offset, "not a constant");
+            return std::nullopt;
+        }
+
+        default_args.push_back(static_cast<llvm::Constant*>(val->value));
+    }
+
+    std::string name = m_current_scope_prefix + function->name.value + "(<";
+
+    for (std::size_t i = 0; i < types.size(); ++i) {
+        name += types[i]->to_string();
+
+        if (i + 1 != types.size()) {
+            name += ",";
+        }
+    }
+
+    name += ">)";
+
+    auto* fn_type = get_fn_type(
+        inst_template_param(
+            function->template_params, types, function->return_type),
+        std::move(param_types), std::move(default_args), false);
+
+    auto* llvm_fn_type = static_cast<llvm::FunctionType*>(fn_type->llvm_type);
+
+    auto* llvm_function = llvm::Function::Create(
+        llvm_fn_type, llvm::Function::PrivateLinkage, name, *m_module);
+
+    auto* entry = llvm::BasicBlock::Create(m_context, "", llvm_function);
+
+    auto* insert_point = m_builder.GetInsertBlock();
+    m_builder.SetInsertPoint(entry);
+
+    auto* current_function = m_current_function;
+    m_current_function = fn_type;
+
+    auto current_scope = *m_current_scope;
+
+    for (std::size_t i = 0; i < function->params.size(); ++i) {
+        const auto& param = function->params[i];
+
+        auto* value = llvm_function->getArg(i);
+        auto* variable = create_alloca(value->getType());
+
+        m_builder.CreateStore(value, variable);
+
+        m_current_scope->names[param.name] = {
+            m_current_function->param_types[i], variable, param.is_mutable};
+    }
+
+    for (std::size_t i = 0; i < function->template_params.size(); ++i) {
+        m_named_types.push_back(std::make_unique<types::Alias>(
+            types[i]->llvm_type, function->template_params[i]->name, types[i],
+            false));
+
+        m_current_scope->types[function->template_params[i]->name] =
+            m_named_types.back().get();
+    }
+
+    auto scope_prefix = m_current_scope_prefix;
+    m_current_scope_prefix = name + "::__";
+
+    function->block->codegen(*this);
+
+    m_current_scope_prefix = scope_prefix;
+    *m_current_scope = current_scope;
+    m_current_function = current_function;
+
+    if (m_builder.GetInsertBlock()->getTerminator()) {
+        m_builder.SetInsertPoint(insert_point);
+        return Value{fn_type, llvm_function};
+    }
+
+    if (!m_current_fn_had_error &&
+        !llvm_function->getReturnType()->isVoidTy()) {
+        error(
+            function->name.offset, "non-void function does not return a value");
+
+        m_builder.SetInsertPoint(insert_point);
+
+        return std::nullopt;
+    }
+
+    m_builder.CreateRetVoid();
+    m_builder.SetInsertPoint(insert_point);
+
+    return Value{fn_type, llvm_function};
 }
 
 Type* Codegen::inst_template_param(

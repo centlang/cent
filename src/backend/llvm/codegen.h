@@ -24,7 +24,7 @@
 #include "backend/llvm/types/struct.h"
 #include "backend/llvm/types/union.h"
 
-#include "backend/llvm/generic_types.h"
+#include "backend/llvm/generics.h"
 #include "backend/llvm/scope.h"
 
 namespace cent::ast {
@@ -65,6 +65,7 @@ struct ArrayLiteral;
 struct TupleLiteral;
 struct Identifier;
 struct CallExpr;
+struct CallExprGeneric;
 struct MethodExpr;
 struct MemberExpr;
 struct IndexExpr;
@@ -142,6 +143,10 @@ public:
     [[nodiscard]] std::optional<Value> generate(const ast::TupleLiteral& expr);
     [[nodiscard]] std::optional<Value> generate(const ast::Identifier& expr);
     [[nodiscard]] std::optional<Value> generate(const ast::CallExpr& expr);
+
+    [[nodiscard]] std::optional<Value>
+    generate(const ast::CallExprGeneric& expr);
+
     [[nodiscard]] std::optional<Value> generate(const ast::MethodExpr& expr);
     [[nodiscard]] std::optional<Value> generate(const ast::MemberExpr& expr);
     [[nodiscard]] std::optional<Value> generate(const ast::IndexExpr& expr);
@@ -207,6 +212,9 @@ private:
 
     [[nodiscard]] types::Union*
     inst_generic_union(GenericUnion* type, const std::vector<Type*>& types);
+
+    [[nodiscard]] std::optional<Value>
+    inst_generic_fn(GenericFunction* function, const std::vector<Type*>& types);
 
     [[nodiscard]] Type* inst_template_param(
         const std::vector<types::TemplateParam*>& params,
@@ -312,6 +320,9 @@ private:
         GenericUnion*,
         std::map<std::vector<Type*>, std::unique_ptr<types::Union>>>
         m_generic_union_inst;
+
+    std::map<GenericFunction*, std::map<std::vector<Type*>, Value>>
+        m_generic_fns_inst;
 
     std::map<std::pair<Type*, bool>, std::unique_ptr<types::Pointer>>
         m_ptr_types;

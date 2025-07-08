@@ -819,6 +819,91 @@ std::optional<Value> Codegen::generate(const ast::CallExpr& expr) {
             arguments)};
 }
 
+std::optional<Value> Codegen::generate(const ast::CallExprGeneric& expr) {
+    auto* scope = m_current_scope;
+    std::size_t last_index = expr.identifier->value.size() - 1;
+
+    for (std::size_t i = 0; i < last_index; ++i) {
+        scope = get_scope(
+            expr.identifier->value[i].offset, expr.identifier->value[i].value,
+            *scope);
+
+        if (!scope) {
+            return std::nullopt;
+        }
+    }
+
+    auto name = expr.identifier->value[last_index].value;
+    auto offset = expr.identifier->value[last_index].offset;
+
+    auto generic_fn = scope->generic_fns.find(name);
+
+    if (generic_fn == scope->generic_fns.end()) {
+        error(
+            offset, fmt::format("undeclared function: {}", log::quoted(name)));
+
+        return std::nullopt;
+    }
+
+    std::vector<Type*> template_args;
+    template_args.reserve(expr.template_args.size());
+
+    for (const auto& arg : expr.template_args) {
+        auto* type = arg->codegen(*this);
+
+        if (!type) {
+            return std::nullopt;
+        }
+
+        template_args.push_back(type);
+    }
+
+    auto function = inst_generic_fn(&generic_fn->second, template_args);
+    auto* type = static_cast<types::Function*>(function->type);
+
+    auto arg_size = type->param_types.size();
+    auto passed_args_size = expr.arguments.size();
+    auto default_args_size = type->default_args.size();
+
+    if (passed_args_size < arg_size - default_args_size ||
+        passed_args_size > arg_size) {
+        error(expr.identifier->offset, "incorrect number of arguments passed");
+
+        return std::nullopt;
+    }
+
+    std::vector<llvm::Value*> arguments;
+    arguments.reserve(arg_size);
+
+    for (std::size_t i = 0; i < passed_args_size; ++i) {
+        auto value = expr.arguments[i]->codegen(*this);
+
+        if (!value) {
+            return std::nullopt;
+        }
+
+        if (auto val = cast(type->param_types[i], *value)) {
+            arguments.push_back(load_value(*val).value);
+        } else {
+            type_mismatch(
+                expr.arguments[i]->offset, type->param_types[i], value->type);
+
+            return std::nullopt;
+        }
+    }
+
+    for (std::size_t i = default_args_size - (arg_size - passed_args_size);
+         i < default_args_size; ++i) {
+        arguments.push_back(type->default_args[i]);
+    }
+
+    return Value{
+        type->return_type,
+        m_builder.CreateCall(
+            static_cast<llvm::FunctionType*>(type->llvm_type), function->value,
+            arguments)};
+}
+
 std::optional<Value> Codegen::generate(const ast::MethodExpr& expr) {
     auto value = expr.value->codegen(*this);
 

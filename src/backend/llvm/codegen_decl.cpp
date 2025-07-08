@@ -145,10 +145,11 @@ std::optional<Value> Codegen::generate(const ast::Struct& decl) {
             m_named_types.push_back(
                 std::make_unique<types::TemplateParam>(param.value));
 
-            generic_struct.params.push_back(
+            generic_struct.template_params.push_back(
                 static_cast<types::TemplateParam*>(m_named_types.back().get()));
 
-            m_current_scope->types[param.value] = generic_struct.params.back();
+            m_current_scope->types[param.value] =
+                generic_struct.template_params.back();
         }
 
         std::vector<GenericStruct::Field> fields;
@@ -229,10 +230,11 @@ std::optional<Value> Codegen::generate(const ast::Union& decl) {
             m_named_types.push_back(
                 std::make_unique<types::TemplateParam>(param.value));
 
-            generic_union.params.push_back(
+            generic_union.template_params.push_back(
                 static_cast<types::TemplateParam*>(m_named_types.back().get()));
 
-            m_current_scope->types[param.value] = generic_union.params.back();
+            m_current_scope->types[param.value] =
+                generic_union.template_params.back();
         }
 
         std::vector<GenericUnion::Field> fields;
@@ -614,6 +616,59 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
         error(
             decl.name.offset,
             fmt::format("{} is already defined", log::quoted(decl.name.value)));
+
+        return;
+    }
+
+    if (!decl.template_params.empty()) {
+        auto& generic_fn = m_current_scope->generic_fns[decl.name.value];
+        auto current_scope_types = m_current_scope->types;
+
+        for (const auto& param : decl.template_params) {
+            m_named_types.push_back(
+                std::make_unique<types::TemplateParam>(param.value));
+
+            generic_fn.template_params.emplace_back(
+                static_cast<types::TemplateParam*>(m_named_types.back().get()));
+
+            m_current_scope->types[param.value] =
+                generic_fn.template_params.back();
+        }
+
+        Type* return_type = m_void_type.get();
+
+        if (decl.proto.return_type) {
+            return_type = decl.proto.return_type->codegen(*this);
+
+            if (!return_type) {
+                return;
+            }
+        }
+
+        generic_fn.params.reserve(decl.proto.params.size());
+
+        for (const auto& parameter : decl.proto.params) {
+            auto* type = parameter.type->codegen(*this);
+
+            if (!type) {
+                return;
+            }
+
+            generic_fn.params.emplace_back(
+                parameter.name.value, type, parameter.is_mutable);
+
+            if (!parameter.value) {
+                continue;
+            }
+
+            generic_fn.default_args.push_back(parameter.value.get());
+        }
+
+        m_current_scope->types = current_scope_types;
+
+        generic_fn.name = decl.name;
+        generic_fn.return_type = return_type;
+        generic_fn.block = decl.block.get();
 
         return;
     }
