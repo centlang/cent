@@ -230,6 +230,8 @@ private:
     [[nodiscard]] types::Optional* get_optional_type(Type* type);
     [[nodiscard]] types::Range* get_range_type(Type* type);
 
+    [[nodiscard]] Type* unwrap_type(Type* type);
+
     void create_panic_fn();
 
     void generate_fn_proto(const ast::FnDecl& decl);
@@ -258,9 +260,6 @@ private:
     [[nodiscard]] static bool is_float(const Type* type);
     [[nodiscard]] static bool is_sint(const Type* type);
     [[nodiscard]] static bool is_uint(const Type* type);
-
-    [[nodiscard]] static Type* unwrap_type(Type* type);
-    [[nodiscard]] static const Type* unwrap_type(const Type* type);
 
     static constexpr auto optional_member_value = 0;
     static constexpr auto optional_member_bool = 1;

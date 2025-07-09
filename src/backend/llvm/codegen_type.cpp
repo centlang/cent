@@ -713,31 +713,60 @@ types::Range* Codegen::get_range_type(Type* type) {
 }
 
 Type* Codegen::unwrap_type(Type* type) {
-    auto* result = type;
-
-    while (auto* alias = dyn_cast<types::Alias>(result)) {
+    if (auto* alias = dyn_cast<types::Alias>(type)) {
         if (alias->distinct) {
-            return result;
+            return type;
         }
 
-        result = alias->type;
+        return unwrap_type(alias->type);
     }
 
-    return result;
-}
+    if (auto* ptr = dyn_cast<types::Pointer>(type)) {
+        return get_ptr_type(unwrap_type(ptr->type), ptr->is_mutable);
+    }
 
-const Type* Codegen::unwrap_type(const Type* type) {
-    const auto* result = type;
+    if (auto* optional = dyn_cast<types::Optional>(type)) {
+        return get_optional_type(unwrap_type(optional->type));
+    }
 
-    while (const auto* alias = dyn_cast<types::Alias>(result)) {
-        if (alias->distinct) {
-            return result;
+    if (auto* range = dyn_cast<types::Range>(type)) {
+        return get_range_type(unwrap_type(range->type));
+    }
+
+    if (auto* array = dyn_cast<types::Array>(type)) {
+        return get_array_type(unwrap_type(array->type), array->size);
+    }
+
+    if (auto* slice = dyn_cast<types::Slice>(type)) {
+        return get_slice_type(unwrap_type(slice->type), slice->is_mutable);
+    }
+
+    if (auto* tuple = dyn_cast<types::Tuple>(type)) {
+        std::vector<Type*> types;
+        types.reserve(tuple->types.size());
+
+        for (auto& element : tuple->types) {
+            types.push_back(unwrap_type(element));
         }
 
-        result = alias->type;
+        return get_tuple_type(types);
     }
 
-    return result;
+    if (auto* func = dyn_cast<types::Function>(type)) {
+        Type* return_type = unwrap_type(func->return_type);
+
+        std::vector<Type*> param_types;
+        param_types.reserve(func->param_types.size());
+
+        for (auto& param_type : func->param_types) {
+            param_types.push_back(unwrap_type(param_type));
+        }
+
+        return get_fn_type(
+            return_type, param_types, func->default_args, func->variadic);
+    }
+
+    return type;
 }
 
 } // namespace cent::backend
