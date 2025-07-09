@@ -125,7 +125,7 @@ Codegen::cast(Type* type, const Value& value, bool implicit) {
     auto* base_value_type = unwrap_type(value.type);
 
     if (base_type == base_value_type) {
-        return Value{type, value.value, false, value.is_ref};
+        return Value{type, value.value, false, value.is_ref, value.is_deref};
     }
 
     if (is<types::Void>(base_type)) {
@@ -150,7 +150,7 @@ Codegen::cast(Type* type, const Value& value, bool implicit) {
                 is<types::Null>(base_value_type)
                     ? llvm::Constant::getNullValue(base_type->llvm_type)
                     : value.value,
-                false, value.is_ref};
+                false, value.is_ref, value.is_deref};
         }
 
         if (auto* val = llvm::dyn_cast<llvm::Constant>(value.value)) {
@@ -360,7 +360,8 @@ Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
             cast_op = PtrToInt;
         } else if (type_is_ptr) {
             if (!implicit) {
-                return Value{type, value.value, false, value.is_ref};
+                return Value{
+                    type, value.value, false, value.is_ref, value.is_deref};
             }
 
             auto* value_ptr = static_cast<types::Pointer*>(base_value_type);
@@ -368,7 +369,8 @@ Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
 
             if (value_ptr->type == type_ptr->type &&
                 (value_ptr->is_mutable || !type_ptr->is_mutable)) {
-                return Value{type, value.value, false, value.is_ref};
+                return Value{
+                    type, value.value, false, value.is_ref, value.is_deref};
             }
         }
     }
