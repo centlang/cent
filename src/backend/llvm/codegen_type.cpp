@@ -23,6 +23,11 @@ namespace cent::backend {
 
 Type* Codegen::generate(const ast::NamedType& type) {
     auto* scope = resolve_scope(type.value);
+
+    if (!scope) {
+        return nullptr;
+    }
+
     auto [name, offset] = type.value.back();
 
     if (!type.template_args.empty()) {

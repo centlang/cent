@@ -562,6 +562,11 @@ std::optional<Value> Codegen::generate(const ast::TupleLiteral& expr) {
 
 std::optional<Value> Codegen::generate(const ast::Identifier& expr) {
     auto* scope = resolve_scope(expr.value);
+
+    if (!scope) {
+        return std::nullopt;
+    }
+
     auto [name, offset] = expr.value.back();
 
     auto* result = get_name(offset, name, *scope);
@@ -654,6 +659,11 @@ std::optional<Value> Codegen::generate(const ast::CallExpr& expr) {
 
 std::optional<Value> Codegen::generate(const ast::CallExprGeneric& expr) {
     auto* scope = resolve_scope(expr.identifier->value);
+
+    if (!scope) {
+        return std::nullopt;
+    }
+
     auto [name, offset] = expr.identifier->value.back();
 
     auto generic_fn = scope->generic_fns.find(name);
