@@ -20,7 +20,7 @@
 
 namespace cent::backend {
 
-std::optional<Value> Codegen::generate(const ast::FnDecl& decl) {
+Value Codegen::generate(const ast::FnDecl& decl) {
     if (m_current_function) {
         generate_fn_proto(decl);
     }
@@ -31,7 +31,7 @@ std::optional<Value> Codegen::generate(const ast::FnDecl& decl) {
         type = get_type(decl.type->offset, decl.type->value, *m_current_scope);
 
         if (!type) {
-            return std::nullopt;
+            return Value::poisoned();
         }
     }
 
@@ -71,7 +71,7 @@ std::optional<Value> Codegen::generate(const ast::FnDecl& decl) {
     auto* function_type = get_fn_type();
 
     if (!function_type) {
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     auto* function = get_llvm_fn();
@@ -108,23 +108,23 @@ std::optional<Value> Codegen::generate(const ast::FnDecl& decl) {
 
     if (m_builder.GetInsertBlock()->getTerminator()) {
         m_builder.SetInsertPoint(insert_point);
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     if (!m_current_fn_had_error && !function->getReturnType()->isVoidTy()) {
         error(decl.name.offset, "non-void function does not return a value");
         m_builder.SetInsertPoint(insert_point);
 
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     m_builder.CreateRetVoid();
     m_builder.SetInsertPoint(insert_point);
 
-    return std::nullopt;
+    return Value::poisoned();
 }
 
-std::optional<Value> Codegen::generate(const ast::Struct& decl) {
+Value Codegen::generate(const ast::Struct& decl) {
     if (m_current_scope->types.contains(decl.name.value) ||
         m_current_scope->generic_structs.contains(decl.name.value) ||
         m_current_scope->generic_unions.contains(decl.name.value)) {
@@ -132,7 +132,7 @@ std::optional<Value> Codegen::generate(const ast::Struct& decl) {
             decl.name.offset,
             fmt::format("{} is already defined", log::quoted(decl.name.value)));
 
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     if (!decl.template_params.empty()) {
@@ -159,7 +159,7 @@ std::optional<Value> Codegen::generate(const ast::Struct& decl) {
             auto* type = field.type->codegen(*this);
 
             if (!type) {
-                return std::nullopt;
+                return Value::poisoned();
             }
 
             fields.emplace_back(field.name.value, type);
@@ -170,7 +170,7 @@ std::optional<Value> Codegen::generate(const ast::Struct& decl) {
         generic_struct.mangled_name = m_current_scope_prefix + decl.name.value;
         generic_struct.fields = std::move(fields);
 
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     auto* struct_type = llvm::StructType::create(
@@ -188,7 +188,7 @@ std::optional<Value> Codegen::generate(const ast::Struct& decl) {
         auto* type = field.type->codegen(*this);
 
         if (!type) {
-            return std::nullopt;
+            return Value::poisoned();
         }
 
         llvm_fields.push_back(type->llvm_type);
@@ -205,10 +205,10 @@ std::optional<Value> Codegen::generate(const ast::Struct& decl) {
 
     m_current_scope->types[decl.name.value] = m_named_types.back().get();
 
-    return std::nullopt;
+    return Value::poisoned();
 }
 
-std::optional<Value> Codegen::generate(const ast::Union& decl) {
+Value Codegen::generate(const ast::Union& decl) {
     auto attrs = parse_attrs(decl, {"untagged"});
     bool untagged = attrs.contains("untagged");
 
@@ -219,7 +219,7 @@ std::optional<Value> Codegen::generate(const ast::Union& decl) {
             decl.name.offset,
             fmt::format("{} is already defined", log::quoted(decl.name.value)));
 
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     if (!decl.template_params.empty()) {
@@ -244,7 +244,7 @@ std::optional<Value> Codegen::generate(const ast::Union& decl) {
             auto* type = field.type->codegen(*this);
 
             if (!type) {
-                return std::nullopt;
+                return Value::poisoned();
             }
 
             fields.emplace_back(field.name.value, type);
@@ -277,7 +277,7 @@ std::optional<Value> Codegen::generate(const ast::Union& decl) {
             generic_union.tag_type = tag_type;
         }
 
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     auto* struct_type = llvm::StructType::create(
@@ -292,7 +292,7 @@ std::optional<Value> Codegen::generate(const ast::Union& decl) {
         auto* type = field.type->codegen(*this);
 
         if (!type) {
-            return std::nullopt;
+            return Value::poisoned();
         }
 
         fields.push_back(type);
@@ -345,10 +345,10 @@ std::optional<Value> Codegen::generate(const ast::Union& decl) {
         m_current_scope->types[decl.name.value] = m_named_types.back().get();
     }
 
-    return std::nullopt;
+    return Value::poisoned();
 }
 
-std::optional<Value> Codegen::generate(const ast::EnumDecl& decl) {
+Value Codegen::generate(const ast::EnumDecl& decl) {
     if (m_current_function) {
         generate_enum(decl);
     }
@@ -356,7 +356,7 @@ std::optional<Value> Codegen::generate(const ast::EnumDecl& decl) {
     auto iterator = m_current_scope->types.find(decl.name.value);
 
     if (iterator == m_current_scope->types.end()) {
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     auto* type = static_cast<types::Enum*>(iterator->second);
@@ -377,43 +377,42 @@ std::optional<Value> Codegen::generate(const ast::EnumDecl& decl) {
 
         auto value = field.value->codegen(*this);
 
-        if (!value) {
-            return std::nullopt;
+        if (!value.ok()) {
+            return Value::poisoned();
         }
 
-        if (auto val = cast(type->type, *value)) {
+        if (auto val = cast(type->type, value); val.ok()) {
             m_current_scope->scopes[decl.name.value].names[field.name.value] =
-                *val;
+                val;
 
-            if (auto* constant =
-                    llvm::dyn_cast<llvm::ConstantInt>(val->value)) {
+            if (auto* constant = llvm::dyn_cast<llvm::ConstantInt>(val.value)) {
                 number = is_sint(type) ? constant->getSExtValue()
                                        : constant->getZExtValue();
             } else {
                 error(field.value->offset, "not a constant");
 
-                return std::nullopt;
+                return Value::poisoned();
             }
         } else {
-            type_mismatch(field.value->offset, type->type, value->type);
+            type_mismatch(field.value->offset, type->type, value.type);
 
-            return std::nullopt;
+            return Value::poisoned();
         }
 
         ++number;
     }
 
-    return std::nullopt;
+    return Value::poisoned();
 }
 
-std::optional<Value> Codegen::generate(const ast::TypeAlias& decl) {
+Value Codegen::generate(const ast::TypeAlias& decl) {
     auto attrs = parse_attrs(decl, {"distinct"});
     bool distinct = attrs.contains("distinct");
 
     auto* type = decl.type->codegen(*this);
 
     if (!type) {
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     m_named_types.push_back(std::make_unique<types::Alias>(
@@ -422,48 +421,48 @@ std::optional<Value> Codegen::generate(const ast::TypeAlias& decl) {
 
     m_current_scope->types[decl.name.value] = m_named_types.back().get();
 
-    return std::nullopt;
+    return Value::poisoned();
 }
 
-std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
+Value Codegen::generate(const ast::VarDecl& decl) {
     auto& result = m_current_scope->names[decl.name.value];
     result = Value::poisoned();
 
     if (decl.mutability == ast::VarDecl::Mut::Const) {
         if (!decl.value) {
             error(decl.name.offset, "constant has no value");
-            return std::nullopt;
+            return Value::poisoned();
         }
 
         auto value = decl.value->codegen(*this);
 
-        if (!value) {
-            return std::nullopt;
+        if (!value.ok()) {
+            return Value::poisoned();
         }
 
         if (decl.type) {
             auto* type = decl.type->codegen(*this);
 
             if (!type) {
-                return std::nullopt;
+                return Value::poisoned();
             }
 
-            auto* value_type = value->type;
-            value = cast(type, *value);
+            auto* value_type = value.type;
+            value = cast(type, value);
 
-            if (!value) {
+            if (!value.ok()) {
                 type_mismatch(decl.value->offset, type, value_type);
-                return std::nullopt;
+                return Value::poisoned();
             }
         }
 
-        if (!llvm::isa<llvm::Constant>(value->value)) {
+        if (!llvm::isa<llvm::Constant>(value.value)) {
             error(decl.value->offset, "not a constant");
-            return std::nullopt;
+            return Value::poisoned();
         }
 
-        result = *value;
-        return std::nullopt;
+        result = value;
+        return Value::poisoned();
     }
 
     if (decl.mutability == ast::VarDecl::Mut::Immut && !decl.value) {
@@ -472,7 +471,7 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
                                   "immutable variable {} must be initialized",
                                   log::quoted(decl.name.value)));
 
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     auto global_var_init = [&] {
@@ -482,7 +481,7 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
                                     log::quoted(decl.name.value)));
     };
 
-    std::optional<Value> value = std::nullopt;
+    Value value = Value::poisoned();
     Type* type = nullptr;
 
     llvm::Type* llvm_type = nullptr;
@@ -491,7 +490,7 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
         type = decl.type->codegen(*this);
 
         if (!type) {
-            return std::nullopt;
+            return Value::poisoned();
         }
 
         llvm_type = type->llvm_type;
@@ -500,41 +499,41 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
     if (decl.value) {
         value = decl.value->codegen(*this);
 
-        if (!value) {
-            return std::nullopt;
+        if (!value.ok()) {
+            return Value::poisoned();
         }
 
         if (!type) {
-            if (is<types::Null>(value->type) ||
-                is<types::Undefined>(value->type)) {
+            if (is<types::Null>(value.type) ||
+                is<types::Undefined>(value.type)) {
                 error(
                     decl.name.offset, fmt::format(
                                           "cannot infer type for {}",
                                           log::quoted(decl.name.value)));
 
-                return std::nullopt;
+                return Value::poisoned();
             }
 
-            type = value->type;
-            llvm_type = value->type->llvm_type;
+            type = value.type;
+            llvm_type = value.type->llvm_type;
         } else {
             if (!m_current_function) {
                 global_var_init();
-                return std::nullopt;
+                return Value::poisoned();
             }
 
-            if (is<types::Undefined>(value->type)) {
+            if (is<types::Undefined>(value.type)) {
                 result = {
                     type, create_alloca(llvm_type),
                     decl.mutability == ast::VarDecl::Mut::Mut};
 
-                return std::nullopt;
+                return Value::poisoned();
             }
 
             m_current_result = create_alloca(llvm_type);
 
-            if (!cast_to_result(type, *value)) {
-                type_mismatch(decl.value->offset, type, value->type);
+            if (!cast_to_result(type, value)) {
+                type_mismatch(decl.value->offset, type, value.type);
             } else {
                 result = {
                     type, m_current_result,
@@ -543,27 +542,27 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
 
             m_current_result = nullptr;
 
-            return std::nullopt;
+            return Value::poisoned();
         }
     }
 
-    if (value) {
-        if (value->stack_allocated) {
+    if (value.ok()) {
+        if (value.stack_allocated) {
             result = {
-                type, value->value, decl.mutability == ast::VarDecl::Mut::Mut};
+                type, value.value, decl.mutability == ast::VarDecl::Mut::Mut};
 
-            return std::nullopt;
+            return Value::poisoned();
         }
 
         if (m_current_function) {
             m_current_result = create_alloca(llvm_type);
         } else {
             global_var_init();
-            return std::nullopt;
+            return Value::poisoned();
         }
 
-        if (!is<types::Undefined>(value->type)) {
-            m_builder.CreateStore(load_value(*value).value, m_current_result);
+        if (!is<types::Undefined>(value.type)) {
+            m_builder.CreateStore(load_value(value).value, m_current_result);
         }
 
         result = {
@@ -594,7 +593,7 @@ std::optional<Value> Codegen::generate(const ast::VarDecl& decl) {
 
     m_current_result = nullptr;
 
-    return std::nullopt;
+    return Value::poisoned();
 }
 
 void Codegen::generate_fn_proto(const ast::FnDecl& decl) {

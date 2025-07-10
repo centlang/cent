@@ -117,67 +117,66 @@ public:
     [[nodiscard]] Type* generate(const ast::TupleType& type);
     [[nodiscard]] Type* generate(const ast::FnPointer& type);
 
-    std::optional<Value> generate(const ast::Assignment& stmt);
-    std::optional<Value> generate(const ast::BlockStmt& stmt);
-    std::optional<Value> generate(const ast::IfElse& stmt);
-    std::optional<Value> generate(const ast::Switch& stmt);
-    std::optional<Value> generate(const ast::ReturnStmt& stmt);
-    std::optional<Value> generate(const ast::WhileLoop& stmt);
-    std::optional<Value> generate(const ast::ForLoop& stmt);
-    std::optional<Value> generate(const ast::BreakStmt& stmt);
-    std::optional<Value> generate(const ast::ContinueStmt& stmt);
-    std::optional<Value> generate(const ast::Unreachable& stmt);
-    std::optional<Value> generate(const ast::AssertStmt& stmt);
+    Value generate(const ast::Assignment& stmt);
+    Value generate(const ast::BlockStmt& stmt);
+    Value generate(const ast::IfElse& stmt);
+    Value generate(const ast::Switch& stmt);
+    Value generate(const ast::ReturnStmt& stmt);
+    Value generate(const ast::WhileLoop& stmt);
+    Value generate(const ast::ForLoop& stmt);
+    Value generate(const ast::BreakStmt& stmt);
+    Value generate(const ast::ContinueStmt& stmt);
+    Value generate(const ast::Unreachable& stmt);
+    Value generate(const ast::AssertStmt& stmt);
 
-    [[nodiscard]] std::optional<Value> generate(const ast::BinaryExpr& expr);
-    [[nodiscard]] std::optional<Value> generate(const ast::UnaryExpr& expr);
-    [[nodiscard]] std::optional<Value> generate(const ast::IntLiteral& expr);
-    [[nodiscard]] std::optional<Value> generate(const ast::FloatLiteral& expr);
-    [[nodiscard]] std::optional<Value> generate(const ast::StrLiteral& expr);
-    [[nodiscard]] std::optional<Value> generate(const ast::BoolLiteral& expr);
-    [[nodiscard]] std::optional<Value> generate(const ast::NullLiteral& expr);
-    [[nodiscard]] std::optional<Value> generate(const ast::Undefined& expr);
-    [[nodiscard]] std::optional<Value> generate(const ast::RangeLiteral& expr);
-    [[nodiscard]] std::optional<Value> generate(const ast::StructLiteral& expr);
-    [[nodiscard]] std::optional<Value> generate(const ast::ArrayLiteral& expr);
-    [[nodiscard]] std::optional<Value> generate(const ast::TupleLiteral& expr);
-    [[nodiscard]] std::optional<Value> generate(const ast::Identifier& expr);
-    [[nodiscard]] std::optional<Value> generate(const ast::CallExpr& expr);
+    [[nodiscard]] Value generate(const ast::BinaryExpr& expr);
+    [[nodiscard]] Value generate(const ast::UnaryExpr& expr);
+    [[nodiscard]] Value generate(const ast::IntLiteral& expr);
+    [[nodiscard]] Value generate(const ast::FloatLiteral& expr);
+    [[nodiscard]] Value generate(const ast::StrLiteral& expr);
+    [[nodiscard]] Value generate(const ast::BoolLiteral& expr);
+    [[nodiscard]] Value generate(const ast::NullLiteral& expr);
+    [[nodiscard]] Value generate(const ast::Undefined& expr);
+    [[nodiscard]] Value generate(const ast::RangeLiteral& expr);
+    [[nodiscard]] Value generate(const ast::StructLiteral& expr);
+    [[nodiscard]] Value generate(const ast::ArrayLiteral& expr);
+    [[nodiscard]] Value generate(const ast::TupleLiteral& expr);
+    [[nodiscard]] Value generate(const ast::Identifier& expr);
+    [[nodiscard]] Value generate(const ast::CallExpr& expr);
 
-    [[nodiscard]] std::optional<Value>
-    generate(const ast::CallExprGeneric& expr);
+    [[nodiscard]] Value generate(const ast::CallExprGeneric& expr);
 
-    [[nodiscard]] std::optional<Value> generate(const ast::MethodExpr& expr);
-    [[nodiscard]] std::optional<Value> generate(const ast::MemberExpr& expr);
-    [[nodiscard]] std::optional<Value> generate(const ast::IndexExpr& expr);
-    [[nodiscard]] std::optional<Value> generate(const ast::SliceExpr& expr);
-    [[nodiscard]] std::optional<Value> generate(const ast::AsExpr& expr);
+    [[nodiscard]] Value generate(const ast::MethodExpr& expr);
+    [[nodiscard]] Value generate(const ast::MemberExpr& expr);
+    [[nodiscard]] Value generate(const ast::IndexExpr& expr);
+    [[nodiscard]] Value generate(const ast::SliceExpr& expr);
+    [[nodiscard]] Value generate(const ast::AsExpr& expr);
 
-    std::optional<Value> generate(const ast::FnDecl& decl);
-    std::optional<Value> generate(const ast::Struct& decl);
-    std::optional<Value> generate(const ast::Union& decl);
-    std::optional<Value> generate(const ast::EnumDecl& decl);
-    std::optional<Value> generate(const ast::TypeAlias& decl);
+    Value generate(const ast::FnDecl& decl);
+    Value generate(const ast::Struct& decl);
+    Value generate(const ast::Union& decl);
+    Value generate(const ast::EnumDecl& decl);
+    Value generate(const ast::TypeAlias& decl);
 
-    std::optional<Value> generate(const ast::VarDecl& decl);
+    Value generate(const ast::VarDecl& decl);
 
 private:
     void generate(const ast::Module& module);
 
-    [[nodiscard]] std::optional<Value>
+    [[nodiscard]] Value
     cast(Type* type, const Value& value, bool implicit = true);
 
-    [[nodiscard]] std::optional<Value>
+    [[nodiscard]] Value
     primitive_cast(Type* type, const Value& value, bool implicit = true);
 
     [[nodiscard]] bool
     cast_to_result(Type* type, const Value& value, bool implicit = true);
 
-    [[nodiscard]] std::optional<Value> generate_bin_logical_expr(
+    [[nodiscard]] Value generate_bin_logical_expr(
         const ast::Expression& lhs, const ast::Expression& rhs,
         ast::OffsetValue<frontend::Token::Type> oper);
 
-    [[nodiscard]] std::optional<Value> generate_bin_expr(
+    [[nodiscard]] Value generate_bin_expr(
         ast::OffsetValue<const Value&> lhs, ast::OffsetValue<const Value&> rhs,
         ast::OffsetValue<frontend::Token::Type> oper);
 
@@ -216,7 +215,7 @@ private:
     [[nodiscard]] types::Union*
     inst_generic_union(GenericUnion* type, const std::vector<Type*>& types);
 
-    [[nodiscard]] std::optional<Value>
+    [[nodiscard]] Value
     inst_generic_fn(GenericFunction* function, const std::vector<Type*>& types);
 
     [[nodiscard]] Type* inst_template_param(

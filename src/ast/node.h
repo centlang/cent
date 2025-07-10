@@ -34,8 +34,7 @@ struct Type : Node {
 struct Statement : Node {
     [[nodiscard]] Statement(std::size_t offset) : offset{offset} {}
 
-    virtual std::optional<backend::Value>
-    codegen(backend::Codegen& codegen) const = 0;
+    virtual backend::Value codegen(backend::Codegen& codegen) const = 0;
 
     std::size_t offset;
 };
@@ -69,8 +68,7 @@ template <typename Derived> struct Type : ast::Type {
 template <typename Derived> struct Stmt : Statement {
     using Statement::Statement;
 
-    std::optional<backend::Value>
-    codegen(backend::Codegen& codegen) const override {
+    backend::Value codegen(backend::Codegen& codegen) const override {
         return codegen.generate(static_cast<const Derived&>(*this));
     }
 };
@@ -78,8 +76,7 @@ template <typename Derived> struct Stmt : Statement {
 template <typename Derived> struct Expr : Expression {
     using Expression::Expression;
 
-    [[nodiscard]] std::optional<backend::Value>
-    codegen(backend::Codegen& codegen) const override {
+    backend::Value codegen(backend::Codegen& codegen) const override {
         return codegen.generate(static_cast<const Derived&>(*this));
     }
 };
@@ -87,8 +84,7 @@ template <typename Derived> struct Expr : Expression {
 template <typename Derived> struct Decl : Declaration {
     using Declaration::Declaration;
 
-    std::optional<backend::Value>
-    codegen(backend::Codegen& codegen) const override {
+    backend::Value codegen(backend::Codegen& codegen) const override {
         return codegen.generate(static_cast<const Derived&>(*this));
     }
 };

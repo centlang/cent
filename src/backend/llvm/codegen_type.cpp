@@ -154,17 +154,17 @@ Type* Codegen::generate(const ast::ArrayType& type) {
 
     auto size = type.size->codegen(*this);
 
-    if (!size) {
+    if (!size.ok()) {
         return nullptr;
     }
 
-    auto value = cast(m_primitive_types["usize"].get(), *size);
+    auto value = cast(m_primitive_types["usize"].get(), size);
 
-    if (!value) {
+    if (!value.ok()) {
         return nullptr;
     }
 
-    if (auto* constant = llvm::dyn_cast<llvm::ConstantInt>(value->value)) {
+    if (auto* constant = llvm::dyn_cast<llvm::ConstantInt>(value.value)) {
         return get_array_type(contained, constant->getZExtValue());
     }
 
@@ -235,23 +235,23 @@ types::Function* Codegen::generate_fn_type(const ast::FnProto& proto) {
 
         auto value = parameter.value->codegen(*this);
 
-        if (!value) {
+        if (!value.ok()) {
             return nullptr;
         }
 
-        auto val = cast(type, *value);
+        auto val = cast(type, value);
 
-        if (!val) {
-            type_mismatch(parameter.value->offset, type, value->type);
+        if (!val.ok()) {
+            type_mismatch(parameter.value->offset, type, value.type);
             return nullptr;
         }
 
-        if (!llvm::isa<llvm::Constant>(val->value)) {
+        if (!llvm::isa<llvm::Constant>(val.value)) {
             error(parameter.value->offset, "not a constant");
             return nullptr;
         }
 
-        default_args.push_back(static_cast<llvm::Constant*>(val->value));
+        default_args.push_back(static_cast<llvm::Constant*>(val.value));
     }
 
     return get_fn_type(
@@ -402,7 +402,7 @@ types::Union* Codegen::inst_generic_union(
     return result.get();
 }
 
-std::optional<Value> Codegen::inst_generic_fn(
+Value Codegen::inst_generic_fn(
     GenericFunction* function, const std::vector<Type*>& types) {
     auto generic_fn_inst = m_generic_fns_inst[function];
 
@@ -426,26 +426,26 @@ std::optional<Value> Codegen::inst_generic_fn(
         const auto* arg = function->default_args[i];
         auto value = arg->codegen(*this);
 
-        if (!value) {
-            return std::nullopt;
+        if (!value.ok()) {
+            return Value::poisoned();
         }
 
         auto* type =
             param_types[i + param_types.size() - function->default_args.size()];
 
-        auto val = cast(type, *value);
+        auto val = cast(type, value);
 
-        if (!val) {
-            type_mismatch(arg->offset, type, value->type);
-            return std::nullopt;
+        if (!val.ok()) {
+            type_mismatch(arg->offset, type, value.type);
+            return Value::poisoned();
         }
 
-        if (!llvm::isa<llvm::Constant>(val->value)) {
+        if (!llvm::isa<llvm::Constant>(val.value)) {
             error(arg->offset, "not a constant");
-            return std::nullopt;
+            return Value::poisoned();
         }
 
-        default_args.push_back(static_cast<llvm::Constant*>(val->value));
+        default_args.push_back(static_cast<llvm::Constant*>(val.value));
     }
 
     std::string name = function->mangled_name + "(<";
@@ -522,7 +522,7 @@ std::optional<Value> Codegen::inst_generic_fn(
 
         m_builder.SetInsertPoint(insert_point);
 
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     m_builder.CreateRetVoid();

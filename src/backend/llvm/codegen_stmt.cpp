@@ -22,18 +22,17 @@
 
 namespace cent::backend {
 
-std::optional<Value>
-Codegen::generate([[maybe_unused]] const ast::Assignment& stmt) {
+Value Codegen::generate([[maybe_unused]] const ast::Assignment& stmt) {
     auto var = stmt.variable->codegen(*this);
 
-    if (!var) {
-        return std::nullopt;
+    if (!var.ok()) {
+        return Value::poisoned();
     }
 
     auto value = stmt.value->codegen(*this);
 
-    if (!value) {
-        return std::nullopt;
+    if (!value.ok()) {
+        return Value::poisoned();
     }
 
     auto without_equal = [](frontend::Token::Type type) {
@@ -63,42 +62,42 @@ Codegen::generate([[maybe_unused]] const ast::Assignment& stmt) {
 
     if (stmt.oper.value != frontend::Token::Type::Equal) {
         value = generate_bin_expr(
-            ast::OffsetValue<const Value&>{*var, stmt.variable->offset},
-            ast::OffsetValue<const Value&>{*value, stmt.value->offset},
+            ast::OffsetValue<const Value&>{var, stmt.variable->offset},
+            ast::OffsetValue<const Value&>{value, stmt.value->offset},
             ast::OffsetValue{without_equal(stmt.oper.value), stmt.oper.offset});
 
-        if (!value) {
-            return std::nullopt;
+        if (!value.ok()) {
+            return Value::poisoned();
         }
     }
 
-    if (!var->is_deref && !llvm::isa<llvm::AllocaInst>(var->value) &&
-        !llvm::isa<llvm::GlobalVariable>(var->value) &&
-        !llvm::isa<llvm::LoadInst>(var->value) &&
-        !llvm::isa<llvm::GetElementPtrInst>(var->value)) {
+    if (!var.is_deref && !llvm::isa<llvm::AllocaInst>(var.value) &&
+        !llvm::isa<llvm::GlobalVariable>(var.value) &&
+        !llvm::isa<llvm::LoadInst>(var.value) &&
+        !llvm::isa<llvm::GetElementPtrInst>(var.value)) {
         error(stmt.variable->offset, "cannot assign to a value");
 
-        return std::nullopt;
+        return Value::poisoned();
     }
 
-    if (!var->is_mutable) {
+    if (!var.is_mutable) {
         error(stmt.value->offset, "cannot assign to an immutable value");
 
-        return std::nullopt;
+        return Value::poisoned();
     }
 
-    m_current_result = var->value;
+    m_current_result = var.value;
 
-    if (!cast_to_result(var->type, *value)) {
-        type_mismatch(stmt.value->offset, var->type, value->type);
+    if (!cast_to_result(var.type, value)) {
+        type_mismatch(stmt.value->offset, var.type, value.type);
     }
 
     m_current_result = nullptr;
 
-    return std::nullopt;
+    return Value::poisoned();
 }
 
-std::optional<Value> Codegen::generate(const ast::BlockStmt& stmt) {
+Value Codegen::generate(const ast::BlockStmt& stmt) {
     auto current_scope = *m_current_scope;
 
     for (const auto& statement : stmt.body) {
@@ -107,14 +106,14 @@ std::optional<Value> Codegen::generate(const ast::BlockStmt& stmt) {
 
     *m_current_scope = std::move(current_scope);
 
-    return std::nullopt;
+    return Value::poisoned();
 }
 
-std::optional<Value> Codegen::generate(const ast::IfElse& stmt) {
+Value Codegen::generate(const ast::IfElse& stmt) {
     auto condition = stmt.condition->codegen(*this);
 
-    if (!condition) {
-        return std::nullopt;
+    if (!condition.ok()) {
+        return Value::poisoned();
     }
 
     auto* function = m_builder.GetInsertBlock()->getParent();
@@ -124,7 +123,7 @@ std::optional<Value> Codegen::generate(const ast::IfElse& stmt) {
     if (!stmt.else_block) {
         auto* end = llvm::BasicBlock::Create(m_context, "", function);
 
-        m_builder.CreateCondBr(load_value(*condition).value, if_block, end);
+        m_builder.CreateCondBr(load_value(condition).value, if_block, end);
 
         m_builder.SetInsertPoint(if_block);
         stmt.if_block->codegen(*this);
@@ -135,11 +134,11 @@ std::optional<Value> Codegen::generate(const ast::IfElse& stmt) {
 
         m_builder.SetInsertPoint(end);
 
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     auto* else_block = llvm::BasicBlock::Create(m_context, "", function);
-    m_builder.CreateCondBr(load_value(*condition).value, if_block, else_block);
+    m_builder.CreateCondBr(load_value(condition).value, if_block, else_block);
 
     m_builder.SetInsertPoint(if_block);
     stmt.if_block->codegen(*this);
@@ -159,7 +158,7 @@ std::optional<Value> Codegen::generate(const ast::IfElse& stmt) {
             m_builder.SetInsertPoint(end);
         }
 
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     if (!end) {
@@ -169,29 +168,29 @@ std::optional<Value> Codegen::generate(const ast::IfElse& stmt) {
     m_builder.CreateBr(end);
     m_builder.SetInsertPoint(end);
 
-    return std::nullopt;
+    return Value::poisoned();
 }
 
-std::optional<Value> Codegen::generate(const ast::Switch& stmt) {
+Value Codegen::generate(const ast::Switch& stmt) {
     auto value = stmt.value->codegen(*this);
 
-    if (!value) {
-        return std::nullopt;
+    if (!value.ok()) {
+        return Value::poisoned();
     }
 
-    if (auto* union_type = dyn_cast<types::Union>(value->type)) {
+    if (auto* union_type = dyn_cast<types::Union>(value.type)) {
         if (!union_type->tag_type) {
             error(stmt.value->offset, "switch on an untagged union");
-            return std::nullopt;
+            return Value::poisoned();
         }
 
         auto* tag_member = load_struct_member(
-            union_type->llvm_type, union_type->tag_type->llvm_type,
-            value->value, union_member_tag);
+            union_type->llvm_type, union_type->tag_type->llvm_type, value.value,
+            union_member_tag);
 
         value = {union_type->tag_type, tag_member};
     } else {
-        value = load_value(*value);
+        value = load_value(value);
     }
 
     auto* function = m_builder.GetInsertBlock()->getParent();
@@ -203,7 +202,7 @@ std::optional<Value> Codegen::generate(const ast::Switch& stmt) {
                            : nullptr;
 
     auto* switch_inst = m_builder.CreateSwitch(
-        value->value, else_block ? else_block : end, stmt.cases.size());
+        value.value, else_block ? else_block : end, stmt.cases.size());
 
     bool all_terminate = stmt.else_block != nullptr;
 
@@ -220,15 +219,14 @@ std::optional<Value> Codegen::generate(const ast::Switch& stmt) {
 
         for (const auto& case_value : case_stmt.values) {
             auto case_val = case_value->codegen(*this);
-            auto val = cast(value->type, *case_val);
+            auto val = cast(value.type, case_val);
 
-            if (!val) {
-                type_mismatch(stmt.offset, value->type, case_val->type);
-                return std::nullopt;
+            if (!val.ok()) {
+                type_mismatch(stmt.offset, value.type, case_val.type);
+                return Value::poisoned();
             }
 
-            if (auto* constant =
-                    llvm::dyn_cast<llvm::ConstantInt>(val->value)) {
+            if (auto* constant = llvm::dyn_cast<llvm::ConstantInt>(val.value)) {
                 switch_inst->addCase(constant, block);
                 continue;
             }
@@ -253,49 +251,48 @@ std::optional<Value> Codegen::generate(const ast::Switch& stmt) {
         end->eraseFromParent();
     }
 
-    return std::nullopt;
+    return Value::poisoned();
 }
 
-std::optional<Value> Codegen::generate(const ast::ReturnStmt& stmt) {
+Value Codegen::generate(const ast::ReturnStmt& stmt) {
     auto* function = m_builder.GetInsertBlock()->getParent();
 
     if (!stmt.value) {
         if (!function->getReturnType()->isVoidTy()) {
             error(stmt.offset, "type mismatch");
 
-            return std::nullopt;
+            return Value::poisoned();
         }
 
         if (!m_builder.GetInsertBlock()->getTerminator()) {
             m_builder.CreateRetVoid();
         }
 
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     auto value = stmt.value->codegen(*this);
 
-    if (!value) {
-        return std::nullopt;
+    if (!value.ok()) {
+        return Value::poisoned();
     }
 
-    if (auto val = cast(m_current_function->return_type, *value)) {
+    if (auto val = cast(m_current_function->return_type, value); val.ok()) {
         if (!m_builder.GetInsertBlock()->getTerminator()) {
-            m_builder.CreateRet(load_value(*val).value);
+            m_builder.CreateRet(load_value(val).value);
         }
     } else {
-        type_mismatch(
-            stmt.offset, m_current_function->return_type, value->type);
+        type_mismatch(stmt.offset, m_current_function->return_type, value.type);
     }
 
-    return std::nullopt;
+    return Value::poisoned();
 }
 
-std::optional<Value> Codegen::generate(const ast::WhileLoop& stmt) {
+Value Codegen::generate(const ast::WhileLoop& stmt) {
     auto condition = stmt.condition->codegen(*this);
 
-    if (!condition) {
-        return std::nullopt;
+    if (!condition.ok()) {
+        return Value::poisoned();
     }
 
     auto* function = m_builder.GetInsertBlock()->getParent();
@@ -307,7 +304,7 @@ std::optional<Value> Codegen::generate(const ast::WhileLoop& stmt) {
     m_loop_end = llvm::BasicBlock::Create(m_context, "", function);
 
     m_builder.CreateCondBr(
-        load_value(*condition).value, m_loop_body, m_loop_end);
+        load_value(condition).value, m_loop_body, m_loop_end);
 
     m_builder.SetInsertPoint(m_loop_body);
     stmt.body->codegen(*this);
@@ -315,21 +312,21 @@ std::optional<Value> Codegen::generate(const ast::WhileLoop& stmt) {
     condition = stmt.condition->codegen(*this);
 
     m_builder.CreateCondBr(
-        load_value(*condition).value, m_loop_body, m_loop_end);
+        load_value(condition).value, m_loop_body, m_loop_end);
 
     m_builder.SetInsertPoint(m_loop_end);
 
     m_loop_body = loop_body;
     m_loop_end = loop_end;
 
-    return std::nullopt;
+    return Value::poisoned();
 }
 
-std::optional<Value> Codegen::generate(const ast::ForLoop& stmt) {
+Value Codegen::generate(const ast::ForLoop& stmt) {
     auto value = stmt.value->codegen(*this);
 
-    if (!value) {
-        return std::nullopt;
+    if (!value.ok()) {
+        return Value::poisoned();
     }
 
     auto* function = m_builder.GetInsertBlock()->getParent();
@@ -340,7 +337,7 @@ std::optional<Value> Codegen::generate(const ast::ForLoop& stmt) {
     m_loop_body = llvm::BasicBlock::Create(m_context, "", function);
     m_loop_end = llvm::BasicBlock::Create(m_context, "", function);
 
-    if (auto* type = dyn_cast<types::Slice>(value->type)) {
+    if (auto* type = dyn_cast<types::Slice>(value.type)) {
         auto* llvm_contained_type = type->type->llvm_type;
 
         auto* usize = m_module->getDataLayout().getIntPtrType(m_context);
@@ -350,7 +347,7 @@ std::optional<Value> Codegen::generate(const ast::ForLoop& stmt) {
         m_builder.CreateStore(usize_null, index);
 
         auto* length = load_struct_member(
-            value->type->llvm_type, usize, value->value, slice_member_len);
+            value.type->llvm_type, usize, value.value, slice_member_len);
 
         m_builder.CreateCondBr(
             m_builder.CreateICmpULT(usize_null, length), m_loop_body,
@@ -361,7 +358,7 @@ std::optional<Value> Codegen::generate(const ast::ForLoop& stmt) {
         auto current_scope = *m_current_scope;
 
         auto* ptr_value = load_struct_member(
-            type->llvm_type, llvm::PointerType::get(m_context, 0), value->value,
+            type->llvm_type, llvm::PointerType::get(m_context, 0), value.value,
             slice_member_ptr);
 
         auto* index_value = m_builder.CreateLoad(usize, index);
@@ -390,10 +387,10 @@ std::optional<Value> Codegen::generate(const ast::ForLoop& stmt) {
         m_loop_body = loop_body;
         m_loop_end = loop_end;
 
-        return std::nullopt;
+        return Value::poisoned();
     }
 
-    if (auto* type = dyn_cast<types::Array>(value->type)) {
+    if (auto* type = dyn_cast<types::Array>(value.type)) {
         auto* llvm_contained_type = type->type->llvm_type;
 
         auto* usize = m_module->getDataLayout().getIntPtrType(m_context);
@@ -419,7 +416,7 @@ std::optional<Value> Codegen::generate(const ast::ForLoop& stmt) {
             m_builder.CreateLoad(
                 llvm_contained_type,
                 m_builder.CreateGEP(
-                    llvm_contained_type, value->value, index_value))};
+                    llvm_contained_type, value.value, index_value))};
 
         stmt.body->codegen(*this);
 
@@ -439,39 +436,39 @@ std::optional<Value> Codegen::generate(const ast::ForLoop& stmt) {
         m_loop_body = loop_body;
         m_loop_end = loop_end;
 
-        return std::nullopt;
+        return Value::poisoned();
     }
 
-    auto* type = dyn_cast<types::Range>(value->type);
+    auto* type = dyn_cast<types::Range>(value.type);
 
     if (!type) {
         error(stmt.value->offset, "not iterable");
 
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     auto* llvm_contained_type = type->type->llvm_type;
 
     llvm::Value* begin = load_struct_member(
-        value->type->llvm_type, llvm_contained_type, value->value,
+        value.type->llvm_type, llvm_contained_type, value.value,
         range_member_begin);
 
     llvm::Value* end = load_struct_member(
-        value->type->llvm_type, llvm_contained_type, value->value,
+        value.type->llvm_type, llvm_contained_type, value.value,
         range_member_end);
 
     if (!is_sint(type->type) && !is_uint(type->type)) {
         error(stmt.value->offset, "type mismatch");
 
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     auto* variable = create_alloca(llvm_contained_type);
     m_builder.CreateStore(begin, variable);
 
     m_builder.CreateCondBr(
-        is_sint(value->type) ? m_builder.CreateICmpSLT(begin, end)
-                             : m_builder.CreateICmpULT(begin, end),
+        is_sint(value.type) ? m_builder.CreateICmpSLT(begin, end)
+                            : m_builder.CreateICmpULT(begin, end),
         m_loop_body, m_loop_end);
 
     m_builder.SetInsertPoint(m_loop_body);
@@ -490,8 +487,8 @@ std::optional<Value> Codegen::generate(const ast::ForLoop& stmt) {
     m_builder.CreateStore(incremented, variable);
 
     m_builder.CreateCondBr(
-        is_sint(value->type) ? m_builder.CreateICmpSLT(incremented, end)
-                             : m_builder.CreateICmpULT(incremented, end),
+        is_sint(value.type) ? m_builder.CreateICmpSLT(incremented, end)
+                            : m_builder.CreateICmpULT(incremented, end),
         m_loop_body, m_loop_end);
 
     m_builder.SetInsertPoint(m_loop_end);
@@ -499,45 +496,44 @@ std::optional<Value> Codegen::generate(const ast::ForLoop& stmt) {
     m_loop_body = loop_body;
     m_loop_end = loop_end;
 
-    return std::nullopt;
+    return Value::poisoned();
 }
 
-std::optional<Value> Codegen::generate(const ast::BreakStmt& stmt) {
+Value Codegen::generate(const ast::BreakStmt& stmt) {
     if (!m_loop_end) {
         error(stmt.offset, "`break` not in loop");
 
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     m_builder.CreateBr(m_loop_end);
 
-    return std::nullopt;
+    return Value::poisoned();
 }
 
-std::optional<Value> Codegen::generate(const ast::ContinueStmt& stmt) {
+Value Codegen::generate(const ast::ContinueStmt& stmt) {
     if (!m_loop_body) {
         error(stmt.offset, "`continue` not in loop");
 
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     m_builder.CreateBr(m_loop_body);
 
-    return std::nullopt;
+    return Value::poisoned();
 }
 
-std::optional<Value>
-Codegen::generate([[maybe_unused]] const ast::Unreachable& stmt) {
+Value Codegen::generate([[maybe_unused]] const ast::Unreachable& stmt) {
     m_builder.CreateUnreachable();
 
-    return std::nullopt;
+    return Value::poisoned();
 }
 
-std::optional<Value> Codegen::generate(const ast::AssertStmt& stmt) {
+Value Codegen::generate(const ast::AssertStmt& stmt) {
     auto condition = stmt.condition->codegen(*this);
 
-    if (!condition) {
-        return std::nullopt;
+    if (!condition.ok()) {
+        return Value::poisoned();
     }
 
     auto* function = m_builder.GetInsertBlock()->getParent();
@@ -545,7 +541,7 @@ std::optional<Value> Codegen::generate(const ast::AssertStmt& stmt) {
     auto* success = llvm::BasicBlock::Create(m_context, "", function);
     auto* failure = llvm::BasicBlock::Create(m_context, "", function);
 
-    m_builder.CreateCondBr(condition->value, success, failure);
+    m_builder.CreateCondBr(condition.value, success, failure);
 
     m_builder.SetInsertPoint(failure);
 
@@ -561,7 +557,7 @@ std::optional<Value> Codegen::generate(const ast::AssertStmt& stmt) {
 
     m_builder.SetInsertPoint(success);
 
-    return std::nullopt;
+    return Value::poisoned();
 }
 
 } // namespace cent::backend

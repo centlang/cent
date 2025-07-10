@@ -119,8 +119,7 @@ void Codegen::generate(const ast::Module& module) {
     m_generated_modules[module.path] = *m_current_scope;
 }
 
-std::optional<Value>
-Codegen::cast(Type* type, const Value& value, bool implicit) {
+Value Codegen::cast(Type* type, const Value& value, bool implicit) {
     auto* base_type = unwrap_type(type);
     auto* base_value_type = unwrap_type(value.type);
 
@@ -129,7 +128,7 @@ Codegen::cast(Type* type, const Value& value, bool implicit) {
     }
 
     if (is<types::Void>(base_type)) {
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     if (const auto* optional = dyn_cast<types::Optional>(base_type)) {
@@ -141,7 +140,7 @@ Codegen::cast(Type* type, const Value& value, bool implicit) {
         }
 
         if (base_contained_type != base_value_type) {
-            return std::nullopt;
+            return Value::poisoned();
         }
 
         if (is<types::Pointer>(base_contained_type)) {
@@ -184,13 +183,13 @@ Codegen::cast(Type* type, const Value& value, bool implicit) {
         const auto* array_type = dyn_cast<types::Array>(base_value_type);
 
         if (!array_type) {
-            return std::nullopt;
+            return Value::poisoned();
         }
 
         auto* base_array_contained_type = unwrap_type(array_type->type);
 
         if (base_slice_contained_type != base_array_contained_type) {
-            return std::nullopt;
+            return Value::poisoned();
         }
 
         auto* variable = create_alloca(base_type->llvm_type);
@@ -218,8 +217,7 @@ Codegen::cast(Type* type, const Value& value, bool implicit) {
     return primitive_cast(type, value, implicit);
 }
 
-std::optional<Value>
-Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
+Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
     using enum llvm::Instruction::CastOps;
 
     auto* base_type = unwrap_type(type);
@@ -233,7 +231,7 @@ Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
 
     if (!value_is_float && !value_is_sint && !value_is_uint && !value_is_ptr &&
         !value_is_enum) {
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     bool type_is_float = is_float(base_type);
@@ -376,7 +374,7 @@ Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
     }
 
     if (cast_op == CastOpsEnd) {
-        return std::nullopt;
+        return Value::poisoned();
     }
 
     return Value{
@@ -484,8 +482,8 @@ bool Codegen::cast_to_result(Type* type, const Value& value, bool implicit) {
         return true;
     }
 
-    if (auto val = primitive_cast(type, value, implicit)) {
-        m_builder.CreateStore(val->value, m_current_result);
+    if (auto val = primitive_cast(type, value, implicit); val.ok()) {
+        m_builder.CreateStore(val.value, m_current_result);
         return true;
     }
 
@@ -601,7 +599,7 @@ Codegen::get_name(std::size_t offset, std::string_view name, Scope& parent) {
         return nullptr;
     }
 
-    return iterator->second.is_poisoned() ? nullptr : &iterator->second;
+    return iterator->second.ok() ? &iterator->second : nullptr;
 }
 
 Scope*
