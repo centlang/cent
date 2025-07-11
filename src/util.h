@@ -1,17 +1,64 @@
 #ifndef CENT_UTIL_H
 #define CENT_UTIL_H
 
+#include <cmath>
 #include <fstream>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include "log.h"
 
 namespace cent {
+
+[[nodiscard]] inline std::uint8_t
+edit_distance(std::string_view first, std::string_view second) {
+    std::vector distances(
+        first.size() + 1, std::vector<std::uint8_t>(second.size() + 1));
+
+    for (std::size_t i = 0; i <= first.size(); ++i) {
+        distances[i][0] = i;
+    }
+
+    for (std::size_t i = 0; i <= second.size(); ++i) {
+        distances[0][i] = i;
+    }
+
+    for (std::size_t i = 1; i <= first.size(); ++i) {
+        for (std::size_t j = 1; j <= second.size(); ++j) {
+            if (first[i - 1] == second[j - 1]) {
+                distances[i][j] = distances[i - 1][j - 1];
+                continue;
+            }
+
+            distances[i][j] =
+                1 + std::min(
+                        std::min(distances[i][j - 1], distances[i - 1][j]),
+                        distances[i - 1][j - 1]);
+        }
+    }
+
+    return distances[first.size()][second.size()];
+}
+
+template <typename Map>
+[[nodiscard]] inline std::string_view
+closest_match(std::string_view name, const Map& map) {
+    std::string_view result;
+    std::uint8_t min_distance = -1;
+
+    for (const auto& pair : map) {
+        if (auto distance = edit_distance(name, pair.first);
+            distance < min_distance) {
+            result = pair.first;
+            min_distance = distance;
+        }
+    }
+
+    return result;
+}
 
 [[nodiscard]] inline std::optional<std::string>
 read_file(const std::string& filename) {
