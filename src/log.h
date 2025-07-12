@@ -196,14 +196,14 @@ log(std::string_view type, Color type_fg, std::uint32_t line,
         column);
 
     fmt::print(
-        stderr, "{}\n",
+        stderr, "{}\n\n",
         fg(hint ? fmt::format("^ hint: {}", *hint) : "^", Green));
 }
 
 inline void
 log(std::string_view type, Color type_fg, std::string_view message) {
     fmt::print(
-        stderr, "{} {}\n", bold(fg(fmt::format("{}:", type), type_fg)),
+        stderr, "{} {}\n\n", bold(fg(fmt::format("{}:", type), type_fg)),
         message);
 }
 
