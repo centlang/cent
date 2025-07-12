@@ -2,6 +2,7 @@
 #define CENT_LOG_H
 
 #include <cstdint>
+#include <optional>
 #include <string_view>
 
 #include <fmt/format.h>
@@ -182,7 +183,8 @@ template <typename ValueType> inline auto quoted(ValueType value) {
 inline void
 log(std::string_view type, Color type_fg, std::uint32_t line,
     std::uint32_t column, std::string_view filename, std::string_view message,
-    std::string_view code) {
+    std::string_view code,
+    std::optional<std::string_view> hint = std::nullopt) {
     fmt::print(
         stderr, "{}:{}:{}: {} {}\n", filename, line, column,
         bold(fg(fmt::format("{}:", type), type_fg)), message);
@@ -190,8 +192,12 @@ log(std::string_view type, Color type_fg, std::uint32_t line,
     fmt::print(stderr, " {} | {}\n", line, code);
 
     fmt::print(
-        stderr, " {:{}} |{:{}}{}\n", "", fmt::formatted_size("{}", line), "",
-        column, fg("^", Green));
+        stderr, " {:{}} |{:{}}", "", fmt::formatted_size("{}", line), "",
+        column);
+
+    fmt::print(
+        stderr, "{}\n",
+        fg(hint ? fmt::format("^ hint: {}", *hint) : "^", Green));
 }
 
 inline void
@@ -203,16 +209,18 @@ log(std::string_view type, Color type_fg, std::string_view message) {
 
 inline void error(
     std::uint32_t line, std::uint32_t column, std::string_view filename,
-    std::string_view message, std::string_view code) {
-    log("error", Red, line, column, filename, message, code);
+    std::string_view message, std::string_view code,
+    std::optional<std::string_view> hint = std::nullopt) {
+    log("error", Red, line, column, filename, message, code, hint);
 }
 
 inline void error(std::string_view message) { log("error", Red, message); }
 
 inline void warning(
     std::uint32_t line, std::uint32_t column, std::string_view filename,
-    std::string_view message, std::string_view code) {
-    log("warning", Yellow, line, column, filename, message, code);
+    std::string_view message, std::string_view code,
+    std::optional<std::string_view> hint = std::nullopt) {
+    log("warning", Yellow, line, column, filename, message, code, hint);
 }
 
 inline void warning(std::string_view message) {
@@ -221,8 +229,9 @@ inline void warning(std::string_view message) {
 
 inline void note(
     std::uint32_t line, std::uint32_t column, std::string_view filename,
-    std::string_view message, std::string_view code) {
-    log("note", Cyan, line, column, filename, message, code);
+    std::string_view message, std::string_view code,
+    std::optional<std::string_view> hint = std::nullopt) {
+    log("note", Cyan, line, column, filename, message, code, hint);
 }
 
 inline void note(std::string_view message) { log("note", Cyan, message); }
