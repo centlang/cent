@@ -579,7 +579,10 @@ Type* Codegen::get_type(
     auto user = parent.types.find(name);
 
     if (user == parent.types.end()) {
-        error(offset, fmt::format("undeclared type: {}", log::quoted(name)));
+        error(
+            offset, fmt::format("undeclared type: {}", log::quoted(name)),
+            fmt::format(
+                "did you mean `{}`?", closest_match(name, parent.types)));
 
         return nullptr;
     }
@@ -593,8 +596,9 @@ Codegen::get_name(std::size_t offset, std::string_view name, Scope& parent) {
 
     if (iterator == parent.names.end()) {
         error(
-            offset,
-            fmt::format("undeclared identifier: {}", log::quoted(name)));
+            offset, fmt::format("undeclared identifier: {}", log::quoted(name)),
+            fmt::format(
+                "did you mean `{}`?", closest_match(name, parent.names)));
 
         return nullptr;
     }
@@ -607,7 +611,10 @@ Codegen::get_scope(std::size_t offset, std::string_view name, Scope& parent) {
     auto iterator = parent.scopes.find(name);
 
     if (iterator == parent.scopes.end()) {
-        error(offset, fmt::format("could not find {}", log::quoted(name)));
+        error(
+            offset, fmt::format("could not find {}", log::quoted(name)),
+            fmt::format(
+                "did you mean `{}`?", closest_match(name, parent.names)));
 
         return nullptr;
     }

@@ -239,11 +239,13 @@ private:
     void
     type_mismatch(std::size_t offset, const Type* expected, const Type* got);
 
-    void error(std::size_t offset, std::string_view message) {
+    void error(
+        std::size_t offset, std::string_view message,
+        std::optional<std::string_view> hint = std::nullopt) {
         auto src = read_file(m_filename);
 
         auto loc = cent::offset_to_loc(*src, offset);
-        log::error(loc.line, loc.column, m_filename, message, loc.code);
+        log::error(loc.line, loc.column, m_filename, message, loc.code, hint);
 
         m_had_error = true;
 
