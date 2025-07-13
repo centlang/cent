@@ -82,24 +82,8 @@ void Codegen::generate(const ast::Module& module) {
     m_current_scope = scope;
     m_current_scope_prefix = scope_prefix;
 
-    for (const auto& enum_decl : module.enums) {
-        generate_enum(*enum_decl);
-    }
-
-    for (const auto& enum_decl : module.enums) {
-        enum_decl->codegen(*this);
-    }
-
-    for (const auto& type : module.aliases) {
+    for (const auto& type : module.types) {
         type->codegen(*this);
-    }
-
-    for (const auto& struct_decl : module.structs) {
-        struct_decl->codegen(*this);
-    }
-
-    for (const auto& union_decl : module.unions) {
-        union_decl->codegen(*this);
     }
 
     for (const auto& variable : module.variables) {

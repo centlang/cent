@@ -7,8 +7,11 @@
 
 #include "ast/module.h"
 
+#include "ast/decl/enum_decl.h"
 #include "ast/decl/fn_decl.h"
+#include "ast/decl/struct.h"
 #include "ast/decl/type_alias.h"
+#include "ast/decl/union.h"
 #include "ast/decl/var_decl.h"
 
 #include "backend/llvm/types/alias.h"
@@ -349,9 +352,39 @@ Value Codegen::generate(const ast::Union& decl) {
 }
 
 Value Codegen::generate(const ast::EnumDecl& decl) {
-    if (m_current_function) {
-        generate_enum(decl);
+    if (m_current_scope->types.contains(decl.name.value)) {
+        error(
+            decl.name.offset,
+            fmt::format("{} is already defined", log::quoted(decl.name.value)));
+
+        return Value::poisoned();
     }
+
+    if (decl.type) {
+        auto* type = decl.type->codegen(*this);
+
+        if (!type) {
+            return Value::poisoned();
+        }
+
+        if (!is_sint(type) && !is_uint(type) && !is<types::Bool>(type)) {
+            error(decl.type->offset, "type mismatch");
+            return Value::poisoned();
+        }
+
+        m_named_types.push_back(std::make_unique<types::Enum>(
+            type->llvm_type, m_current_scope_prefix + decl.name.value, type));
+
+        m_current_scope->types[decl.name.value] = m_named_types.back().get();
+    }
+
+    auto* underlying = m_primitive_types["i32"].get();
+
+    m_named_types.push_back(std::make_unique<types::Enum>(
+        underlying->llvm_type, m_current_scope_prefix + decl.name.value,
+        underlying));
+
+    m_current_scope->types[decl.name.value] = m_named_types.back().get();
 
     auto iterator = m_current_scope->types.find(decl.name.value);
 
@@ -724,44 +757,6 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
             }
         }
     }
-}
-
-void Codegen::generate_enum(const ast::EnumDecl& decl) {
-    if (m_current_scope->types.contains(decl.name.value)) {
-        error(
-            decl.name.offset,
-            fmt::format("{} is already defined", log::quoted(decl.name.value)));
-
-        return;
-    }
-
-    if (decl.type) {
-        auto* type = decl.type->codegen(*this);
-
-        if (!type) {
-            return;
-        }
-
-        if (!is_sint(type) && !is_uint(type) && !is<types::Bool>(type)) {
-            error(decl.type->offset, "type mismatch");
-            return;
-        }
-
-        m_named_types.push_back(std::make_unique<types::Enum>(
-            type->llvm_type, m_current_scope_prefix + decl.name.value, type));
-
-        m_current_scope->types[decl.name.value] = m_named_types.back().get();
-
-        return;
-    }
-
-    auto* underlying = m_primitive_types["i32"].get();
-
-    m_named_types.push_back(std::make_unique<types::Enum>(
-        underlying->llvm_type, m_current_scope_prefix + decl.name.value,
-        underlying));
-
-    m_current_scope->types[decl.name.value] = m_named_types.back().get();
 }
 
 } // namespace cent::backend

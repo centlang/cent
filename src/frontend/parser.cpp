@@ -52,7 +52,7 @@ std::unique_ptr<ast::Module> Parser::parse() {
             auto type = parse_type_alias(std::move(attrs), is_public);
 
             if (type) {
-                result->aliases.push_back(std::move(type));
+                result->types.push_back(std::move(type));
             } else {
                 skip_until_decl();
             }
@@ -60,7 +60,7 @@ std::unique_ptr<ast::Module> Parser::parse() {
             auto struct_decl = parse_struct(std::move(attrs), is_public);
 
             if (struct_decl) {
-                result->structs.push_back(std::move(struct_decl));
+                result->types.push_back(std::move(struct_decl));
             } else {
                 skip_until_decl();
             }
@@ -119,7 +119,7 @@ std::unique_ptr<ast::Module> Parser::parse() {
             auto union_decl = parse_union(std::move(attrs), is_public);
 
             if (union_decl) {
-                result->unions.push_back(std::move(union_decl));
+                result->types.push_back(std::move(union_decl));
             } else {
                 skip_until_decl();
             }
@@ -131,7 +131,7 @@ std::unique_ptr<ast::Module> Parser::parse() {
             auto enum_decl = parse_enum(std::move(attrs), is_public);
 
             if (enum_decl) {
-                result->enums.push_back(std::move(enum_decl));
+                result->types.push_back(std::move(enum_decl));
             } else {
                 skip_until_decl();
             }

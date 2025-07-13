@@ -234,7 +234,6 @@ private:
     void create_panic_fn();
 
     void generate_fn_proto(const ast::FnDecl& decl);
-    void generate_enum(const ast::EnumDecl& decl);
 
     void
     type_mismatch(std::size_t offset, const Type* expected, const Type* got);
