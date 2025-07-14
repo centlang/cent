@@ -1,6 +1,7 @@
 #ifndef CENT_UTIL_H
 #define CENT_UTIL_H
 
+#include <cctype>
 #include <cmath>
 #include <fstream>
 #include <limits>
@@ -29,7 +30,7 @@ edit_distance(std::string_view first, std::string_view second) {
 
     for (std::size_t i = 1; i <= first.size(); ++i) {
         for (std::size_t j = 1; j <= second.size(); ++j) {
-            if (first[i - 1] == second[j - 1]) {
+            if (std::tolower(first[i - 1]) == std::tolower(second[j - 1])) {
                 distances[i][j] = distances[i - 1][j - 1];
                 continue;
             }
