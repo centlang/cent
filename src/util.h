@@ -45,9 +45,9 @@ edit_distance(std::string_view first, std::string_view second) {
     return distances[first.size()][second.size()];
 }
 
-template <typename Map>
+template <typename... Maps>
 [[nodiscard]] inline std::optional<std::string_view>
-closest_match(std::string_view name, const Map& map) {
+closest_match(std::string_view name, const Maps&... maps) {
     static constexpr auto u8_max = std::numeric_limits<std::uint8_t>::max();
     static constexpr std::uint8_t max_threshold = 5;
 
@@ -57,13 +57,17 @@ closest_match(std::string_view name, const Map& map) {
     std::string_view result;
     std::uint8_t min_distance = u8_max;
 
-    for (const auto& pair : map) {
-        if (auto distance = edit_distance(name, pair.first);
-            distance <= threshold && distance < min_distance) {
-            result = pair.first;
-            min_distance = distance;
-        }
-    }
+    (
+        [&] {
+            for (const auto& pair : maps) {
+                if (auto distance = edit_distance(name, pair.first);
+                    distance <= threshold && distance < min_distance) {
+                    result = pair.first;
+                    min_distance = distance;
+                }
+            }
+        }(),
+        ...);
 
     if (min_distance == u8_max) {
         return std::nullopt;

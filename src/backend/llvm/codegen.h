@@ -191,10 +191,10 @@ private:
     [[nodiscard]] llvm::Value* create_gep_or_extract(
         llvm::Type* struct_type, llvm::Value* value, std::uint32_t index);
 
-    template <typename Map>
+    template <typename... Maps>
     [[nodiscard]] std::optional<std::string>
-    did_you_mean_hint(std::string_view name, const Map& map) {
-        if (auto match = closest_match(name, map)) {
+    did_you_mean_hint(std::string_view name, const Maps&... maps) {
+        if (auto match = closest_match(name, maps...)) {
             return fmt::format("did you mean `{}`?", *match);
         }
 

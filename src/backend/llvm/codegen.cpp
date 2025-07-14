@@ -565,7 +565,7 @@ Type* Codegen::get_type(
     if (user == parent.types.end()) {
         error(
             offset, fmt::format("undeclared type: {}", log::quoted(name)),
-            did_you_mean_hint(name, parent.types));
+            did_you_mean_hint(name, parent.types, m_primitive_types));
 
         return nullptr;
     }
