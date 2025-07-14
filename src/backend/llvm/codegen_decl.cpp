@@ -714,18 +714,29 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
 
     auto* llvm_fn_type = static_cast<llvm::FunctionType*>(fn_type->llvm_type);
 
-    auto* function = llvm::Function::Create(
-        llvm_fn_type,
-        (decl.is_public || is_extern) ? llvm::Function::ExternalLinkage
-                                      : llvm::Function::PrivateLinkage,
-        is_extern
-            ? decl.name.value
-            : m_current_scope_prefix +
-                  (decl.type ? decl.type->value + "::" : "") + decl.name.value,
-        *m_module);
+    llvm::Function* function = nullptr;
+
+    if (is_extern) {
+        if (auto* func = m_module->getFunction(decl.name.value)) {
+            function = func;
+        }
+    }
+
+    if (!function) {
+        function = llvm::Function::Create(
+            llvm_fn_type,
+            (decl.is_public || is_extern) ? llvm::Function::ExternalLinkage
+                                          : llvm::Function::PrivateLinkage,
+            is_extern ? decl.name.value
+                      : m_current_scope_prefix +
+                            (decl.type ? decl.type->value + "::" : "") +
+                            decl.name.value,
+            *m_module);
+    }
+
+    scope.names[decl.name.value] = {fn_type, function};
 
     if (!decl.type) {
-        scope.names[decl.name.value] = Value{fn_type, function};
         return;
     }
 
@@ -736,25 +747,25 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
         return;
     }
 
-    scope.names[decl.name.value] = {fn_type, function};
+    if (decl.proto.params.empty()) {
+        return;
+    }
 
-    if (!decl.proto.params.empty()) {
-        auto* param_type = decl.proto.params[0].type->codegen(*this);
+    auto* param_type = decl.proto.params[0].type->codegen(*this);
 
-        if (!param_type) {
-            return;
-        }
+    if (!param_type) {
+        return;
+    }
 
-        if (param_type == type) {
+    if (param_type == type) {
+        m_methods[type][decl.name.value] = {fn_type, function};
+
+        return;
+    }
+
+    if (auto* pointer_type = dyn_cast<types::Pointer>(param_type)) {
+        if (pointer_type->type == type) {
             m_methods[type][decl.name.value] = {fn_type, function};
-
-            return;
-        }
-
-        if (auto* pointer_type = dyn_cast<types::Pointer>(param_type)) {
-            if (pointer_type->type == type) {
-                m_methods[type][decl.name.value] = {fn_type, function};
-            }
         }
     }
 }
