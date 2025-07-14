@@ -191,6 +191,16 @@ private:
     [[nodiscard]] llvm::Value* create_gep_or_extract(
         llvm::Type* struct_type, llvm::Value* value, std::uint32_t index);
 
+    template <typename Map>
+    [[nodiscard]] std::optional<std::string>
+    did_you_mean_hint(std::string_view name, const Map& map) {
+        if (auto match = closest_match(name, map)) {
+            return fmt::format("did you mean `{}`?", *match);
+        }
+
+        return std::nullopt;
+    }
+
     [[nodiscard]] Type*
     get_type(std::size_t offset, std::string_view name, Scope& parent);
 

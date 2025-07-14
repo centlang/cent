@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <fstream>
+#include <limits>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -44,17 +45,27 @@ edit_distance(std::string_view first, std::string_view second) {
 }
 
 template <typename Map>
-[[nodiscard]] inline std::string_view
+[[nodiscard]] inline std::optional<std::string_view>
 closest_match(std::string_view name, const Map& map) {
+    static constexpr auto u8_max = std::numeric_limits<std::uint8_t>::max();
+    static constexpr std::uint8_t max_threshold = 5;
+
+    auto threshold =
+        std::min(static_cast<std::uint8_t>(name.size() / 2), max_threshold);
+
     std::string_view result;
-    std::uint8_t min_distance = -1;
+    std::uint8_t min_distance = u8_max;
 
     for (const auto& pair : map) {
         if (auto distance = edit_distance(name, pair.first);
-            distance < min_distance) {
+            distance <= threshold && distance < min_distance) {
             result = pair.first;
             min_distance = distance;
         }
+    }
+
+    if (min_distance == u8_max) {
+        return std::nullopt;
     }
 
     return result;
