@@ -492,6 +492,11 @@ void Lexer::ident() {
         keyword(Undefined);
         return;
     }
+
+    if (m_token.value == "sizeof") {
+        keyword(Sizeof);
+        return;
+    }
 }
 
 } // namespace cent::frontend

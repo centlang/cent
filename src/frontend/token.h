@@ -106,6 +106,7 @@ struct Token {
         Unreachable,
         Assert,
         Undefined,
+        Sizeof,
 
         Identifier
     };
