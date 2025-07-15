@@ -139,20 +139,17 @@ Value Codegen::generate(const ast::Struct& decl) {
     }
 
     if (!decl.template_params.empty()) {
-        auto& generic_struct =
-            m_current_scope->generic_structs[decl.name.value];
-
+        std::vector<types::TemplateParam*> template_params;
         auto current_scope_types = m_current_scope->types;
 
         for (const auto& param : decl.template_params) {
             m_named_types.push_back(
                 std::make_unique<types::TemplateParam>(param.value));
 
-            generic_struct.template_params.push_back(
+            template_params.push_back(
                 static_cast<types::TemplateParam*>(m_named_types.back().get()));
 
-            m_current_scope->types[param.value] =
-                generic_struct.template_params.back();
+            m_current_scope->types[param.value] = template_params.back();
         }
 
         std::vector<GenericStruct::Field> fields;
@@ -170,8 +167,10 @@ Value Codegen::generate(const ast::Struct& decl) {
 
         m_current_scope->types = current_scope_types;
 
-        generic_struct.mangled_name = m_current_scope_prefix + decl.name.value;
-        generic_struct.fields = std::move(fields);
+        m_current_scope->generic_structs[decl.name.value] =
+            std::make_shared<GenericStruct>(
+                m_current_scope_prefix + decl.name.value, std::move(fields),
+                std::move(template_params));
 
         return Value::poisoned();
     }
@@ -226,18 +225,17 @@ Value Codegen::generate(const ast::Union& decl) {
     }
 
     if (!decl.template_params.empty()) {
-        auto& generic_union = m_current_scope->generic_unions[decl.name.value];
+        std::vector<types::TemplateParam*> template_params;
         auto current_scope_types = m_current_scope->types;
 
         for (const auto& param : decl.template_params) {
             m_named_types.push_back(
                 std::make_unique<types::TemplateParam>(param.value));
 
-            generic_union.template_params.push_back(
+            template_params.push_back(
                 static_cast<types::TemplateParam*>(m_named_types.back().get()));
 
-            m_current_scope->types[param.value] =
-                generic_union.template_params.back();
+            m_current_scope->types[param.value] = template_params.back();
         }
 
         std::vector<GenericUnion::Field> fields;
@@ -255,12 +253,9 @@ Value Codegen::generate(const ast::Union& decl) {
 
         m_current_scope->types = current_scope_types;
 
-        generic_union.mangled_name = m_current_scope_prefix + decl.name.value;
-        generic_union.fields = std::move(fields);
+        types::Enum* tag_type = nullptr;
 
-        if (untagged) {
-            generic_union.tag_type = nullptr;
-        } else {
+        if (!untagged) {
             auto* underlying = m_primitive_types["i32"].get();
 
             m_named_types.push_back(std::make_unique<types::Enum>(
@@ -268,8 +263,7 @@ Value Codegen::generate(const ast::Union& decl) {
                 m_current_scope_prefix + decl.name.value + "(tag)",
                 underlying));
 
-            auto* tag_type =
-                static_cast<types::Enum*>(m_named_types.back().get());
+            auto* type = static_cast<types::Enum*>(m_named_types.back().get());
 
             for (std::size_t i = 0; i < decl.fields.size(); ++i) {
                 m_current_scope->scopes[decl.name.value]
@@ -277,8 +271,13 @@ Value Codegen::generate(const ast::Union& decl) {
                     tag_type, llvm::ConstantInt::get(underlying->llvm_type, i)};
             }
 
-            generic_union.tag_type = tag_type;
+            tag_type = type;
         }
+
+        m_current_scope->generic_unions[decl.name.value] =
+            std::make_shared<GenericUnion>(
+                m_current_scope_prefix + decl.name.value, std::move(fields),
+                std::move(template_params), tag_type);
 
         return Value::poisoned();
     }
@@ -653,18 +652,17 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
     }
 
     if (!decl.template_params.empty()) {
-        auto& generic_fn = m_current_scope->generic_fns[decl.name.value];
+        std::vector<types::TemplateParam*> template_params;
         auto current_scope_types = m_current_scope->types;
 
         for (const auto& param : decl.template_params) {
             m_named_types.push_back(
                 std::make_unique<types::TemplateParam>(param.value));
 
-            generic_fn.template_params.emplace_back(
+            template_params.emplace_back(
                 static_cast<types::TemplateParam*>(m_named_types.back().get()));
 
-            m_current_scope->types[param.value] =
-                generic_fn.template_params.back();
+            m_current_scope->types[param.value] = template_params.back();
         }
 
         Type* return_type = m_void_type.get();
@@ -677,7 +675,10 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
             }
         }
 
-        generic_fn.params.reserve(decl.proto.params.size());
+        std::vector<GenericFunction::Param> params;
+        std::vector<const ast::Expression*> default_args;
+
+        params.reserve(decl.proto.params.size());
 
         for (const auto& parameter : decl.proto.params) {
             auto* type = parameter.type->codegen(*this);
@@ -686,22 +687,23 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
                 return;
             }
 
-            generic_fn.params.emplace_back(
+            params.emplace_back(
                 parameter.name.value, type, parameter.is_mutable);
 
             if (!parameter.value) {
                 continue;
             }
 
-            generic_fn.default_args.push_back(parameter.value.get());
+            default_args.push_back(parameter.value.get());
         }
 
         m_current_scope->types = current_scope_types;
 
-        generic_fn.mangled_name = m_current_scope_prefix + decl.name.value;
-        generic_fn.name_offset = decl.name.offset;
-        generic_fn.return_type = return_type;
-        generic_fn.block = decl.block.get();
+        m_current_scope->generic_fns[decl.name.value] =
+            std::make_shared<GenericFunction>(
+                m_current_scope_prefix + decl.name.value, decl.name.offset,
+                return_type, std::move(params), std::move(default_args),
+                decl.block.get(), std::move(template_params));
 
         return;
     }

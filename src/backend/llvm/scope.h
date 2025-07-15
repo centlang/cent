@@ -16,9 +16,9 @@ struct Scope {
     std::map<std::string_view, Value> names;
     std::map<std::string_view, Scope> scopes;
 
-    std::map<std::string_view, GenericStruct> generic_structs;
-    std::map<std::string_view, GenericUnion> generic_unions;
-    std::map<std::string_view, GenericFunction> generic_fns;
+    std::map<std::string_view, std::shared_ptr<GenericStruct>> generic_structs;
+    std::map<std::string_view, std::shared_ptr<GenericUnion>> generic_unions;
+    std::map<std::string_view, std::shared_ptr<GenericFunction>> generic_fns;
 };
 
 } // namespace cent::backend

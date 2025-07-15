@@ -575,6 +575,109 @@ Value Codegen::generate(const ast::Identifier& expr) {
 }
 
 Value Codegen::generate(const ast::CallExpr& expr) {
+    auto not_a_function = [&] {
+        error(expr.identifier->offset, "not a function");
+    };
+
+    if (auto* identifier =
+            dynamic_cast<ast::Identifier*>(expr.identifier.get())) {
+        auto* scope = resolve_scope(identifier->value);
+
+        if (!scope) {
+            return Value::poisoned();
+        }
+
+        auto [name, offset] = identifier->value.back();
+
+        if (auto value = scope->names.find(name); value != scope->names.end()) {
+            auto function = load_value(value->second);
+
+            if (auto* type = dyn_cast<types::Function>(function.type)) {
+                return create_call(
+                    expr.identifier->offset, type, function.value,
+                    expr.arguments);
+            }
+
+            if (auto* pointer = dyn_cast<types::Pointer>(function.type)) {
+                if (auto* type = dyn_cast<types::Function>(pointer->type)) {
+                    return create_call(
+                        expr.identifier->offset, type, function.value,
+                        expr.arguments);
+                }
+            }
+
+            not_a_function();
+            return Value::poisoned();
+        }
+
+        auto* generic_fn = get_generic_fn(offset, name, *scope);
+
+        if (!generic_fn) {
+            return Value::poisoned();
+        }
+
+        auto params_size = generic_fn->params.size();
+        auto args_size = expr.arguments.size();
+        auto default_args_size = generic_fn->default_args.size();
+
+        if (args_size < params_size - default_args_size ||
+            args_size > params_size) {
+            error(
+                expr.identifier->offset,
+                "incorrect number of arguments passed");
+
+            return Value::poisoned();
+        }
+
+        std::vector<Value> arguments;
+        arguments.reserve(params_size);
+
+        for (std::size_t i = 0; i < args_size; ++i) {
+            auto value = expr.arguments[i]->codegen(*this);
+
+            if (!value.ok()) {
+                return Value::poisoned();
+            }
+
+            if (auto val = cast(generic_fn->params[i].type, value); val.ok()) {
+                arguments.push_back(load_value(val));
+            } else {
+                type_mismatch(
+                    expr.arguments[i]->offset, generic_fn->params[i].type,
+                    value.type);
+
+                return Value::poisoned();
+            }
+        }
+
+        for (std::size_t i = default_args_size - (params_size - args_size);
+             i < default_args_size; ++i) {
+            auto arg = generic_fn->default_args[i]->codegen(*this);
+
+            if (!arg.ok()) {
+                return Value::poisoned();
+            }
+
+            arguments.push_back(arg);
+        }
+
+        auto function = inst_generic_fn(generic_fn, arguments);
+        auto* type = static_cast<types::Function*>(function.type);
+
+        std::vector<llvm::Value*> llvm_args;
+        llvm_args.reserve(params_size);
+
+        for (auto arg : arguments) {
+            llvm_args.push_back(arg.value);
+        }
+
+        return Value{
+            type->return_type,
+            m_builder.CreateCall(
+                static_cast<llvm::FunctionType*>(type->llvm_type),
+                function.value, llvm_args)};
+    }
+
     auto value = expr.identifier->codegen(*this);
 
     if (!value.ok()) {
@@ -583,74 +686,20 @@ Value Codegen::generate(const ast::CallExpr& expr) {
 
     value = load_value(value);
 
-    auto not_a_function = [&] {
-        error(expr.identifier->offset, "not a function");
-    };
+    if (auto* type = dyn_cast<types::Function>(value.type)) {
+        return create_call(
+            expr.identifier->offset, type, value.value, expr.arguments);
+    }
 
-    auto* type = dyn_cast<types::Function>(value.type);
-
-    if (!type) {
-        auto* pointer = dyn_cast<types::Pointer>(value.type);
-
-        if (!pointer) {
-            not_a_function();
-            return Value::poisoned();
-        }
-
-        type = dyn_cast<types::Function>(pointer->type);
-
-        if (!type) {
-            not_a_function();
-            return Value::poisoned();
+    if (auto* pointer = dyn_cast<types::Pointer>(value.type)) {
+        if (auto* type = dyn_cast<types::Function>(pointer->type)) {
+            return create_call(
+                expr.identifier->offset, type, value.value, expr.arguments);
         }
     }
 
-    auto arg_size = type->param_types.size();
-    auto passed_args_size = expr.arguments.size();
-    auto default_args_size = type->default_args.size();
-
-    if (!type->variadic && (passed_args_size < arg_size - default_args_size ||
-                            passed_args_size > arg_size)) {
-        error(expr.identifier->offset, "incorrect number of arguments passed");
-
-        return Value::poisoned();
-    }
-
-    std::vector<llvm::Value*> arguments;
-    arguments.reserve(arg_size);
-
-    for (std::size_t i = 0; i < passed_args_size; ++i) {
-        auto value = expr.arguments[i]->codegen(*this);
-
-        if (!value.ok()) {
-            return Value::poisoned();
-        }
-
-        if (type->variadic && i >= arg_size) {
-            arguments.push_back(load_value(value).value);
-            continue;
-        }
-
-        if (auto val = cast(type->param_types[i], value); val.ok()) {
-            arguments.push_back(load_value(val).value);
-        } else {
-            type_mismatch(
-                expr.arguments[i]->offset, type->param_types[i], value.type);
-
-            return Value::poisoned();
-        }
-    }
-
-    for (std::size_t i = default_args_size - (arg_size - passed_args_size);
-         i < default_args_size; ++i) {
-        arguments.push_back(type->default_args[i]);
-    }
-
-    return Value{
-        type->return_type,
-        m_builder.CreateCall(
-            static_cast<llvm::FunctionType*>(type->llvm_type), value.value,
-            arguments)};
+    not_a_function();
+    return Value::poisoned();
 }
 
 Value Codegen::generate(const ast::CallExprGeneric& expr) {
@@ -662,12 +711,9 @@ Value Codegen::generate(const ast::CallExprGeneric& expr) {
 
     auto [name, offset] = expr.identifier->value.back();
 
-    auto generic_fn = scope->generic_fns.find(name);
+    auto* generic_fn = get_generic_fn(offset, name, *scope);
 
-    if (generic_fn == scope->generic_fns.end()) {
-        error(
-            offset, fmt::format("undeclared function: {}", log::quoted(name)));
-
+    if (!generic_fn) {
         return Value::poisoned();
     }
 
@@ -684,50 +730,11 @@ Value Codegen::generate(const ast::CallExprGeneric& expr) {
         template_args.push_back(type);
     }
 
-    auto function = inst_generic_fn(&generic_fn->second, template_args);
-    auto* type = static_cast<types::Function*>(function.type);
+    auto function = inst_generic_fn(generic_fn, template_args);
 
-    auto arg_size = type->param_types.size();
-    auto passed_args_size = expr.arguments.size();
-    auto default_args_size = type->default_args.size();
-
-    if (passed_args_size < arg_size - default_args_size ||
-        passed_args_size > arg_size) {
-        error(expr.identifier->offset, "incorrect number of arguments passed");
-
-        return Value::poisoned();
-    }
-
-    std::vector<llvm::Value*> arguments;
-    arguments.reserve(arg_size);
-
-    for (std::size_t i = 0; i < passed_args_size; ++i) {
-        auto value = expr.arguments[i]->codegen(*this);
-
-        if (!value.ok()) {
-            return Value::poisoned();
-        }
-
-        if (auto val = cast(type->param_types[i], value); val.ok()) {
-            arguments.push_back(load_value(val).value);
-        } else {
-            type_mismatch(
-                expr.arguments[i]->offset, type->param_types[i], value.type);
-
-            return Value::poisoned();
-        }
-    }
-
-    for (std::size_t i = default_args_size - (arg_size - passed_args_size);
-         i < default_args_size; ++i) {
-        arguments.push_back(type->default_args[i]);
-    }
-
-    return Value{
-        type->return_type,
-        m_builder.CreateCall(
-            static_cast<llvm::FunctionType*>(type->llvm_type), function.value,
-            arguments)};
+    return create_call(
+        expr.identifier->offset, static_cast<types::Function*>(function.type),
+        function.value, expr.arguments);
 }
 
 Value Codegen::generate(const ast::MethodExpr& expr) {

@@ -5,10 +5,10 @@
 #include "ast/module.h"
 
 #include "ast/decl/fn_decl.h"
-#include "ast/decl/type_alias.h"
 #include "ast/decl/var_decl.h"
 
 #include "backend/llvm/types/enum.h"
+#include "backend/llvm/types/generic.h"
 
 #include "backend/llvm/codegen.h"
 
@@ -109,6 +109,10 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
 
     if (base_type == base_value_type) {
         return Value{type, value.value, false, value.is_ref, value.is_deref};
+    }
+
+    if (is<types::TemplateParam>(base_type)) {
+        return value;
     }
 
     if (is<types::Void>(base_type)) {
@@ -474,6 +478,57 @@ bool Codegen::cast_to_result(Type* type, const Value& value, bool implicit) {
     return false;
 }
 
+Value Codegen::create_call(
+    std::size_t offset, types::Function* type, llvm::Value* function,
+    const std::vector<std::unique_ptr<ast::Expression>>& arguments) {
+    auto params_size = type->param_types.size();
+    auto args_size = arguments.size();
+    auto default_args_size = type->default_args.size();
+
+    if (!type->variadic && (args_size < params_size - default_args_size ||
+                            args_size > params_size)) {
+        error(offset, "incorrect number of arguments passed");
+
+        return Value::poisoned();
+    }
+
+    std::vector<llvm::Value*> llvm_args;
+    llvm_args.reserve(params_size);
+
+    for (std::size_t i = 0; i < args_size; ++i) {
+        auto value = arguments[i]->codegen(*this);
+
+        if (!value.ok()) {
+            return Value::poisoned();
+        }
+
+        if (type->variadic && i >= params_size) {
+            llvm_args.push_back(load_value(value).value);
+            continue;
+        }
+
+        if (auto val = cast(type->param_types[i], value); val.ok()) {
+            llvm_args.push_back(load_value(val).value);
+        } else {
+            type_mismatch(
+                arguments[i]->offset, type->param_types[i], value.type);
+
+            return Value::poisoned();
+        }
+    }
+
+    for (std::size_t i = default_args_size - (params_size - args_size);
+         i < default_args_size; ++i) {
+        llvm_args.push_back(type->default_args[i]);
+    }
+
+    return Value{
+        type->return_type,
+        m_builder.CreateCall(
+            static_cast<llvm::FunctionType*>(type->llvm_type), function,
+            llvm_args)};
+}
+
 Value Codegen::load_value(const Value& value) {
     if (value.is_ref) {
         return value;
@@ -585,7 +640,22 @@ Codegen::get_name(std::size_t offset, std::string_view name, Scope& parent) {
         return nullptr;
     }
 
-    return iterator->second.ok() ? &iterator->second : nullptr;
+    return &iterator->second;
+}
+
+GenericFunction* Codegen::get_generic_fn(
+    std::size_t offset, std::string_view name, Scope& parent) {
+    auto iterator = parent.generic_fns.find(name);
+
+    if (iterator == parent.generic_fns.end()) {
+        error(
+            offset, fmt::format("undeclared function: {}", log::quoted(name)),
+            did_you_mean_hint(name, parent.names));
+
+        return nullptr;
+    }
+
+    return iterator->second.get();
 }
 
 Scope*

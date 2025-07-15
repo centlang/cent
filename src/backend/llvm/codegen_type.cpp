@@ -54,7 +54,7 @@ Type* Codegen::generate(const ast::NamedType& type) {
             auto generic = scope->generic_structs.find(name);
 
             if (generic != scope->generic_structs.end()) {
-                if (generic->second.template_params.size() !=
+                if (generic->second->template_params.size() !=
                     type.template_args.size()) {
                     error(
                         offset,
@@ -65,7 +65,7 @@ Type* Codegen::generate(const ast::NamedType& type) {
 
                 m_named_types.push_back(
                     std::make_unique<types::TemplateStructInst>(
-                        &generic->second, std::move(args)));
+                        generic->second.get(), std::move(args)));
 
                 return m_named_types.back().get();
             }
@@ -80,14 +80,14 @@ Type* Codegen::generate(const ast::NamedType& type) {
                 return nullptr;
             }
 
-            if (generic_union->second.template_params.size() !=
+            if (generic_union->second->template_params.size() !=
                 type.template_args.size()) {
                 error(offset, "incorrect number of template arguments passed");
                 return nullptr;
             }
 
             m_named_types.push_back(std::make_unique<types::TemplateUnionInst>(
-                &generic_union->second, std::move(args)));
+                generic_union->second.get(), std::move(args)));
 
             return m_named_types.back().get();
         }
@@ -95,13 +95,13 @@ Type* Codegen::generate(const ast::NamedType& type) {
         auto generic = scope->generic_structs.find(name);
 
         if (generic != scope->generic_structs.end()) {
-            if (generic->second.template_params.size() !=
+            if (generic->second->template_params.size() !=
                 type.template_args.size()) {
                 error(offset, "incorrect number of template arguments passed");
                 return nullptr;
             }
 
-            return inst_generic_struct(&generic->second, args);
+            return inst_generic_struct(generic->second.get(), args);
         }
 
         auto generic_union = scope->generic_unions.find(name);
@@ -113,13 +113,13 @@ Type* Codegen::generate(const ast::NamedType& type) {
             return nullptr;
         }
 
-        if (generic_union->second.template_params.size() !=
+        if (generic_union->second->template_params.size() !=
             type.template_args.size()) {
             error(offset, "incorrect number of template arguments passed");
             return nullptr;
         }
 
-        return inst_generic_union(&generic_union->second, args);
+        return inst_generic_union(generic_union->second.get(), args);
     }
 
     return get_type(offset, name, *scope);
@@ -404,7 +404,7 @@ types::Union* Codegen::inst_generic_union(
 
 Value Codegen::inst_generic_fn(
     GenericFunction* function, const std::vector<Type*>& types) {
-    auto generic_fn_inst = m_generic_fns_inst[function];
+    auto& generic_fn_inst = m_generic_fns_inst[function];
 
     if (auto result = generic_fn_inst.find(types);
         result != generic_fn_inst.end()) {
@@ -470,6 +470,8 @@ Value Codegen::inst_generic_fn(
     auto* llvm_function = llvm::Function::Create(
         llvm_fn_type, llvm::Function::PrivateLinkage, name, *m_module);
 
+    generic_fn_inst[types] = {fn_type, llvm_function};
+
     auto* entry = llvm::BasicBlock::Create(m_context, "", llvm_function);
 
     auto* insert_point = m_builder.GetInsertBlock();
@@ -529,6 +531,180 @@ Value Codegen::inst_generic_fn(
     m_builder.SetInsertPoint(insert_point);
 
     return Value{fn_type, llvm_function};
+}
+
+Value Codegen::inst_generic_fn(
+    GenericFunction* function, const std::vector<Value>& args) {
+    std::map<types::TemplateParam*, Type*> deduced;
+
+    for (std::size_t i = 0; i < args.size(); ++i) {
+        if (!deduce_template_arg(
+                function->params[i].type, args[i].type, deduced)) {
+            error(
+                function->name_offset,
+                fmt::format(
+                    "cannot deduce type for {}",
+                    log::quoted(function->params[i].name)));
+
+            return Value::poisoned();
+        }
+    }
+
+    std::vector<Type*> types;
+    types.reserve(function->template_params.size());
+
+    for (auto* param : function->template_params) {
+        auto type = deduced.find(param);
+
+        if (type == deduced.end()) {
+            error(
+                function->name_offset,
+                fmt::format(
+                    "cannot deduce type for {}", log::quoted(param->name)));
+
+            return Value::poisoned();
+        }
+
+        types.push_back(type->second);
+    }
+
+    return inst_generic_fn(function, types);
+}
+
+bool Codegen::deduce_template_arg(
+    Type* param, Type* arg, std::map<types::TemplateParam*, Type*>& deduced) {
+    if (auto* t_param = dyn_cast<types::TemplateParam>(param)) {
+        auto type = deduced.find(t_param);
+
+        if (type == deduced.end()) {
+            deduced[t_param] = arg;
+            return true;
+        }
+
+        return arg == type->second;
+    }
+
+    if (param == arg) {
+        return true;
+    }
+
+    if (param->kind != arg->kind) {
+        return false;
+    }
+
+    if (auto* struct_param = dyn_cast<types::TemplateStructInst>(param)) {
+        auto* struct_arg = static_cast<types::TemplateStructInst*>(arg);
+
+        if (struct_param->type != struct_arg->type ||
+            struct_param->args.size() != struct_arg->args.size()) {
+            return false;
+        }
+
+        for (std::size_t i = 0; i < struct_param->args.size(); ++i) {
+            if (!deduce_template_arg(
+                    struct_param->args[i], struct_arg->args[i], deduced)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    if (auto* union_param = dyn_cast<types::TemplateUnionInst>(param)) {
+        auto* union_arg = static_cast<types::TemplateUnionInst*>(arg);
+
+        if (union_param->type != union_arg->type ||
+            union_param->args.size() != union_arg->args.size()) {
+            return false;
+        }
+
+        for (std::size_t i = 0; i < union_param->args.size(); ++i) {
+            if (!deduce_template_arg(
+                    union_param->args[i], union_arg->args[i], deduced)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    if (auto* ptr_param = dyn_cast<types::Pointer>(param)) {
+        auto* ptr_arg = static_cast<types::Pointer*>(arg);
+
+        return deduce_template_arg(ptr_param->type, ptr_arg->type, deduced);
+    }
+
+    if (auto* optional_param = dyn_cast<types::Optional>(param)) {
+        auto* optional_arg = static_cast<types::Optional*>(arg);
+
+        return deduce_template_arg(
+            optional_param->type, optional_arg->type, deduced);
+    }
+
+    if (auto* range_param = dyn_cast<types::Range>(param)) {
+        auto* range_arg = static_cast<types::Range*>(arg);
+
+        return deduce_template_arg(range_param->type, range_arg->type, deduced);
+    }
+
+    if (auto* array_param = dyn_cast<types::Array>(param)) {
+        auto* array_arg = static_cast<types::Array*>(arg);
+
+        if (array_param->size != array_arg->size) {
+            return false;
+        }
+
+        return deduce_template_arg(array_param->type, array_arg->type, deduced);
+    }
+
+    if (auto* slice_param = dyn_cast<types::Slice>(param)) {
+        auto* slice_arg = static_cast<types::Slice*>(arg);
+
+        return deduce_template_arg(slice_param->type, slice_arg->type, deduced);
+    }
+
+    if (auto* tuple_param = dyn_cast<types::Tuple>(param)) {
+        auto* tuple_arg = static_cast<types::Tuple*>(arg);
+
+        if (tuple_param->types.size() != tuple_arg->types.size()) {
+            return false;
+        }
+
+        for (std::size_t i = 0; i < tuple_param->types.size(); ++i) {
+            if (!deduce_template_arg(
+                    tuple_param->types[i], tuple_arg->types[i], deduced)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    if (auto* fn_param = dyn_cast<types::Function>(param)) {
+        auto* fn_arg = static_cast<types::Function*>(arg);
+
+        if (fn_param->param_types.size() != fn_arg->param_types.size() ||
+            fn_param->variadic != fn_arg->variadic) {
+            return false;
+        }
+
+        if (!deduce_template_arg(
+                fn_param->return_type, fn_arg->return_type, deduced)) {
+            return false;
+        }
+
+        for (std::size_t i = 0; i < fn_param->param_types.size(); ++i) {
+            if (!deduce_template_arg(
+                    fn_param->param_types[i], fn_arg->param_types[i],
+                    deduced)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    return false;
 }
 
 Type* Codegen::inst_template_param(

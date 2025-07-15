@@ -182,6 +182,10 @@ private:
         ast::OffsetValue<const Value&> lhs, ast::OffsetValue<const Value&> rhs,
         ast::OffsetValue<frontend::Token::Type> oper);
 
+    [[nodiscard]] Value create_call(
+        std::size_t offset, types::Function* type, llvm::Value* function,
+        const std::vector<std::unique_ptr<ast::Expression>>& arguments);
+
     [[nodiscard]] Value load_value(const Value& value);
 
     [[nodiscard]] llvm::Value* create_alloca(llvm::Type* type);
@@ -209,6 +213,9 @@ private:
     [[nodiscard]] Value*
     get_name(std::size_t offset, std::string_view name, Scope& parent);
 
+    [[nodiscard]] GenericFunction*
+    get_generic_fn(std::size_t offset, std::string_view name, Scope& parent);
+
     [[nodiscard]] Scope*
     get_scope(std::size_t offset, std::string_view name, Scope& parent);
 
@@ -229,6 +236,13 @@ private:
 
     [[nodiscard]] Value
     inst_generic_fn(GenericFunction* function, const std::vector<Type*>& types);
+
+    [[nodiscard]] Value
+    inst_generic_fn(GenericFunction* function, const std::vector<Value>& args);
+
+    [[nodiscard]] bool deduce_template_arg(
+        Type* param, Type* arg,
+        std::map<types::TemplateParam*, Type*>& deduced);
 
     [[nodiscard]] Type* inst_template_param(
         const std::vector<types::TemplateParam*>& params,
