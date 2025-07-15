@@ -487,12 +487,17 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
                 elements.push_back(std::move(value));
             }
 
+            if (match(Eof)) {
+                expected("`}`");
+                return nullptr;
+            }
+
             if (match_next(RightBrace)) {
                 return std::make_unique<ast::ArrayLiteral>(
                     offset, std::move(type), std::move(elements));
             }
 
-            expect("`,`", Token::Type::Comma);
+            expect("`,`", Comma);
         }
     }
 
@@ -638,6 +643,11 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
         while (true) {
             if (auto value = expect_expr(false)) {
                 elements.push_back(std::move(value));
+            }
+
+            if (match(Eof)) {
+                expected("`)`");
+                return nullptr;
             }
 
             if (match_next(RightParen)) {
