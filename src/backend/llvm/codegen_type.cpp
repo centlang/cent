@@ -320,6 +320,10 @@ types::Struct* Codegen::inst_generic_struct(
         auto* field_type =
             inst_template_param(type->template_params, types, field.type);
 
+        if (!field_type) {
+            return nullptr;
+        }
+
         llvm_fields.push_back(field_type->llvm_type);
         fields.push_back(field_type);
 
@@ -364,6 +368,10 @@ types::Union* Codegen::inst_generic_union(
 
         auto* field_type =
             inst_template_param(type->template_params, types, field.type);
+
+        if (!field_type) {
+            return nullptr;
+        }
 
         fields.push_back(field_type);
         m_members[struct_type][field.name] = i;
@@ -415,8 +423,13 @@ Value Codegen::inst_generic_fn(
     param_types.reserve(function->params.size());
 
     for (const auto& param : function->params) {
-        param_types.push_back(
-            inst_template_param(function->template_params, types, param.type));
+        if (auto* type = inst_template_param(
+                function->template_params, types, param.type)) {
+            param_types.push_back(type);
+            continue;
+        }
+
+        return Value::poisoned();
     }
 
     std::vector<llvm::Constant*> default_args;
@@ -460,10 +473,15 @@ Value Codegen::inst_generic_fn(
 
     name += ">)";
 
+    auto* return_type = inst_template_param(
+        function->template_params, types, function->return_type);
+
+    if (!return_type) {
+        return Value::poisoned();
+    }
+
     auto* fn_type = get_fn_type(
-        inst_template_param(
-            function->template_params, types, function->return_type),
-        std::move(param_types), std::move(default_args), false);
+        return_type, std::move(param_types), std::move(default_args), false);
 
     auto* llvm_fn_type = static_cast<llvm::FunctionType*>(fn_type->llvm_type);
 
@@ -727,7 +745,12 @@ Type* Codegen::inst_template_param(
         new_args.reserve(t_struct->args.size());
 
         for (auto* arg : t_struct->args) {
-            new_args.push_back(inst_template_param(params, args, arg));
+            if (auto* new_arg = inst_template_param(params, args, arg)) {
+                new_args.push_back(new_arg);
+                continue;
+            }
+
+            return nullptr;
         }
 
         return inst_generic_struct(t_struct->type, new_args);
@@ -738,34 +761,65 @@ Type* Codegen::inst_template_param(
         new_args.reserve(t_union->args.size());
 
         for (auto* arg : t_union->args) {
-            new_args.push_back(inst_template_param(params, args, arg));
+            if (auto* new_arg = inst_template_param(params, args, arg)) {
+                new_args.push_back(new_arg);
+                continue;
+            }
+
+            return nullptr;
         }
 
         return inst_generic_union(t_union->type, new_args);
     }
 
     if (auto* ptr = dyn_cast<types::Pointer>(base_type)) {
-        return get_ptr_type(
-            inst_template_param(params, args, ptr->type), ptr->is_mutable);
+        auto* type = inst_template_param(params, args, ptr->type);
+
+        if (!type) {
+            return nullptr;
+        }
+
+        return get_ptr_type(type, ptr->is_mutable);
     }
 
     if (auto* optional = dyn_cast<types::Optional>(base_type)) {
-        return get_optional_type(
-            inst_template_param(params, args, optional->type));
+        auto* type = inst_template_param(params, args, optional->type);
+
+        if (!type) {
+            return nullptr;
+        }
+
+        return get_optional_type(type);
     }
 
     if (auto* range = dyn_cast<types::Range>(base_type)) {
-        return get_range_type(inst_template_param(params, args, range->type));
+        auto* type = inst_template_param(params, args, range->type);
+
+        if (!type) {
+            return nullptr;
+        }
+
+        return get_range_type(type);
     }
 
     if (auto* array = dyn_cast<types::Array>(base_type)) {
-        return get_array_type(
-            inst_template_param(params, args, array->type), array->size);
+        auto* type = inst_template_param(params, args, array->type);
+
+        if (!type) {
+            return nullptr;
+        }
+
+        return get_array_type(type, array->size);
     }
 
     if (auto* slice = dyn_cast<types::Slice>(base_type)) {
-        return get_slice_type(
-            inst_template_param(params, args, slice->type), slice->is_mutable);
+        auto* type = inst_template_param(params, args, slice->type);
+
+        if (!type) {
+            return nullptr;
+        }
+
+        return get_ptr_type(type, slice->is_mutable);
     }
 
     if (auto* tuple = dyn_cast<types::Tuple>(base_type)) {
@@ -773,7 +827,12 @@ Type* Codegen::inst_template_param(
         types.reserve(tuple->types.size());
 
         for (auto& element : tuple->types) {
-            types.push_back(inst_template_param(params, args, element));
+            if (auto* type = inst_template_param(params, args, element)) {
+                types.push_back(type);
+                continue;
+            }
+
+            return nullptr;
         }
 
         return get_tuple_type(types);
@@ -783,12 +842,20 @@ Type* Codegen::inst_template_param(
         Type* return_type =
             inst_template_param(params, args, func->return_type);
 
+        if (!return_type) {
+            return nullptr;
+        }
+
         std::vector<Type*> param_types;
         param_types.reserve(func->param_types.size());
 
         for (auto& param_type : func->param_types) {
-            param_types.push_back(
-                inst_template_param(params, args, param_type));
+            if (auto* type = inst_template_param(params, args, param_type)) {
+                param_types.push_back(type);
+                continue;
+            }
+
+            return nullptr;
         }
 
         return get_fn_type(

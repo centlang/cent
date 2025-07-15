@@ -662,6 +662,11 @@ Value Codegen::generate(const ast::CallExpr& expr) {
         }
 
         auto function = inst_generic_fn(generic_fn, arguments);
+
+        if (!function.ok()) {
+            return Value::poisoned();
+        }
+
         auto* type = static_cast<types::Function*>(function.type);
 
         std::vector<llvm::Value*> llvm_args;
@@ -731,6 +736,10 @@ Value Codegen::generate(const ast::CallExprGeneric& expr) {
     }
 
     auto function = inst_generic_fn(generic_fn, template_args);
+
+    if (!function.ok()) {
+        return Value::poisoned();
+    }
 
     return create_call(
         expr.identifier->offset, static_cast<types::Function*>(function.type),
