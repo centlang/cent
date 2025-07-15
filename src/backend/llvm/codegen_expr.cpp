@@ -195,20 +195,25 @@ Value Codegen::generate(const ast::RangeLiteral& expr) {
     auto begin_value = load_value(begin);
     auto end_value = load_value(end);
 
-    auto right = cast(begin_value.type, end_value);
+    auto value_x = begin_value;
+    auto value_y = cast(begin_value.type, end_value);
 
-    if (!right.ok()) {
-        type_mismatch(expr.begin->offset, begin_value.type, end_value.type);
+    if (!value_y.ok()) {
+        value_x = cast(end_value.type, begin_value);
 
-        return Value::poisoned();
+        if (!value_x.ok()) {
+            type_mismatch(expr.end->offset, begin_value.type, end_value.type);
+            return Value::poisoned();
+        }
+
+        value_y = end_value;
     }
 
-    auto* type = get_range_type(begin_value.type);
+    auto* type = get_range_type(value_x.type);
 
-    if (auto* begin_constant =
-            llvm::dyn_cast<llvm::Constant>(begin_value.value)) {
+    if (auto* begin_constant = llvm::dyn_cast<llvm::Constant>(value_x.value)) {
         if (auto* end_constant =
-                llvm::dyn_cast<llvm::Constant>(end_value.value)) {
+                llvm::dyn_cast<llvm::Constant>(value_y.value)) {
             return Value{
                 type, llvm::ConstantStruct::get(
                           static_cast<llvm::StructType*>(type->llvm_type),
@@ -227,8 +232,8 @@ Value Codegen::generate(const ast::RangeLiteral& expr) {
     auto* end_ptr =
         m_builder.CreateStructGEP(type->llvm_type, variable, range_member_end);
 
-    m_builder.CreateStore(begin_value.value, begin_ptr);
-    m_builder.CreateStore(end_value.value, end_ptr);
+    m_builder.CreateStore(value_x.value, begin_ptr);
+    m_builder.CreateStore(value_y.value, end_ptr);
 
     return Value{type, variable, false, false, false, stack_allocated};
 }
