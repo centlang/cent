@@ -23,14 +23,15 @@
 #include "log.h"
 #include "util.h"
 
+enum struct EmitType : std::uint8_t { Exe, LlvmIr, LlvmBc };
+
 void help() {
-    fmt::print(R"(USAGE: centc [options] file... [-- linker_options]
+    fmt::print(R"(USAGE: centc [options] file [-- linker options]
 
 OPTIONS:
   -O                    Enable optimizations
   -o <file>             Place the output into <file>
-  --emit-llvm-ir        Produce LLVM IR
-  --emit-llvm-bc        Produce LLVM bitcode
+  --emit <type>         Specify the compiler output type
   --target <triple>     Specify the target triple
   --help                Print this help message and exit
 )");
@@ -44,38 +45,62 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    std::string triple = llvm::sys::getDefaultTargetTriple();
+    std::string target_triple = llvm::sys::getDefaultTargetTriple();
 
-    std::optional<std::filesystem::path> source_file;
-    std::optional<std::filesystem::path> output = std::nullopt;
+    std::optional<std::filesystem::path> source_file = std::nullopt;
+    std::optional<std::filesystem::path> output_file = std::nullopt;
 
-    std::vector<std::string> gcc_args;
+    std::vector<std::string> linker_options;
 
     bool optimize = false;
-    bool emit_llvm_ir = false;
-    bool emit_llvm_bc = false;
+    EmitType emit_type = EmitType::Exe;
 
     bool expecting_output = false;
     bool expecting_target = false;
-    bool parsing_gcc_args = false;
+    bool expecting_emit_type = false;
+    bool parsing_linker_options = false;
 
     for (const char* arg_cstr : args.subspan(1)) {
         std::string arg = arg_cstr;
 
-        if (parsing_gcc_args) {
-            gcc_args.push_back(arg);
+        if (parsing_linker_options) {
+            linker_options.push_back(std::move(arg));
             continue;
         }
 
         if (expecting_output) {
-            output = arg;
+            output_file = arg;
             expecting_output = false;
             continue;
         }
 
         if (expecting_target) {
-            triple = arg;
+            target_triple = arg;
             expecting_target = false;
+            continue;
+        }
+
+        if (expecting_emit_type) {
+            expecting_emit_type = false;
+
+            if (arg == "exe") {
+                emit_type = EmitType::Exe;
+                continue;
+            }
+
+            if (arg == "llvm-ir") {
+                emit_type = EmitType::LlvmIr;
+                continue;
+            }
+
+            if (arg == "llvm-bc") {
+                emit_type = EmitType::LlvmBc;
+                continue;
+            }
+
+            cent::log::error(fmt::format(
+                "unrecognized emit type: {}", cent::log::quoted(arg)));
+
             continue;
         }
 
@@ -89,13 +114,8 @@ int main(int argc, char** argv) {
             continue;
         }
 
-        if (arg == "--emit-llvm-ir") {
-            emit_llvm_ir = true;
-            continue;
-        }
-
-        if (arg == "--emit-llvm-bc") {
-            emit_llvm_bc = true;
+        if (arg == "--emit") {
+            expecting_emit_type = true;
             continue;
         }
 
@@ -110,7 +130,7 @@ int main(int argc, char** argv) {
         }
 
         if (arg == "--") {
-            parsing_gcc_args = true;
+            parsing_linker_options = true;
             continue;
         }
 
@@ -139,6 +159,11 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    if (expecting_emit_type) {
+        cent::log::error("missing emit type");
+        return 1;
+    }
+
     if (!source_file) {
         cent::log::error("no input file provided");
         return 1;
@@ -152,7 +177,8 @@ int main(int argc, char** argv) {
 
     std::string message;
 
-    const auto* target = llvm::TargetRegistry::lookupTarget(triple, message);
+    const auto* target =
+        llvm::TargetRegistry::lookupTarget(target_triple, message);
 
     if (!target) {
         cent::log::error(message);
@@ -160,7 +186,7 @@ int main(int argc, char** argv) {
     }
 
     auto* machine = target->createTargetMachine(
-        triple, "generic", "", llvm::TargetOptions{}, llvm::Reloc::PIC_);
+        target_triple, "generic", "", llvm::TargetOptions{}, llvm::Reloc::PIC_);
 
     auto code = cent::read_file(*source_file);
 
@@ -178,7 +204,8 @@ int main(int argc, char** argv) {
     }
 
     cent::backend::Codegen codegen{
-        std::move(program), filename, machine->createDataLayout(), triple};
+        std::move(program), filename, machine->createDataLayout(),
+        target_triple};
 
     auto module = codegen.generate();
 
@@ -195,8 +222,8 @@ int main(int argc, char** argv) {
     }
 
     auto get_output_file = [&](std::string_view extension) {
-        if (output) {
-            return *output;
+        if (output_file) {
+            return *output_file;
         }
 
         auto result = *source_file;
@@ -205,37 +232,35 @@ int main(int argc, char** argv) {
         return result;
     };
 
-    if (emit_llvm_ir) {
+    switch (emit_type) {
+    case EmitType::LlvmIr:
         if (!cent::backend::emit_llvm_ir(*module, get_output_file(".ll"))) {
             return 1;
         }
 
-        return 0;
-    }
-
-    if (emit_llvm_bc) {
+        break;
+    case EmitType::LlvmBc:
         if (!cent::backend::emit_llvm_bc(*module, get_output_file(".bc"))) {
             return 1;
         }
 
-        return 0;
-    }
+        break;
+    case EmitType::Exe:
+        std::filesystem::path object_file = std::tmpnam(nullptr);
 
-    std::filesystem::path object_file = std::tmpnam(nullptr);
+        if (!cent::backend::emit_obj(*module, *machine, object_file)) {
+            return 1;
+        }
 
-    if (!cent::backend::emit_obj(*module, *machine, object_file)) {
-        return 1;
-    }
-
-    if (!emit_llvm_ir && !emit_llvm_bc) {
         std::vector<std::string> args = {
             "-o", get_output_file(""), object_file};
 
-        args.insert(args.end(), gcc_args.begin(), gcc_args.end());
+        args.insert(args.end(), linker_options.begin(), linker_options.end());
 
         int exit_code = cent::exec_command("gcc", args);
 
         std::filesystem::remove(object_file);
+
         return exit_code;
     }
 
