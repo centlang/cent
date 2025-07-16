@@ -297,26 +297,26 @@ Value Codegen::generate(const ast::WhileLoop& stmt) {
 
     auto* function = m_builder.GetInsertBlock()->getParent();
 
-    auto* loop_body = m_loop_body;
+    auto* loop_continue = m_loop_continue;
     auto* loop_end = m_loop_end;
 
-    m_loop_body = llvm::BasicBlock::Create(m_context, "", function);
+    m_loop_continue = llvm::BasicBlock::Create(m_context, "", function);
     m_loop_end = llvm::BasicBlock::Create(m_context, "", function);
 
     m_builder.CreateCondBr(
-        load_value(condition).value, m_loop_body, m_loop_end);
+        load_value(condition).value, m_loop_continue, m_loop_end);
 
-    m_builder.SetInsertPoint(m_loop_body);
+    m_builder.SetInsertPoint(m_loop_continue);
     stmt.body->codegen(*this);
 
     condition = stmt.condition->codegen(*this);
 
     m_builder.CreateCondBr(
-        load_value(condition).value, m_loop_body, m_loop_end);
+        load_value(condition).value, m_loop_continue, m_loop_end);
 
     m_builder.SetInsertPoint(m_loop_end);
 
-    m_loop_body = loop_body;
+    m_loop_continue = loop_continue;
     m_loop_end = loop_end;
 
     return Value::poisoned();
@@ -331,10 +331,12 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
     auto* function = m_builder.GetInsertBlock()->getParent();
 
-    auto* loop_body = m_loop_body;
+    auto* loop_continue = m_loop_continue;
     auto* loop_end = m_loop_end;
 
-    m_loop_body = llvm::BasicBlock::Create(m_context, "", function);
+    auto* loop_body = llvm::BasicBlock::Create(m_context, "", function);
+
+    m_loop_continue = llvm::BasicBlock::Create(m_context, "", function);
     m_loop_end = llvm::BasicBlock::Create(m_context, "", function);
 
     if (auto* type = dyn_cast<types::Slice>(value.type)) {
@@ -350,10 +352,10 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
             value.type->llvm_type, usize, value.value, slice_member_len);
 
         m_builder.CreateCondBr(
-            m_builder.CreateICmpULT(usize_null, length), m_loop_body,
+            m_builder.CreateICmpULT(usize_null, length), m_loop_continue,
             m_loop_end);
 
-        m_builder.SetInsertPoint(m_loop_body);
+        m_builder.SetInsertPoint(loop_body);
 
         auto current_scope = *m_current_scope;
 
@@ -371,7 +373,11 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
         stmt.body->codegen(*this);
 
+        m_builder.CreateBr(m_loop_continue);
+
         *m_current_scope = current_scope;
+
+        m_builder.SetInsertPoint(m_loop_continue);
 
         auto* incremented =
             m_builder.CreateAdd(index_value, llvm::ConstantInt::get(usize, 1));
@@ -379,12 +385,12 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
         m_builder.CreateStore(incremented, index);
 
         m_builder.CreateCondBr(
-            m_builder.CreateICmpULT(incremented, length), m_loop_body,
+            m_builder.CreateICmpULT(incremented, length), loop_body,
             m_loop_end);
 
         m_builder.SetInsertPoint(m_loop_end);
 
-        m_loop_body = loop_body;
+        m_loop_continue = loop_continue;
         m_loop_end = loop_end;
 
         return Value::poisoned();
@@ -402,10 +408,10 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
         auto* length = llvm::ConstantInt::get(usize, type->size);
 
         m_builder.CreateCondBr(
-            m_builder.CreateICmpULT(usize_null, length), m_loop_body,
+            m_builder.CreateICmpULT(usize_null, length), m_loop_continue,
             m_loop_end);
 
-        m_builder.SetInsertPoint(m_loop_body);
+        m_builder.SetInsertPoint(loop_body);
 
         auto current_scope = *m_current_scope;
 
@@ -420,7 +426,11 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
         stmt.body->codegen(*this);
 
+        m_builder.CreateBr(m_loop_continue);
+
         *m_current_scope = current_scope;
+
+        m_builder.SetInsertPoint(m_loop_continue);
 
         auto* incremented =
             m_builder.CreateAdd(index_value, llvm::ConstantInt::get(usize, 1));
@@ -428,12 +438,12 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
         m_builder.CreateStore(incremented, index);
 
         m_builder.CreateCondBr(
-            m_builder.CreateICmpULT(incremented, length), m_loop_body,
+            m_builder.CreateICmpULT(incremented, length), loop_body,
             m_loop_end);
 
         m_builder.SetInsertPoint(m_loop_end);
 
-        m_loop_body = loop_body;
+        m_loop_continue = loop_continue;
         m_loop_end = loop_end;
 
         return Value::poisoned();
@@ -469,16 +479,20 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
     m_builder.CreateCondBr(
         is_sint(value.type) ? m_builder.CreateICmpSLT(begin, end)
                             : m_builder.CreateICmpULT(begin, end),
-        m_loop_body, m_loop_end);
+        m_loop_continue, m_loop_end);
 
-    m_builder.SetInsertPoint(m_loop_body);
+    m_builder.SetInsertPoint(loop_body);
 
     auto current_scope = *m_current_scope;
 
     m_current_scope->names[stmt.name.value] = {type->type, variable};
     stmt.body->codegen(*this);
 
+    m_builder.CreateBr(m_loop_continue);
+
     *m_current_scope = current_scope;
+
+    m_builder.SetInsertPoint(m_loop_continue);
 
     auto* incremented = m_builder.CreateAdd(
         m_builder.CreateLoad(llvm_contained_type, variable),
@@ -489,11 +503,11 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
     m_builder.CreateCondBr(
         is_sint(value.type) ? m_builder.CreateICmpSLT(incremented, end)
                             : m_builder.CreateICmpULT(incremented, end),
-        m_loop_body, m_loop_end);
+        loop_body, m_loop_end);
 
     m_builder.SetInsertPoint(m_loop_end);
 
-    m_loop_body = loop_body;
+    m_loop_continue = loop_continue;
     m_loop_end = loop_end;
 
     return Value::poisoned();
@@ -512,13 +526,13 @@ Value Codegen::generate(const ast::BreakStmt& stmt) {
 }
 
 Value Codegen::generate(const ast::ContinueStmt& stmt) {
-    if (!m_loop_body) {
+    if (!m_loop_continue) {
         error(stmt.offset, "`continue` not in loop");
 
         return Value::poisoned();
     }
 
-    m_builder.CreateBr(m_loop_body);
+    m_builder.CreateBr(m_loop_continue);
 
     return Value::poisoned();
 }

@@ -312,7 +312,7 @@ private:
     llvm::Value* m_current_result{nullptr};
     bool m_current_fn_had_error{false};
 
-    llvm::BasicBlock* m_loop_body{nullptr};
+    llvm::BasicBlock* m_loop_continue{nullptr};
     llvm::BasicBlock* m_loop_end{nullptr};
 
     std::string m_current_scope_prefix;
