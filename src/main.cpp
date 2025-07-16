@@ -23,7 +23,7 @@
 #include "log.h"
 #include "util.h"
 
-enum struct EmitType : std::uint8_t { Exe, LlvmIr, LlvmBc };
+enum struct EmitType : std::uint8_t { Obj, Exe, LlvmIr, LlvmBc };
 
 void help() {
     fmt::print(R"(USAGE: centc [options] file [-- linker options]
@@ -82,6 +82,11 @@ int main(int argc, char** argv) {
 
         if (expecting_emit_type) {
             expecting_emit_type = false;
+
+            if (arg == "obj") {
+                emit_type = EmitType::Obj;
+                continue;
+            }
 
             if (arg == "exe") {
                 emit_type = EmitType::Exe;
@@ -241,6 +246,13 @@ int main(int argc, char** argv) {
         break;
     case EmitType::LlvmBc:
         if (!cent::backend::emit_llvm_bc(*module, get_output_file(".bc"))) {
+            return 1;
+        }
+
+        break;
+    case EmitType::Obj:
+        if (!cent::backend::emit_obj(
+                *module, *machine, get_output_file(".o"))) {
             return 1;
         }
 
