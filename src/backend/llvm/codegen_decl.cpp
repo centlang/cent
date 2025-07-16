@@ -383,15 +383,9 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
         underlying->llvm_type, m_current_scope_prefix + decl.name.value,
         underlying));
 
-    m_current_scope->types[decl.name.value] = m_named_types.back().get();
+    auto* type = static_cast<types::Enum*>(m_named_types.back().get());
 
-    auto iterator = m_current_scope->types.find(decl.name.value);
-
-    if (iterator == m_current_scope->types.end()) {
-        return Value::poisoned();
-    }
-
-    auto* type = static_cast<types::Enum*>(iterator->second);
+    m_current_scope->types[decl.name.value] = type;
 
     std::uint64_t number = 0;
 
