@@ -20,6 +20,7 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
     auto* int32 = llvm::Type::getInt32Ty(m_context);
     auto* int64 = llvm::Type::getInt64Ty(m_context);
     auto* size = m_module->getDataLayout().getIntPtrType(m_context);
+    auto* void_type = llvm::Type::getVoidTy(m_context);
 
     m_primitive_types["i8"] = std::make_unique<types::I8>(int8);
     m_primitive_types["i16"] = std::make_unique<types::I16>(int16);
@@ -41,11 +42,12 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
     m_primitive_types["bool"] =
         std::make_unique<types::Bool>(llvm::Type::getInt1Ty(m_context));
 
+    m_primitive_types["never"] = std::make_unique<types::Never>(void_type);
+
     m_null_type = std::make_unique<types::Null>(nullptr);
     m_undefined_type = std::make_unique<types::Undefined>(nullptr);
 
-    m_void_type =
-        std::make_unique<types::Void>(llvm::Type::getVoidTy(m_context));
+    m_void_type = std::make_unique<types::Void>(void_type);
 
     m_slice_type = llvm::StructType::create(
         {llvm::PointerType::get(m_context, 0),
@@ -109,6 +111,11 @@ void Codegen::generate(const ast::Module& module) {
 Value Codegen::cast(Type* type, const Value& value, bool implicit) {
     auto* base_type = unwrap_type(type);
     auto* base_value_type = unwrap_type(value.type);
+
+    if (is<types::Never>(base_value_type)) {
+        m_builder.CreateUnreachable();
+        return Value{type, value.value};
+    }
 
     if (base_type == base_value_type) {
         return Value{type, value.value, false, value.is_ref, value.is_deref};
@@ -379,7 +386,11 @@ bool Codegen::cast_to_result(Type* type, const Value& value, bool implicit) {
 
     if (base_type == base_value_type) {
         m_builder.CreateStore(load_value(value).value, m_current_result);
+        return true;
+    }
 
+    if (is<types::Never>(base_value_type)) {
+        m_builder.CreateUnreachable();
         return true;
     }
 

@@ -258,7 +258,6 @@ private:
     [[nodiscard]] Type* unwrap_type(Type* type);
 
     [[nodiscard]] TranslationUnit get_unit(const std::filesystem::path& path) {
-
         auto directory = path;
 
         if (!std::filesystem::is_directory(path)) {

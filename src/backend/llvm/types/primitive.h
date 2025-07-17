@@ -107,6 +107,12 @@ struct Void : detail::Ty<Void, Type::Kind::Void> {
     [[nodiscard]] std::string to_string() const override { return "void"; }
 };
 
+struct Never : detail::Ty<Never, Type::Kind::Never> {
+    [[nodiscard]] Never(llvm::Type* llvm_type) : Ty{llvm_type} {}
+
+    [[nodiscard]] std::string to_string() const override { return "never"; }
+};
+
 struct Pointer : detail::Ty<Pointer, Type::Kind::Pointer> {
     [[nodiscard]] Pointer(llvm::Type* llvm_type, Type* type, bool is_mutable)
     : Ty{llvm_type}, type{type}, is_mutable{is_mutable} {}

@@ -26,6 +26,7 @@ struct Type {
         Null,
         Undefined,
         Void,
+        Never,
 
         Pointer,
         Optional,
