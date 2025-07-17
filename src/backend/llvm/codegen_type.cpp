@@ -54,7 +54,7 @@ Type* Codegen::generate(const ast::NamedType& type) {
             auto generic = scope->generic_structs.find(name);
 
             if (generic != scope->generic_structs.end()) {
-                if (generic->second->template_params.size() !=
+                if (generic->second.element->template_params.size() !=
                     type.template_args.size()) {
                     error(
                         offset,
@@ -65,7 +65,7 @@ Type* Codegen::generate(const ast::NamedType& type) {
 
                 m_named_types.push_back(
                     std::make_unique<types::TemplateStructInst>(
-                        generic->second.get(), std::move(args)));
+                        generic->second.element.get(), std::move(args)));
 
                 return m_named_types.back().get();
             }
@@ -80,14 +80,14 @@ Type* Codegen::generate(const ast::NamedType& type) {
                 return nullptr;
             }
 
-            if (generic_union->second->template_params.size() !=
+            if (generic_union->second.element->template_params.size() !=
                 type.template_args.size()) {
                 error(offset, "incorrect number of template arguments passed");
                 return nullptr;
             }
 
             m_named_types.push_back(std::make_unique<types::TemplateUnionInst>(
-                generic_union->second.get(), std::move(args)));
+                generic_union->second.element.get(), std::move(args)));
 
             return m_named_types.back().get();
         }
@@ -95,13 +95,13 @@ Type* Codegen::generate(const ast::NamedType& type) {
         auto generic = scope->generic_structs.find(name);
 
         if (generic != scope->generic_structs.end()) {
-            if (generic->second->template_params.size() !=
+            if (generic->second.element->template_params.size() !=
                 type.template_args.size()) {
                 error(offset, "incorrect number of template arguments passed");
                 return nullptr;
             }
 
-            return inst_generic_struct(generic->second.get(), args);
+            return inst_generic_struct(generic->second.element.get(), args);
         }
 
         auto generic_union = scope->generic_unions.find(name);
@@ -113,13 +113,13 @@ Type* Codegen::generate(const ast::NamedType& type) {
             return nullptr;
         }
 
-        if (generic_union->second->template_params.size() !=
+        if (generic_union->second.element->template_params.size() !=
             type.template_args.size()) {
             error(offset, "incorrect number of template arguments passed");
             return nullptr;
         }
 
-        return inst_generic_union(generic_union->second.get(), args);
+        return inst_generic_union(generic_union->second.element.get(), args);
     }
 
     return get_type(offset, name, *scope);
@@ -517,8 +517,8 @@ Value Codegen::inst_generic_fn(
             types[i]->llvm_type, function->template_params[i]->name, types[i],
             false));
 
-        m_current_scope->types[function->template_params[i]->name] =
-            m_named_types.back().get();
+        m_current_scope->types[function->template_params[i]->name] = {
+            m_named_types.back().get()};
     }
 
     auto scope_prefix = m_current_scope_prefix;

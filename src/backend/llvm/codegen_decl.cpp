@@ -43,7 +43,7 @@ Value Codegen::generate(const ast::FnDecl& decl) {
             auto iterator = m_current_scope->names.find(decl.name.value);
 
             if (iterator != m_current_scope->names.end()) {
-                return iterator->second.type;
+                return iterator->second.element.type;
             }
 
             return nullptr;
@@ -53,7 +53,7 @@ Value Codegen::generate(const ast::FnDecl& decl) {
             decl.name.value);
 
         if (iterator != m_current_scope->scopes[decl.type->value].names.end()) {
-            return iterator->second.type;
+            return iterator->second.element.type;
         }
 
         return nullptr;
@@ -62,13 +62,13 @@ Value Codegen::generate(const ast::FnDecl& decl) {
     auto get_llvm_fn = [&]() {
         if (!decl.type) {
             return static_cast<llvm::Function*>(
-                m_current_scope->names[decl.name.value].value);
+                m_current_scope->names[decl.name.value].element.value);
         }
 
         return static_cast<llvm::Function*>(
             m_current_scope->scopes[decl.type->value]
                 .names[decl.name.value]
-                .value);
+                .element.value);
     };
 
     auto* function_type = get_fn_type();
@@ -97,7 +97,8 @@ Value Codegen::generate(const ast::FnDecl& decl) {
         m_builder.CreateStore(value, variable);
 
         m_current_scope->names[param.name.value] = {
-            m_current_function->param_types[i], variable, param.is_mutable};
+            {m_current_function->param_types[i], variable, param.is_mutable},
+            true};
     }
 
     auto scope_prefix = m_current_scope_prefix;
@@ -149,7 +150,8 @@ Value Codegen::generate(const ast::Struct& decl) {
             template_params.push_back(
                 static_cast<types::TemplateParam*>(m_named_types.back().get()));
 
-            m_current_scope->types[param.value] = template_params.back();
+            m_current_scope->types[param.value] = {
+                template_params.back(), true};
         }
 
         std::vector<GenericStruct::Field> fields;
@@ -167,10 +169,11 @@ Value Codegen::generate(const ast::Struct& decl) {
 
         m_current_scope->types = current_scope_types;
 
-        m_current_scope->generic_structs[decl.name.value] =
+        m_current_scope->generic_structs[decl.name.value] = {
             std::make_shared<GenericStruct>(
                 m_current_scope_prefix + decl.name.value, std::move(fields),
-                std::move(template_params));
+                std::move(template_params)),
+            decl.is_public, m_current_unit};
 
         return Value::poisoned();
     }
@@ -205,7 +208,8 @@ Value Codegen::generate(const ast::Struct& decl) {
         struct_type, m_current_scope_prefix + decl.name.value,
         std::move(fields)));
 
-    m_current_scope->types[decl.name.value] = m_named_types.back().get();
+    m_current_scope->types[decl.name.value] = {
+        m_named_types.back().get(), decl.is_public, m_current_unit};
 
     return Value::poisoned();
 }
@@ -235,7 +239,8 @@ Value Codegen::generate(const ast::Union& decl) {
             template_params.push_back(
                 static_cast<types::TemplateParam*>(m_named_types.back().get()));
 
-            m_current_scope->types[param.value] = template_params.back();
+            m_current_scope->types[param.value] = {
+                template_params.back(), true};
         }
 
         std::vector<GenericUnion::Field> fields;
@@ -268,16 +273,20 @@ Value Codegen::generate(const ast::Union& decl) {
             for (std::size_t i = 0; i < decl.fields.size(); ++i) {
                 m_current_scope->scopes[decl.name.value]
                     .names[decl.fields[i].name.value] = {
-                    tag_type, llvm::ConstantInt::get(underlying->llvm_type, i)};
+                    {tag_type,
+                     llvm::ConstantInt::get(underlying->llvm_type, i)},
+                    decl.is_public,
+                    m_current_unit};
             }
 
             tag_type = type;
         }
 
-        m_current_scope->generic_unions[decl.name.value] =
+        m_current_scope->generic_unions[decl.name.value] = {
             std::make_shared<GenericUnion>(
                 m_current_scope_prefix + decl.name.value, std::move(fields),
-                std::move(template_params), tag_type);
+                std::move(template_params), tag_type),
+            decl.is_public, m_current_unit};
 
         return Value::poisoned();
     }
@@ -322,30 +331,36 @@ Value Codegen::generate(const ast::Union& decl) {
             struct_type, m_current_scope_prefix + decl.name.value,
             std::move(fields)));
 
-        m_current_scope->types[decl.name.value] = m_named_types.back().get();
-    } else {
-        auto* underlying = m_primitive_types["i32"].get();
+        m_current_scope->types[decl.name.value] = {
+            m_named_types.back().get(), decl.is_public, m_current_unit};
 
-        m_named_types.push_back(std::make_unique<types::Enum>(
-            underlying->llvm_type,
-            m_current_scope_prefix + decl.name.value + "(tag)", underlying));
-
-        auto* tag_type = static_cast<types::Enum*>(m_named_types.back().get());
-
-        for (std::size_t i = 0; i < decl.fields.size(); ++i) {
-            m_current_scope->scopes[decl.name.value]
-                .names[decl.fields[i].name.value] = {
-                tag_type, llvm::ConstantInt::get(underlying->llvm_type, i)};
-        }
-
-        struct_type->setBody({max_type, underlying->llvm_type});
-
-        m_named_types.push_back(std::make_unique<types::Union>(
-            struct_type, m_current_scope_prefix + decl.name.value,
-            std::move(fields), tag_type));
-
-        m_current_scope->types[decl.name.value] = m_named_types.back().get();
+        return Value::poisoned();
     }
+
+    auto* underlying = m_primitive_types["i32"].get();
+
+    m_named_types.push_back(std::make_unique<types::Enum>(
+        underlying->llvm_type,
+        m_current_scope_prefix + decl.name.value + "(tag)", underlying));
+
+    auto* tag_type = static_cast<types::Enum*>(m_named_types.back().get());
+
+    for (std::size_t i = 0; i < decl.fields.size(); ++i) {
+        m_current_scope->scopes[decl.name.value]
+            .names[decl.fields[i].name.value] = {
+            {tag_type, llvm::ConstantInt::get(underlying->llvm_type, i)},
+            decl.is_public,
+            m_current_unit};
+    }
+
+    struct_type->setBody({max_type, underlying->llvm_type});
+
+    m_named_types.push_back(std::make_unique<types::Union>(
+        struct_type, m_current_scope_prefix + decl.name.value,
+        std::move(fields), tag_type));
+
+    m_current_scope->types[decl.name.value] = {
+        m_named_types.back().get(), decl.is_public, m_current_unit};
 
     return Value::poisoned();
 }
@@ -374,7 +389,8 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
         m_named_types.push_back(std::make_unique<types::Enum>(
             type->llvm_type, m_current_scope_prefix + decl.name.value, type));
 
-        m_current_scope->types[decl.name.value] = m_named_types.back().get();
+        m_current_scope->types[decl.name.value] = {
+            m_named_types.back().get(), decl.is_public, m_current_unit};
     }
 
     auto* underlying = m_primitive_types["i32"].get();
@@ -385,7 +401,8 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
 
     auto* type = static_cast<types::Enum*>(m_named_types.back().get());
 
-    m_current_scope->types[decl.name.value] = type;
+    m_current_scope->types[decl.name.value] = {
+        type, decl.is_public, m_current_unit};
 
     std::uint64_t number = 0;
 
@@ -393,10 +410,11 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
         const auto& field = decl.fields[i];
 
         if (!field.value) {
-            m_current_scope->scopes[decl.name.value].names[field.name.value] =
-                Value{
-                    type, llvm::ConstantInt::get(
-                              type->llvm_type, number++, is_sint(type))};
+            m_current_scope->scopes[decl.name.value].names[field.name.value] = {
+                {type, llvm::ConstantInt::get(
+                           type->llvm_type, number++, is_sint(type))},
+                decl.is_public,
+                m_current_unit};
 
             continue;
         }
@@ -408,8 +426,8 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
         }
 
         if (auto val = cast(type->type, value); val.ok()) {
-            m_current_scope->scopes[decl.name.value].names[field.name.value] =
-                val;
+            m_current_scope->scopes[decl.name.value].names[field.name.value] = {
+                val, decl.is_public, m_current_unit};
 
             if (auto* constant = llvm::dyn_cast<llvm::ConstantInt>(val.value)) {
                 number = is_sint(type) ? constant->getSExtValue()
@@ -445,14 +463,15 @@ Value Codegen::generate(const ast::TypeAlias& decl) {
         type->llvm_type, m_current_scope_prefix + decl.name.value, type,
         distinct));
 
-    m_current_scope->types[decl.name.value] = m_named_types.back().get();
+    m_current_scope->types[decl.name.value] = {
+        m_named_types.back().get(), decl.is_public, m_current_unit};
 
     return Value::poisoned();
 }
 
 Value Codegen::generate(const ast::VarDecl& decl) {
     auto& result = m_current_scope->names[decl.name.value];
-    result = Value::poisoned();
+    result = {Value::poisoned()};
 
     if (decl.mutability == ast::VarDecl::Mut::Const) {
         if (!decl.value) {
@@ -487,7 +506,7 @@ Value Codegen::generate(const ast::VarDecl& decl) {
             return Value::poisoned();
         }
 
-        result = value;
+        result = {value, decl.is_public, m_current_unit};
         return Value::poisoned();
     }
 
@@ -613,7 +632,8 @@ Value Codegen::generate(const ast::VarDecl& decl) {
 
             m_current_result = global;
 
-            result = {type, m_current_result, true};
+            result = {
+                {type, m_current_result, true}, decl.is_public, m_current_unit};
         }
     }
 
@@ -656,7 +676,7 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
             template_params.emplace_back(
                 static_cast<types::TemplateParam*>(m_named_types.back().get()));
 
-            m_current_scope->types[param.value] = template_params.back();
+            m_current_scope->types[param.value] = {template_params.back()};
         }
 
         Type* return_type = m_void_type.get();
@@ -693,11 +713,12 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
 
         m_current_scope->types = current_scope_types;
 
-        m_current_scope->generic_fns[decl.name.value] =
+        m_current_scope->generic_fns[decl.name.value] = {
             std::make_shared<GenericFunction>(
                 m_current_scope_prefix + decl.name.value, decl.name.offset,
                 return_type, std::move(params), std::move(default_args),
-                decl.block.get(), std::move(template_params));
+                decl.block.get(), std::move(template_params)),
+            decl.is_public, m_current_unit};
 
         return;
     }
@@ -730,7 +751,8 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
             *m_module);
     }
 
-    scope.names[decl.name.value] = {fn_type, function};
+    scope.names[decl.name.value] = {
+        {fn_type, function}, decl.is_public, m_current_unit};
 
     if (!decl.type) {
         return;

@@ -69,11 +69,13 @@ void Codegen::generate(const ast::Module& module) {
     auto filename = m_filename;
     auto* scope = m_current_scope;
     auto scope_prefix = m_current_scope_prefix;
+    auto unit = m_current_unit;
 
     for (const auto& submodule : module.submodules) {
         m_filename = submodule->path.string();
         m_current_scope = &scope->scopes[*submodule->name];
         m_current_scope_prefix = *submodule->name + "::";
+        m_current_unit = get_unit(m_filename);
 
         generate(*submodule);
     }
@@ -81,6 +83,7 @@ void Codegen::generate(const ast::Module& module) {
     m_filename = filename;
     m_current_scope = scope;
     m_current_scope_prefix = scope_prefix;
+    m_current_unit = unit;
 
     for (const auto& type : module.types) {
         type->codegen(*this);
@@ -625,7 +628,13 @@ Type* Codegen::get_type(
         return nullptr;
     }
 
-    return user->second;
+    if (is_accessible(user->second, m_current_unit)) {
+        return user->second.element;
+    }
+
+    error(offset, fmt::format("{} is private", log::quoted(name)));
+
+    return nullptr;
 }
 
 Value*
@@ -640,7 +649,13 @@ Codegen::get_name(std::size_t offset, std::string_view name, Scope& parent) {
         return nullptr;
     }
 
-    return &iterator->second;
+    if (is_accessible(iterator->second, m_current_unit)) {
+        return &iterator->second.element;
+    }
+
+    error(offset, fmt::format("{} is private", log::quoted(name)));
+
+    return nullptr;
 }
 
 GenericFunction* Codegen::get_generic_fn(
@@ -655,7 +670,13 @@ GenericFunction* Codegen::get_generic_fn(
         return nullptr;
     }
 
-    return iterator->second.get();
+    if (is_accessible(iterator->second, m_current_unit)) {
+        return iterator->second.element.get();
+    }
+
+    error(offset, fmt::format("{} is private", log::quoted(name)));
+
+    return nullptr;
 }
 
 Scope*

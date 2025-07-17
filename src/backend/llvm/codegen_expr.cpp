@@ -595,7 +595,12 @@ Value Codegen::generate(const ast::CallExpr& expr) {
         auto [name, offset] = identifier->value.back();
 
         if (auto value = scope->names.find(name); value != scope->names.end()) {
-            auto function = load_value(value->second);
+            if (!is_accessible(value->second, m_current_unit)) {
+                error(offset, fmt::format("{} is private", log::quoted(name)));
+                return Value::poisoned();
+            }
+
+            auto function = load_value(value->second.element);
 
             if (auto* type = dyn_cast<types::Function>(function.type)) {
                 return create_call(

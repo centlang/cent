@@ -100,8 +100,8 @@ public:
         std::unique_ptr<ast::Module> program, std::string_view filename,
         const llvm::DataLayout& layout, const std::string& triple)
     : m_module{std::make_unique<llvm::Module>("", m_context)},
-      m_builder{m_context}, m_program{std::move(program)},
-      m_filename{filename} {
+      m_builder{m_context}, m_program{std::move(program)}, m_filename{filename},
+      m_units{std::filesystem::path{m_filename}.parent_path()} {
         m_module->setDataLayout(layout);
         m_module->setTargetTriple(triple);
     }
@@ -257,6 +257,30 @@ private:
 
     [[nodiscard]] Type* unwrap_type(Type* type);
 
+    [[nodiscard]] TranslationUnit get_unit(const std::filesystem::path& path) {
+
+        auto directory = path;
+
+        if (!std::filesystem::is_directory(path)) {
+            directory = path.parent_path();
+        }
+
+        for (std::size_t i = 0; i < m_units.size(); ++i) {
+            if (directory == m_units[i]) {
+                return static_cast<TranslationUnit>(i);
+            }
+        }
+
+        m_units.push_back(directory);
+        return static_cast<TranslationUnit>(m_units.size()) - 1;
+    }
+
+    template <typename ElementType>
+    [[nodiscard]] bool is_accessible(
+        const Scope::Element<ElementType>& element, TranslationUnit unit) {
+        return element.is_public || element.unit == unit;
+    }
+
     void create_panic_fn();
 
     void generate_fn_proto(const ast::FnDecl& decl);
@@ -310,6 +334,7 @@ private:
     Scope* m_current_scope{&m_scope};
     types::Function* m_current_function{nullptr};
     llvm::Value* m_current_result{nullptr};
+    TranslationUnit m_current_unit{0};
     bool m_current_fn_had_error{false};
 
     llvm::BasicBlock* m_loop_continue{nullptr};
@@ -372,6 +397,8 @@ private:
     std::map<FnTypeKey, std::unique_ptr<types::Function>> m_fn_types;
 
     std::vector<std::unique_ptr<Type>> m_named_types;
+
+    std::vector<std::filesystem::path> m_units;
 
     bool m_had_error{false};
 };
