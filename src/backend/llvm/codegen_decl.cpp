@@ -624,8 +624,13 @@ Value Codegen::generate(const ast::VarDecl& decl) {
                 decl.mutability == ast::VarDecl::Mut::Mut};
         } else {
             auto* global = new llvm::GlobalVariable{
-                *m_module, llvm_type, false, llvm::GlobalValue::PrivateLinkage,
-                llvm::Constant::getNullValue(llvm_type)};
+                *m_module,
+                llvm_type,
+                false,
+                decl.is_public ? llvm::GlobalValue::ExternalLinkage
+                               : llvm::GlobalValue::PrivateLinkage,
+                llvm::Constant::getNullValue(llvm_type),
+                m_current_scope_prefix + decl.name.value};
 
             global->setAlignment(
                 m_module->getDataLayout().getPreferredAlign(global));
