@@ -470,6 +470,9 @@ Value Codegen::generate(const ast::TypeAlias& decl) {
 }
 
 Value Codegen::generate(const ast::VarDecl& decl) {
+    auto attrs = parse_attrs(decl, {"extern"});
+    bool is_extern = attrs.contains("extern");
+
     auto& result = m_current_scope->names[decl.name.value];
     result = {Value::poisoned()};
 
@@ -627,18 +630,17 @@ Value Codegen::generate(const ast::VarDecl& decl) {
                 *m_module,
                 llvm_type,
                 false,
-                decl.is_public ? llvm::GlobalValue::ExternalLinkage
-                               : llvm::GlobalValue::PrivateLinkage,
-                llvm::Constant::getNullValue(llvm_type),
-                m_current_scope_prefix + decl.name.value};
+                (decl.is_public || is_extern)
+                    ? llvm::GlobalValue::ExternalLinkage
+                    : llvm::GlobalValue::PrivateLinkage,
+                is_extern ? nullptr : llvm::Constant::getNullValue(llvm_type),
+                is_extern ? decl.name.value
+                          : m_current_scope_prefix + decl.name.value};
 
             global->setAlignment(
                 m_module->getDataLayout().getPreferredAlign(global));
 
-            m_current_result = global;
-
-            result = {
-                {type, m_current_result, true}, decl.is_public, m_current_unit};
+            result = {{type, global, true}, decl.is_public, m_current_unit};
         }
     }
 
