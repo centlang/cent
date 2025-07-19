@@ -2,12 +2,11 @@
 
 namespace cent {
 
-std::vector<std::filesystem::path> find_module(
-    std::span<std::string> path,
-    std::span<std::filesystem::path> search_paths) {
+std::vector<std::filesystem::path>
+find_module(std::span<std::string> path, const SearchPath& search_path) {
     std::vector<std::filesystem::path> result;
 
-    for (const auto& search_path : search_paths) {
+    for (const auto& search_path : search_path) {
         if (!std::filesystem::is_directory(search_path)) {
             continue;
         }

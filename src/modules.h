@@ -8,8 +8,10 @@
 
 namespace cent {
 
-[[nodiscard]] std::vector<std::filesystem::path> find_module(
-    std::span<std::string> path, std::span<std::filesystem::path> search_paths);
+using SearchPath = std::vector<std::filesystem::path>;
+
+[[nodiscard]] std::vector<std::filesystem::path>
+find_module(std::span<std::string> path, const SearchPath& search_path);
 
 } // namespace cent
 

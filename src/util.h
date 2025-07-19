@@ -129,6 +129,20 @@ offset_to_loc(std::string_view source, std::size_t offset) {
 [[nodiscard]] int
 exec_command(std::string program, std::vector<std::string> args);
 
+[[nodiscard]] inline std::vector<std::string>
+split(const std::string& value, char delimiter) {
+    std::vector<std::string> result;
+    std::string current;
+
+    std::istringstream stream{value};
+
+    while (std::getline(stream, current, delimiter)) {
+        result.push_back(std::move(current));
+    }
+
+    return result;
+}
+
 } // namespace cent
 
 #endif

@@ -1660,12 +1660,22 @@ bool Parser::parse_with(ast::Module& module) {
         module_name = token->value;
     }
 
-    std::array search_paths = {
-        std::filesystem::absolute(m_filename).parent_path(),
-        std::filesystem::path{"/usr/local/lib/cent"},
-        std::filesystem::path{"/usr/lib/cent"}};
+    SearchPath search_path = {
+        std::filesystem::absolute(m_filename).parent_path()};
 
-    auto module_paths = cent::find_module(path, search_paths);
+    if (const auto* cent_path = std::getenv("CENTPATH")) {
+        auto paths = split(cent_path, ':');
+        search_path.reserve(paths.size() + search_path.size());
+
+        for (const auto& path : paths) {
+            search_path.emplace_back(path);
+        }
+    } else {
+        search_path.emplace_back("/usr/local/lib/cent");
+        search_path.emplace_back("/usr/lib/cent");
+    }
+
+    auto module_paths = cent::find_module(path, search_path);
 
     if (module_paths.empty()) {
         error(
