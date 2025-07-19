@@ -199,10 +199,9 @@ Value Codegen::generate(const ast::RangeLiteral& expr) {
     auto value_y = cast(begin_value.type, end_value);
 
     if (!value_y.ok()) {
-        value_x = cast(end_value.type, begin_value);
+        value_x = cast_or_error(expr.end->offset, end_value.type, begin_value);
 
         if (!value_x.ok()) {
-            type_mismatch(expr.end->offset, begin_value.type, end_value.type);
             return Value::poisoned();
         }
 
@@ -295,12 +294,9 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
         m_current_result = m_builder.CreateStructGEP(
             union_type->llvm_type, variable, union_member_value);
 
-        if (!cast_to_result(union_type->fields[*index], value)) {
-            type_mismatch(
-                field.value->offset, union_type->fields[*index], value.type);
-
+        if (!cast_to_result_or_error(
+                field.value->offset, union_type->fields[*index], value)) {
             m_current_result = nullptr;
-
             return Value::poisoned();
         }
 
@@ -398,12 +394,9 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
         m_current_result =
             m_builder.CreateStructGEP(struct_type->llvm_type, variable, *index);
 
-        if (!cast_to_result(struct_type->fields[*index], value)) {
-            type_mismatch(
-                field.value->offset, struct_type->fields[*index], value.type);
-
+        if (!cast_to_result_or_error(
+                field.value->offset, struct_type->fields[*index], value)) {
             m_current_result = nullptr;
-
             return Value::poisoned();
         }
 
@@ -482,12 +475,9 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
             {llvm::ConstantInt::get(intptr, 0),
              llvm::ConstantInt::get(intptr, i)});
 
-        if (!cast_to_result(array_type->type, value)) {
-            type_mismatch(
-                expr.elements[i]->offset, array_type->type, value.type);
-
+        if (!cast_to_result_or_error(
+                expr.elements[i]->offset, array_type->type, value)) {
             m_current_result = nullptr;
-
             return Value::poisoned();
         }
 
@@ -649,13 +639,12 @@ Value Codegen::generate(const ast::CallExpr& expr) {
                 return Value::poisoned();
             }
 
-            if (auto val = cast(generic_fn->params[i].type, value); val.ok()) {
+            if (auto val = cast_or_error(
+                    expr.arguments[i]->offset, generic_fn->params[i].type,
+                    value);
+                val.ok()) {
                 arguments.push_back(load_value(val));
             } else {
-                type_mismatch(
-                    expr.arguments[i]->offset, generic_fn->params[i].type,
-                    value.type);
-
                 return Value::poisoned();
             }
         }
@@ -841,14 +830,12 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
             return Value::poisoned();
         }
 
-        if (auto val = cast(iterator->second.type->param_types[i + 1], value);
+        if (auto val = cast_or_error(
+                expr.arguments[i]->offset,
+                iterator->second.type->param_types[i + 1], value);
             val.ok()) {
             arguments.push_back(load_value(val).value);
         } else {
-            type_mismatch(
-                expr.arguments[i]->offset,
-                iterator->second.type->param_types[i + 1], value.type);
-
             return Value::poisoned();
         }
     }
@@ -1011,12 +998,11 @@ Value Codegen::generate(const ast::IndexExpr& expr) {
     }
 
     auto index_val = load_value(index);
-    auto val = cast(m_primitive_types["usize"].get(), index_val);
+
+    auto val = cast_or_error(
+        expr.index->offset, m_primitive_types["usize"].get(), index_val);
 
     if (!val.ok()) {
-        type_mismatch(
-            expr.index->offset, m_primitive_types["usize"].get(), index.type);
-
         return Value::poisoned();
     }
 
@@ -1066,12 +1052,11 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
         }
 
         low = load_value(low);
-        auto low_val = cast(m_primitive_types["usize"].get(), low);
+
+        auto low_val = cast_or_error(
+            expr.low->offset, m_primitive_types["usize"].get(), low);
 
         if (!low_val.ok()) {
-            type_mismatch(
-                expr.low->offset, m_primitive_types["usize"].get(), low.type);
-
             return Value::poisoned();
         }
 
@@ -1093,12 +1078,11 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
         }
 
         high = load_value(high);
-        auto high_val = cast(m_primitive_types["usize"].get(), high);
+
+        auto high_val = cast_or_error(
+            expr.high->offset, m_primitive_types["usize"].get(), high);
 
         if (!high_val.ok()) {
-            type_mismatch(
-                expr.high->offset, m_primitive_types["usize"].get(), high.type);
-
             return Value::poisoned();
         }
 
@@ -1199,13 +1183,7 @@ Value Codegen::generate(const ast::AsExpr& expr) {
         return Value::poisoned();
     }
 
-    if (auto val = cast(type, value, false); val.ok()) {
-        return val;
-    }
-
-    type_mismatch(expr.type->offset, type, value.type);
-
-    return Value::poisoned();
+    return cast_or_error(expr.type->offset, type, value, false);
 }
 
 Value Codegen::generate(const ast::SizeofExpr& expr) {
@@ -1350,11 +1328,9 @@ Value Codegen::generate_bin_expr(
     auto value_y = cast(lhs_base_type, rhs_value);
 
     if (!value_y.ok()) {
-        value_y = cast(rhs_base_type, lhs_value);
+        value_y = cast_or_error(rhs.offset, rhs_base_type, lhs_value);
 
         if (!value_y.ok()) {
-            type_mismatch(rhs.offset, lhs_value.type, rhs_value.type);
-
             return Value::poisoned();
         }
 

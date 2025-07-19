@@ -425,7 +425,8 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
             return Value::poisoned();
         }
 
-        if (auto val = cast(type->type, value); val.ok()) {
+        if (auto val = cast_or_error(field.value->offset, type->type, value);
+            val.ok()) {
             m_current_scope->scopes[decl.name.value].names[field.name.value] = {
                 val, decl.is_public, m_current_unit};
 
@@ -438,8 +439,6 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
                 return Value::poisoned();
             }
         } else {
-            type_mismatch(field.value->offset, type->type, value.type);
-
             return Value::poisoned();
         }
 
@@ -496,10 +495,9 @@ Value Codegen::generate(const ast::VarDecl& decl) {
             }
 
             auto* value_type = value.type;
-            value = cast(type, value);
+            value = cast_or_error(decl.value->offset, type, value);
 
             if (!value.ok()) {
-                type_mismatch(decl.value->offset, type, value_type);
                 return Value::poisoned();
             }
         }
@@ -580,9 +578,7 @@ Value Codegen::generate(const ast::VarDecl& decl) {
 
             m_current_result = create_alloca(llvm_type);
 
-            if (!cast_to_result(type, value)) {
-                type_mismatch(decl.value->offset, type, value.type);
-            } else {
+            if (cast_to_result_or_error(decl.value->offset, type, value)) {
                 result = {
                     type, m_current_result,
                     decl.mutability == ast::VarDecl::Mut::Mut};

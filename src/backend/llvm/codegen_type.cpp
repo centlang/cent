@@ -239,10 +239,9 @@ types::Function* Codegen::generate_fn_type(const ast::FnProto& proto) {
             return nullptr;
         }
 
-        auto val = cast(type, value);
+        auto val = cast_or_error(parameter.value->offset, type, value);
 
         if (!val.ok()) {
-            type_mismatch(parameter.value->offset, type, value.type);
             return nullptr;
         }
 
@@ -446,10 +445,9 @@ Value Codegen::inst_generic_fn(
         auto* type =
             param_types[i + param_types.size() - function->default_args.size()];
 
-        auto val = cast(type, value);
+        auto val = cast_or_error(arg->offset, type, value);
 
         if (!val.ok()) {
-            type_mismatch(arg->offset, type, value.type);
             return Value::poisoned();
         }
 

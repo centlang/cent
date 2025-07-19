@@ -88,9 +88,7 @@ Value Codegen::generate([[maybe_unused]] const ast::Assignment& stmt) {
 
     m_current_result = var.value;
 
-    if (!cast_to_result(var.type, value)) {
-        type_mismatch(stmt.value->offset, var.type, value.type);
-    }
+    cast_to_result_or_error(stmt.value->offset, var.type, value);
 
     m_current_result = nullptr;
 
@@ -219,10 +217,9 @@ Value Codegen::generate(const ast::Switch& stmt) {
 
         for (const auto& case_value : case_stmt.values) {
             auto case_val = case_value->codegen(*this);
-            auto val = cast(value.type, case_val);
+            auto val = cast_or_error(stmt.offset, value.type, case_val);
 
             if (!val.ok()) {
-                type_mismatch(stmt.offset, value.type, case_val.type);
                 return Value::poisoned();
             }
 
@@ -277,12 +274,12 @@ Value Codegen::generate(const ast::ReturnStmt& stmt) {
         return Value::poisoned();
     }
 
-    if (auto val = cast(m_current_function->return_type, value); val.ok()) {
+    if (auto val =
+            cast_or_error(stmt.offset, m_current_function->return_type, value);
+        val.ok()) {
         if (!m_builder.GetInsertBlock()->getTerminator()) {
             m_builder.CreateRet(load_value(val).value);
         }
-    } else {
-        type_mismatch(stmt.offset, m_current_function->return_type, value.type);
     }
 
     return Value::poisoned();

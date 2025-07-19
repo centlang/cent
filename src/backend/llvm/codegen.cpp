@@ -108,113 +108,6 @@ void Codegen::generate(const ast::Module& module) {
     m_generated_modules[module.path] = *m_current_scope;
 }
 
-Value Codegen::cast(Type* type, const Value& value, bool implicit) {
-    auto* base_type = unwrap_type(type);
-    auto* base_value_type = unwrap_type(value.type);
-
-    if (is<types::Never>(base_value_type)) {
-        m_builder.CreateUnreachable();
-        return Value{type, value.value};
-    }
-
-    if (base_type == base_value_type) {
-        return Value{type, value.value, false, value.is_ref, value.is_deref};
-    }
-
-    if (is<types::TemplateParam>(base_type)) {
-        return value;
-    }
-
-    if (is<types::Void>(base_type)) {
-        return Value::poisoned();
-    }
-
-    if (const auto* optional = dyn_cast<types::Optional>(base_type)) {
-        auto* base_contained_type = unwrap_type(optional->type);
-
-        if (is<types::Null>(base_value_type)) {
-            return Value{
-                type, llvm::Constant::getNullValue(base_type->llvm_type)};
-        }
-
-        if (base_contained_type != base_value_type) {
-            return Value::poisoned();
-        }
-
-        if (is<types::Pointer>(base_contained_type)) {
-            return Value{
-                type,
-                is<types::Null>(base_value_type)
-                    ? llvm::Constant::getNullValue(base_type->llvm_type)
-                    : value.value,
-                false, value.is_ref, value.is_deref};
-        }
-
-        if (auto* val = llvm::dyn_cast<llvm::Constant>(value.value)) {
-            return Value{
-                type, llvm::ConstantStruct::get(
-                          static_cast<llvm::StructType*>(base_type->llvm_type),
-                          {val, llvm::ConstantInt::get(
-                                    llvm::Type::getInt1Ty(m_context), true)})};
-        }
-
-        auto* variable = create_alloca(base_type->llvm_type);
-
-        auto* bool_ptr = m_builder.CreateStructGEP(
-            base_type->llvm_type, variable, optional_member_bool);
-
-        auto* value_ptr = m_builder.CreateStructGEP(
-            base_type->llvm_type, variable, optional_member_value);
-
-        m_builder.CreateStore(load_value(value).value, value_ptr);
-
-        m_builder.CreateStore(
-            llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), true),
-            bool_ptr);
-
-        return Value{type, variable, false, false, false, true};
-    }
-
-    if (const auto* slice = dyn_cast<types::Slice>(base_type)) {
-        auto* base_slice_contained_type = unwrap_type(slice->type);
-
-        const auto* array_type = dyn_cast<types::Array>(base_value_type);
-
-        if (!array_type) {
-            return Value::poisoned();
-        }
-
-        auto* base_array_contained_type = unwrap_type(array_type->type);
-
-        if (base_slice_contained_type != base_array_contained_type) {
-            return Value::poisoned();
-        }
-
-        auto* variable = create_alloca(base_type->llvm_type);
-
-        auto* ptr_member = m_builder.CreateStructGEP(
-            base_type->llvm_type, variable, slice_member_ptr);
-
-        auto* len_member = m_builder.CreateStructGEP(
-            base_type->llvm_type, variable, slice_member_len);
-
-        auto* intptr = m_module->getDataLayout().getIntPtrType(m_context);
-
-        auto* ptr_value = m_builder.CreateGEP(
-            base_slice_contained_type->llvm_type, value.value,
-            llvm::ConstantInt::get(intptr, 0));
-
-        m_builder.CreateStore(ptr_value, ptr_member);
-
-        m_builder.CreateStore(
-            llvm::ConstantInt::get(intptr, array_type->size), len_member);
-
-        return Value{type, variable, false, false, false, true};
-    }
-
-    return primitive_cast(type, value, implicit);
-}
-
 Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
     using enum llvm::Instruction::CastOps;
 
@@ -380,6 +273,113 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
                   cast_op, load_value(value).value, base_type->llvm_type)};
 }
 
+Value Codegen::cast(Type* type, const Value& value, bool implicit) {
+    auto* base_type = unwrap_type(type);
+    auto* base_value_type = unwrap_type(value.type);
+
+    if (is<types::Never>(base_value_type)) {
+        m_builder.CreateUnreachable();
+        return Value{type, value.value};
+    }
+
+    if (base_type == base_value_type) {
+        return Value{type, value.value, false, value.is_ref, value.is_deref};
+    }
+
+    if (is<types::TemplateParam>(base_type)) {
+        return value;
+    }
+
+    if (is<types::Void>(base_type)) {
+        return Value::poisoned();
+    }
+
+    if (const auto* optional = dyn_cast<types::Optional>(base_type)) {
+        auto* base_contained_type = unwrap_type(optional->type);
+
+        if (is<types::Null>(base_value_type)) {
+            return Value{
+                type, llvm::Constant::getNullValue(base_type->llvm_type)};
+        }
+
+        if (base_contained_type != base_value_type) {
+            return Value::poisoned();
+        }
+
+        if (is<types::Pointer>(base_contained_type)) {
+            return Value{
+                type,
+                is<types::Null>(base_value_type)
+                    ? llvm::Constant::getNullValue(base_type->llvm_type)
+                    : value.value,
+                false, value.is_ref, value.is_deref};
+        }
+
+        if (auto* val = llvm::dyn_cast<llvm::Constant>(value.value)) {
+            return Value{
+                type, llvm::ConstantStruct::get(
+                          static_cast<llvm::StructType*>(base_type->llvm_type),
+                          {val, llvm::ConstantInt::get(
+                                    llvm::Type::getInt1Ty(m_context), true)})};
+        }
+
+        auto* variable = create_alloca(base_type->llvm_type);
+
+        auto* bool_ptr = m_builder.CreateStructGEP(
+            base_type->llvm_type, variable, optional_member_bool);
+
+        auto* value_ptr = m_builder.CreateStructGEP(
+            base_type->llvm_type, variable, optional_member_value);
+
+        m_builder.CreateStore(load_value(value).value, value_ptr);
+
+        m_builder.CreateStore(
+            llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), true),
+            bool_ptr);
+
+        return Value{type, variable, false, false, false, true};
+    }
+
+    if (const auto* slice = dyn_cast<types::Slice>(base_type)) {
+        auto* base_slice_contained_type = unwrap_type(slice->type);
+
+        const auto* array_type = dyn_cast<types::Array>(base_value_type);
+
+        if (!array_type) {
+            return Value::poisoned();
+        }
+
+        auto* base_array_contained_type = unwrap_type(array_type->type);
+
+        if (base_slice_contained_type != base_array_contained_type) {
+            return Value::poisoned();
+        }
+
+        auto* variable = create_alloca(base_type->llvm_type);
+
+        auto* ptr_member = m_builder.CreateStructGEP(
+            base_type->llvm_type, variable, slice_member_ptr);
+
+        auto* len_member = m_builder.CreateStructGEP(
+            base_type->llvm_type, variable, slice_member_len);
+
+        auto* intptr = m_module->getDataLayout().getIntPtrType(m_context);
+
+        auto* ptr_value = m_builder.CreateGEP(
+            base_slice_contained_type->llvm_type, value.value,
+            llvm::ConstantInt::get(intptr, 0));
+
+        m_builder.CreateStore(ptr_value, ptr_member);
+
+        m_builder.CreateStore(
+            llvm::ConstantInt::get(intptr, array_type->size), len_member);
+
+        return Value{type, variable, false, false, false, true};
+    }
+
+    return primitive_cast(type, value, implicit);
+}
+
 bool Codegen::cast_to_result(Type* type, const Value& value, bool implicit) {
     auto* base_type = unwrap_type(type);
     auto* base_value_type = unwrap_type(value.type);
@@ -492,6 +492,27 @@ bool Codegen::cast_to_result(Type* type, const Value& value, bool implicit) {
     return false;
 }
 
+Value Codegen::cast_or_error(
+    std::size_t offset, Type* type, const Value& value, bool implicit) {
+    auto result = cast(type, value, implicit);
+
+    if (!result.ok()) {
+        type_mismatch(offset, type, value.type);
+    }
+
+    return result;
+}
+
+bool Codegen::cast_to_result_or_error(
+    std::size_t offset, Type* type, const Value& value, bool implicit) {
+    if (cast_to_result(type, value, implicit)) {
+        return true;
+    }
+
+    type_mismatch(offset, type, value.type);
+    return false;
+}
+
 Value Codegen::create_call(
     std::size_t offset, types::Function* type, llvm::Value* function,
     const std::vector<std::unique_ptr<ast::Expression>>& arguments) {
@@ -521,12 +542,11 @@ Value Codegen::create_call(
             continue;
         }
 
-        if (auto val = cast(type->param_types[i], value); val.ok()) {
+        if (auto val = cast_or_error(
+                arguments[i]->offset, type->param_types[i], value);
+            val.ok()) {
             llvm_args.push_back(load_value(val).value);
         } else {
-            type_mismatch(
-                arguments[i]->offset, type->param_types[i], value.type);
-
             return Value::poisoned();
         }
     }

@@ -166,13 +166,21 @@ private:
     void generate(const ast::Module& module);
 
     [[nodiscard]] Value
-    cast(Type* type, const Value& value, bool implicit = true);
+    primitive_cast(Type* type, const Value& value, bool implicit = true);
 
     [[nodiscard]] Value
-    primitive_cast(Type* type, const Value& value, bool implicit = true);
+    cast(Type* type, const Value& value, bool implicit = true);
 
     [[nodiscard]] bool
     cast_to_result(Type* type, const Value& value, bool implicit = true);
+
+    [[nodiscard]] Value cast_or_error(
+        std::size_t offset, Type* type, const Value& value,
+        bool implicit = true);
+
+    bool cast_to_result_or_error(
+        std::size_t offset, Type* type, const Value& value,
+        bool implicit = true);
 
     [[nodiscard]] Value generate_bin_logical_expr(
         const ast::Expression& lhs, const ast::Expression& rhs,
