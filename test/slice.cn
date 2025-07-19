@@ -1,6 +1,6 @@
 pub fn main() i32 {
-    let array = [i32, 5]{1, 2, 3, 4, 5};
-    mut slice: [i32] = array;
+    let array = [5]i32{1, 2, 3, 4, 5};
+    mut slice: []i32 = array;
 
     assert(slice.len == 5);
     assert(slice[0] == 1);
