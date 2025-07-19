@@ -15,6 +15,7 @@ target_include_directories(centc PRIVATE src)
 target_link_libraries(centc PRIVATE LLVM fmt::fmt)
 
 install(TARGETS centc)
+install(DIRECTORY lib/ DESTINATION lib/cent)
 
 enable_testing()
 
