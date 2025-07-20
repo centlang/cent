@@ -1,3 +1,5 @@
+with std;
+
 type Vector3 {
     x: i32,
     y: i32,
@@ -8,13 +10,13 @@ pub fn main() i32 {
     mut v = Vector3 { x: 1, y: 2, z: 3 };
 
     v.x += 1;
-    assert v.x == 2;
+    std::assert(v.x == 2);
 
     v.y = 3;
-    assert v.y == 3;
+    std::assert(v.y == 3);
 
     v.z = v.x + v.y;
-    assert v.z == 5;
+    std::assert(v.z == 5);
 
     return 0;
 }

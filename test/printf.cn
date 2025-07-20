@@ -1,0 +1,6 @@
+with c;
+
+pub fn main() i32 {
+    c::printf(c::to_cstr("Hello, %s!\n"), c::to_cstr("world"));
+    return 0;
+}

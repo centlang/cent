@@ -1,3 +1,5 @@
+with std;
+
 fn fib(n: u64) u64 {
     if n < 2 {
         return n;
@@ -7,6 +9,6 @@ fn fib(n: u64) u64 {
 }
 
 pub fn main() i32 {
-    assert fib(36) == 14_930_352;
+    std::assert(fib(36) == 14_930_352);
     return 0; 
 }

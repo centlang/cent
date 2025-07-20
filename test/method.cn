@@ -1,3 +1,5 @@
+with std;
+
 type Vector2 {
     x: i32,
     y: i32,
@@ -10,8 +12,8 @@ fn Vector2::sum(self: Vector2) i32 {
 pub fn main() i32 {
     mut v = Vector2 { x: 1, y: 2 };
 
-    assert v.sum() == 3;
-    assert Vector2::sum(v) == 3;
+    std::assert(v.sum() == 3);
+    std::assert(Vector2::sum(v) == 3);
 
     return 0;
 }

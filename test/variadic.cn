@@ -1,7 +1,0 @@
-pub fn main() i32 {
-    printf("Hello, %s!\n", "world");
-    return 0;
-}
-
-!(extern)
-fn printf(fmt: str, ...);
