@@ -38,6 +38,8 @@ foreach(TEST_SOURCE ${TEST_SOURCES})
         COMMAND "$<TARGET_FILE:centc>" "${TEST_PATH}" -o "${TEST_OUTPUT}"
     )
 
+    set_property(TEST "${BUILD_TEST}" PROPERTY ENVIRONMENT "CENTPATH=${CMAKE_SOURCE_DIR}/lib")
+
     add_test(NAME "${RUN_TEST}" COMMAND "${TEST_OUTPUT}")
     set_tests_properties("${RUN_TEST}" PROPERTIES DEPENDS "${BUILD_TEST}")
 endforeach()
