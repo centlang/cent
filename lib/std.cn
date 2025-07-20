@@ -1,7 +1,7 @@
 with c;
 
 pub fn panic(s: []u8) never {
-    c::fputs(&s[0] as *c::types::char, c::stderr);
+    c::fputs(c::to_cstr(s), c::stderr);
     return c::exit(c::EXIT_FAILURE);
 }
 
