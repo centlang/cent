@@ -483,11 +483,6 @@ void Lexer::ident() {
         return;
     }
 
-    if (m_token.value == "assert") {
-        keyword(Assert);
-        return;
-    }
-
     if (m_token.value == "undefined") {
         keyword(Undefined);
         return;

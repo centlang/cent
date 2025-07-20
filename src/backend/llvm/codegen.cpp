@@ -53,8 +53,6 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
         {llvm::PointerType::get(m_context, 0),
          m_module->getDataLayout().getIntPtrType(m_context)});
 
-    create_panic_fn();
-
     generate(*m_program);
 
     return std::move(m_module);
@@ -738,51 +736,6 @@ Scope* Codegen::resolve_scope(
     }
 
     return scope;
-}
-
-void Codegen::create_panic_fn() {
-    auto* panic_type = llvm::FunctionType::get(
-        llvm::Type::getVoidTy(m_context),
-        llvm::Type::getInt8Ty(m_context)->getPointerTo(), false);
-
-    m_panic_fn = llvm::Function::Create(
-        panic_type, llvm::Function::PrivateLinkage, "panic", *m_module);
-
-    auto* fputs_type = llvm::FunctionType::get(
-        llvm::Type::getInt32Ty(m_context),
-        {llvm::Type::getInt8Ty(m_context)->getPointerTo(),
-         llvm::PointerType::get(m_context, 0)},
-        false);
-
-    auto* fputs_fn = llvm::Function::Create(
-        fputs_type, llvm::Function::ExternalLinkage, "fputs", *m_module);
-
-    auto* stderr_ptr = new llvm::GlobalVariable{
-        *m_module, llvm::PointerType::get(m_context, 0),
-        false,     llvm::GlobalValue::ExternalLinkage,
-        nullptr,   "stderr"};
-
-    auto* exit_type = llvm::FunctionType::get(
-        llvm::Type::getVoidTy(m_context), {llvm::Type::getInt32Ty(m_context)},
-        false);
-
-    auto* exit_fn = llvm::Function::Create(
-        exit_type, llvm::Function::ExternalLinkage, "exit", *m_module);
-
-    auto* entry = llvm::BasicBlock::Create(m_context, "", m_panic_fn);
-
-    m_builder.SetInsertPoint(entry);
-
-    auto* stderr_value =
-        m_builder.CreateLoad(llvm::PointerType::get(m_context, 0), stderr_ptr);
-
-    m_builder.CreateCall(fputs_fn, {m_panic_fn->getArg(0), stderr_value});
-
-    m_builder.CreateCall(
-        exit_fn,
-        llvm::ConstantInt::getSigned(llvm::Type::getInt32Ty(m_context), 1));
-
-    m_builder.CreateUnreachable();
 }
 
 void Codegen::type_mismatch(

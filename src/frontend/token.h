@@ -104,7 +104,6 @@ struct Token {
         Continue,
 
         Unreachable,
-        Assert,
         Undefined,
         Sizeof,
 

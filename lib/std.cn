@@ -1,0 +1,10 @@
+with c;
+
+pub fn panic(s: []u8) never {
+    c::fputs(&s[0] as *c::types::char, c::stderr);
+    return c::exit(c::EXIT_FAILURE);
+}
+
+pub fn assert(cond: bool) {
+    if !cond { return panic("Assertion failed\n"); }
+}

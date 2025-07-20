@@ -9,7 +9,6 @@
 #include "ast/expr/slice_expr.h"
 #include "ast/expr/unary_expr.h"
 
-#include "ast/stmt/assert_stmt.h"
 #include "ast/stmt/assignment.h"
 #include "ast/stmt/break_stmt.h"
 #include "ast/stmt/continue_stmt.h"
@@ -202,20 +201,6 @@ void Parser::expect_stmt(ast::BlockStmt& block) {
         block.body.push_back(std::make_unique<ast::Unreachable>(get().offset));
         expect_semicolon();
         return;
-    case Assert: {
-        auto offset = get().offset;
-        auto expression = expect_expr(false);
-
-        if (!expression) {
-            return;
-        }
-
-        block.body.push_back(
-            std::make_unique<ast::AssertStmt>(offset, std::move(expression)));
-
-        expect_semicolon();
-        return;
-    }
     case Bang:
     case Fn:
     case Type:

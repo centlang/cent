@@ -49,7 +49,6 @@ struct ForLoop;
 struct BreakStmt;
 struct ContinueStmt;
 struct Unreachable;
-struct AssertStmt;
 
 struct BinaryExpr;
 struct UnaryExpr;
@@ -128,7 +127,6 @@ public:
     Value generate(const ast::BreakStmt& stmt);
     Value generate(const ast::ContinueStmt& stmt);
     Value generate(const ast::Unreachable& stmt);
-    Value generate(const ast::AssertStmt& stmt);
 
     [[nodiscard]] Value generate(const ast::BinaryExpr& expr);
     [[nodiscard]] Value generate(const ast::UnaryExpr& expr);
@@ -287,8 +285,6 @@ private:
         const Scope::Element<ElementType>& element, TranslationUnit unit) {
         return element.is_public || element.unit == unit;
     }
-
-    void create_panic_fn();
 
     void generate_fn_proto(const ast::FnDecl& decl);
 

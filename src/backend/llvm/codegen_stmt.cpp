@@ -4,7 +4,6 @@
 
 #include "ast/module.h"
 
-#include "ast/stmt/assert_stmt.h"
 #include "ast/stmt/assignment.h"
 #include "ast/stmt/block_stmt.h"
 #include "ast/stmt/break_stmt.h"
@@ -536,37 +535,6 @@ Value Codegen::generate(const ast::ContinueStmt& stmt) {
 
 Value Codegen::generate([[maybe_unused]] const ast::Unreachable& stmt) {
     m_builder.CreateUnreachable();
-
-    return Value::poisoned();
-}
-
-Value Codegen::generate(const ast::AssertStmt& stmt) {
-    auto condition = stmt.condition->codegen(*this);
-
-    if (!condition.ok()) {
-        return Value::poisoned();
-    }
-
-    auto* function = m_builder.GetInsertBlock()->getParent();
-
-    auto* success = llvm::BasicBlock::Create(m_context, "", function);
-    auto* failure = llvm::BasicBlock::Create(m_context, "", function);
-
-    m_builder.CreateCondBr(condition.value, success, failure);
-
-    m_builder.SetInsertPoint(failure);
-
-    auto src = read_file(m_filename);
-    auto loc = cent::offset_to_loc(*src, stmt.condition->offset);
-
-    m_builder.CreateCall(
-        m_panic_fn, {m_builder.CreateGlobalString(fmt::format(
-                        "Assertion failed at {}:{}:{}\n", m_filename, loc.line,
-                        loc.column))});
-
-    m_builder.CreateUnreachable();
-
-    m_builder.SetInsertPoint(success);
 
     return Value::poisoned();
 }
