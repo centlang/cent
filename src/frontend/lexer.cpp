@@ -138,6 +138,9 @@ void Lexer::next_token() {
     case ':':
         twice(Colon, ColonColon);
         break;
+    case '?':
+        twice(Question, QuestionQuestion);
+        break;
     case ';':
         single_char(Semicolon);
         break;
@@ -155,9 +158,6 @@ void Lexer::next_token() {
         break;
     case '%':
         with_equal(Percent, PercentEqual);
-        break;
-    case '?':
-        single_char(QuestionMark);
         break;
     case '/': {
         m_token.offset = m_offset;

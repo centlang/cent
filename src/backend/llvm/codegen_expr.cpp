@@ -1239,7 +1239,13 @@ Value Codegen::generate_bin_logical_expr(
             return Value::poisoned();
         }
 
-        auto value_y = cast(lhs_base_type, load_value(rhs_value));
+        auto value_y =
+            cast_or_error(rhs.offset, lhs_value.type, load_value(rhs_value));
+
+        if (!value_y.ok()) {
+            return Value::poisoned();
+        }
+
         m_builder.CreateBr(end);
 
         m_builder.SetInsertPoint(end);
@@ -1253,7 +1259,60 @@ Value Codegen::generate_bin_logical_expr(
 
         phi->addIncoming(value_y.value, next);
 
-        return Value{lhs_base_type, phi};
+        return Value{lhs_value.type, phi};
+    }
+
+    if (oper.value == QuestionQuestion) {
+        auto* optional = dyn_cast<types::Optional>(lhs_base_type);
+
+        if (!optional) {
+            error(lhs.offset, "type mismatch");
+
+            return Value::poisoned();
+        }
+
+        auto* root = m_builder.GetInsertBlock();
+        auto* function = root->getParent();
+
+        auto* bool_true = llvm::BasicBlock::Create(m_context, "", function);
+        auto* bool_false = llvm::BasicBlock::Create(m_context, "", function);
+        auto* end = llvm::BasicBlock::Create(m_context, "", function);
+
+        auto* optional_bool = get_optional_bool(lhs_value);
+
+        m_builder.CreateCondBr(optional_bool, bool_true, bool_false);
+
+        m_builder.SetInsertPoint(bool_true);
+
+        auto* optional_value = get_optional_value(lhs_value);
+
+        m_builder.CreateBr(end);
+
+        m_builder.SetInsertPoint(bool_false);
+
+        auto rhs_value = rhs.codegen(*this);
+
+        if (!rhs_value.ok()) {
+            return Value::poisoned();
+        }
+
+        auto value_y =
+            cast_or_error(rhs.offset, optional->type, load_value(rhs_value));
+
+        if (!value_y.ok()) {
+            return Value::poisoned();
+        }
+
+        m_builder.CreateBr(end);
+
+        m_builder.SetInsertPoint(end);
+
+        auto* phi = m_builder.CreatePHI(optional->type->llvm_type, 2);
+
+        phi->addIncoming(optional_value, bool_true);
+        phi->addIncoming(value_y.value, bool_false);
+
+        return Value{optional->type, phi};
     }
 
     auto rhs_value = rhs.codegen(*this);
@@ -1291,24 +1350,7 @@ Value Codegen::generate_bin_expr(
         }
 
         if (value.ok()) {
-            auto* type = static_cast<types::Optional*>(base_type);
-
-            if (is<types::Pointer>(type->type)) {
-                auto* null =
-                    llvm::Constant::getNullValue(value.value->getType());
-
-                auto* llvm_value = load_value(value).value;
-
-                auto* val = oper.value == EqualEqual
-                                ? m_builder.CreateICmpEQ(llvm_value, null)
-                                : m_builder.CreateICmpNE(llvm_value, null);
-
-                return Value{m_primitive_types["bool"].get(), val};
-            }
-
-            llvm::Value* val = load_struct_member(
-                type->llvm_type, llvm::Type::getInt1Ty(m_context), value.value,
-                optional_member_bool);
+            auto* val = get_optional_bool(value);
 
             if (oper.value == EqualEqual) {
                 val = m_builder.CreateNot(val);

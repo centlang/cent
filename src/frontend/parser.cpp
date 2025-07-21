@@ -979,7 +979,7 @@ std::unique_ptr<ast::Type> Parser::expect_type() {
             offset, std::move(type), is_mutable);
     }
 
-    if (match_next(QuestionMark)) {
+    if (match_next(Question)) {
         auto type = expect_type();
 
         if (!type) {

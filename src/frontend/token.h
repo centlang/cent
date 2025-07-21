@@ -39,7 +39,8 @@ struct Token {
         PercentEqual,
 
         Bang,
-        QuestionMark,
+        Question,
+        QuestionQuestion,
 
         And,
         Or,

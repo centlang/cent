@@ -200,6 +200,9 @@ private:
         llvm::Type* struct_type, llvm::Type* member_type, llvm::Value* value,
         std::uint32_t index);
 
+    [[nodiscard]] llvm::Value* get_optional_bool(const Value& value);
+    [[nodiscard]] llvm::Value* get_optional_value(const Value& value);
+
     [[nodiscard]] llvm::Value* create_gep_or_extract(
         llvm::Type* struct_type, llvm::Value* value, std::uint32_t index);
 

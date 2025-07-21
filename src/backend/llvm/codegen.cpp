@@ -630,6 +630,31 @@ llvm::Value* Codegen::load_struct_member(
         member_type, m_builder.CreateStructGEP(struct_type, value, index));
 }
 
+llvm::Value* Codegen::get_optional_bool(const Value& value) {
+    auto* optional = static_cast<types::Optional*>(value.type);
+
+    if (is<types::Pointer>(optional->type)) {
+        auto* null = llvm::Constant::getNullValue(optional->type->llvm_type);
+        return m_builder.CreateICmpNE(value.value, null);
+    }
+
+    return load_struct_member(
+        value.type->llvm_type, llvm::Type::getInt1Ty(m_context), value.value,
+        optional_member_bool);
+}
+
+llvm::Value* Codegen::get_optional_value(const Value& value) {
+    auto* optional = static_cast<types::Optional*>(value.type);
+
+    if (is<types::Pointer>(optional->type)) {
+        return value.value;
+    }
+
+    return load_struct_member(
+        value.type->llvm_type, optional->type->llvm_type, value.value,
+        optional_member_value);
+}
+
 llvm::Value* Codegen::create_gep_or_extract(
     llvm::Type* struct_type, llvm::Value* value, std::uint32_t index) {
     if (value->getType()->isStructTy()) {

@@ -193,6 +193,7 @@ private:
 
         enum {
             PNone = 0,
+            PNull,
             PLogicalOr,
             PLogicalAnd,
             POr,
@@ -204,6 +205,8 @@ private:
         };
 
         switch (type) {
+        case QuestionQuestion:
+            return PNull;
         case OrOr:
             return PLogicalOr;
         case AndAnd:
