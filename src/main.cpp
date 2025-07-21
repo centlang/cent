@@ -25,6 +25,18 @@
 
 enum struct EmitType : std::uint8_t { Obj, Exe, LlvmIr, LlvmBc };
 
+struct Options {
+    std::string target_triple;
+
+    std::optional<std::filesystem::path> source_file = std::nullopt;
+    std::optional<std::filesystem::path> output_file = std::nullopt;
+
+    std::vector<std::string> linker_options;
+
+    EmitType emit_type;
+    bool optimize;
+};
+
 void help() {
     fmt::print(R"(USAGE: centc [options] file [-- linker options]
 
@@ -37,23 +49,16 @@ OPTIONS:
 )");
 }
 
-int main(int argc, char** argv) {
-    std::span args{argv, static_cast<std::size_t>(argc)};
-
+std::optional<Options> parse_args(std::span<char*> args) {
     if (args.size() < 2) {
         help();
-        return 0;
+        return std::nullopt;
     }
 
-    std::string target_triple = llvm::sys::getDefaultTargetTriple();
-
-    std::optional<std::filesystem::path> source_file = std::nullopt;
-    std::optional<std::filesystem::path> output_file = std::nullopt;
-
-    std::vector<std::string> linker_options;
-
-    bool optimize = false;
-    EmitType emit_type = EmitType::Exe;
+    Options options = {
+        .target_triple = llvm::sys::getDefaultTargetTriple(),
+        .emit_type = EmitType::Exe,
+        .optimize = false};
 
     bool expecting_output = false;
     bool expecting_target = false;
@@ -64,18 +69,18 @@ int main(int argc, char** argv) {
         std::string arg = arg_cstr;
 
         if (parsing_linker_options) {
-            linker_options.push_back(std::move(arg));
+            options.linker_options.push_back(std::move(arg));
             continue;
         }
 
         if (expecting_output) {
-            output_file = arg;
+            options.output_file = arg;
             expecting_output = false;
             continue;
         }
 
         if (expecting_target) {
-            target_triple = arg;
+            options.target_triple = arg;
             expecting_target = false;
             continue;
         }
@@ -84,38 +89,38 @@ int main(int argc, char** argv) {
             expecting_emit_type = false;
 
             if (arg == "obj") {
-                emit_type = EmitType::Obj;
+                options.emit_type = EmitType::Obj;
                 continue;
             }
 
             if (arg == "exe") {
-                emit_type = EmitType::Exe;
+                options.emit_type = EmitType::Exe;
                 continue;
             }
 
             if (arg == "llvm-ir") {
-                emit_type = EmitType::LlvmIr;
+                options.emit_type = EmitType::LlvmIr;
                 continue;
             }
 
             if (arg == "llvm-bc") {
-                emit_type = EmitType::LlvmBc;
+                options.emit_type = EmitType::LlvmBc;
                 continue;
             }
 
             cent::log::error(fmt::format(
                 "unrecognized emit type: {}", cent::log::quoted(arg)));
 
-            continue;
+            return std::nullopt;
         }
 
         if (arg == "--help") {
             help();
-            return 0;
+            return std::nullopt;
         }
 
         if (arg == "-O") {
-            optimize = true;
+            options.optimize = true;
             continue;
         }
 
@@ -143,37 +148,41 @@ int main(int argc, char** argv) {
             cent::log::error(
                 fmt::format("unrecognized option: {}", cent::log::quoted(arg)));
 
-            return 1;
+            return std::nullopt;
         }
 
-        if (source_file) {
+        if (options.source_file) {
             cent::log::error("multiple input files provided");
-            return 1;
+            return std::nullopt;
         }
 
-        source_file = arg;
+        options.source_file = arg;
     }
 
     if (expecting_output) {
         cent::log::error("missing filename");
-        return 1;
+        return std::nullopt;
     }
 
     if (expecting_target) {
         cent::log::error("missing target triple");
-        return 1;
+        return std::nullopt;
     }
 
     if (expecting_emit_type) {
         cent::log::error("missing emit type");
-        return 1;
+        return std::nullopt;
     }
 
-    if (!source_file) {
+    if (!options.source_file) {
         cent::log::error("no input file provided");
-        return 1;
+        return std::nullopt;
     }
 
+    return options;
+}
+
+llvm::TargetMachine* init_llvm(std::string_view triple) {
     llvm::InitializeAllTargetInfos();
     llvm::InitializeAllTargets();
     llvm::InitializeAllTargetMCs();
@@ -182,78 +191,79 @@ int main(int argc, char** argv) {
 
     std::string message;
 
-    const auto* target =
-        llvm::TargetRegistry::lookupTarget(target_triple, message);
+    const auto* target = llvm::TargetRegistry::lookupTarget(triple, message);
 
     if (!target) {
         cent::log::error(message);
-        return 1;
+        return nullptr;
     }
 
-    auto* machine = target->createTargetMachine(
-        target_triple, "generic", "", llvm::TargetOptions{}, llvm::Reloc::PIC_);
+    return target->createTargetMachine(
+        triple, "generic", "", llvm::TargetOptions{}, llvm::Reloc::PIC_);
+}
 
-    auto code = cent::read_file(*source_file);
+bool compile(const Options& options, llvm::TargetMachine* machine) {
+    auto code = cent::read_file(*options.source_file);
 
     if (!code) {
-        return 1;
+        return false;
     }
 
-    std::string filename = source_file->string();
+    std::string filename = options.source_file->string();
 
     cent::frontend::Parser parser{*code, filename};
     auto program = parser.parse();
 
     if (!program) {
-        return 1;
+        return false;
     }
 
     cent::backend::Codegen codegen{
         std::move(program), filename, machine->createDataLayout(),
-        target_triple};
+        options.target_triple};
 
     auto module = codegen.generate();
 
     if (!module) {
-        return 1;
+        return false;
     }
 
     if (parser.had_error() || codegen.had_error()) {
-        return 1;
+        return false;
     }
 
-    if (optimize) {
+    if (options.optimize) {
         cent::backend::optimize_module(*module, llvm::OptimizationLevel::O3);
     }
 
     auto get_output_file = [&](std::string_view extension) {
-        if (output_file) {
-            return *output_file;
+        if (options.output_file) {
+            return *options.output_file;
         }
 
-        auto result = *source_file;
+        auto result = *options.source_file;
         result.replace_extension(extension);
 
         return result;
     };
 
-    switch (emit_type) {
+    switch (options.emit_type) {
     case EmitType::LlvmIr:
         if (!cent::backend::emit_llvm_ir(*module, get_output_file(".ll"))) {
-            return 1;
+            return false;
         }
 
         break;
     case EmitType::LlvmBc:
         if (!cent::backend::emit_llvm_bc(*module, get_output_file(".bc"))) {
-            return 1;
+            return false;
         }
 
         break;
     case EmitType::Obj:
         if (!cent::backend::emit_obj(
                 *module, *machine, get_output_file(".o"))) {
-            return 1;
+            return false;
         }
 
         break;
@@ -261,20 +271,34 @@ int main(int argc, char** argv) {
         std::filesystem::path object_file = std::tmpnam(nullptr);
 
         if (!cent::backend::emit_obj(*module, *machine, object_file)) {
-            return 1;
+            return false;
         }
 
         std::vector<std::string> args = {
             "-o", get_output_file(""), object_file};
 
-        args.insert(args.end(), linker_options.begin(), linker_options.end());
+        args.insert(
+            args.end(), options.linker_options.begin(),
+            options.linker_options.end());
 
         int exit_code = cent::exec_command("gcc", args);
 
         std::filesystem::remove(object_file);
 
-        return exit_code;
+        return exit_code == 0;
     }
 
-    return 0;
+    return true;
+}
+
+int main(int argc, char** argv) {
+    auto options =
+        parse_args(std::span<char*>{argv, static_cast<std::size_t>(argc)});
+
+    if (!options) {
+        return 1;
+    }
+
+    auto* machine = init_llvm(options->target_triple);
+    return compile(*options, machine) ? 0 : 1;
 }
