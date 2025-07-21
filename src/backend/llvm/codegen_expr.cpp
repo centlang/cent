@@ -6,8 +6,6 @@
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Instructions.h>
 
-#include "ast/module.h"
-
 #include "ast/expr/as_expr.h"
 #include "ast/expr/binary_expr.h"
 #include "ast/expr/call_expr.h"

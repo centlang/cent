@@ -5,8 +5,6 @@
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Instructions.h>
 
-#include "ast/module.h"
-
 #include "ast/decl/enum_decl.h"
 #include "ast/decl/fn_decl.h"
 #include "ast/decl/struct.h"

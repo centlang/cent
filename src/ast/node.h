@@ -1,7 +1,6 @@
 #ifndef CENT_AST_NODE_H
 #define CENT_AST_NODE_H
 
-#include <optional>
 #include <vector>
 
 #include "backend/llvm/codegen.h"

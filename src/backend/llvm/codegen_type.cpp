@@ -4,8 +4,6 @@
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Instructions.h>
 
-#include "ast/module.h"
-
 #include "ast/type/array_type.h"
 #include "ast/type/fn_pointer.h"
 #include "ast/type/named_type.h"

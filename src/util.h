@@ -1,8 +1,8 @@
 #ifndef CENT_UTIL_H
 #define CENT_UTIL_H
 
+#include <algorithm>
 #include <cctype>
-#include <cmath>
 #include <fstream>
 #include <limits>
 #include <optional>

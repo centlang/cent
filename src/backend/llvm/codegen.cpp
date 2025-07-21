@@ -14,6 +14,16 @@
 
 namespace cent::backend {
 
+Codegen::Codegen(
+    std::unique_ptr<ast::Module> program, std::string_view filename,
+    const llvm::DataLayout& layout, const std::string& triple)
+: m_module{std::make_unique<llvm::Module>("", m_context)}, m_builder{m_context},
+  m_program{std::move(program)}, m_filename{filename},
+  m_units{std::filesystem::path{m_filename}.parent_path()} {
+    m_module->setDataLayout(layout);
+    m_module->setTargetTriple(triple);
+}
+
 std::unique_ptr<llvm::Module> Codegen::generate() {
     auto* int8 = llvm::Type::getInt8Ty(m_context);
     auto* int16 = llvm::Type::getInt16Ty(m_context);

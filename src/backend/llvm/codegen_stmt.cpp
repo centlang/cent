@@ -2,8 +2,6 @@
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Instructions.h>
 
-#include "ast/module.h"
-
 #include "ast/stmt/assignment.h"
 #include "ast/stmt/block_stmt.h"
 #include "ast/stmt/break_stmt.h"

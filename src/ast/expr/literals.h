@@ -8,7 +8,6 @@
 #include "ast/node.h"
 #include "offset_value.h"
 
-#include "ast/type/array_type.h"
 #include "ast/type/named_type.h"
 
 namespace cent::ast {
