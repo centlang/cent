@@ -758,8 +758,8 @@ Codegen::get_scope(std::size_t offset, std::string_view name, Scope& parent) {
     return &iterator->second;
 }
 
-Scope* Codegen::resolve_scope(
-    const std::vector<ast::OffsetValue<std::string>>& value) {
+Scope*
+Codegen::resolve_scope(const std::vector<OffsetValue<std::string>>& value) {
     auto* scope = m_current_scope;
 
     for (std::size_t i = 0; i < value.size() - 1; ++i) {

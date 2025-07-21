@@ -59,9 +59,9 @@ Value Codegen::generate([[maybe_unused]] const ast::Assignment& stmt) {
 
     if (stmt.oper.value != frontend::Token::Type::Equal) {
         value = generate_bin_expr(
-            ast::OffsetValue<const Value&>{var, stmt.variable->offset},
-            ast::OffsetValue<const Value&>{value, stmt.value->offset},
-            ast::OffsetValue{without_equal(stmt.oper.value), stmt.oper.offset});
+            OffsetValue<const Value&>{var, stmt.variable->offset},
+            OffsetValue<const Value&>{value, stmt.value->offset},
+            OffsetValue{without_equal(stmt.oper.value), stmt.oper.offset});
 
         if (!value.ok()) {
             return Value::poisoned();

@@ -157,8 +157,7 @@ private:
 
     [[nodiscard]] std::vector<std::unique_ptr<ast::Type>> parse_template_args();
 
-    [[nodiscard]] std::vector<ast::OffsetValue<std::string>>
-    parse_template_params();
+    [[nodiscard]] std::vector<OffsetValue<std::string>> parse_template_params();
 
     [[nodiscard]] std::vector<ast::EnumDecl::Field> parse_enum_fields();
 

@@ -176,11 +176,11 @@ private:
 
     [[nodiscard]] Value generate_bin_logical_expr(
         const ast::Expression& lhs, const ast::Expression& rhs,
-        ast::OffsetValue<frontend::Token::Type> oper);
+        OffsetValue<frontend::Token::Type> oper);
 
     [[nodiscard]] Value generate_bin_expr(
-        ast::OffsetValue<const Value&> lhs, ast::OffsetValue<const Value&> rhs,
-        ast::OffsetValue<frontend::Token::Type> oper);
+        OffsetValue<const Value&> lhs, OffsetValue<const Value&> rhs,
+        OffsetValue<frontend::Token::Type> oper);
 
     [[nodiscard]] Value create_call(
         std::size_t offset, types::Function* type, llvm::Value* function,
@@ -223,7 +223,7 @@ private:
     get_scope(std::size_t offset, std::string_view name, Scope& parent);
 
     [[nodiscard]] Scope*
-    resolve_scope(const std::vector<ast::OffsetValue<std::string>>& value);
+    resolve_scope(const std::vector<OffsetValue<std::string>>& value);
 
     [[nodiscard]] types::Function* generate_fn_type(const ast::FnProto& proto);
 

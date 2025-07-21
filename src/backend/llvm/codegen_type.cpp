@@ -12,6 +12,8 @@
 #include "ast/type/slice_type.h"
 #include "ast/type/tuple_type.h"
 
+#include "ast/stmt/block_stmt.h"
+
 #include "backend/llvm/types/alias.h"
 #include "backend/llvm/types/generic.h"
 

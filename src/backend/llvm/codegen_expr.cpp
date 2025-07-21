@@ -1199,7 +1199,7 @@ Value Codegen::generate(const ast::SizeofExpr& expr) {
 
 Value Codegen::generate_bin_logical_expr(
     const ast::Expression& lhs, const ast::Expression& rhs,
-    ast::OffsetValue<frontend::Token::Type> oper) {
+    OffsetValue<frontend::Token::Type> oper) {
     using enum frontend::Token::Type;
 
     auto lhs_value = lhs.codegen(*this);
@@ -1320,13 +1320,13 @@ Value Codegen::generate_bin_logical_expr(
     }
 
     return generate_bin_expr(
-        ast::OffsetValue<const Value&>{lhs_value, lhs.offset},
-        ast::OffsetValue<const Value&>{rhs_value, rhs.offset}, oper);
+        OffsetValue<const Value&>{lhs_value, lhs.offset},
+        OffsetValue<const Value&>{rhs_value, rhs.offset}, oper);
 }
 
 Value Codegen::generate_bin_expr(
-    ast::OffsetValue<const Value&> lhs, ast::OffsetValue<const Value&> rhs,
-    ast::OffsetValue<frontend::Token::Type> oper) {
+    OffsetValue<const Value&> lhs, OffsetValue<const Value&> rhs,
+    OffsetValue<frontend::Token::Type> oper) {
     using enum frontend::Token::Type;
 
     auto* lhs_base_type = unwrap_type(lhs.value.type);
