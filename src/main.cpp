@@ -34,7 +34,9 @@ struct Options {
     std::vector<std::string> linker_options;
 
     EmitType emit_type;
+
     bool optimize;
+    bool run;
 };
 
 void help() {
@@ -45,11 +47,12 @@ OPTIONS:
   -o <file>             Place the output into <file>
   --emit <type>         Specify the compiler output type
   --target <triple>     Specify the target triple
+  --run                 Build and run immediately
   --help                Print this help message and exit
 )");
 }
 
-std::optional<Options> parse_args(std::span<char*> args) {
+[[nodiscard]] std::optional<Options> parse_args(std::span<char*> args) {
     if (args.size() < 2) {
         help();
         return std::nullopt;
@@ -124,6 +127,11 @@ std::optional<Options> parse_args(std::span<char*> args) {
             continue;
         }
 
+        if (arg == "--run") {
+            options.run = true;
+            continue;
+        }
+
         if (arg == "--emit") {
             expecting_emit_type = true;
             continue;
@@ -182,7 +190,7 @@ std::optional<Options> parse_args(std::span<char*> args) {
     return options;
 }
 
-llvm::TargetMachine* init_llvm(std::string_view triple) {
+[[nodiscard]] llvm::TargetMachine* init_llvm(std::string_view triple) {
     llvm::InitializeAllTargetInfos();
     llvm::InitializeAllTargets();
     llvm::InitializeAllTargetMCs();
@@ -202,11 +210,12 @@ llvm::TargetMachine* init_llvm(std::string_view triple) {
         triple, "generic", "", llvm::TargetOptions{}, llvm::Reloc::PIC_);
 }
 
-bool compile(const Options& options, llvm::TargetMachine* machine) {
+[[nodiscard]] std::optional<std::filesystem::path>
+compile(const Options& options, llvm::TargetMachine* machine) {
     auto code = cent::read_file(*options.source_file);
 
     if (!code) {
-        return false;
+        return std::nullopt;
     }
 
     std::string filename = options.source_file->string();
@@ -215,7 +224,7 @@ bool compile(const Options& options, llvm::TargetMachine* machine) {
     auto program = parser.parse();
 
     if (!program) {
-        return false;
+        return std::nullopt;
     }
 
     cent::backend::Codegen codegen{
@@ -225,11 +234,11 @@ bool compile(const Options& options, llvm::TargetMachine* machine) {
     auto module = codegen.generate();
 
     if (!module) {
-        return false;
+        return std::nullopt;
     }
 
     if (parser.had_error() || codegen.had_error()) {
-        return false;
+        return std::nullopt;
     }
 
     if (options.optimize) {
@@ -248,34 +257,45 @@ bool compile(const Options& options, llvm::TargetMachine* machine) {
     };
 
     switch (options.emit_type) {
-    case EmitType::LlvmIr:
-        if (!cent::backend::emit_llvm_ir(*module, get_output_file(".ll"))) {
-            return false;
+    case EmitType::LlvmIr: {
+        auto output = get_output_file(".ll");
+
+        if (!cent::backend::emit_llvm_ir(*module, output)) {
+            return std::nullopt;
         }
 
-        break;
-    case EmitType::LlvmBc:
-        if (!cent::backend::emit_llvm_bc(*module, get_output_file(".bc"))) {
-            return false;
+        return output;
+    }
+    case EmitType::LlvmBc: {
+        auto output = get_output_file(".bc");
+
+        if (!cent::backend::emit_llvm_bc(*module, output)) {
+            return std::nullopt;
         }
 
-        break;
-    case EmitType::Obj:
+        return output;
+    }
+    case EmitType::Obj: {
+        auto output = get_output_file(".o");
+
         if (!cent::backend::emit_obj(
-                *module, *machine, get_output_file(".o"))) {
-            return false;
+
+                *module, *machine, output)) {
+            return std::nullopt;
         }
 
-        break;
+        return output;
+    }
     case EmitType::Exe:
         std::filesystem::path object_file = std::tmpnam(nullptr);
 
         if (!cent::backend::emit_obj(*module, *machine, object_file)) {
-            return false;
+            return std::nullopt;
         }
 
-        std::vector<std::string> args = {
-            "-o", get_output_file(""), object_file};
+        auto output = get_output_file("");
+
+        std::vector<std::string> args = {"-o", output, object_file};
 
         args.insert(
             args.end(), options.linker_options.begin(),
@@ -285,10 +305,14 @@ bool compile(const Options& options, llvm::TargetMachine* machine) {
 
         std::filesystem::remove(object_file);
 
-        return exit_code == 0;
+        if (exit_code == 0) {
+            return output;
+        }
+
+        return std::nullopt;
     }
 
-    return true;
+    return std::nullopt;
 }
 
 int main(int argc, char** argv) {
@@ -300,5 +324,21 @@ int main(int argc, char** argv) {
     }
 
     auto* machine = init_llvm(options->target_triple);
-    return compile(*options, machine) ? 0 : 1;
+
+    auto output = compile(*options, machine);
+
+    if (!output) {
+        return 1;
+    }
+
+    if (!options->run) {
+        return 0;
+    }
+
+    if (options->emit_type != EmitType::Exe) {
+        cent::log::error("`--run` can only be used with `--emit exe`");
+        return 1;
+    }
+
+    return cent::exec_command(std::filesystem::absolute(*output), {});
 }
