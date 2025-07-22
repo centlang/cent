@@ -65,7 +65,47 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
 
     generate(*m_program);
 
+    create_main();
+
     return std::move(m_module);
+}
+
+void Codegen::create_main() {
+    if (m_module->getFunction("main")) {
+        return;
+    }
+
+    auto* user_main = m_module->getFunction("main::main");
+
+    if (!user_main) {
+        return;
+    }
+
+    auto* user_main_return = user_main->getReturnType();
+    auto* int32 = llvm::Type::getInt32Ty(m_context);
+
+    if (!user_main_return->isVoidTy() && user_main_return != int32) {
+        log::error("invalid `main` signature");
+        return;
+    }
+
+    auto* main = llvm::Function::Create(
+        llvm::FunctionType::get(int32, false), llvm::Function::ExternalLinkage,
+        "main", *m_module);
+
+    auto* entry = llvm::BasicBlock::Create(m_context, "", main);
+
+    m_builder.SetInsertPoint(entry);
+
+    if (user_main_return->isVoidTy()) {
+        m_builder.CreateCall(user_main);
+        m_builder.CreateRet(llvm::ConstantInt::get(int32, 0));
+
+        return;
+    }
+
+    auto* result = m_builder.CreateCall(user_main);
+    m_builder.CreateRet(result);
 }
 
 void Codegen::generate(const ast::Module& module) {
