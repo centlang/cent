@@ -1,0 +1,18 @@
+with c;
+
+pub fn print(s: []u8) {
+    c::fputs(c::to_cstr(s), c::stdout);
+}
+
+pub fn eprint(s: []u8) {
+    c::fputs(c::to_cstr(s), c::stderr);
+}
+
+pub fn println(s: []u8) {
+    c::puts(c::to_cstr(s));
+}
+
+pub fn eprintln(s: []u8) {
+    c::fputs(c::to_cstr(s), c::stderr);
+    c::putchar(74);
+}

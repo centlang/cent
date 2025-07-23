@@ -2,10 +2,13 @@ with c::types;
 
 pub const EXIT_FAILURE = 1;
 
+!(extern) pub mut stdout: *mut types::FILE;
 !(extern) pub mut stderr: *mut types::FILE;
 
 !(extern) pub fn fputs(s: *types::char, stream: *mut types::FILE) types::int;
+!(extern) pub fn puts(s: *types::char) types::int;
 !(extern) pub fn printf(format: *types::char, ...) types::int;
+!(extern) pub fn putchar(c: types::int) types::int;
 !(extern) pub fn strlen(s: *types::char) usize;
 !(extern) pub fn exit(status: types::int) never;
 
