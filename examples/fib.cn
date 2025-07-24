@@ -1,0 +1,33 @@
+with c;
+
+fn fib_iterative(n: u64) u64 {
+    if n < 2 {
+        return n;
+    }
+
+    mut a: u64 = 1;
+    mut b: u64 = 0;
+
+    for i in 2..=n {
+        let c = a + b;
+        b = a;
+        a = c;
+    }
+
+    return a;
+}
+
+fn fib_recursive(n: u64) u64 {
+    if n < 2 {
+        return n;
+    }
+
+    return fib_recursive(n - 1) + fib_recursive(n - 2);
+}
+
+fn main() {
+    c::puts(c::to_cstr("fib(36):"));
+
+    c::printf(c::to_cstr("  fib_iterative: %llu\n"), fib_iterative(36));
+    c::printf(c::to_cstr("  fib_recursive: %llu\n"), fib_recursive(36));
+}
