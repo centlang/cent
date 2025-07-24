@@ -206,7 +206,7 @@ Value Codegen::generate(const ast::RangeLiteral& expr) {
         value_y = end_value;
     }
 
-    auto* type = get_range_type(value_x.type);
+    auto* type = get_range_type(value_x.type, expr.inclusive);
 
     if (auto* begin_constant = llvm::dyn_cast<llvm::Constant>(value_x.value)) {
         if (auto* end_constant =

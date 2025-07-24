@@ -137,13 +137,15 @@ struct Optional : detail::Ty<Optional, Type::Kind::Optional> {
 };
 
 struct Range : detail::Ty<Range, Type::Kind::Range> {
-    [[nodiscard]] Range(llvm::Type* llvm_type, Type* type)
-    : Ty{llvm_type}, type{type} {}
+    [[nodiscard]] Range(llvm::Type* llvm_type, bool inclusive, Type* type)
+    : Ty{llvm_type}, inclusive{inclusive}, type{type} {}
 
     [[nodiscard]] std::string to_string() const override {
-        return ".." + type->to_string();
+        return std::string{"range"} + (inclusive ? "(inclusive)(<" : "(<") +
+               type->to_string() + ">)";
     }
 
+    bool inclusive;
     Type* type;
 };
 

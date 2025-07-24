@@ -50,9 +50,12 @@ struct Undefined : detail::Expr<Undefined> {
 
 struct RangeLiteral : detail::Expr<RangeLiteral> {
     [[nodiscard]] RangeLiteral(
-        std::size_t offset, std::unique_ptr<Expression> begin,
+        std::size_t offset, bool inclusive, std::unique_ptr<Expression> begin,
         std::unique_ptr<Expression> end)
-    : Expr{offset}, begin{std::move(begin)}, end{std::move(end)} {}
+    : Expr{offset}, inclusive{inclusive}, begin{std::move(begin)},
+      end{std::move(end)} {}
+
+    bool inclusive;
 
     std::unique_ptr<Expression> begin;
     std::unique_ptr<Expression> end;

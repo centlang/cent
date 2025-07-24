@@ -258,7 +258,7 @@ private:
     [[nodiscard]] types::Array* get_array_type(Type* type, std::size_t size);
     [[nodiscard]] types::Tuple* get_tuple_type(const std::vector<Type*>& types);
     [[nodiscard]] types::Optional* get_optional_type(Type* type);
-    [[nodiscard]] types::Range* get_range_type(Type* type);
+    [[nodiscard]] types::Range* get_range_type(Type* type, bool inclusive);
 
     [[nodiscard]] Type* unwrap_type(Type* type);
 
@@ -390,8 +390,10 @@ private:
 
     std::map<std::vector<Type*>, std::unique_ptr<types::Tuple>> m_tuple_types;
 
+    std::map<std::pair<Type*, bool>, std::unique_ptr<types::Range>>
+        m_range_types;
+
     std::map<Type*, std::unique_ptr<types::Optional>> m_optional_types;
-    std::map<Type*, std::unique_ptr<types::Range>> m_range_types;
 
     using FnTypeKey = std::tuple<
         Type*, std::vector<Type*>, std::vector<llvm::Constant*>, bool>;

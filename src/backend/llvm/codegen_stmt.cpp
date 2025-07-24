@@ -468,10 +468,17 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
     auto* variable = create_alloca(llvm_contained_type);
     m_builder.CreateStore(begin, variable);
 
-    m_builder.CreateCondBr(
-        is_sint(type->type) ? m_builder.CreateICmpSLT(begin, end)
-                            : m_builder.CreateICmpULT(begin, end),
-        loop_body, m_loop_end);
+    auto create_compare = [&](llvm::Value* begin, llvm::Value* end) {
+        if (type->inclusive) {
+            return is_sint(type->type) ? m_builder.CreateICmpSLE(begin, end)
+                                       : m_builder.CreateICmpULE(begin, end);
+        }
+
+        return is_sint(type->type) ? m_builder.CreateICmpSLT(begin, end)
+                                   : m_builder.CreateICmpULT(begin, end);
+    };
+
+    m_builder.CreateCondBr(create_compare(begin, end), loop_body, m_loop_end);
 
     m_builder.SetInsertPoint(loop_body);
 
@@ -493,9 +500,7 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
     m_builder.CreateStore(incremented, variable);
 
     m_builder.CreateCondBr(
-        is_sint(type->type) ? m_builder.CreateICmpSLT(incremented, end)
-                            : m_builder.CreateICmpULT(incremented, end),
-        loop_body, m_loop_end);
+        create_compare(incremented, end), loop_body, m_loop_end);
 
     m_builder.SetInsertPoint(m_loop_end);
 

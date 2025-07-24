@@ -797,7 +797,7 @@ Type* Codegen::inst_template_param(
             return nullptr;
         }
 
-        return get_range_type(type);
+        return get_range_type(type, range->inclusive);
     }
 
     if (auto* array = dyn_cast<types::Array>(base_type)) {
@@ -944,15 +944,15 @@ types::Optional* Codegen::get_optional_type(Type* type) {
     return result.get();
 }
 
-types::Range* Codegen::get_range_type(Type* type) {
-    auto& result = m_range_types[type];
+types::Range* Codegen::get_range_type(Type* type, bool inclusive) {
+    auto& result = m_range_types[std::make_pair(type, inclusive)];
 
     if (!result) {
         result = std::make_unique<types::Range>(
             type->llvm_type
                 ? llvm::StructType::create({type->llvm_type, type->llvm_type})
                 : nullptr,
-            type);
+            inclusive, type);
     }
 
     return result.get();
@@ -976,7 +976,7 @@ Type* Codegen::unwrap_type(Type* type) {
     }
 
     if (auto* range = dyn_cast<types::Range>(type)) {
-        return get_range_type(unwrap_type(range->type));
+        return get_range_type(unwrap_type(range->type), range->inclusive);
     }
 
     if (auto* array = dyn_cast<types::Array>(type)) {

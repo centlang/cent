@@ -816,7 +816,11 @@ std::unique_ptr<ast::Expression> Parser::expect_range_expr(bool is_condition) {
         return nullptr;
     }
 
-    if (!match_next(Token::Type::DotDot)) {
+    bool inclusive = false;
+
+    if (match_next(Token::Type::DotDotEqual)) {
+        inclusive = true;
+    } else if (!match_next(Token::Type::DotDot)) {
         return begin;
     }
 
@@ -827,7 +831,7 @@ std::unique_ptr<ast::Expression> Parser::expect_range_expr(bool is_condition) {
     }
 
     return std::make_unique<ast::RangeLiteral>(
-        begin->offset, std::move(begin), std::move(end));
+        begin->offset, inclusive, std::move(begin), std::move(end));
 }
 
 std::unique_ptr<ast::Expression> Parser::expect_expr(bool is_condition) {

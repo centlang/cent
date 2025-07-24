@@ -126,7 +126,18 @@ void Lexer::next_token() {
 
         get();
 
-        if (eof() || peek() != '.') {
+        if (eof()) {
+            m_token.type = DotDot;
+            return;
+        }
+
+        if (peek() == '=') {
+            get();
+            m_token.type = DotDotEqual;
+            return;
+        }
+
+        if (peek() != '.') {
             m_token.type = DotDot;
             return;
         }
