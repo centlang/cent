@@ -1,6 +1,7 @@
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Instruction.h>
@@ -131,7 +132,7 @@ Value Codegen::generate(const ast::IntLiteral& expr) {
         return Dec;
     }();
 
-    std::int32_t value{};
+    std::uint64_t value{};
 
     auto [pointer, result] =
         std::from_chars(literal.cbegin(), literal.cend(), value, base);
@@ -141,9 +142,25 @@ Value Codegen::generate(const ast::IntLiteral& expr) {
         return Value::poisoned();
     }
 
+    if (value <= std::numeric_limits<std::int32_t>::max()) {
+        return Value{
+            m_primitive_types["i32"].get(),
+            llvm::ConstantInt::getSigned(
+                llvm::Type::getInt32Ty(m_context),
+                static_cast<std::int32_t>(value))};
+    }
+
+    if (value <= std::numeric_limits<std::int64_t>::max()) {
+        return Value{
+            m_primitive_types["i64"].get(),
+            llvm::ConstantInt::getSigned(
+                llvm::Type::getInt64Ty(m_context),
+                static_cast<std::int64_t>(value))};
+    }
+
     return Value{
-        m_primitive_types["i32"].get(),
-        llvm::ConstantInt::getSigned(llvm::Type::getInt32Ty(m_context), value)};
+        m_primitive_types["u64"].get(),
+        llvm::ConstantInt::get(llvm::Type::getInt64Ty(m_context), value)};
 }
 
 Value Codegen::generate(const ast::FloatLiteral& expr) {
