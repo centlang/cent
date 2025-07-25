@@ -1,0 +1,21 @@
+with c;
+
+type Vec2 {
+    x: f64,
+    y: f64,
+}
+
+fn Vec2::length_squared(self: Vec2) f64 {
+    return self.x * self.x + self.y * self.y;
+}
+
+fn Vec2::length(self: Vec2) f64 {
+    return c::sqrt(self.length_squared());
+}
+
+fn main() {
+    let v = Vec2 { x: 1.0, y: 1.0 };
+
+    c::printf(c::to_cstr("Vec2 { x: %f, y: %f }:\n"), v.x, v.y);
+    c::printf(c::to_cstr("  length: %f\n"), v.length());
+}
