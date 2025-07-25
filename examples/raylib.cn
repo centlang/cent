@@ -1,0 +1,36 @@
+with c;
+
+type Color = u32;
+
+const RAYWHITE: Color = 0xfff5f5f5;
+const LIGHTGRAY: Color = 0xffc8c8c8;
+
+!(extern) fn InitWindow(
+    width: c::types::int, height: c::types::int, title: *c::types::char
+);
+
+!(extern) fn CloseWindow();
+!(extern) fn WindowShouldClose() bool;
+
+!(extern) fn BeginDrawing();
+!(extern) fn EndDrawing();
+
+!(extern) fn ClearBackground(color: Color);
+
+!(extern) fn DrawText(
+    text: *c::types::char, pos_x: c::types::int, pos_y: c::types::int,
+    font_size: c::types::int, color: Color
+);
+
+fn main() {
+    InitWindow(800, 600, c::to_cstr("raylib example"));
+
+    while !WindowShouldClose() {
+        BeginDrawing();
+
+        ClearBackground(RAYWHITE);
+        DrawText(c::to_cstr("Hello from Cent!"), 250, 250, 36, LIGHTGRAY);
+
+        EndDrawing();
+    }
+}
