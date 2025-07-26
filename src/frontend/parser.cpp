@@ -1562,7 +1562,7 @@ std::unique_ptr<ast::Module> Parser::parse_submodule(
 
     submodule_visiting = true;
 
-    auto code = cent::read_file(path);
+    auto code = read_file(path);
 
     if (!code) {
         return nullptr;
@@ -1664,7 +1664,7 @@ bool Parser::parse_with(ast::Module& module) {
         search_path.emplace_back("/usr/lib/cent");
     }
 
-    auto module_paths = cent::find_module(path, search_path);
+    auto module_paths = find_module(path, search_path);
 
     if (module_paths.empty()) {
         error(

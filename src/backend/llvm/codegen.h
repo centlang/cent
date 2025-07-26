@@ -297,7 +297,7 @@ private:
         std::optional<std::string_view> hint = std::nullopt) {
         auto src = read_file(m_filename);
 
-        auto loc = cent::offset_to_loc(*src, offset);
+        auto loc = offset_to_loc(*src, offset);
         log::error(loc.line, loc.column, m_filename, message, loc.code, hint);
 
         m_had_error = true;
