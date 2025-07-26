@@ -185,6 +185,12 @@ Value Codegen::generate(const ast::StrLiteral& expr) {
         m_builder.CreateGlobalString(expr.value)};
 }
 
+Value Codegen::generate(const ast::RuneLiteral& expr) {
+    auto* rune = m_primitive_types["rune"].get();
+
+    return Value{rune, llvm::ConstantInt::get(rune->llvm_type, expr.value)};
+}
+
 Value Codegen::generate(const ast::BoolLiteral& expr) {
     return Value{
         m_primitive_types["bool"].get(),

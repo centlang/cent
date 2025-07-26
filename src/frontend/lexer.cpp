@@ -92,6 +92,33 @@ void Lexer::next_token() {
     case '"':
         string();
         break;
+    case '\'':
+        m_token = {Token::Type::RuneLiteral, {}, m_offset};
+        get();
+
+        if (eof()) {
+            m_token.type = Token::Type::Invalid;
+            return;
+        }
+
+        if (peek() == '\\') {
+            escape_seq();
+        } else {
+            m_token.value = get();
+        }
+
+        if (eof()) {
+            m_token.type = Token::Type::Invalid;
+            return;
+        }
+
+        if (peek() != '\'') {
+            m_token.type = Token::Type::Invalid;
+            return;
+        }
+
+        get();
+        break;
     case '(':
         single_char(LeftParen);
         break;
@@ -327,41 +354,12 @@ void Lexer::string() {
             return;
         }
 
-        if (peek() != '\\') {
-            m_token.value += get();
+        if (peek() == '\\') {
+            escape_seq();
             continue;
         }
 
-        get();
-
-        if (eof()) {
-            m_token.type = Token::Type::Invalid;
-            return;
-        }
-
-        switch (get()) {
-        case '\\':
-            m_token.value += '\\';
-            break;
-        case 'n':
-            m_token.value += '\n';
-            break;
-        case 'r':
-            m_token.value += '\r';
-            break;
-        case 't':
-            m_token.value += '\t';
-            break;
-        case '\'':
-            m_token.value += '\'';
-            break;
-        case '"':
-            m_token.value += '"';
-            break;
-        default:
-            m_token.type = Token::Type::Invalid;
-            return;
-        }
+        m_token.value += get();
     }
 }
 

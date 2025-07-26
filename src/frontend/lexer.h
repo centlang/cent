@@ -23,6 +23,38 @@ private:
 
     char get() { return m_source[m_offset++]; }
 
+    void escape_seq() {
+        get();
+
+        if (eof()) {
+            m_token.type = Token::Type::Invalid;
+            return;
+        }
+
+        switch (get()) {
+        case '\\':
+            m_token.value += '\\';
+            break;
+        case 'n':
+            m_token.value += '\n';
+            break;
+        case 'r':
+            m_token.value += '\r';
+            break;
+        case 't':
+            m_token.value += '\t';
+            break;
+        case '\'':
+            m_token.value += '\'';
+            break;
+        case '"':
+            m_token.value += '"';
+            break;
+        default:
+            m_token.type = Token::Type::Invalid;
+        }
+    }
+
     [[nodiscard]] bool eof() const { return m_offset == m_source.size(); }
 
     void skip_whitespaces() {

@@ -89,6 +89,12 @@ struct Bool : detail::Ty<Bool, Type::Kind::Bool> {
     [[nodiscard]] std::string to_string() const override { return "bool"; }
 };
 
+struct Rune : detail::Ty<Rune, Type::Kind::Rune> {
+    [[nodiscard]] Rune(llvm::Type* llvm_type) : Ty{llvm_type} {}
+
+    [[nodiscard]] std::string to_string() const override { return "rune"; }
+};
+
 struct Null : detail::Ty<Null, Type::Kind::Null> {
     [[nodiscard]] Null(llvm::Type* llvm_type) : Ty{llvm_type} {}
 

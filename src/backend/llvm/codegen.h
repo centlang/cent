@@ -55,6 +55,7 @@ struct UnaryExpr;
 struct IntLiteral;
 struct FloatLiteral;
 struct StrLiteral;
+struct RuneLiteral;
 struct BoolLiteral;
 struct NullLiteral;
 struct Undefined;
@@ -127,6 +128,7 @@ public:
     [[nodiscard]] Value generate(const ast::IntLiteral& expr);
     [[nodiscard]] Value generate(const ast::FloatLiteral& expr);
     [[nodiscard]] Value generate(const ast::StrLiteral& expr);
+    [[nodiscard]] Value generate(const ast::RuneLiteral& expr);
     [[nodiscard]] Value generate(const ast::BoolLiteral& expr);
     [[nodiscard]] Value generate(const ast::NullLiteral& expr);
     [[nodiscard]] Value generate(const ast::Undefined& expr);

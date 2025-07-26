@@ -72,6 +72,7 @@ struct Token {
         IntLiteral,
         StrLiteral,
         FloatLiteral,
+        RuneLiteral,
 
         True,
         False,

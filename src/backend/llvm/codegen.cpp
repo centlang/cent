@@ -43,6 +43,8 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
     m_primitive_types["u64"] = std::make_unique<types::U64>(int64);
     m_primitive_types["usize"] = std::make_unique<types::USize>(size);
 
+    m_primitive_types["rune"] = std::make_unique<types::Rune>(int32);
+
     m_primitive_types["f32"] =
         std::make_unique<types::F32>(llvm::Type::getFloatTy(m_context));
 
@@ -162,9 +164,16 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
     auto* base_type = unwrap_type(type);
     auto* base_value_type = unwrap_type(value.type);
 
+    bool value_is_rune = is<types::Rune>(base_value_type);
+    bool type_is_rune = is<types::Rune>(base_type);
+
+    if ((value_is_rune || type_is_rune) && implicit) {
+        return Value::poisoned();
+    }
+
     bool value_is_float = is_float(base_value_type);
     bool value_is_sint = is_sint(base_value_type);
-    bool value_is_uint = is_uint(base_value_type);
+    bool value_is_uint = is_uint(base_value_type) || value_is_rune;
     bool value_is_ptr = is<types::Pointer>(base_value_type);
     bool value_is_enum = is<types::Enum>(base_value_type);
 
@@ -175,7 +184,7 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
 
     bool type_is_float = is_float(base_type);
     bool type_is_sint = is_sint(base_type);
-    bool type_is_uint = is_uint(base_type);
+    bool type_is_uint = is_uint(base_type) || type_is_rune;
     bool type_is_ptr = is<types::Pointer>(base_type);
     bool type_is_enum = is<types::Enum>(base_type);
 

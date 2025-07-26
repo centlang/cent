@@ -23,6 +23,7 @@ struct Type {
         F32,
         F64,
         Bool,
+        Rune,
         Null,
         Undefined,
         Void,

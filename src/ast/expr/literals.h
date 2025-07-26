@@ -1,6 +1,7 @@
 #ifndef CENT_AST_LITERALS_H
 #define CENT_AST_LITERALS_H
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -38,6 +39,13 @@ struct BoolLiteral : detail::Expr<BoolLiteral> {
     : Expr{offset}, value{value} {}
 
     bool value;
+};
+
+struct RuneLiteral : detail::Expr<RuneLiteral> {
+    [[nodiscard]] RuneLiteral(std::size_t offset, std::uint32_t value)
+    : Expr{offset}, value{value} {}
+
+    std::uint32_t value;
 };
 
 struct NullLiteral : detail::Expr<NullLiteral> {
