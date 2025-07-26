@@ -14,5 +14,5 @@ pub fn println(s: []u8) {
 
 pub fn eprintln(s: []u8) {
     c::fputs(c::to_cstr(s), c::stderr);
-    c::putchar(74);
+    c::fputc('\n' as c::types::int, c::stderr);
 }
