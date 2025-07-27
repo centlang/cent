@@ -439,7 +439,7 @@ std::optional<ast::FnProto> Parser::parse_fn_proto() {
 
     std::unique_ptr<ast::Type> return_type = nullptr;
 
-    if (!match(Semicolon, LeftBrace)) {
+    if (!match(Semicolon, LeftBrace, RightParen, Comma)) {
         return_type = expect_type();
 
         if (!return_type) {
