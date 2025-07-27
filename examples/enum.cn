@@ -1,0 +1,36 @@
+with std::io;
+with c;
+
+enum WindowEvent u8 {
+    closed,
+    minimized,
+    maximized,
+    moved,
+    resized,
+    focused,
+    unfocused,
+    end,
+}
+
+fn poll_event() WindowEvent {
+    return (c::rand() % WindowEvent::end as u8) as WindowEvent;
+}
+
+fn handle_event(e: WindowEvent) {
+    switch e {
+        WindowEvent::closed { io::println("goodbye!"); c::exit(0); }
+        WindowEvent::maximized { io::println("hello!"); }
+        else { c::printf(c::to_cstr("ignoring event %d\n"), e as u8); }
+    }
+}
+
+fn main() {
+    c::srand(c::time(null) as c::types::uint);
+
+    mut e = poll_event();
+
+    while true {
+        handle_event(e);
+        e = poll_event();
+    }
+}
