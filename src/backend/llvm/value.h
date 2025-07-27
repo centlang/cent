@@ -11,9 +11,9 @@ struct Value {
     Type* type{nullptr};
     llvm::Value* value{nullptr};
 
+    std::uint8_t ptr_depth = 0;
+
     bool is_mutable = false;
-    bool is_ref = false;
-    bool is_deref = false;
     bool stack_allocated = false;
 
     [[nodiscard]] bool ok() const { return type; }

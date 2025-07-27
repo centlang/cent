@@ -95,7 +95,7 @@ Value Codegen::generate(const ast::FnDecl& decl) {
         m_builder.CreateStore(value, variable);
 
         m_current_scope->names[param.name.value] = {
-            {m_current_function->param_types[i], variable, param.is_mutable},
+            {m_current_function->param_types[i], variable, 1, param.is_mutable},
             true};
     }
 
@@ -568,7 +568,7 @@ Value Codegen::generate(const ast::VarDecl& decl) {
 
             if (is<types::Undefined>(value.type)) {
                 result = {
-                    type, create_alloca(llvm_type),
+                    type, create_alloca(llvm_type), 1,
                     decl.mutability == ast::VarDecl::Mut::Mut};
 
                 return Value::poisoned();
@@ -578,7 +578,7 @@ Value Codegen::generate(const ast::VarDecl& decl) {
 
             if (cast_to_result_or_error(decl.value->offset, type, value)) {
                 result = {
-                    type, m_current_result,
+                    type, m_current_result, 1,
                     decl.mutability == ast::VarDecl::Mut::Mut};
             }
 
@@ -591,24 +591,26 @@ Value Codegen::generate(const ast::VarDecl& decl) {
     if (value.ok()) {
         if (value.stack_allocated) {
             result = {
-                type, value.value, decl.mutability == ast::VarDecl::Mut::Mut};
+                type, value.value, value.ptr_depth,
+                decl.mutability == ast::VarDecl::Mut::Mut};
 
             return Value::poisoned();
         }
 
-        if (m_current_function) {
-            m_current_result = create_alloca(llvm_type);
-        } else {
+        if (!m_current_function) {
             global_var_init();
             return Value::poisoned();
         }
 
+        m_current_result = create_alloca(llvm_type);
+
         if (!is<types::Undefined>(value.type)) {
-            m_builder.CreateStore(load_value(value).value, m_current_result);
+            m_builder.CreateStore(load_rvalue(value).value, m_current_result);
         }
 
         result = {
-            type, m_current_result, decl.mutability == ast::VarDecl::Mut::Mut};
+            type, m_current_result, 1,
+            decl.mutability == ast::VarDecl::Mut::Mut};
     } else {
         if (m_current_function) {
             m_current_result = create_alloca(llvm_type);
@@ -617,7 +619,7 @@ Value Codegen::generate(const ast::VarDecl& decl) {
                 llvm::Constant::getNullValue(llvm_type), m_current_result);
 
             result = {
-                type, m_current_result,
+                type, m_current_result, 1,
                 decl.mutability == ast::VarDecl::Mut::Mut};
         } else {
             auto* global = new llvm::GlobalVariable{
@@ -634,7 +636,7 @@ Value Codegen::generate(const ast::VarDecl& decl) {
             global->setAlignment(
                 m_module->getDataLayout().getPreferredAlign(global));
 
-            result = {{type, global, true}, decl.is_public, m_current_unit};
+            result = {{type, global, 1, true}, decl.is_public, m_current_unit};
         }
     }
 

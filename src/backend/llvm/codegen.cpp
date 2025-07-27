@@ -265,7 +265,7 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
             } else if (to_size < from_size) {
                 cast_op = Trunc;
             } else {
-                return Value{type, load_value(value).value};
+                return Value{type, load_rvalue(value).value};
             }
         } else if (!implicit && type_is_ptr) {
             cast_op = IntToPtr;
@@ -295,7 +295,7 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
                 if (to_size < from_size) {
                     cast_op = Trunc;
                 } else {
-                    return Value{type, load_value(value).value};
+                    return Value{type, load_rvalue(value).value};
                 }
             }
         } else if (!implicit && type_is_ptr) {
@@ -306,8 +306,7 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
             cast_op = PtrToInt;
         } else if (type_is_ptr) {
             if (!implicit) {
-                return Value{
-                    type, value.value, false, value.is_ref, value.is_deref};
+                return Value{type, value.value, value.ptr_depth};
             }
 
             auto* value_ptr = static_cast<types::Pointer*>(base_value_type);
@@ -315,8 +314,7 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
 
             if (value_ptr->type == type_ptr->type &&
                 (value_ptr->is_mutable || !type_ptr->is_mutable)) {
-                return Value{
-                    type, value.value, false, value.is_ref, value.is_deref};
+                return Value{type, value.value, value.ptr_depth};
             }
         }
     }
@@ -327,7 +325,7 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
 
     return Value{
         type, m_builder.CreateCast(
-                  cast_op, load_value(value).value, base_type->llvm_type)};
+                  cast_op, load_rvalue(value).value, base_type->llvm_type)};
 }
 
 Value Codegen::cast(Type* type, const Value& value, bool implicit) {
@@ -340,7 +338,7 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
     }
 
     if (base_type == base_value_type) {
-        return Value{type, value.value, false, value.is_ref, value.is_deref};
+        return Value{type, value.value, value.ptr_depth};
     }
 
     if (is<types::TemplateParam>(base_type)) {
@@ -369,7 +367,7 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
                 is<types::Null>(base_value_type)
                     ? llvm::Constant::getNullValue(base_type->llvm_type)
                     : value.value,
-                false, value.is_ref, value.is_deref};
+                value.ptr_depth};
         }
 
         if (auto* val = llvm::dyn_cast<llvm::Constant>(value.value)) {
@@ -388,13 +386,17 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
         auto* value_ptr = m_builder.CreateStructGEP(
             base_type->llvm_type, variable, optional_member_value);
 
-        m_builder.CreateStore(load_value(value).value, value_ptr);
+        m_builder.CreateStore(load_rvalue(value).value, value_ptr);
 
         m_builder.CreateStore(
             llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), true),
             bool_ptr);
 
-        return Value{type, variable, false, false, false, true};
+        return Value{
+            .type = type,
+            .value = variable,
+            .ptr_depth = 1,
+            .stack_allocated = true};
     }
 
     if (const auto* slice = dyn_cast<types::Slice>(base_type)) {
@@ -431,7 +433,11 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
         m_builder.CreateStore(
             llvm::ConstantInt::get(intptr, array_type->size), len_member);
 
-        return Value{type, variable, false, false, false, true};
+        return Value{
+            .type = type,
+            .value = variable,
+            .ptr_depth = 1,
+            .stack_allocated = true};
     }
 
     return primitive_cast(type, value, implicit);
@@ -442,7 +448,7 @@ bool Codegen::cast_to_result(Type* type, const Value& value, bool implicit) {
     auto* base_value_type = unwrap_type(value.type);
 
     if (base_type == base_value_type) {
-        m_builder.CreateStore(load_value(value).value, m_current_result);
+        m_builder.CreateStore(load_rvalue(value).value, m_current_result);
         return true;
     }
 
@@ -474,7 +480,7 @@ bool Codegen::cast_to_result(Type* type, const Value& value, bool implicit) {
             m_builder.CreateStore(
                 is<types::Null>(base_value_type)
                     ? llvm::Constant::getNullValue(base_type->llvm_type)
-                    : load_value(value).value,
+                    : load_rvalue(value).value,
                 m_current_result);
 
             return true;
@@ -497,7 +503,7 @@ bool Codegen::cast_to_result(Type* type, const Value& value, bool implicit) {
         auto* value_ptr = m_builder.CreateStructGEP(
             base_type->llvm_type, m_current_result, optional_member_value);
 
-        m_builder.CreateStore(load_value(value).value, value_ptr);
+        m_builder.CreateStore(load_rvalue(value).value, value_ptr);
 
         m_builder.CreateStore(
             llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), true),
@@ -595,14 +601,14 @@ Value Codegen::create_call(
         }
 
         if (type->variadic && i >= params_size) {
-            llvm_args.push_back(load_value(value).value);
+            llvm_args.push_back(load_rvalue(value).value);
             continue;
         }
 
         if (auto val = cast_or_error(
                 arguments[i]->offset, type->param_types[i], value);
             val.ok()) {
-            llvm_args.push_back(load_value(val).value);
+            llvm_args.push_back(load_rvalue(val).value);
         } else {
             return Value::poisoned();
         }
@@ -620,52 +626,28 @@ Value Codegen::create_call(
             llvm_args)};
 }
 
-Value Codegen::load_value(const Value& value) {
-    if (value.is_ref) {
-        return value;
+Value Codegen::load_rvalue(const Value& value) {
+    auto result = load_lvalue(value);
+
+    if (result.ptr_depth == 1) {
+        result.value =
+            m_builder.CreateLoad(value.type->llvm_type, result.value);
+        --result.ptr_depth;
     }
 
-    if (value.is_deref) {
-        return Value{
-            value.type,
-            m_builder.CreateLoad(value.type->llvm_type, value.value)};
+    return result;
+}
+
+Value Codegen::load_lvalue(const Value& value) {
+    auto result = value;
+
+    while (result.ptr_depth > 1) {
+        result.value = m_builder.CreateLoad(
+            llvm::PointerType::get(m_context, 0), result.value);
+        --result.ptr_depth;
     }
 
-    if (auto* variable =
-            llvm::dyn_cast_or_null<llvm::AllocaInst>(value.value)) {
-        return Value{
-            value.type, m_builder.CreateLoad(value.type->llvm_type, variable)};
-    }
-
-    if (auto* variable =
-            llvm::dyn_cast_or_null<llvm::GlobalVariable>(value.value)) {
-        return Value{
-            value.type, m_builder.CreateLoad(value.type->llvm_type, variable)};
-    }
-
-    if (auto* val = llvm::dyn_cast_or_null<llvm::LoadInst>(value.value)) {
-        if (val->getType()->isPointerTy() && !is<types::Pointer>(value.type)) {
-            return Value{
-                value.type, m_builder.CreateLoad(value.type->llvm_type, val)};
-        }
-    }
-
-    if (auto* ptr =
-            llvm::dyn_cast_or_null<llvm::GetElementPtrInst>(value.value)) {
-        return Value{
-            value.type, m_builder.CreateLoad(value.type->llvm_type, ptr)};
-    }
-
-    if (auto* constant =
-            llvm::dyn_cast_or_null<llvm::ConstantExpr>(value.value)) {
-        if (constant->getOpcode() == llvm::Instruction::GetElementPtr) {
-            return Value{
-                value.type,
-                m_builder.CreateLoad(value.type->llvm_type, constant)};
-        }
-    }
-
-    return value;
+    return result;
 }
 
 llvm::Value* Codegen::create_alloca(llvm::Type* type) {
@@ -714,13 +696,18 @@ llvm::Value* Codegen::get_optional_value(const Value& value) {
         optional_member_value);
 }
 
-llvm::Value* Codegen::create_gep_or_extract(
-    llvm::Type* struct_type, llvm::Value* value, std::uint32_t index) {
-    if (value->getType()->isStructTy()) {
-        return m_builder.CreateExtractValue(value, index);
+Value Codegen::get_struct_member(
+    Type* member_type, const Value& value, std::uint32_t index) {
+    if (value.ptr_depth == 0) {
+        return {member_type, m_builder.CreateExtractValue(value.value, index)};
     }
 
-    return m_builder.CreateStructGEP(struct_type, value, index);
+    auto val = load_lvalue(value);
+
+    return {
+        member_type,
+        m_builder.CreateStructGEP(val.type->llvm_type, val.value, index), 1,
+        value.is_mutable};
 }
 
 Type* Codegen::get_type(

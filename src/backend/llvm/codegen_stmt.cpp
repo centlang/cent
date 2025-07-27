@@ -68,11 +68,8 @@ Value Codegen::generate([[maybe_unused]] const ast::Assignment& stmt) {
         }
     }
 
-    if (!var.is_deref && !llvm::isa<llvm::AllocaInst>(var.value) &&
-        !llvm::isa<llvm::GlobalVariable>(var.value) &&
-        !llvm::isa<llvm::LoadInst>(var.value) &&
-        !llvm::isa<llvm::GetElementPtrInst>(var.value)) {
-        error(stmt.variable->offset, "cannot assign to a value");
+    if (var.ptr_depth < 1) {
+        error(stmt.variable->offset, "cannot assign to an rvalue");
 
         return Value::poisoned();
     }
@@ -118,7 +115,7 @@ Value Codegen::generate(const ast::IfElse& stmt) {
     if (!stmt.else_block) {
         auto* end = llvm::BasicBlock::Create(m_context, "", function);
 
-        m_builder.CreateCondBr(load_value(condition).value, if_block, end);
+        m_builder.CreateCondBr(load_rvalue(condition).value, if_block, end);
 
         m_builder.SetInsertPoint(if_block);
         stmt.if_block->codegen(*this);
@@ -133,7 +130,7 @@ Value Codegen::generate(const ast::IfElse& stmt) {
     }
 
     auto* else_block = llvm::BasicBlock::Create(m_context, "", function);
-    m_builder.CreateCondBr(load_value(condition).value, if_block, else_block);
+    m_builder.CreateCondBr(load_rvalue(condition).value, if_block, else_block);
 
     m_builder.SetInsertPoint(if_block);
     stmt.if_block->codegen(*this);
@@ -185,7 +182,7 @@ Value Codegen::generate(const ast::Switch& stmt) {
 
         value = {union_type->tag_type, tag_member};
     } else {
-        value = load_value(value);
+        value = load_rvalue(value);
     }
 
     auto* function = m_builder.GetInsertBlock()->getParent();
@@ -275,7 +272,7 @@ Value Codegen::generate(const ast::ReturnStmt& stmt) {
             cast_or_error(stmt.offset, m_current_function->return_type, value);
         val.ok()) {
         if (!m_builder.GetInsertBlock()->getTerminator()) {
-            m_builder.CreateRet(load_value(val).value);
+            m_builder.CreateRet(load_rvalue(val).value);
         }
     }
 
@@ -298,7 +295,7 @@ Value Codegen::generate(const ast::WhileLoop& stmt) {
     m_loop_end = llvm::BasicBlock::Create(m_context, "", function);
 
     m_builder.CreateCondBr(
-        load_value(condition).value, m_loop_continue, m_loop_end);
+        load_rvalue(condition).value, m_loop_continue, m_loop_end);
 
     m_builder.SetInsertPoint(m_loop_continue);
     stmt.body->codegen(*this);
@@ -306,7 +303,7 @@ Value Codegen::generate(const ast::WhileLoop& stmt) {
     condition = stmt.condition->codegen(*this);
 
     m_builder.CreateCondBr(
-        load_value(condition).value, m_loop_continue, m_loop_end);
+        load_rvalue(condition).value, m_loop_continue, m_loop_end);
 
     m_builder.SetInsertPoint(m_loop_end);
 

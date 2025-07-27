@@ -47,7 +47,7 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
     case Minus:
         if (is_float(base_type)) {
             return Value{
-                value.type, m_builder.CreateFNeg(load_value(value).value)};
+                value.type, m_builder.CreateFNeg(load_rvalue(value).value)};
         }
 
         if (!is_sint(base_type) && !is_uint(base_type)) {
@@ -56,7 +56,7 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
             return Value::poisoned();
         }
 
-        return Value{value.type, m_builder.CreateNeg(load_value(value).value)};
+        return Value{value.type, m_builder.CreateNeg(load_rvalue(value).value)};
     case Bang:
         if (!is<types::Bool>(base_type)) {
             error(expr.offset, "cannot apply `!` to a non-boolean type");
@@ -64,7 +64,7 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
             return Value::poisoned();
         }
 
-        return Value{value.type, m_builder.CreateNot(load_value(value).value)};
+        return Value{value.type, m_builder.CreateNot(load_rvalue(value).value)};
     case Star: {
         auto* pointer = dyn_cast<types::Pointer>(base_type);
 
@@ -75,7 +75,9 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
         }
 
         return Value{
-            pointer->type, value.value, pointer->is_mutable, false, true};
+            pointer->type, value.value,
+            static_cast<std::uint8_t>(value.ptr_depth + 1),
+            pointer->is_mutable};
     }
     case And:
         if (llvm::isa<llvm::Function>(value.value)) {
@@ -90,8 +92,8 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
         }
 
         return Value{
-            get_ptr_type(value.type, value.is_mutable), value.value, false,
-            true};
+            get_ptr_type(value.type, value.is_mutable), value.value,
+            static_cast<std::uint8_t>(value.ptr_depth - 1)};
     case Not:
         if (!is_sint(base_type) && !is_uint(base_type)) {
             error(expr.offset, "cannot apply `~` to a non-integer type");
@@ -99,7 +101,7 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
             return Value::poisoned();
         }
 
-        return Value{value.type, m_builder.CreateNot(load_value(value).value)};
+        return Value{value.type, m_builder.CreateNot(load_rvalue(value).value)};
     default:
         return Value::poisoned();
     }
@@ -213,8 +215,8 @@ Value Codegen::generate(const ast::RangeLiteral& expr) {
         return Value::poisoned();
     }
 
-    auto begin_value = load_value(begin);
-    auto end_value = load_value(end);
+    auto begin_value = load_rvalue(begin);
+    auto end_value = load_rvalue(end);
 
     auto value_x = begin_value;
     auto value_y = cast(begin_value.type, end_value);
@@ -255,7 +257,11 @@ Value Codegen::generate(const ast::RangeLiteral& expr) {
     m_builder.CreateStore(value_x.value, begin_ptr);
     m_builder.CreateStore(value_y.value, end_ptr);
 
-    return Value{type, variable, false, false, false, stack_allocated};
+    return Value{
+        .type = type,
+        .value = variable,
+        .ptr_depth = 1,
+        .stack_allocated = stack_allocated};
 }
 
 Value Codegen::generate(const ast::StructLiteral& expr) {
@@ -332,7 +338,11 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
 
         m_current_result = nullptr;
 
-        return Value{type, variable, false, false, false, stack_allocated};
+        return Value{
+            .type = type,
+            .value = variable,
+            .ptr_depth = 1,
+            .stack_allocated = stack_allocated};
     }
 
     auto* struct_type = dyn_cast<types::Struct>(type);
@@ -424,7 +434,11 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
         m_current_result = nullptr;
     }
 
-    return Value{type, variable, false, false, false, stack_allocated};
+    return Value{
+        .type = type,
+        .value = variable,
+        .ptr_depth = 1,
+        .stack_allocated = stack_allocated};
 }
 
 Value Codegen::generate(const ast::ArrayLiteral& expr) {
@@ -505,7 +519,11 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
         m_current_result = nullptr;
     }
 
-    return Value{type, variable, false, false, false, stack_allocated};
+    return Value{
+        .type = type,
+        .value = variable,
+        .ptr_depth = 1,
+        .stack_allocated = stack_allocated};
 }
 
 Value Codegen::generate(const ast::TupleLiteral& expr) {
@@ -565,11 +583,14 @@ Value Codegen::generate(const ast::TupleLiteral& expr) {
     for (std::size_t i = 0; i < values.size(); ++i) {
         auto* pointer = m_builder.CreateStructGEP(struct_type, variable, i);
 
-        m_builder.CreateStore(load_value(values[i]).value, pointer);
+        m_builder.CreateStore(load_rvalue(values[i]).value, pointer);
     }
 
-    return Value{get_tuple_type(types), variable, false, false, false,
-                 stack_allocated};
+    return Value{
+        .type = get_tuple_type(types),
+        .value = variable,
+        .ptr_depth = 1,
+        .stack_allocated = stack_allocated};
 }
 
 Value Codegen::generate(const ast::Identifier& expr) {
@@ -611,7 +632,7 @@ Value Codegen::generate(const ast::CallExpr& expr) {
                 return Value::poisoned();
             }
 
-            auto function = load_value(value->second.element);
+            auto function = load_rvalue(value->second.element);
 
             if (auto* type = dyn_cast<types::Function>(function.type)) {
                 return create_call(
@@ -664,7 +685,7 @@ Value Codegen::generate(const ast::CallExpr& expr) {
                     expr.arguments[i]->offset, generic_fn->params[i].type,
                     value);
                 val.ok()) {
-                arguments.push_back(load_value(val));
+                arguments.push_back(load_rvalue(val));
             } else {
                 return Value::poisoned();
             }
@@ -709,7 +730,7 @@ Value Codegen::generate(const ast::CallExpr& expr) {
         return Value::poisoned();
     }
 
-    value = load_value(value);
+    value = load_rvalue(value);
 
     if (auto* type = dyn_cast<types::Function>(value.type)) {
         return create_call(
@@ -823,7 +844,7 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
         }
 
         if (is<types::Pointer>(value.type)) {
-            arguments.push_back(load_value(value).value);
+            arguments.push_back(load_rvalue(value).value);
         } else {
             if (!value.value->getType()->isPointerTy()) {
                 error(expr.value->offset, "type mismatch");
@@ -834,7 +855,7 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
             arguments.push_back(value.value);
         }
     } else {
-        auto val = load_value(value);
+        auto val = load_rvalue(value);
 
         if (auto* pointer = dyn_cast<types::Pointer>(value.type)) {
             arguments.push_back(
@@ -855,7 +876,7 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
                 expr.arguments[i]->offset,
                 iterator->second.type->param_types[i + 1], value);
             val.ok()) {
-            arguments.push_back(load_value(val).value);
+            arguments.push_back(load_rvalue(val).value);
         } else {
             return Value::poisoned();
         }
@@ -910,10 +931,7 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
             return Value::poisoned();
         }
 
-        return Value{
-            tuple->types[value],
-            create_gep_or_extract(tuple->llvm_type, parent.value, value),
-            parent.is_mutable};
+        return get_struct_member(tuple->types[value], parent, value);
     }
 
     auto not_a_struct = [&] {
@@ -921,15 +939,18 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
     };
 
     if (auto* slice = dyn_cast<types::Slice>(parent.type)) {
-        if (expr.member.value == "len") {
-            return Value{
-                m_primitive_types["usize"].get(),
-                m_builder.CreateStructGEP(
-                    m_slice_type, parent.value, slice_member_len)};
+        if (expr.member.value != "len") {
+            not_a_struct();
+            return Value::poisoned();
         }
 
-        not_a_struct();
-        return Value::poisoned();
+        auto* usize = m_primitive_types["usize"].get();
+
+        return Value{
+            usize, m_builder.CreateLoad(
+                       usize->llvm_type,
+                       m_builder.CreateStructGEP(
+                           m_slice_type, parent.value, slice_member_len))};
     }
 
     if (auto* union_type = dyn_cast<types::Union>(parent.type)) {
@@ -940,14 +961,19 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
             return Value::poisoned();
         }
 
-        return Value{
-            union_type->fields[*index],
-            create_gep_or_extract(
-                union_type->llvm_type, parent.value, union_member_value)};
+        return get_struct_member(
+            union_type->fields[*index], parent, union_member_value);
     }
 
-    if (parent.value->getType()->isStructTy()) {
-        auto* type = static_cast<types::Struct*>(parent.type);
+    if (auto* pointer = dyn_cast<types::Pointer>(parent.type)) {
+        auto* type = dyn_cast<types::Struct>(pointer->type);
+
+        if (!type) {
+            not_a_struct();
+
+            return Value::poisoned();
+        }
+
         auto index =
             get_member(static_cast<llvm::StructType*>(type->llvm_type));
 
@@ -957,41 +983,16 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
 
         return Value{
             type->fields[*index],
-            m_builder.CreateExtractValue(parent.value, *index)};
+            m_builder.CreateStructGEP(type->llvm_type, parent.value, *index), 1,
+            pointer->is_mutable};
     }
 
-    bool is_mutable = false;
+    auto* type = dyn_cast<types::Struct>(parent.type);
 
-    types::Struct* type = nullptr;
+    if (!type) {
+        not_a_struct();
 
-    if (auto* pointer = dyn_cast<types::Pointer>(parent.type)) {
-        type = dyn_cast<types::Struct>(pointer->type);
-
-        if (!type) {
-            not_a_struct();
-
-            return Value::poisoned();
-        }
-
-        is_mutable = pointer->is_mutable;
-    } else {
-        type = dyn_cast<types::Struct>(parent.type);
-
-        if (!type) {
-            not_a_struct();
-
-            return Value::poisoned();
-        }
-
-        is_mutable = parent.is_mutable;
-    }
-
-    auto* value = parent.value;
-
-    if (is<types::Pointer>(parent.type)) {
-        if (auto* variable = llvm::dyn_cast<llvm::AllocaInst>(value)) {
-            value = m_builder.CreateLoad(variable->getAllocatedType(), value);
-        }
+        return Value::poisoned();
     }
 
     auto index = get_member(static_cast<llvm::StructType*>(type->llvm_type));
@@ -1000,9 +1001,7 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
         return Value::poisoned();
     }
 
-    return Value{
-        type->fields[*index],
-        m_builder.CreateStructGEP(type->llvm_type, value, *index), is_mutable};
+    return get_struct_member(type->fields[*index], parent, *index);
 }
 
 Value Codegen::generate(const ast::IndexExpr& expr) {
@@ -1018,7 +1017,7 @@ Value Codegen::generate(const ast::IndexExpr& expr) {
         return Value::poisoned();
     }
 
-    auto index_val = load_value(index);
+    auto index_val = load_rvalue(index);
 
     auto val = cast_or_error(
         expr.index->offset, m_primitive_types["usize"].get(), index_val);
@@ -1034,7 +1033,7 @@ Value Codegen::generate(const ast::IndexExpr& expr) {
 
         return Value{
             type->type,
-            m_builder.CreateGEP(type->type->llvm_type, ptr_value, val.value),
+            m_builder.CreateGEP(type->type->llvm_type, ptr_value, val.value), 1,
             type->is_mutable};
     }
 
@@ -1053,7 +1052,7 @@ Value Codegen::generate(const ast::IndexExpr& expr) {
             {llvm::ConstantInt::get(
                  m_module->getDataLayout().getIntPtrType(m_context), 0),
              val.value}),
-        value.is_mutable};
+        1, value.is_mutable};
 }
 
 Value Codegen::generate(const ast::SliceExpr& expr) {
@@ -1072,7 +1071,7 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
             return Value::poisoned();
         }
 
-        low = load_value(low);
+        low = load_rvalue(low);
 
         auto low_val = cast_or_error(
             expr.low->offset, m_primitive_types["usize"].get(), low);
@@ -1098,7 +1097,7 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
             return Value::poisoned();
         }
 
-        high = load_value(high);
+        high = load_rvalue(high);
 
         auto high_val = cast_or_error(
             expr.high->offset, m_primitive_types["usize"].get(), high);
@@ -1137,12 +1136,10 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
         m_builder.CreateStore(len_value, len_member);
 
         return Value{
-            get_slice_type(type->type, value.is_mutable),
-            variable,
-            false,
-            false,
-            false,
-            m_current_result == nullptr};
+            .type = get_slice_type(type->type, value.is_mutable),
+            .value = variable,
+            .ptr_depth = 1,
+            .stack_allocated = m_current_result == nullptr};
     }
 
     auto* type = dyn_cast<types::Slice>(value.type);
@@ -1187,8 +1184,11 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
     m_builder.CreateStore(new_ptr_value, new_ptr_member);
     m_builder.CreateStore(new_len_value, new_len_member);
 
-    return Value{value.type, variable, false,
-                 false,      false,    m_current_result == nullptr};
+    return Value{
+        .type = type,
+        .value = variable,
+        .ptr_depth = 1,
+        .stack_allocated = m_current_result == nullptr};
 }
 
 Value Codegen::generate(const ast::AsExpr& expr) {
@@ -1247,9 +1247,9 @@ Value Codegen::generate_bin_logical_expr(
         auto* end = llvm::BasicBlock::Create(m_context, "", function);
 
         if (oper.value == AndAnd) {
-            m_builder.CreateCondBr(load_value(lhs_value).value, next, end);
+            m_builder.CreateCondBr(load_rvalue(lhs_value).value, next, end);
         } else {
-            m_builder.CreateCondBr(load_value(lhs_value).value, end, next);
+            m_builder.CreateCondBr(load_rvalue(lhs_value).value, end, next);
         }
 
         m_builder.SetInsertPoint(next);
@@ -1261,7 +1261,7 @@ Value Codegen::generate_bin_logical_expr(
         }
 
         auto value_y =
-            cast_or_error(rhs.offset, lhs_value.type, load_value(rhs_value));
+            cast_or_error(rhs.offset, lhs_value.type, load_rvalue(rhs_value));
 
         if (!value_y.ok()) {
             return Value::poisoned();
@@ -1318,7 +1318,7 @@ Value Codegen::generate_bin_logical_expr(
         }
 
         auto value_y =
-            cast_or_error(rhs.offset, optional->type, load_value(rhs_value));
+            cast_or_error(rhs.offset, optional->type, load_rvalue(rhs_value));
 
         if (!value_y.ok()) {
             return Value::poisoned();
@@ -1381,8 +1381,8 @@ Value Codegen::generate_bin_expr(
         }
     }
 
-    auto lhs_value = load_value(lhs.value);
-    auto rhs_value = load_value(rhs.value);
+    auto lhs_value = load_rvalue(lhs.value);
+    auto rhs_value = load_rvalue(rhs.value);
 
     auto* value_base_type = lhs_base_type;
     auto* value_type = lhs.value.type;

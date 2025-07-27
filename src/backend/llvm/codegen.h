@@ -190,7 +190,8 @@ private:
         std::size_t offset, types::Function* type, llvm::Value* function,
         const std::vector<std::unique_ptr<ast::Expression>>& arguments);
 
-    [[nodiscard]] Value load_value(const Value& value);
+    [[nodiscard]] Value load_rvalue(const Value& value);
+    [[nodiscard]] Value load_lvalue(const Value& value);
 
     [[nodiscard]] llvm::Value* create_alloca(llvm::Type* type);
 
@@ -201,8 +202,8 @@ private:
     [[nodiscard]] llvm::Value* get_optional_bool(const Value& value);
     [[nodiscard]] llvm::Value* get_optional_value(const Value& value);
 
-    [[nodiscard]] llvm::Value* create_gep_or_extract(
-        llvm::Type* struct_type, llvm::Value* value, std::uint32_t index);
+    [[nodiscard]] Value get_struct_member(
+        Type* member_type, const Value& value, std::uint32_t index);
 
     template <typename... Maps>
     [[nodiscard]] std::optional<std::string>

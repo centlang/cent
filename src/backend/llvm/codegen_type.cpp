@@ -507,7 +507,7 @@ Value Codegen::inst_generic_fn(
         m_builder.CreateStore(value, variable);
 
         m_current_scope->names[param.name] = {
-            m_current_function->param_types[i], variable, param.is_mutable};
+            m_current_function->param_types[i], variable, 1, param.is_mutable};
     }
 
     for (std::size_t i = 0; i < function->template_params.size(); ++i) {
