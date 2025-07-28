@@ -195,15 +195,14 @@ private:
 
     [[nodiscard]] llvm::Value* create_alloca(llvm::Type* type);
 
-    [[nodiscard]] llvm::Value* load_struct_member(
-        llvm::Type* struct_type, llvm::Type* member_type, llvm::Value* value,
-        std::uint32_t index);
-
     [[nodiscard]] llvm::Value* get_optional_bool(const Value& value);
     [[nodiscard]] llvm::Value* get_optional_value(const Value& value);
 
     [[nodiscard]] Value get_struct_member(
         Type* member_type, const Value& value, std::uint32_t index);
+
+    [[nodiscard]] llvm::Value* load_struct_member(
+        llvm::Type* member_type, const Value& value, std::uint32_t index);
 
     template <typename... Maps>
     [[nodiscard]] std::optional<std::string>

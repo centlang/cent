@@ -660,40 +660,27 @@ llvm::Value* Codegen::create_alloca(llvm::Type* type) {
     return result;
 }
 
-llvm::Value* Codegen::load_struct_member(
-    llvm::Type* struct_type, llvm::Type* member_type, llvm::Value* value,
-    std::uint32_t index) {
-    if (value->getType()->isStructTy()) {
-        return m_builder.CreateExtractValue(value, index);
-    }
-
-    return m_builder.CreateLoad(
-        member_type, m_builder.CreateStructGEP(struct_type, value, index));
-}
-
 llvm::Value* Codegen::get_optional_bool(const Value& value) {
     auto* optional = static_cast<types::Optional*>(value.type);
 
     if (is<types::Pointer>(optional->type)) {
         auto* null = llvm::Constant::getNullValue(optional->type->llvm_type);
-        return m_builder.CreateICmpNE(value.value, null);
+        return m_builder.CreateICmpNE(load_rvalue(value).value, null);
     }
 
     return load_struct_member(
-        value.type->llvm_type, llvm::Type::getInt1Ty(m_context), value.value,
-        optional_member_bool);
+        llvm::Type::getInt1Ty(m_context), value, optional_member_value);
 }
 
 llvm::Value* Codegen::get_optional_value(const Value& value) {
     auto* optional = static_cast<types::Optional*>(value.type);
 
     if (is<types::Pointer>(optional->type)) {
-        return value.value;
+        return load_rvalue(value).value;
     }
 
     return load_struct_member(
-        value.type->llvm_type, optional->type->llvm_type, value.value,
-        optional_member_value);
+        optional->type->llvm_type, value, optional_member_value);
 }
 
 Value Codegen::get_struct_member(
@@ -708,6 +695,19 @@ Value Codegen::get_struct_member(
         member_type,
         m_builder.CreateStructGEP(val.type->llvm_type, val.value, index), 1,
         value.is_mutable};
+}
+
+llvm::Value* Codegen::load_struct_member(
+    llvm::Type* member_type, const Value& value, std::uint32_t index) {
+    if (value.ptr_depth == 0) {
+        return m_builder.CreateExtractValue(value.value, index);
+    }
+
+    auto val = load_lvalue(value);
+
+    return m_builder.CreateLoad(
+        member_type,
+        m_builder.CreateStructGEP(val.type->llvm_type, val.value, index));
 }
 
 Type* Codegen::get_type(

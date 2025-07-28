@@ -1028,8 +1028,7 @@ Value Codegen::generate(const ast::IndexExpr& expr) {
 
     if (auto* type = dyn_cast<types::Slice>(value.type)) {
         auto* ptr_value = load_struct_member(
-            type->llvm_type, llvm::PointerType::get(m_context, 0), value.value,
-            slice_member_ptr);
+            llvm::PointerType::get(m_context, 0), value, slice_member_ptr);
 
         return Value{
             type->type,
@@ -1062,6 +1061,8 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
         return Value::poisoned();
     }
 
+    value = load_lvalue(value);
+
     Value low = Value::poisoned();
 
     if (expr.low) {
@@ -1073,14 +1074,12 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
 
         low = load_rvalue(low);
 
-        auto low_val = cast_or_error(
+        low = cast_or_error(
             expr.low->offset, m_primitive_types["usize"].get(), low);
 
-        if (!low_val.ok()) {
+        if (!low.ok()) {
             return Value::poisoned();
         }
-
-        low = low_val;
     } else {
         low = {
             m_primitive_types["usize"].get(),
@@ -1099,14 +1098,12 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
 
         high = load_rvalue(high);
 
-        auto high_val = cast_or_error(
+        high = cast_or_error(
             expr.high->offset, m_primitive_types["usize"].get(), high);
 
-        if (!high_val.ok()) {
+        if (!high.ok()) {
             return Value::poisoned();
         }
-
-        high = high_val;
     }
 
     if (auto* type = dyn_cast<types::Array>(value.type)) {
@@ -1164,8 +1161,7 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
     }
 
     auto* ptr_value = load_struct_member(
-        llvm_type, llvm::PointerType::get(m_context, 0), value.value,
-        slice_member_ptr);
+        llvm::PointerType::get(m_context, 0), value, slice_member_ptr);
 
     auto* new_ptr_value =
         m_builder.CreateGEP(type->type->llvm_type, ptr_value, low.value);

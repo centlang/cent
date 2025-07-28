@@ -26,6 +26,8 @@ Value Codegen::generate([[maybe_unused]] const ast::Assignment& stmt) {
         return Value::poisoned();
     }
 
+    var = load_lvalue(var);
+
     auto value = stmt.value->codegen(*this);
 
     if (!value.ok()) {
@@ -177,8 +179,7 @@ Value Codegen::generate(const ast::Switch& stmt) {
         }
 
         auto* tag_member = load_struct_member(
-            union_type->llvm_type, union_type->tag_type->llvm_type, value.value,
-            union_member_tag);
+            union_type->tag_type->llvm_type, value, union_member_tag);
 
         value = {union_type->tag_type, tag_member};
     } else {
@@ -339,8 +340,7 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
         auto* index = create_alloca(usize);
         m_builder.CreateStore(usize_null, index);
 
-        auto* length = load_struct_member(
-            value.type->llvm_type, usize, value.value, slice_member_len);
+        auto* length = load_struct_member(usize, value, slice_member_len);
 
         m_builder.CreateCondBr(
             m_builder.CreateICmpULT(usize_null, length), loop_body, m_loop_end);
@@ -350,8 +350,7 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
         auto current_scope = *m_current_scope;
 
         auto* ptr_value = load_struct_member(
-            type->llvm_type, llvm::PointerType::get(m_context, 0), value.value,
-            slice_member_ptr);
+            llvm::PointerType::get(m_context, 0), value, slice_member_ptr);
 
         auto* index_value = m_builder.CreateLoad(usize, index);
 
@@ -448,13 +447,11 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
     auto* llvm_contained_type = type->type->llvm_type;
 
-    llvm::Value* begin = load_struct_member(
-        value.type->llvm_type, llvm_contained_type, value.value,
-        range_member_begin);
+    llvm::Value* begin =
+        load_struct_member(llvm_contained_type, value, range_member_begin);
 
-    llvm::Value* end = load_struct_member(
-        value.type->llvm_type, llvm_contained_type, value.value,
-        range_member_end);
+    llvm::Value* end =
+        load_struct_member(llvm_contained_type, value, range_member_end);
 
     if (!is_sint(type->type) && !is_uint(type->type)) {
         error(stmt.value->offset, "type mismatch");
