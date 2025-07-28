@@ -1,0 +1,27 @@
+with std::io;
+with c;
+
+fn hello_world() {
+    io::println("Hello, world!");
+}
+
+fn add(a: i32, b: i32) i32 {
+    return a + b;
+}
+
+fn mul(a: i32, b: i32) i32 {
+    return a * b;
+}
+
+fn apply_to(a: *mut i32, b: i32, f: *fn(a: i32, b: i32) i32) {
+    *a = f(*a, b);
+}
+
+fn main() {
+    mut a = 42;
+
+    apply_to(&a, 27, &add);
+    apply_to(&a, 6, &mul);
+
+    c::printf(c::to_cstr("a is %d"), a);
+}
