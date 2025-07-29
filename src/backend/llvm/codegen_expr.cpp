@@ -974,6 +974,8 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
             return Value::poisoned();
         }
 
+        parent = load_rvalue(parent);
+
         auto index =
             get_member(static_cast<llvm::StructType*>(type->llvm_type));
 
