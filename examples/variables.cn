@@ -1,0 +1,21 @@
+with c;
+
+fn main() {
+    let immutable: i32 = 42;
+    let immutable = 42;
+    c::printf(c::to_cstr("immutable is %d\n"), immutable);
+
+    mut mutable: i32 = 0;
+    mut mutable: i32;
+    mut mutable = 0;
+    c::printf(c::to_cstr("mutable is %d\n"), mutable);
+
+    mutable = 42;
+    c::printf(c::to_cstr("mutable is %d\n"), mutable);
+
+    mut init_later: i32 = undefined;
+    c::printf(c::to_cstr("init_later is %d\n"), init_later);
+
+    init_later = 42;
+    c::printf(c::to_cstr("init_later is %d\n"), init_later);
+}
