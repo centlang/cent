@@ -1,0 +1,27 @@
+with c;
+
+union Literal {
+    int: u64,
+    str: []u8,
+    bool: bool,
+}
+
+fn print_literal(l: Literal) {
+    switch l {
+        Literal::int { c::printf(c::to_cstr("int literal: %llu\n"), l.int); }
+        Literal::str { c::printf(c::to_cstr("string literal: %s\n"), c::to_cstr(l.str)); }
+        Literal::bool {
+            if (l.bool) {
+                c::printf(c::to_cstr("bool literal: true\n"));
+            } else {
+                c::printf(c::to_cstr("bool literal: false\n"));
+            }
+        }
+    }
+}
+
+fn main() {
+    print_literal(Literal { str: "Hello, world!" });
+    print_literal(Literal { int: 42 });
+    print_literal(Literal { bool: true });
+}
