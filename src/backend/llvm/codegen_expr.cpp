@@ -616,6 +616,27 @@ Value Codegen::generate(const ast::CallExpr& expr) {
         error(expr.identifier->offset, "not a function");
     };
 
+    auto create_fn_call = [&](const auto& func) {
+        auto* base_type = unwrap_type(func.type);
+
+        if (auto* type = dyn_cast<types::Function>(base_type)) {
+            return create_call(
+                expr.identifier->offset, type, func.value, expr.arguments);
+        }
+
+        if (auto* pointer = dyn_cast<types::Pointer>(base_type)) {
+            base_type = unwrap_type(pointer->type);
+
+            if (auto* type = dyn_cast<types::Function>(base_type)) {
+                return create_call(
+                    expr.identifier->offset, type, func.value, expr.arguments);
+            }
+        }
+
+        not_a_function();
+        return Value::poisoned();
+    };
+
     if (auto* identifier =
             dynamic_cast<ast::Identifier*>(expr.identifier.get())) {
         auto* scope = resolve_scope(identifier->value);
@@ -634,22 +655,7 @@ Value Codegen::generate(const ast::CallExpr& expr) {
 
             auto function = load_rvalue(value->second.element);
 
-            if (auto* type = dyn_cast<types::Function>(function.type)) {
-                return create_call(
-                    expr.identifier->offset, type, function.value,
-                    expr.arguments);
-            }
-
-            if (auto* pointer = dyn_cast<types::Pointer>(function.type)) {
-                if (auto* type = dyn_cast<types::Function>(pointer->type)) {
-                    return create_call(
-                        expr.identifier->offset, type, function.value,
-                        expr.arguments);
-                }
-            }
-
-            not_a_function();
-            return Value::poisoned();
+            return create_fn_call(function);
         }
 
         auto* generic_fn = get_generic_fn(offset, name, *scope);
@@ -732,20 +738,7 @@ Value Codegen::generate(const ast::CallExpr& expr) {
 
     value = load_rvalue(value);
 
-    if (auto* type = dyn_cast<types::Function>(value.type)) {
-        return create_call(
-            expr.identifier->offset, type, value.value, expr.arguments);
-    }
-
-    if (auto* pointer = dyn_cast<types::Pointer>(value.type)) {
-        if (auto* type = dyn_cast<types::Function>(pointer->type)) {
-            return create_call(
-                expr.identifier->offset, type, value.value, expr.arguments);
-        }
-    }
-
-    not_a_function();
-    return Value::poisoned();
+    return create_fn_call(value);
 }
 
 Value Codegen::generate(const ast::CallExprGeneric& expr) {
