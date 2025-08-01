@@ -15,6 +15,8 @@ pub const EXIT_FAILURE = 1;
 !(extern) pub fn rand() types::int;
 !(extern) pub fn srand(seed: types::uint);
 !(extern) pub fn time(tloc: ?*types::time) types::time;
+!(extern) pub fn malloc(size: usize) ?*types::void;
+!(extern) pub fn free(ptr: ?*types::void);
 
 pub fn to_cstr(s: []u8) *types::char {
     return &s[0] as *types::char;

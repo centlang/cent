@@ -1,0 +1,21 @@
+with c;
+
+pub type AllocFn = fn(size: usize) ?*mut u8;
+pub type FreeFn = fn(ptr: *mut u8);
+
+pub type Allocator {
+    _alloc: *AllocFn,
+    _free: *FreeFn,
+}
+
+fn Allocator::alloc(self: Allocator, size: usize) ?*mut u8 {
+    return (self._alloc)(size);
+}
+
+fn Allocator::free(self: Allocator, ptr: *mut u8) {
+    (self._free)(ptr);
+}
+
+pub fn system() Allocator {
+    return Allocator { _alloc: &c::malloc as *AllocFn, _free: &c::free as *FreeFn };
+}
