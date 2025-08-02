@@ -956,6 +956,14 @@ std::unique_ptr<ast::Type> Parser::parse_array_type() {
             error(is_mutable_offset, "array type cannot be mutable");
         }
 
+        if (auto* identifier = dynamic_cast<ast::Identifier*>(size.get())) {
+            if (identifier->value.size() == 1 &&
+                identifier->value[0].value == "_") {
+                return std::make_unique<ast::ArrayType>(
+                    offset, std::move(type), nullptr);
+            }
+        }
+
         return std::make_unique<ast::ArrayType>(
             offset, std::move(type), std::move(size));
     }

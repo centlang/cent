@@ -19,6 +19,7 @@
 #include "ast/expr/slice_expr.h"
 #include "ast/expr/unary_expr.h"
 
+#include "ast/type/array_type.h"
 #include "ast/type/named_type.h"
 
 #include "backend/llvm/types/struct.h"
@@ -442,21 +443,17 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
 }
 
 Value Codegen::generate(const ast::ArrayLiteral& expr) {
-    auto* type = expr.type->codegen(*this);
+    auto* type = dynamic_cast<ast::ArrayType*>(expr.type.get());
 
     if (!type) {
         return Value::poisoned();
     }
 
-    auto* array_type = dyn_cast<types::Array>(type);
+    auto* array_type = static_cast<types::Array*>(
+        type->size ? type->codegen(*this)
+                   : type->codegen(*this, expr.elements.size()));
 
-    if (!array_type) {
-        error(expr.type->offset, "not an array type");
-
-        return Value::poisoned();
-    }
-
-    auto* llvm_type = static_cast<llvm::ArrayType*>(type->llvm_type);
+    auto* llvm_type = static_cast<llvm::ArrayType*>(array_type->llvm_type);
 
     bool stack_allocated = m_current_result == nullptr;
 
@@ -494,7 +491,8 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
             llvm_values.push_back(static_cast<llvm::Constant*>(value.value));
         }
 
-        return Value{type, llvm::ConstantArray::get(llvm_type, llvm_values)};
+        return Value{
+            array_type, llvm::ConstantArray::get(llvm_type, llvm_values)};
     }
 
     auto* variable =
@@ -520,7 +518,7 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
     }
 
     return Value{
-        .type = type,
+        .type = array_type,
         .value = variable,
         .ptr_depth = 1,
         .stack_allocated = stack_allocated};

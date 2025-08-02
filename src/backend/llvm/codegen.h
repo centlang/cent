@@ -108,6 +108,7 @@ public:
     [[nodiscard]] Type* generate(const ast::Pointer& type);
     [[nodiscard]] Type* generate(const ast::Optional& type);
     [[nodiscard]] Type* generate(const ast::ArrayType& type);
+    [[nodiscard]] Type* generate(const ast::ArrayType& type, std::size_t size);
     [[nodiscard]] Type* generate(const ast::SliceType& type);
     [[nodiscard]] Type* generate(const ast::TupleType& type);
     [[nodiscard]] Type* generate(const ast::FnPointer& type);

@@ -4,6 +4,8 @@
 #include <memory>
 #include <utility>
 
+#include "backend/llvm/codegen.h"
+
 #include "ast/node.h"
 
 namespace cent::ast {
@@ -13,6 +15,16 @@ struct ArrayType : detail::Type<ArrayType> {
         std::size_t offset, std::unique_ptr<ast::Type> type,
         std::unique_ptr<Expression> size)
     : Type{offset}, type{std::move(type)}, size{std::move(size)} {}
+
+    [[nodiscard]] backend::Type*
+    codegen(backend::Codegen& codegen) const override {
+        return codegen.generate(*this);
+    }
+
+    [[nodiscard]] backend::Type*
+    codegen(backend::Codegen& codegen, std::size_t size) const {
+        return codegen.generate(*this, size);
+    }
 
     std::unique_ptr<ast::Type> type;
     std::unique_ptr<Expression> size;

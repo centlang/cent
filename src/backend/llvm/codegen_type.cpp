@@ -173,6 +173,16 @@ Type* Codegen::generate(const ast::ArrayType& type) {
     return nullptr;
 }
 
+Type* Codegen::generate(const ast::ArrayType& type, std::size_t size) {
+    auto* contained = type.type->codegen(*this);
+
+    if (!contained) {
+        return nullptr;
+    }
+
+    return get_array_type(contained, size);
+}
+
 Type* Codegen::generate(const ast::SliceType& type) {
     auto* contained = type.type->codegen(*this);
 
