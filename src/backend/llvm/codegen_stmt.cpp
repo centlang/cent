@@ -478,7 +478,7 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
     auto current_scope = *m_current_scope;
 
-    m_current_scope->names[stmt.name.value] = {type->type, variable};
+    m_current_scope->names[stmt.name.value] = {type->type, variable, 1};
     stmt.body->codegen(*this);
 
     m_builder.CreateBr(m_loop_continue);
