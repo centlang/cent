@@ -1,0 +1,23 @@
+with c;
+
+fn main() {
+    mut squares: [10]i32 = undefined;
+
+    for i in 1..=10 {
+        squares[i as usize - 1] = i * i;
+    }
+
+    c::puts(c::to_cstr("Squares:"));
+
+    for x in squares {
+        c::printf(c::to_cstr("  %u\n"), x);
+    }
+
+    c::putchar('\n' as i32);
+
+    let hello = [_]u8{
+        'H' as u8, 'e' as u8, 'l' as u8, 'l' as u8, 'o' as u8, 0
+    };
+
+    c::puts(c::to_cstr(hello));
+}
