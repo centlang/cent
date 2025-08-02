@@ -669,7 +669,7 @@ llvm::Value* Codegen::get_optional_bool(const Value& value) {
     }
 
     return load_struct_member(
-        llvm::Type::getInt1Ty(m_context), value, optional_member_value);
+        llvm::Type::getInt1Ty(m_context), value, optional_member_bool);
 }
 
 llvm::Value* Codegen::get_optional_value(const Value& value) {
