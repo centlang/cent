@@ -249,6 +249,11 @@ private:
         m_had_error = true;
     }
 
+    void warning(std::size_t offset, std::string_view message) {
+        auto loc = offset_to_loc(m_source, offset);
+        log::warning(loc.line, loc.column, m_filename, message, loc.code);
+    }
+
     static constexpr auto buffer_size = 2;
 
     Lexer m_lexer;
