@@ -1,4 +1,4 @@
-# Cent
+![Cent](assets/logo.svg)
 
 A simple systems programming language.
 
