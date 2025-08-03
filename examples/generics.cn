@@ -1,0 +1,19 @@
+with c;
+with std::alloc;
+
+type(<T>) Vec2 {
+    x: T,
+    y: T,
+}
+
+type Vec2f = Vec2(<f32>);
+type Vec2i = Vec2(<i32>);
+
+fn(<T>) add(a: T, b: T) T {
+    return a + b;
+}
+
+fn main() {
+    let v = Vec2(<f32>) { x: 42, y: 4 };
+    c::printf(c::to_cstr("v.x + v.y = %f\n"), add(v.x, v.y) as f64);
+}
