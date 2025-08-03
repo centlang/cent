@@ -54,3 +54,11 @@ Or use `--run` option:
 centc hello_world.cn --run
 Hello, world!
 ```
+
+## Documentation
+
+* [Examples](examples)
+
+## License
+
+[MIT](license)
