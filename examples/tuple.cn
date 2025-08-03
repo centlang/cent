@@ -1,0 +1,8 @@
+with c;
+
+fn main() {
+    let t = (42, 42.42);
+    let t2: (i32, f32) = t;
+
+    c::printf(c::to_cstr("t = (%d, %f)\n"), t2.0, t2.1 as f64);
+}
