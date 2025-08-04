@@ -18,6 +18,6 @@ fn User::print_user(self: *User) {
 }
 
 fn main() {
-    let u = User { username: "lnkrr", email: "lnkrr@proton.me", age: 15, id: 42 };
+    let u = User { username: "lnkrr", email: "lnkrr@proton.me", age: 16, id: 42 };
     u.print_user();
 }
