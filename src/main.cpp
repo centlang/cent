@@ -39,6 +39,8 @@ struct Options {
     bool run;
 };
 
+void version() { fmt::print("Cent v0.001\n"); }
+
 void help() {
     fmt::print(R"(USAGE: centc [options] file [-- linker options]
 
@@ -49,6 +51,7 @@ OPTIONS:
   --target <triple>     Specify the target triple
   --run                 Build and run immediately
   --help                Print this help message and exit
+  --version             Print Cent version and exit
 )");
 }
 
@@ -119,6 +122,11 @@ OPTIONS:
 
         if (arg == "--help") {
             help();
+            return std::nullopt;
+        }
+
+        if (arg == "--version") {
+            version();
             return std::nullopt;
         }
 
