@@ -59,6 +59,10 @@ Hello, world!
 
 * [Examples](examples)
 
+## Editor Support
+
+* Vim: [cent.vim](https://github.com/centlang/cent.vim)
+
 ## License
 
 [MIT](license)
