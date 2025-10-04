@@ -98,7 +98,7 @@ class Codegen {
 public:
     [[nodiscard]] Codegen(
         std::unique_ptr<ast::Module> program, std::string_view filename,
-        const llvm::DataLayout& layout, const std::string& triple);
+        const llvm::DataLayout& layout);
 
     [[nodiscard]] std::unique_ptr<llvm::Module> generate();
 

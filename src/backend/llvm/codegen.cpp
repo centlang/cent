@@ -12,16 +12,18 @@
 
 #include "backend/llvm/codegen.h"
 
+#include "options.h"
+
 namespace cent::backend {
 
 Codegen::Codegen(
     std::unique_ptr<ast::Module> program, std::string_view filename,
-    const llvm::DataLayout& layout, const std::string& triple)
+    const llvm::DataLayout& layout)
 : m_module{std::make_unique<llvm::Module>("", m_context)}, m_builder{m_context},
   m_program{std::move(program)}, m_filename{filename},
   m_units{std::filesystem::path{m_filename}.parent_path()} {
     m_module->setDataLayout(layout);
-    m_module->setTargetTriple(triple);
+    m_module->setTargetTriple(cent::g_options.target_triple);
 }
 
 std::unique_ptr<llvm::Module> Codegen::generate() {

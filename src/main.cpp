@@ -21,23 +21,8 @@
 #include "backend/llvm/emit.h"
 
 #include "log.h"
+#include "options.h"
 #include "util.h"
-
-enum struct EmitType : std::uint8_t { Obj, Exe, LlvmIr, LlvmBc };
-
-struct Options {
-    std::string target_triple;
-
-    std::optional<std::filesystem::path> source_file = std::nullopt;
-    std::optional<std::filesystem::path> output_file = std::nullopt;
-
-    std::vector<std::string> linker_options;
-
-    EmitType emit_type;
-
-    bool optimize;
-    bool run;
-};
 
 void version() { fmt::print("Cent v0.001\n"); }
 
@@ -48,6 +33,8 @@ OPTIONS:
   -O                    Enable optimizations
   -o <file>             Place the output into <file>
   --emit <type>         Specify the compiler output type
+  --color               Force colored output
+  --no-color            Disable colored output
   --target <triple>     Specify the target triple
   --run                 Build and run immediately
   --help                Print this help message and exit
@@ -55,16 +42,11 @@ OPTIONS:
 )");
 }
 
-[[nodiscard]] std::optional<Options> parse_args(std::span<char*> args) {
+[[nodiscard]] bool parse_args(std::span<char*> args) {
     if (args.size() < 2) {
         help();
-        return std::nullopt;
+        return false;
     }
-
-    Options options = {
-        .target_triple = llvm::sys::getDefaultTargetTriple(),
-        .emit_type = EmitType::Exe,
-        .optimize = false};
 
     bool expecting_output = false;
     bool expecting_target = false;
@@ -75,18 +57,18 @@ OPTIONS:
         std::string arg = arg_cstr;
 
         if (parsing_linker_options) {
-            options.linker_options.push_back(std::move(arg));
+            cent::g_options.linker_options.push_back(std::move(arg));
             continue;
         }
 
         if (expecting_output) {
-            options.output_file = arg;
+            cent::g_options.output_file = arg;
             expecting_output = false;
             continue;
         }
 
         if (expecting_target) {
-            options.target_triple = arg;
+            cent::g_options.target_triple = arg;
             expecting_target = false;
             continue;
         }
@@ -95,48 +77,58 @@ OPTIONS:
             expecting_emit_type = false;
 
             if (arg == "obj") {
-                options.emit_type = EmitType::Obj;
+                cent::g_options.emit_type = cent::EmitType::Obj;
                 continue;
             }
 
             if (arg == "exe") {
-                options.emit_type = EmitType::Exe;
+                cent::g_options.emit_type = cent::EmitType::Exe;
                 continue;
             }
 
             if (arg == "llvm-ir") {
-                options.emit_type = EmitType::LlvmIr;
+                cent::g_options.emit_type = cent::EmitType::LlvmIr;
                 continue;
             }
 
             if (arg == "llvm-bc") {
-                options.emit_type = EmitType::LlvmBc;
+                cent::g_options.emit_type = cent::EmitType::LlvmBc;
                 continue;
             }
 
             cent::log::error(fmt::format(
                 "unrecognized emit type: {}", cent::log::quoted(arg)));
 
-            return std::nullopt;
+            return false;
         }
 
         if (arg == "--help") {
             help();
-            return std::nullopt;
+            return false;
         }
 
         if (arg == "--version") {
             version();
-            return std::nullopt;
+            return false;
         }
 
         if (arg == "-O") {
-            options.optimize = true;
+            cent::g_options.optimize = true;
             continue;
         }
 
         if (arg == "--run") {
-            options.run = true;
+            cent::g_options.run = true;
+            continue;
+        }
+
+        if (arg == "--color") {
+            cent::g_options.colorize = true;
+            continue;
+        }
+
+        if (arg == "--no-color") {
+            cent::g_options.colorize = false;
             continue;
         }
 
@@ -164,41 +156,41 @@ OPTIONS:
             cent::log::error(
                 fmt::format("unrecognized option: {}", cent::log::quoted(arg)));
 
-            return std::nullopt;
+            return false;
         }
 
-        if (options.source_file) {
+        if (cent::g_options.source_file) {
             cent::log::error("multiple input files provided");
-            return std::nullopt;
+            return false;
         }
 
-        options.source_file = arg;
+        cent::g_options.source_file = arg;
     }
 
     if (expecting_output) {
         cent::log::error("missing filename");
-        return std::nullopt;
+        return false;
     }
 
     if (expecting_target) {
         cent::log::error("missing target triple");
-        return std::nullopt;
+        return false;
     }
 
     if (expecting_emit_type) {
         cent::log::error("missing emit type");
-        return std::nullopt;
+        return false;
     }
 
-    if (!options.source_file) {
+    if (!cent::g_options.source_file) {
         cent::log::error("no input file provided");
-        return std::nullopt;
+        return false;
     }
 
-    return options;
+    return true;
 }
 
-[[nodiscard]] llvm::TargetMachine* init_llvm(std::string_view triple) {
+[[nodiscard]] llvm::TargetMachine* init_llvm() {
     llvm::InitializeAllTargetInfos();
     llvm::InitializeAllTargets();
     llvm::InitializeAllTargetMCs();
@@ -207,7 +199,8 @@ OPTIONS:
 
     std::string message;
 
-    const auto* target = llvm::TargetRegistry::lookupTarget(triple, message);
+    const auto* target = llvm::TargetRegistry::lookupTarget(
+        cent::g_options.target_triple, message);
 
     if (!target) {
         cent::log::error(message);
@@ -215,18 +208,19 @@ OPTIONS:
     }
 
     return target->createTargetMachine(
-        triple, "generic", "", llvm::TargetOptions{}, llvm::Reloc::PIC_);
+        cent::g_options.target_triple, "generic", "", llvm::TargetOptions{},
+        llvm::Reloc::PIC_);
 }
 
 [[nodiscard]] std::optional<std::filesystem::path>
-compile(const Options& options, llvm::TargetMachine* machine) {
-    auto code = cent::read_file(*options.source_file);
+compile(llvm::TargetMachine* machine) {
+    auto code = cent::read_file(*cent::g_options.source_file);
 
     if (!code) {
         return std::nullopt;
     }
 
-    std::string filename = options.source_file->string();
+    std::string filename = cent::g_options.source_file->string();
 
     cent::frontend::Parser parser{*code, filename};
     auto program = parser.parse();
@@ -236,8 +230,7 @@ compile(const Options& options, llvm::TargetMachine* machine) {
     }
 
     cent::backend::Codegen codegen{
-        std::move(program), filename, machine->createDataLayout(),
-        options.target_triple};
+        std::move(program), filename, machine->createDataLayout()};
 
     auto module = codegen.generate();
 
@@ -249,23 +242,23 @@ compile(const Options& options, llvm::TargetMachine* machine) {
         return std::nullopt;
     }
 
-    if (options.optimize) {
+    if (cent::g_options.optimize) {
         cent::backend::optimize_module(*module, llvm::OptimizationLevel::O3);
     }
 
     auto get_output_file = [&](std::string_view extension) {
-        if (options.output_file) {
-            return *options.output_file;
+        if (cent::g_options.output_file) {
+            return *cent::g_options.output_file;
         }
 
-        auto result = *options.source_file;
+        auto result = *cent::g_options.source_file;
         result.replace_extension(extension);
 
         return result;
     };
 
-    switch (options.emit_type) {
-    case EmitType::LlvmIr: {
+    switch (cent::g_options.emit_type) {
+    case cent::EmitType::LlvmIr: {
         auto output = get_output_file(".ll");
 
         if (!cent::backend::emit_llvm_ir(*module, output)) {
@@ -274,7 +267,7 @@ compile(const Options& options, llvm::TargetMachine* machine) {
 
         return output;
     }
-    case EmitType::LlvmBc: {
+    case cent::EmitType::LlvmBc: {
         auto output = get_output_file(".bc");
 
         if (!cent::backend::emit_llvm_bc(*module, output)) {
@@ -283,7 +276,7 @@ compile(const Options& options, llvm::TargetMachine* machine) {
 
         return output;
     }
-    case EmitType::Obj: {
+    case cent::EmitType::Obj: {
         auto output = get_output_file(".o");
 
         if (!cent::backend::emit_obj(
@@ -294,7 +287,7 @@ compile(const Options& options, llvm::TargetMachine* machine) {
 
         return output;
     }
-    case EmitType::Exe:
+    case cent::EmitType::Exe:
         std::filesystem::path object_file = std::tmpnam(nullptr);
 
         if (!cent::backend::emit_obj(*module, *machine, object_file)) {
@@ -306,8 +299,8 @@ compile(const Options& options, llvm::TargetMachine* machine) {
         std::vector<std::string> args = {"-o", output, object_file};
 
         args.insert(
-            args.end(), options.linker_options.begin(),
-            options.linker_options.end());
+            args.end(), cent::g_options.linker_options.begin(),
+            cent::g_options.linker_options.end());
 
         int exit_code = cent::exec_command("gcc", args);
 
@@ -324,26 +317,22 @@ compile(const Options& options, llvm::TargetMachine* machine) {
 }
 
 int main(int argc, char** argv) {
-    auto options =
-        parse_args(std::span<char*>{argv, static_cast<std::size_t>(argc)});
-
-    if (!options) {
+    if (!parse_args(std::span<char*>{argv, static_cast<std::size_t>(argc)})) {
         return 1;
     }
 
-    auto* machine = init_llvm(options->target_triple);
-
-    auto output = compile(*options, machine);
+    auto* machine = init_llvm();
+    auto output = compile(machine);
 
     if (!output) {
         return 1;
     }
 
-    if (!options->run) {
+    if (!cent::g_options.run) {
         return 0;
     }
 
-    if (options->emit_type != EmitType::Exe) {
+    if (cent::g_options.emit_type != cent::EmitType::Exe) {
         cent::log::error("`--run` can only be used with `--emit exe`");
         return 1;
     }

@@ -7,6 +7,8 @@
 
 #include <fmt/format.h>
 
+#include "options.h"
+
 #define CENT_ANSI_CSI "\x1b["
 #define CENT_ANSI_RESET CENT_ANSI_CSI "0m"
 #define CENT_ANSI_BOLD '1'
@@ -57,6 +59,10 @@ struct fmt::formatter<cent::log::Styled<ValueType>> {
     template <typename Context>
     constexpr auto
     format(cent::log::Styled<ValueType> styled, Context& context) const {
+        if (!cent::g_options.colorize) {
+            return fmt::format_to(context.out(), "{}", styled.value);
+        }
+
         std::string style;
         bool put_semicolon = false;
 
