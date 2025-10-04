@@ -5,8 +5,19 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+include(FetchContent)
+
 find_package(LLVM 17 REQUIRED CONFIG)
-find_package(fmt REQUIRED CONFIG)
+
+message(STATUS "Fetching fmt")
+
+FetchContent_Declare(
+    fmt
+    GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+    GIT_SHALLOW 1
+)
+
+FetchContent_MakeAvailable(fmt)
 
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
 add_executable(centc ${SOURCES})
