@@ -7,7 +7,70 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(FetchContent)
 
-find_package(LLVM 17 REQUIRED CONFIG)
+option(CENTC_LLVM_SHARED "Link LLVM dynamically" OFF)
+option(CENTC_ZLIB_SHARED "Link zlib dynamically" OFF)
+option(CENTC_ZSTD_SHARED "Link zstd dynamically" OFF)
+option(CENTC_NCURSES_SHARED "Link ncurses dynamically" OFF)
+option(CENTC_STATIC "Build static executable" OFF)
+
+if(CENTC_STATIC AND (CENTC_LLVM_SHARED OR CENTC_ZLIB_SHARED OR CENTC_ZSTD_SHARED OR CENTC_NCURSES_SHARED))
+    message(FATAL_ERROR "CENTC_STATIC=ON requires all dependencies to be linked statically")
+endif()
+
+find_program(LLVM_CONFIG llvm-config)
+
+if(NOT LLVM_CONFIG)
+    message(FATAL_ERROR "llvm-config not found")
+endif()
+
+if(CENTC_LLVM_SHARED)
+    set(LLVM_CONFIG_LINK "--link-shared")
+else()
+    set(LLVM_CONFIG_LINK "--link-static")
+endif()
+
+execute_process(
+    COMMAND "${LLVM_CONFIG}" "${LLVM_CONFIG_LINK}" --libfiles core all-targets
+    OUTPUT_VARIABLE LLVM_LIBS
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+string(REPLACE " " ";" LLVM_LIBS "${LLVM_LIBS}")
+
+if(CENTC_ZLIB_SHARED)
+    set(ZLIB "z")
+else()
+    find_library(ZLIB libz.a)
+
+    if(NOT ZLIB)
+        message(FATAL_ERROR "Static zlib not found")
+    endif()
+endif()
+
+if(CENTC_ZSTD_SHARED)
+    set(ZSTD "zstd")
+else()
+    find_library(ZSTD libzstd.a)
+
+    if(NOT ZSTD)
+        message(FATAL_ERROR "Static zstd not found")
+    endif()
+endif()
+
+if(CENTC_NCURSES_SHARED)
+    set(NCURSES "ncursesw")
+else()
+    find_library(NCURSES libncursesw.a)
+
+    if(NOT NCURSES)
+        message(FATAL_ERROR "Static ncurses not found")
+    endif()
+endif()
+
+if(CENTC_STATIC)
+    set(BUILD_SHARED_LIBS OFF)
+    set(CMAKE_EXE_LINKER_FLAGS "-static")
+endif()
 
 message(STATUS "Fetching fmt")
 
@@ -23,7 +86,7 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
 add_executable(centc ${SOURCES})
 
 target_include_directories(centc PRIVATE src)
-target_link_libraries(centc PRIVATE LLVM fmt::fmt)
+target_link_libraries(centc PRIVATE ${LLVM_LIBS} ${ZLIB} ${ZSTD} ${NCURSES} fmt::fmt)
 
 install(TARGETS centc)
 install(DIRECTORY lib/ DESTINATION lib/cent)
