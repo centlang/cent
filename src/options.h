@@ -25,6 +25,7 @@ struct Options {
     EmitType emit_type = EmitType::Exe;
 
     bool optimize = false;
+    bool verbose = false;
     bool run = false;
 
     bool colorize = isatty(fileno(stdout));

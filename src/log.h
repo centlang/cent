@@ -28,14 +28,14 @@ enum Mode : std::uint8_t {
 };
 
 enum Color : std::uint8_t {
-    Black,
-    Red,
-    Green,
-    Yellow,
-    Blue,
-    Magenta,
-    Cyan,
-    White,
+    Black = 0,
+    Red = 1,
+    Green = 2,
+    Yellow = 3,
+    Blue = 4,
+    Magenta = 5,
+    Cyan = 6,
+    White = 7,
     Default = 9
 };
 
@@ -123,27 +123,30 @@ struct fmt::formatter<cent::log::Styled<ValueType>> {
 
 namespace cent::log {
 
-template <typename ValueType> inline auto fg(ValueType value, Color color) {
+template <typename ValueType>
+inline auto fg(const ValueType& value, Color color) {
     return Styled{.value = value, .fg = color};
 }
 
-template <typename ValueType> inline auto bg(ValueType value, Color color) {
+template <typename ValueType>
+inline auto bg(const ValueType& value, Color color) {
     return Styled{.value = value, .bg = color};
 }
 
-template <typename ValueType> inline auto bold(ValueType value) {
+template <typename ValueType> inline auto bold(const ValueType& value) {
     return Styled{.value = value, .mode = Bold};
 }
 
-template <typename ValueType> inline auto italic(ValueType value) {
+template <typename ValueType> inline auto italic(const ValueType& value) {
     return Styled{.value = value, .mode = Italic};
 }
 
-template <typename ValueType> inline auto underline(ValueType value) {
+template <typename ValueType> inline auto underline(const ValueType& value) {
     return Styled{.value = value, .mode = Underline};
 }
 
-template <typename ValueType> inline auto strikethrough(ValueType value) {
+template <typename ValueType>
+inline auto strikethrough(const ValueType& value) {
     return Styled{.value = value, .mode = Underline};
 }
 
@@ -165,24 +168,26 @@ inline auto mode(Styled<ValueType> value, Mode mode) {
     return value;
 }
 
-template <typename ValueType> inline auto bold(Styled<ValueType> value) {
+template <typename ValueType> inline auto bold(const Styled<ValueType>& value) {
     return mode(value, Bold);
 }
 
-template <typename ValueType> inline auto italic(Styled<ValueType> value) {
+template <typename ValueType>
+inline auto italic(const Styled<ValueType>& value) {
     return mode(value, Italic);
 }
 
-template <typename ValueType> inline auto underline(Styled<ValueType> value) {
+template <typename ValueType>
+inline auto underline(const Styled<ValueType>& value) {
     return mode(value, Underline);
 }
 
 template <typename ValueType>
-inline auto strikethrough(Styled<ValueType> value) {
+inline auto strikethrough(const Styled<ValueType>& value) {
     return mode(value, Strikethrough);
 }
 
-template <typename ValueType> inline auto quoted(ValueType value) {
+template <typename ValueType> inline auto quoted(const ValueType& value) {
     return fmt::format("`{}`", value);
 }
 
@@ -241,6 +246,21 @@ inline void note(
 }
 
 inline void note(std::string_view message) { log("note", Cyan, message); }
+
+inline void verbose(
+    std::uint32_t line, std::uint32_t column, std::string_view filename,
+    std::string_view message, std::string_view code,
+    std::optional<std::string_view> hint = std::nullopt) {
+    if (cent::g_options.verbose) {
+        log("info", Magenta, line, column, filename, message, code, hint);
+    }
+}
+
+inline void verbose(std::string_view message) {
+    if (cent::g_options.verbose) {
+        log("info", Magenta, message);
+    }
+}
 
 } // namespace cent::log
 

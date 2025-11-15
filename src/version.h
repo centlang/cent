@@ -1,0 +1,7 @@
+#ifndef CENT_VERSION_H
+#define CENT_VERSION_H
+
+#define CENT_VERSION_MAJOR 0
+#define CENT_VERSION_MINOR 1
+
+#endif

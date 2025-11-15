@@ -2,11 +2,20 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "log.h"
 #include "util.h"
 
 namespace cent {
 
 int exec_command(std::string program, std::vector<std::string> args) {
+    std::string command = program;
+
+    for (const auto& arg : args) {
+        command += " " + arg;
+    }
+
+    log::verbose(fmt::format("running {}", log::quoted(command)));
+
     auto pid = fork();
 
     if (pid == 0) {

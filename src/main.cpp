@@ -23,8 +23,11 @@
 #include "log.h"
 #include "options.h"
 #include "util.h"
+#include "version.h"
 
-void version() { fmt::print("Cent v0.001\n"); }
+void version() {
+    fmt::print("Cent v{}.{}\n", CENT_VERSION_MAJOR, CENT_VERSION_MINOR);
+}
 
 void help() {
     fmt::print(R"(USAGE: centc [options] file [-- linker options]
@@ -36,6 +39,7 @@ OPTIONS:
   --color               Force colored output
   --no-color            Disable colored output
   --target <triple>     Specify the target triple
+  --verbose             Use verbose output
   --run                 Build and run immediately
   --help                Print this help message and exit
   --version             Print Cent version and exit
@@ -96,8 +100,9 @@ OPTIONS:
                 continue;
             }
 
-            cent::log::error(fmt::format(
-                "unrecognized emit type: {}", cent::log::quoted(arg)));
+            cent::log::error(
+                fmt::format(
+                    "unrecognized emit type: {}", cent::log::quoted(arg)));
 
             return false;
         }
@@ -114,6 +119,11 @@ OPTIONS:
 
         if (arg == "-O") {
             cent::g_options.optimize = true;
+            continue;
+        }
+
+        if (arg == "--verbose") {
+            cent::g_options.verbose = true;
             continue;
         }
 
