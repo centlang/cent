@@ -7,30 +7,33 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(FetchContent)
 
-option(CENTC_LLVM_SHARED "Link LLVM dynamically" OFF)
 option(CENTC_ZLIB_SHARED "Link zlib dynamically" OFF)
 option(CENTC_ZSTD_SHARED "Link zstd dynamically" OFF)
 option(CENTC_NCURSES_SHARED "Link ncurses dynamically" OFF)
 option(CENTC_STATIC "Build static executable" OFF)
 
-if(CENTC_STATIC AND (CENTC_LLVM_SHARED OR CENTC_ZLIB_SHARED OR CENTC_ZSTD_SHARED OR CENTC_NCURSES_SHARED))
+if(CENTC_STATIC AND (CENTC_ZLIB_SHARED OR CENTC_ZSTD_SHARED OR CENTC_NCURSES_SHARED))
     message(FATAL_ERROR "CENTC_STATIC=ON requires all dependencies to be linked statically")
 endif()
 
-find_program(LLVM_CONFIG llvm-config)
+FetchContent_Declare(
+    llvm
+    URL https://github.com/centlang/llvm-build/releases/download/20.1.8/llvm-linux-x86_64.tar.xz
+)
 
-if(NOT LLVM_CONFIG)
+FetchContent_MakeAvailable(llvm)
+
+list(APPEND CMAKE_PREFIX_PATH ${llvm_SOURCE_DIR})
+find_package(LLVM REQUIRED CONFIG)
+
+find_program(LLVM_CONFIG_EXE llvm-config PATHS "${LLVM_TOOLS_BINARY_DIR}" NO_DEFAULT_PATH)
+
+if(NOT LLVM_CONFIG_EXE)
     message(FATAL_ERROR "llvm-config not found")
 endif()
 
-if(CENTC_LLVM_SHARED)
-    set(LLVM_CONFIG_LINK "--link-shared")
-else()
-    set(LLVM_CONFIG_LINK "--link-static")
-endif()
-
 execute_process(
-    COMMAND "${LLVM_CONFIG}" "${LLVM_CONFIG_LINK}" --libfiles core all-targets
+    COMMAND "${LLVM_CONFIG_EXE}" --link-static --libfiles core all-targets
     OUTPUT_VARIABLE LLVM_LIBS
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
@@ -85,7 +88,7 @@ FetchContent_MakeAvailable(fmt)
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
 add_executable(centc ${SOURCES})
 
-target_include_directories(centc PRIVATE src)
+target_include_directories(centc PRIVATE src ${LLVM_INCLUDE_DIRS})
 target_link_libraries(centc PRIVATE ${LLVM_LIBS} ${ZLIB} ${ZSTD} ${NCURSES} fmt::fmt)
 
 install(TARGETS centc)

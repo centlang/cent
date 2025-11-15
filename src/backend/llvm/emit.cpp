@@ -50,7 +50,7 @@ bool emit_obj(
 
     llvm::legacy::PassManager manager;
 
-    machine.addPassesToEmitFile(manager, file, nullptr, llvm::CGFT_ObjectFile);
+    machine.addPassesToEmitFile(manager, file, nullptr, llvm::CodeGenFileType::ObjectFile);
 
     manager.run(module);
     file.flush();
