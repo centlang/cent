@@ -2,17 +2,15 @@
 
 A simple systems programming language.
 
-## Quick Start
+https://centlang.github.io
 
-### Building from Source
+## Building from Source
 
 Ensure you have the dependencies installed:
 
-* CMake (at least 3.15)
-* LLVM (17.x)
-* C++ compiler with C++20 support
-* Make
-* fmt
+- CMake
+- C++ compiler with C++20 support
+- Make
 
 Clone the repository:
 
@@ -30,7 +28,7 @@ make && sudo make install
 
 ### "Hello, world!"
 
-Create a file named `hello_world.cn`:
+Create a file named `main.cn`:
 
 ```
 with std::io;
@@ -43,25 +41,17 @@ fn main() {
 Build an executable and run it:
 
 ```sh
-centc hello_world.cn
-./hello_world
+centc main.cn
+./main
 Hello, world!
 ```
 
 Or use `--run` option:
 
 ```sh
-centc hello_world.cn --run
+centc main.cn --run
 Hello, world!
 ```
-
-## Documentation
-
-* [Examples](examples)
-
-## Editor Support
-
-* Vim: [cent.vim](https://github.com/centlang/cent.vim)
 
 ## License
 
