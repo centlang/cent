@@ -22,6 +22,8 @@ public:
 
     void next_token();
 
+    [[nodiscard]] bool had_error() const { return m_had_error; };
+
 private:
     [[nodiscard]] char peek() const { return m_source[m_offset]; }
 
@@ -77,6 +79,8 @@ private:
     void error(std::size_t offset, std::string_view message) {
         auto loc = cent::offset_to_loc(m_source, offset);
         log::error(loc.line, loc.column, m_filename, message, loc.code);
+
+        m_had_error = true;
     }
 
     void error(std::string_view message) { error(m_offset, message); }
@@ -90,6 +94,8 @@ private:
 
     std::size_t m_offset{0};
     Token m_token;
+
+    bool m_had_error{false};
 };
 
 } // namespace cent::frontend

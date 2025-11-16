@@ -12,9 +12,10 @@
 
 #include <fmt/core.h>
 
-#include "frontend/lexer.h"
 #include "log.h"
 #include "util.h"
+
+#include "frontend/lexer.h"
 
 #include "ast/attribute.h"
 #include "ast/module.h"
@@ -48,7 +49,9 @@ public:
 
     [[nodiscard]] std::unique_ptr<ast::Module> parse();
 
-    [[nodiscard]] bool had_error() const { return m_had_error; };
+    [[nodiscard]] bool had_error() const {
+        return m_had_error || m_lexer.had_error();
+    };
 
 private:
     [[nodiscard]] auto peek(std::uint8_t ahead = 0) const {
@@ -191,7 +194,7 @@ private:
     [[nodiscard]] static std::uint8_t precedence_of(Token::Type type) {
         using enum Token::Type;
 
-        enum {
+        enum : std::uint8_t {
             PNone = 0,
             PNull,
             PLogicalOr,
