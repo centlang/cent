@@ -65,8 +65,6 @@ struct Token {
         GreaterEqual,
         LessEqual,
 
-        Invalid,
-
         Eof,
 
         IntLiteral,
@@ -113,7 +111,7 @@ struct Token {
         Identifier
     };
 
-    Type type = Type::Invalid;
+    Type type;
     std::string value;
 
     std::size_t offset;

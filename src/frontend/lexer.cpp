@@ -88,6 +88,10 @@ void Lexer::next_token() {
         m_token.type = with_eq;
     };
 
+    auto unclosed_rune = [&] {
+        error(m_token.offset, "unclosed rune literal");
+    };
+
     switch (peek()) {
     case '"':
         string();
@@ -97,7 +101,7 @@ void Lexer::next_token() {
         get();
 
         if (eof()) {
-            m_token.type = Token::Type::Invalid;
+            unclosed_rune();
             return;
         }
 
@@ -107,13 +111,8 @@ void Lexer::next_token() {
             m_token.value = get();
         }
 
-        if (eof()) {
-            m_token.type = Token::Type::Invalid;
-            return;
-        }
-
-        if (peek() != '\'') {
-            m_token.type = Token::Type::Invalid;
+        if (eof() || peek() != '\'') {
+            unclosed_rune();
             return;
         }
 
@@ -249,7 +248,11 @@ void Lexer::next_token() {
         with_equal(Xor, XorEqual);
         break;
     default:
-        m_token = {Invalid, std::string{get()}, m_offset};
+        auto offset = m_offset;
+
+        error(offset, "unexpected character");
+        m_token = {Identifier, std::string{get()}, offset};
+
         break;
     }
 }
@@ -345,7 +348,7 @@ void Lexer::string() {
 
     while (true) {
         if (eof()) {
-            m_token.type = Token::Type::Invalid;
+            error(m_token.offset, "unclosed string literal");
             return;
         }
 

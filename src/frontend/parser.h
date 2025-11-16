@@ -38,7 +38,8 @@ namespace cent::frontend {
 class Parser {
 public:
     [[nodiscard]] Parser(std::string_view source, std::string filename)
-    : m_lexer{source}, m_source{source}, m_filename{std::move(filename)} {
+    : m_lexer{source, filename}, m_source{source},
+      m_filename{std::move(filename)} {
         for (auto& token : m_buffer) {
             token = m_lexer.token();
             m_lexer.next_token();
@@ -235,12 +236,7 @@ private:
         }
     }
 
-    void error(std::string_view message) {
-        auto loc = offset_to_loc(m_source, peek().offset);
-        log::error(loc.line, loc.column, m_filename, message, loc.code);
-
-        m_had_error = true;
-    }
+    void error(std::string_view message) { error(peek().offset, message); }
 
     void error(std::size_t offset, std::string_view message) {
         auto loc = offset_to_loc(m_source, offset);
