@@ -16,6 +16,8 @@ if(CENTC_STATIC AND (CENTC_ZLIB_SHARED OR CENTC_ZSTD_SHARED OR CENTC_NCURSES_SHA
     message(FATAL_ERROR "CENTC_STATIC=ON requires all dependencies to be linked statically")
 endif()
 
+message(STATUS "Downloading LLVM...")
+
 FetchContent_Declare(
     llvm
     URL https://github.com/centlang/llvm-build/releases/download/20.1.8/llvm-linux-x86_64.tar.xz
@@ -75,12 +77,12 @@ if(CENTC_STATIC)
     set(CMAKE_EXE_LINKER_FLAGS "-static")
 endif()
 
-message(STATUS "Fetching fmt")
+message(STATUS "Fetching fmt...")
 
 FetchContent_Declare(
     fmt
     GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-    GIT_SHALLOW 1
+    GIT_TAG 11.1.4
 )
 
 FetchContent_MakeAvailable(fmt)
