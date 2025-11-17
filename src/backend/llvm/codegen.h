@@ -345,7 +345,7 @@ private:
     llvm::BasicBlock* m_loop_continue{nullptr};
     llvm::BasicBlock* m_loop_end{nullptr};
 
-    std::string m_current_scope_prefix{"main::"};
+    std::string m_current_scope_prefix{"<main>::"};
 
     std::map<llvm::StructType*, std::map<std::string_view, std::size_t>>
         m_members;

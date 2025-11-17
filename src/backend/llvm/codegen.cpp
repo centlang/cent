@@ -79,7 +79,7 @@ void Codegen::create_main() {
         return;
     }
 
-    auto* user_main = m_module->getFunction("main::main");
+    auto* user_main = m_module->getFunction("<main>::main");
 
     if (!user_main) {
         return;
