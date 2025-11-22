@@ -1,3 +1,6 @@
+#include <cstdlib>
+#include <cstring>
+
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -31,6 +34,13 @@ int exec_command(std::string program, std::vector<std::string> args) {
         argv.push_back(nullptr);
 
         execvp(program.c_str(), argv.data());
+
+        log::error(
+            fmt::format(
+                "failed to invoke {}: {}", log::quoted(program),
+                std::strerror(errno)));
+
+        std::exit(1);
     }
 
     int status{};
