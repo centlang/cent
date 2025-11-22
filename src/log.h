@@ -2,7 +2,6 @@
 #define CENT_LOG_H
 
 #include <cstdint>
-#include <optional>
 #include <string_view>
 
 #include <fmt/format.h>
@@ -191,14 +190,16 @@ template <typename ValueType> inline auto quoted(const ValueType& value) {
     return fmt::format("`{}`", value);
 }
 
-inline void
-log(std::string_view type, Color type_fg, std::uint32_t line,
-    std::uint32_t column, std::string_view filename, std::string_view message,
-    std::string_view code,
-    std::optional<std::string_view> hint = std::nullopt) {
+template <typename... Args>
+inline void log_hint(
+    std::string_view type, Color type_fg, std::uint32_t line,
+    std::uint32_t column, std::string_view filename, std::string_view code,
+    std::string_view hint, fmt::format_string<Args...> message,
+    Args&&... args) {
     fmt::print(
         stderr, "{}:{}:{}: {} {}\n", filename, line, column,
-        bold(fg(fmt::format("{}:", type), type_fg)), message);
+        bold(fg(fmt::format("{}:", type), type_fg)),
+        fmt::format(message, std::forward<Args>(args)...));
 
     fmt::print(stderr, " {} | {}\n", line, code);
 
@@ -206,59 +207,132 @@ log(std::string_view type, Color type_fg, std::uint32_t line,
         stderr, " {:{}} |{:{}}", "", fmt::formatted_size("{}", line), "",
         column);
 
-    fmt::print(
-        stderr, "{}\n\n",
-        fg(hint ? fmt::format("^ hint: {}", *hint) : "^", Green));
+    fmt::print(stderr, "{}\n\n", fg(fmt::format("^ hint: {}", hint), Green));
 }
 
+template <typename... Args>
 inline void
-log(std::string_view type, Color type_fg, std::string_view message) {
+log(std::string_view type, Color type_fg, std::uint32_t line,
+    std::uint32_t column, std::string_view filename, std::string_view code,
+    fmt::format_string<Args...> message, Args&&... args) {
+    fmt::print(
+        stderr, "{}:{}:{}: {} {}\n", filename, line, column,
+        bold(fg(fmt::format("{}:", type), type_fg)),
+        fmt::format(message, std::forward<Args>(args)...));
+
+    fmt::print(stderr, " {} | {}\n", line, code);
+
+    fmt::print(
+        stderr, " {:{}} |{:{}}", "", fmt::formatted_size("{}", line), "",
+        column);
+
+    fmt::print(stderr, "{}\n\n", fg("^", Green));
+}
+
+template <typename... Args>
+inline void
+log(std::string_view type, Color type_fg, fmt::format_string<Args...> message,
+    Args&&... args) {
     fmt::print(
         stderr, "{} {}\n\n", bold(fg(fmt::format("{}:", type), type_fg)),
-        message);
+        fmt::format(message, std::forward<Args>(args)...));
 }
 
+template <typename... Args>
+inline void error_hint(
+    std::uint32_t line, std::uint32_t column, std::string_view filename,
+    std::string_view code, std::string_view hint,
+    fmt::format_string<Args...> message, Args&&... args) {
+    log_hint(
+        "error", Red, line, column, filename, code, hint, message,
+        std::forward<Args>(args)...);
+}
+
+template <typename... Args>
 inline void error(
     std::uint32_t line, std::uint32_t column, std::string_view filename,
-    std::string_view message, std::string_view code,
-    std::optional<std::string_view> hint = std::nullopt) {
-    log("error", Red, line, column, filename, message, code, hint);
+    std::string_view code, fmt::format_string<Args...> message,
+    Args&&... args) {
+    log("error", Red, line, column, filename, code, message,
+        std::forward<Args>(args)...);
 }
 
-inline void error(std::string_view message) { log("error", Red, message); }
+template <typename... Args>
+inline void error(fmt::format_string<Args...> message, Args&&... args) {
+    log("error", Red, message, std::forward<Args>(args)...);
+}
 
+template <typename... Args>
+inline void warning_hint(
+    std::uint32_t line, std::uint32_t column, std::string_view filename,
+    std::string_view code, std::string_view hint,
+    fmt::format_string<Args...> message, Args&&... args) {
+    log_hint(
+        "warning", Yellow, line, column, filename, code, hint, message,
+        std::forward<Args>(args)...);
+}
+
+template <typename... Args>
 inline void warning(
     std::uint32_t line, std::uint32_t column, std::string_view filename,
-    std::string_view message, std::string_view code,
-    std::optional<std::string_view> hint = std::nullopt) {
-    log("warning", Yellow, line, column, filename, message, code, hint);
+    std::string_view code, fmt::format_string<Args...> message,
+    Args&&... args) {
+    log("warning", Yellow, line, column, filename, code, message,
+        std::forward<Args>(args)...);
 }
 
-inline void warning(std::string_view message) {
-    log("warning", Yellow, message);
+template <typename... Args>
+inline void warning(fmt::format_string<Args...> message, Args&&... args) {
+    log("warning", Yellow, message, std::forward<Args>(args)...);
 }
 
+template <typename... Args>
+inline void note_hint(
+    std::uint32_t line, std::uint32_t column, std::string_view filename,
+    std::string_view code, std::string_view hint,
+    fmt::format_string<Args...> message, Args&&... args) {
+    log_hint(
+        "note", Cyan, line, column, filename, code, hint, message,
+        std::forward<Args>(args)...);
+}
+
+template <typename... Args>
 inline void note(
     std::uint32_t line, std::uint32_t column, std::string_view filename,
-    std::string_view message, std::string_view code,
-    std::optional<std::string_view> hint = std::nullopt) {
-    log("note", Cyan, line, column, filename, message, code, hint);
+    std::string_view code, fmt::format_string<Args...> message,
+    Args&&... args) {
+    log("note", Cyan, line, column, filename, code, message,
+        std::forward<Args>(args)...);
 }
 
-inline void note(std::string_view message) { log("note", Cyan, message); }
+template <typename... Args>
+inline void note(fmt::format_string<Args...> message, Args&&... args) {
+    log("note", Cyan, message, std::forward<Args>(args)...);
+}
 
+template <typename... Args>
+inline void verbose_hint(
+    std::uint32_t line, std::uint32_t column, std::string_view filename,
+    std::string_view code, std::string_view hint,
+    fmt::format_string<Args...> message, Args&&... args) {
+    log_hint(
+        "verbose", Magenta, line, column, filename, code, hint, message,
+        std::forward<Args>(args)...);
+}
+
+template <typename... Args>
 inline void verbose(
     std::uint32_t line, std::uint32_t column, std::string_view filename,
-    std::string_view message, std::string_view code,
-    std::optional<std::string_view> hint = std::nullopt) {
-    if (cent::g_options.verbose) {
-        log("info", Magenta, line, column, filename, message, code, hint);
-    }
+    std::string_view code, fmt::format_string<Args...> message,
+    Args&&... args) {
+    log("verbose", Magenta, line, column, filename, code, message,
+        std::forward<Args>(args)...);
 }
 
-inline void verbose(std::string_view message) {
+template <typename... Args>
+inline void verbose(fmt::format_string<Args...> message, Args&&... args) {
     if (cent::g_options.verbose) {
-        log("info", Magenta, message);
+        log("info", Magenta, message, std::forward<Args>(args)...);
     }
 }
 

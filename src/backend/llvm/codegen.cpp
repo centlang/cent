@@ -723,9 +723,12 @@ Type* Codegen::get_type(
     auto user = parent.types.find(name);
 
     if (user == parent.types.end()) {
-        error(
-            offset, fmt::format("undeclared type: {}", log::quoted(name)),
-            did_you_mean_hint(name, parent.types, m_primitive_types));
+        if (auto hint =
+                did_you_mean_hint(name, parent.types, m_primitive_types)) {
+            error_hint(offset, *hint, "undeclared type: {}", log::quoted(name));
+        } else {
+            error(offset, "undeclared type: {}", log::quoted(name));
+        }
 
         return nullptr;
     }
@@ -734,7 +737,7 @@ Type* Codegen::get_type(
         return user->second.element;
     }
 
-    error(offset, fmt::format("{} is private", log::quoted(name)));
+    error(offset, "{} is private", log::quoted(name));
 
     return nullptr;
 }
@@ -744,9 +747,12 @@ Codegen::get_name(std::size_t offset, std::string_view name, Scope& parent) {
     auto iterator = parent.names.find(name);
 
     if (iterator == parent.names.end()) {
-        error(
-            offset, fmt::format("undeclared identifier: {}", log::quoted(name)),
-            did_you_mean_hint(name, parent.names));
+        if (auto hint = did_you_mean_hint(name, parent.names)) {
+            error_hint(
+                offset, *hint, "undeclared identifier: {}", log::quoted(name));
+        } else {
+            error(offset, "undeclared identifier: {}", log::quoted(name));
+        }
 
         return nullptr;
     }
@@ -755,7 +761,7 @@ Codegen::get_name(std::size_t offset, std::string_view name, Scope& parent) {
         return &iterator->second.element;
     }
 
-    error(offset, fmt::format("{} is private", log::quoted(name)));
+    error(offset, "{} is private", log::quoted(name));
 
     return nullptr;
 }
@@ -765,9 +771,12 @@ GenericFunction* Codegen::get_generic_fn(
     auto iterator = parent.generic_fns.find(name);
 
     if (iterator == parent.generic_fns.end()) {
-        error(
-            offset, fmt::format("undeclared function: {}", log::quoted(name)),
-            did_you_mean_hint(name, parent.names));
+        if (auto hint = did_you_mean_hint(name, parent.names)) {
+            error_hint(
+                offset, *hint, "undeclared function: {}", log::quoted(name));
+        } else {
+            error(offset, "undeclared function: {}", log::quoted(name));
+        }
 
         return nullptr;
     }
@@ -776,7 +785,7 @@ GenericFunction* Codegen::get_generic_fn(
         return iterator->second.element.get();
     }
 
-    error(offset, fmt::format("{} is private", log::quoted(name)));
+    error(offset, "{} is private", log::quoted(name));
 
     return nullptr;
 }
@@ -786,9 +795,11 @@ Codegen::get_scope(std::size_t offset, std::string_view name, Scope& parent) {
     auto iterator = parent.scopes.find(name);
 
     if (iterator == parent.scopes.end()) {
-        error(
-            offset, fmt::format("could not find {}", log::quoted(name)),
-            did_you_mean_hint(name, parent.scopes));
+        if (auto hint = did_you_mean_hint(name, parent.scopes)) {
+            error_hint(offset, *hint, "could not find {}", log::quoted(name));
+        } else {
+            error(offset, "could not find {}", log::quoted(name));
+        }
 
         return nullptr;
     }
@@ -814,10 +825,8 @@ Codegen::resolve_scope(const std::vector<OffsetValue<std::string>>& value) {
 void Codegen::type_mismatch(
     std::size_t offset, const Type* expected, const Type* got) {
     error(
-        offset,
-        fmt::format(
-            "expected {} but got {}", log::quoted(expected->to_string()),
-            log::quoted(got->to_string())));
+        offset, "expected {} but got {}", log::quoted(expected->to_string()),
+        log::quoted(got->to_string()));
 }
 
 Attributes Codegen::parse_attrs(
@@ -830,9 +839,7 @@ Attributes Codegen::parse_attrs(
             continue;
         }
 
-        error(
-            attr.offset,
-            fmt::format("unexpected attribute {}", log::quoted(attr.name)));
+        error(attr.offset, "unexpected attribute {}", log::quoted(attr.name));
     }
 
     return result;

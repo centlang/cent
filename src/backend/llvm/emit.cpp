@@ -42,15 +42,16 @@ bool emit_obj(
     llvm::raw_fd_ostream file{path.string(), code, llvm::sys::fs::OF_None};
 
     if (code) {
-        log::error(fmt::format(
-            "could not open file `{}`: {}", path.string(), code.message()));
+        log::error(
+            "could not open file `{}`: {}", path.string(), code.message());
 
         return false;
     }
 
     llvm::legacy::PassManager manager;
 
-    machine.addPassesToEmitFile(manager, file, nullptr, llvm::CodeGenFileType::ObjectFile);
+    machine.addPassesToEmitFile(
+        manager, file, nullptr, llvm::CodeGenFileType::ObjectFile);
 
     manager.run(module);
     file.flush();
@@ -63,8 +64,8 @@ bool emit_llvm_ir(llvm::Module& module, const std::filesystem::path& path) {
     llvm::raw_fd_ostream file{path.string(), code, llvm::sys::fs::OF_None};
 
     if (code) {
-        log::error(fmt::format(
-            "could not open file `{}`: {}", path.string(), code.message()));
+        log::error(
+            "could not open file `{}`: {}", path.string(), code.message());
 
         return false;
     }
@@ -79,8 +80,8 @@ bool emit_llvm_bc(llvm::Module& module, const std::filesystem::path& path) {
     llvm::raw_fd_ostream file{path.string(), code, llvm::sys::fs::OF_None};
 
     if (code) {
-        log::error(fmt::format(
-            "could not open file `{}`: {}", path.string(), code.message()));
+        log::error(
+            "could not open file `{}`: {}", path.string(), code.message());
 
         return false;
     }

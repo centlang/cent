@@ -279,9 +279,8 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
 
         if (iterator == members.end()) {
             error(
-                field.name.offset,
-                fmt::format(
-                    "no such member: {}", log::quoted(field.name.value)));
+                field.name.offset, "no such member: {}",
+                log::quoted(field.name.value));
 
             return std::nullopt;
         }
@@ -647,7 +646,7 @@ Value Codegen::generate(const ast::CallExpr& expr) {
 
         if (auto value = scope->names.find(name); value != scope->names.end()) {
             if (!is_accessible(value->second, m_current_unit)) {
-                error(offset, fmt::format("{} is private", log::quoted(name)));
+                error(offset, "{} is private", log::quoted(name));
                 return Value::poisoned();
             }
 
@@ -789,8 +788,8 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
 
     auto no_such_method = [&] {
         error(
-            expr.name.offset,
-            fmt::format("no such method: {}", log::quoted(expr.name.value)));
+            expr.name.offset, "no such method: {}",
+            log::quoted(expr.name.value));
     };
 
     if (iterator == m_methods[value.type].end()) {
@@ -826,10 +825,8 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
             dyn_cast<types::Pointer>(iterator->second.type->param_types[0])) {
         if (!value.is_mutable && type->is_mutable) {
             error(
-                expr.name.offset,
-                fmt::format(
-                    "cannot call method {} on an immutable value",
-                    log::quoted(expr.name.value)));
+                expr.name.offset, "cannot call method {} on an immutable value",
+                log::quoted(expr.name.value));
 
             return Value::poisoned();
         }
@@ -887,8 +884,8 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
 
     auto no_such_member = [&] {
         error(
-            expr.member.offset,
-            fmt::format("no such member: {}", log::quoted(expr.member.value)));
+            expr.member.offset, "no such member: {}",
+            log::quoted(expr.member.value));
     };
 
     auto get_member =

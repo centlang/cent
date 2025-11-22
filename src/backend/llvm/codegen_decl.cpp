@@ -131,8 +131,8 @@ Value Codegen::generate(const ast::Struct& decl) {
         m_current_scope->generic_structs.contains(decl.name.value) ||
         m_current_scope->generic_unions.contains(decl.name.value)) {
         error(
-            decl.name.offset,
-            fmt::format("{} is already defined", log::quoted(decl.name.value)));
+            decl.name.offset, "{} is already defined",
+            log::quoted(decl.name.value));
 
         return Value::poisoned();
     }
@@ -202,9 +202,10 @@ Value Codegen::generate(const ast::Struct& decl) {
 
     struct_type->setBody(llvm_fields);
 
-    m_named_types.push_back(std::make_unique<types::Struct>(
-        struct_type, m_current_scope_prefix + decl.name.value,
-        std::move(fields)));
+    m_named_types.push_back(
+        std::make_unique<types::Struct>(
+            struct_type, m_current_scope_prefix + decl.name.value,
+            std::move(fields)));
 
     m_current_scope->types[decl.name.value] = {
         m_named_types.back().get(), decl.is_public, m_current_unit};
@@ -220,8 +221,8 @@ Value Codegen::generate(const ast::Union& decl) {
         m_current_scope->generic_structs.contains(decl.name.value) ||
         m_current_scope->generic_unions.contains(decl.name.value)) {
         error(
-            decl.name.offset,
-            fmt::format("{} is already defined", log::quoted(decl.name.value)));
+            decl.name.offset, "{} is already defined",
+            log::quoted(decl.name.value));
 
         return Value::poisoned();
     }
@@ -261,10 +262,11 @@ Value Codegen::generate(const ast::Union& decl) {
         if (!untagged) {
             auto* underlying = m_primitive_types["i32"].get();
 
-            m_named_types.push_back(std::make_unique<types::Enum>(
-                underlying->llvm_type,
-                m_current_scope_prefix + decl.name.value + "(tag)",
-                underlying));
+            m_named_types.push_back(
+                std::make_unique<types::Enum>(
+                    underlying->llvm_type,
+                    m_current_scope_prefix + decl.name.value + "(tag)",
+                    underlying));
 
             auto* type = static_cast<types::Enum*>(m_named_types.back().get());
 
@@ -325,9 +327,10 @@ Value Codegen::generate(const ast::Union& decl) {
     if (untagged) {
         struct_type->setBody(max_type);
 
-        m_named_types.push_back(std::make_unique<types::Union>(
-            struct_type, m_current_scope_prefix + decl.name.value,
-            std::move(fields)));
+        m_named_types.push_back(
+            std::make_unique<types::Union>(
+                struct_type, m_current_scope_prefix + decl.name.value,
+                std::move(fields)));
 
         m_current_scope->types[decl.name.value] = {
             m_named_types.back().get(), decl.is_public, m_current_unit};
@@ -337,9 +340,10 @@ Value Codegen::generate(const ast::Union& decl) {
 
     auto* underlying = m_primitive_types["i32"].get();
 
-    m_named_types.push_back(std::make_unique<types::Enum>(
-        underlying->llvm_type,
-        m_current_scope_prefix + decl.name.value + "(tag)", underlying));
+    m_named_types.push_back(
+        std::make_unique<types::Enum>(
+            underlying->llvm_type,
+            m_current_scope_prefix + decl.name.value + "(tag)", underlying));
 
     auto* tag_type = static_cast<types::Enum*>(m_named_types.back().get());
 
@@ -353,9 +357,10 @@ Value Codegen::generate(const ast::Union& decl) {
 
     struct_type->setBody({max_type, underlying->llvm_type});
 
-    m_named_types.push_back(std::make_unique<types::Union>(
-        struct_type, m_current_scope_prefix + decl.name.value,
-        std::move(fields), tag_type));
+    m_named_types.push_back(
+        std::make_unique<types::Union>(
+            struct_type, m_current_scope_prefix + decl.name.value,
+            std::move(fields), tag_type));
 
     m_current_scope->types[decl.name.value] = {
         m_named_types.back().get(), decl.is_public, m_current_unit};
@@ -366,8 +371,8 @@ Value Codegen::generate(const ast::Union& decl) {
 Value Codegen::generate(const ast::EnumDecl& decl) {
     if (m_current_scope->types.contains(decl.name.value)) {
         error(
-            decl.name.offset,
-            fmt::format("{} is already defined", log::quoted(decl.name.value)));
+            decl.name.offset, "{} is already defined",
+            log::quoted(decl.name.value));
 
         return Value::poisoned();
     }
@@ -384,8 +389,10 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
             return Value::poisoned();
         }
 
-        m_named_types.push_back(std::make_unique<types::Enum>(
-            type->llvm_type, m_current_scope_prefix + decl.name.value, type));
+        m_named_types.push_back(
+            std::make_unique<types::Enum>(
+                type->llvm_type, m_current_scope_prefix + decl.name.value,
+                type));
 
         m_current_scope->types[decl.name.value] = {
             m_named_types.back().get(), decl.is_public, m_current_unit};
@@ -393,9 +400,10 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
 
     auto* underlying = m_primitive_types["i32"].get();
 
-    m_named_types.push_back(std::make_unique<types::Enum>(
-        underlying->llvm_type, m_current_scope_prefix + decl.name.value,
-        underlying));
+    m_named_types.push_back(
+        std::make_unique<types::Enum>(
+            underlying->llvm_type, m_current_scope_prefix + decl.name.value,
+            underlying));
 
     auto* type = static_cast<types::Enum*>(m_named_types.back().get());
 
@@ -456,9 +464,10 @@ Value Codegen::generate(const ast::TypeAlias& decl) {
         return Value::poisoned();
     }
 
-    m_named_types.push_back(std::make_unique<types::Alias>(
-        type->llvm_type, m_current_scope_prefix + decl.name.value, type,
-        distinct));
+    m_named_types.push_back(
+        std::make_unique<types::Alias>(
+            type->llvm_type, m_current_scope_prefix + decl.name.value, type,
+            distinct));
 
     m_current_scope->types[decl.name.value] = {
         m_named_types.back().get(), decl.is_public, m_current_unit};
@@ -511,18 +520,16 @@ Value Codegen::generate(const ast::VarDecl& decl) {
 
     if (decl.mutability == ast::VarDecl::Mut::Immut && !decl.value) {
         error(
-            decl.name.offset, fmt::format(
-                                  "immutable variable {} must be initialized",
-                                  log::quoted(decl.name.value)));
+            decl.name.offset, "immutable variable {} must be initialized",
+            log::quoted(decl.name.value));
 
         return Value::poisoned();
     }
 
     auto global_var_init = [&] {
         error(
-            decl.value->offset, fmt::format(
-                                    "global variable {} cannot be initialized",
-                                    log::quoted(decl.name.value)));
+            decl.value->offset, "global variable {} cannot be initialized",
+            log::quoted(decl.name.value));
     };
 
     Value value = Value::poisoned();
@@ -551,9 +558,8 @@ Value Codegen::generate(const ast::VarDecl& decl) {
             if (is<types::Null>(value.type) ||
                 is<types::Undefined>(value.type)) {
                 error(
-                    decl.name.offset, fmt::format(
-                                          "cannot infer type for {}",
-                                          log::quoted(decl.name.value)));
+                    decl.name.offset, "cannot infer type for {}",
+                    log::quoted(decl.name.value));
 
                 return Value::poisoned();
             }
@@ -650,9 +656,7 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
     bool is_extern = attrs.contains("extern");
 
     if (!is_extern && !decl.block) {
-        error(
-            decl.name.offset,
-            fmt::format("{} has no body", log::quoted(decl.name.value)));
+        error(decl.name.offset, "{} has no body", log::quoted(decl.name.value));
 
         return;
     }
@@ -662,8 +666,8 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
 
     if (scope.names.contains(decl.name.value)) {
         error(
-            decl.name.offset,
-            fmt::format("{} is already defined", log::quoted(decl.name.value)));
+            decl.name.offset, "{} is already defined",
+            log::quoted(decl.name.value));
 
         return;
     }

@@ -92,9 +92,7 @@ private:
         return false;
     }
 
-    void expected(std::string_view what) {
-        error(fmt::format("expected {}", what));
-    }
+    void expected(std::string_view what) { error("expected {}", what); }
 
     std::optional<Token> expect(std::string_view what, auto... types) {
         if (!match(types...)) {
@@ -239,18 +237,33 @@ private:
         }
     }
 
-    void error(std::string_view message) { error(peek().offset, message); }
+    template <typename... Args>
+    void error(fmt::format_string<Args...> message, Args&&... args) {
+        error(peek().offset, message, std::forward<Args>(args)...);
+    }
 
-    void error(std::size_t offset, std::string_view message) {
+    template <typename... Args>
+    void error(
+        std::size_t offset, fmt::format_string<Args...> message,
+        Args&&... args) {
         auto loc = offset_to_loc(m_source, offset);
-        log::error(loc.line, loc.column, m_filename, message, loc.code);
+
+        log::error(
+            loc.line, loc.column, m_filename, loc.code, message,
+            std::forward<Args>(args)...);
 
         m_had_error = true;
     }
 
-    void warning(std::size_t offset, std::string_view message) {
+    template <typename... Args>
+    void warning(
+        std::size_t offset, fmt::format_string<Args...> message,
+        Args&&... args) {
         auto loc = offset_to_loc(m_source, offset);
-        log::warning(loc.line, loc.column, m_filename, message, loc.code);
+
+        log::warning(
+            loc.line, loc.column, m_filename, loc.code, message,
+            std::forward<Args>(args)...);
     }
 
     static constexpr auto buffer_size = 2;

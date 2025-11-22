@@ -76,14 +76,22 @@ private:
     void string();
     void ident();
 
-    void error(std::size_t offset, std::string_view message) {
+    template <typename... Args>
+    void error(
+        std::size_t offset, fmt::format_string<Args...> message,
+        Args&&... args) {
         auto loc = cent::offset_to_loc(m_source, offset);
-        log::error(loc.line, loc.column, m_filename, message, loc.code);
+        log::error(
+            loc.line, loc.column, m_filename, loc.code, message,
+            std::forward<Args>(args)...);
 
         m_had_error = true;
     }
 
-    void error(std::string_view message) { error(m_offset, message); }
+    template <typename... Args>
+    void error(fmt::format_string<Args...> message, Args&&... args) {
+        error(m_offset, message, std::forward<Args>(args)...);
+    }
 
     [[nodiscard]] static bool is_ident(char character) {
         return std::isalnum(character) || character == '_';

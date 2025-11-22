@@ -293,13 +293,34 @@ private:
     void
     type_mismatch(std::size_t offset, const Type* expected, const Type* got);
 
-    void error(
-        std::size_t offset, std::string_view message,
-        std::optional<std::string_view> hint = std::nullopt) {
+    template <typename... Args>
+    void error_hint(
+        std::size_t offset, std::string_view hint,
+        fmt::format_string<Args...> message, Args&&... args) {
         auto src = read_file(m_filename);
-
         auto loc = offset_to_loc(*src, offset);
-        log::error(loc.line, loc.column, m_filename, message, loc.code, hint);
+
+        log::error_hint(
+            loc.line, loc.column, m_filename, loc.code, hint, message,
+            std::forward<Args>(args)...);
+
+        m_had_error = true;
+
+        if (m_current_function) {
+            m_current_fn_had_error = true;
+        }
+    }
+
+    template <typename... Args>
+    void error(
+        std::size_t offset, fmt::format_string<Args...> message,
+        Args&&... args) {
+        auto src = read_file(m_filename);
+        auto loc = offset_to_loc(*src, offset);
+
+        log::error(
+            loc.line, loc.column, m_filename, loc.code, message,
+            std::forward<Args>(args)...);
 
         m_had_error = true;
 

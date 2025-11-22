@@ -17,7 +17,7 @@ int exec_command(std::string program, std::vector<std::string> args) {
         command += " " + arg;
     }
 
-    log::verbose(fmt::format("running {}", log::quoted(command)));
+    log::verbose("running {}", log::quoted(command));
 
     auto pid = fork();
 
@@ -36,9 +36,8 @@ int exec_command(std::string program, std::vector<std::string> args) {
         execvp(program.c_str(), argv.data());
 
         log::error(
-            fmt::format(
-                "failed to invoke {}: {}", log::quoted(program),
-                std::strerror(errno)));
+            "failed to invoke {}: {}", log::quoted(program),
+            std::strerror(errno));
 
         std::exit(1);
     }

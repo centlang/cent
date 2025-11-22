@@ -73,9 +73,7 @@ Type* Codegen::generate(const ast::NamedType& type) {
             auto generic_union = scope->generic_unions.find(name);
 
             if (generic_union == scope->generic_unions.end()) {
-                error(
-                    offset,
-                    fmt::format("undeclared type: {}", log::quoted(name)));
+                error(offset, "undeclared type: {}", log::quoted(name));
 
                 return nullptr;
             }
@@ -86,8 +84,9 @@ Type* Codegen::generate(const ast::NamedType& type) {
                 return nullptr;
             }
 
-            m_named_types.push_back(std::make_unique<types::TemplateUnionInst>(
-                generic_union->second.element.get(), std::move(args)));
+            m_named_types.push_back(
+                std::make_unique<types::TemplateUnionInst>(
+                    generic_union->second.element.get(), std::move(args)));
 
             return m_named_types.back().get();
         }
@@ -107,8 +106,7 @@ Type* Codegen::generate(const ast::NamedType& type) {
         auto generic_union = scope->generic_unions.find(name);
 
         if (generic_union == scope->generic_unions.end()) {
-            error(
-                offset, fmt::format("undeclared type: {}", log::quoted(name)));
+            error(offset, "undeclared type: {}", log::quoted(name));
 
             return nullptr;
         }
@@ -521,9 +519,10 @@ Value Codegen::inst_generic_fn(
     }
 
     for (std::size_t i = 0; i < function->template_params.size(); ++i) {
-        m_named_types.push_back(std::make_unique<types::Alias>(
-            types[i]->llvm_type, function->template_params[i]->name, types[i],
-            false));
+        m_named_types.push_back(
+            std::make_unique<types::Alias>(
+                types[i]->llvm_type, function->template_params[i]->name,
+                types[i], false));
 
         m_current_scope->types[function->template_params[i]->name] = {
             m_named_types.back().get()};
@@ -567,10 +566,8 @@ Value Codegen::inst_generic_fn(
         if (!deduce_template_arg(
                 function->params[i].type, args[i].type, deduced)) {
             error(
-                function->name_offset,
-                fmt::format(
-                    "cannot deduce type for {}",
-                    log::quoted(function->params[i].name)));
+                function->name_offset, "cannot deduce type for {}",
+                log::quoted(function->params[i].name));
 
             return Value::poisoned();
         }
@@ -584,9 +581,8 @@ Value Codegen::inst_generic_fn(
 
         if (type == deduced.end()) {
             error(
-                function->name_offset,
-                fmt::format(
-                    "cannot deduce type for {}", log::quoted(param->name)));
+                function->name_offset, "cannot deduce type for {}",
+                log::quoted(param->name));
 
             return Value::poisoned();
         }

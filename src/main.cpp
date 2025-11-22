@@ -75,8 +75,7 @@ get_reloc_model(std::string_view model) {
     }
 
     cent::log::error(
-        fmt::format(
-            "unrecognized relocation model: {}", cent::log::quoted(model)));
+        "unrecognized relocation model: {}", cent::log::quoted(model));
 
     return std::nullopt;
 }
@@ -99,8 +98,7 @@ get_emit_type(std::string_view type) {
         return cent::EmitType::LlvmBc;
     }
 
-    cent::log::error(
-        fmt::format("unrecognized emit type: {}", cent::log::quoted(type)));
+    cent::log::error("unrecognized emit type: {}", cent::log::quoted(type));
 
     return std::nullopt;
 }
@@ -225,9 +223,7 @@ get_emit_type(std::string_view type) {
         }
 
         if (arg.starts_with('-')) {
-            cent::log::error(
-                fmt::format("unrecognized option: {}", cent::log::quoted(arg)));
-
+            cent::log::error("unrecognized option: {}", cent::log::quoted(arg));
             return false;
         }
 
@@ -280,7 +276,7 @@ get_emit_type(std::string_view type) {
         cent::g_options.target_triple, message);
 
     if (!target) {
-        cent::log::error(message);
+        cent::log::error("{}", message);
         return nullptr;
     }
 
