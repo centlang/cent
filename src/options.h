@@ -1,6 +1,7 @@
 #ifndef CENT_OPTIONS_H
 #define CENT_OPTIONS_H
 
+#include <llvm/Support/CodeGen.h>
 #include <llvm/TargetParser/Host.h>
 
 #include <unistd.h>
@@ -23,6 +24,7 @@ struct Options {
     std::vector<std::string> linker_options;
 
     EmitType emit_type = EmitType::Exe;
+    llvm::Reloc::Model reloc_model = llvm::Reloc::PIC_;
 
     bool optimize = false;
     bool verbose = false;
