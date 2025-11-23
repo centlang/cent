@@ -185,7 +185,7 @@ Value Codegen::generate(const ast::FloatLiteral& expr) {
 Value Codegen::generate(const ast::StrLiteral& expr) {
     return Value{
         get_array_type(m_primitive_types["u8"].get(), expr.value.size() + 1),
-        m_builder.CreateGlobalString(expr.value)};
+        m_builder.CreateGlobalString(expr.value, "", 0, m_module.get())};
 }
 
 Value Codegen::generate(const ast::RuneLiteral& expr) {
