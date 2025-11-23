@@ -150,6 +150,11 @@ Type* Codegen::generate(const ast::ArrayType& type) {
         return nullptr;
     }
 
+    if (!type.size) {
+        error(type.offset, "cannot infer array size");
+        return nullptr;
+    }
+
     auto size = type.size->codegen(*this);
 
     if (!size.ok()) {
