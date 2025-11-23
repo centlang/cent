@@ -1,7 +1,7 @@
 with std;
 with c;
 
-pub fn main() i32 {
+fn main() i32 {
     std::assert(c::strlen(c::to_cstr("Hello, world!")) == 13);
     return 0;
 }

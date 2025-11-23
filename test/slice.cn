@@ -1,6 +1,6 @@
 with std;
 
-pub fn main() i32 {
+fn main() i32 {
     let array = [5]i32{1, 2, 3, 4, 5};
     mut slice: []i32 = array;
 

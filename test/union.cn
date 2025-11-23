@@ -11,7 +11,7 @@ union Tagged {
     b: i64,
 }
 
-pub fn main() i32 {
+fn main() i32 {
     mut u = Untagged { a: 1 };
     std::assert(u.a == 1);
 
