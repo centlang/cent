@@ -501,7 +501,6 @@ Value Codegen::generate(const ast::VarDecl& decl) {
                 return Value::poisoned();
             }
 
-            auto* value_type = value.type;
             value = cast_or_error(decl.value->offset, type, value);
 
             if (!value.ok()) {
@@ -518,24 +517,16 @@ Value Codegen::generate(const ast::VarDecl& decl) {
         return Value::poisoned();
     }
 
-    if (decl.mutability == ast::VarDecl::Mut::Immut && !decl.value) {
+    Value value = Value::poisoned();
+    Type* type = nullptr;
+
+    if (!decl.type && !m_current_function) {
         error(
-            decl.name.offset, "immutable variable {} must be initialized",
+            decl.value->offset, "type of global variable {} was not specified",
             log::quoted(decl.name.value));
 
         return Value::poisoned();
     }
-
-    auto global_var_init = [&] {
-        error(
-            decl.value->offset, "global variable {} cannot be initialized",
-            log::quoted(decl.name.value));
-    };
-
-    Value value = Value::poisoned();
-    Type* type = nullptr;
-
-    llvm::Type* llvm_type = nullptr;
 
     if (decl.type) {
         type = decl.type->codegen(*this);
@@ -543,8 +534,14 @@ Value Codegen::generate(const ast::VarDecl& decl) {
         if (!type) {
             return Value::poisoned();
         }
+    }
 
-        llvm_type = type->llvm_type;
+    if (!decl.value && decl.mutability == ast::VarDecl::Mut::Immut) {
+        error(
+            decl.name.offset, "immutable variable {} must be initialized",
+            log::quoted(decl.name.value));
+
+        return Value::poisoned();
     }
 
     if (decl.value) {
@@ -554,9 +551,14 @@ Value Codegen::generate(const ast::VarDecl& decl) {
             return Value::poisoned();
         }
 
-        if (!type) {
-            if (is<types::Null>(value.type) ||
-                is<types::Undefined>(value.type)) {
+        if (type) {
+            value = cast_or_error(decl.value->offset, type, value);
+
+            if (!value.ok()) {
+                return Value::poisoned();
+            }
+        } else {
+            if (is<types::Null, types::Undefined>(value.type)) {
                 error(
                     decl.name.offset, "cannot infer type for {}",
                     log::quoted(decl.name.value));
@@ -565,89 +567,79 @@ Value Codegen::generate(const ast::VarDecl& decl) {
             }
 
             type = value.type;
-            llvm_type = value.type->llvm_type;
-        } else {
-            if (!m_current_function) {
-                global_var_init();
-                return Value::poisoned();
-            }
-
-            if (is<types::Undefined>(value.type)) {
-                result = {
-                    type, create_alloca(llvm_type), 1,
-                    decl.mutability == ast::VarDecl::Mut::Mut};
-
-                return Value::poisoned();
-            }
-
-            m_current_result = create_alloca(llvm_type);
-
-            if (cast_to_result_or_error(decl.value->offset, type, value)) {
-                result = {
-                    type, m_current_result, 1,
-                    decl.mutability == ast::VarDecl::Mut::Mut};
-            }
-
-            m_current_result = nullptr;
-
-            return Value::poisoned();
         }
     }
 
+    if (!m_current_function) {
+        llvm::Constant* constant = nullptr;
+
+        if (value.ok()) {
+            if (is<types::Undefined>(value.type)) {
+                error(
+                    decl.value->offset,
+                    "cannot initialize global variable with `undefined`");
+
+                return Value::poisoned();
+            }
+
+            constant = llvm::dyn_cast<llvm::Constant>(value.value);
+
+            if (!constant) {
+                error(decl.value->offset, "not a constant");
+                return Value::poisoned();
+            }
+        }
+
+        auto* global = new llvm::GlobalVariable{
+            *m_module,
+            type->llvm_type,
+            false,
+            (decl.is_public || is_extern) ? llvm::GlobalValue::ExternalLinkage
+                                          : llvm::GlobalValue::PrivateLinkage,
+            constant,
+            is_extern ? decl.name.value
+                      : m_current_scope_prefix + decl.name.value};
+
+        global->setAlignment(
+            m_module->getDataLayout().getPreferredAlign(global));
+
+        result = {{type, global, 1, true}, decl.is_public, m_current_unit};
+        return Value::poisoned();
+    }
+
+    m_current_result = create_alloca(type->llvm_type);
+
+    result = {
+        type, m_current_result, 1, decl.mutability == ast::VarDecl::Mut::Mut};
+
+    if (value.ok() && is<types::Undefined>(value.type)) {
+        m_current_result = nullptr;
+        return Value::poisoned();
+    }
+
     if (value.ok()) {
-        if (value.stack_allocated) {
+        if (is<types::Undefined>(value.type)) {
+            m_current_result = nullptr;
+            return Value::poisoned();
+        }
+
+        if (value.stack_allocated &&
+            unwrap_type(type) == unwrap_type(value.type)) {
             result = {
                 type, value.value, value.ptr_depth,
                 decl.mutability == ast::VarDecl::Mut::Mut};
 
             return Value::poisoned();
         }
-
-        if (!m_current_function) {
-            global_var_init();
-            return Value::poisoned();
-        }
-
-        m_current_result = create_alloca(llvm_type);
-
-        if (!is<types::Undefined>(value.type)) {
-            m_builder.CreateStore(load_rvalue(value).value, m_current_result);
-        }
-
-        result = {
-            type, m_current_result, 1,
-            decl.mutability == ast::VarDecl::Mut::Mut};
-    } else {
-        if (m_current_function) {
-            m_current_result = create_alloca(llvm_type);
-
-            m_builder.CreateStore(
-                llvm::Constant::getNullValue(llvm_type), m_current_result);
-
-            result = {
-                type, m_current_result, 1,
-                decl.mutability == ast::VarDecl::Mut::Mut};
-        } else {
-            auto* global = new llvm::GlobalVariable{
-                *m_module,
-                llvm_type,
-                false,
-                (decl.is_public || is_extern)
-                    ? llvm::GlobalValue::ExternalLinkage
-                    : llvm::GlobalValue::PrivateLinkage,
-                is_extern ? nullptr : llvm::Constant::getNullValue(llvm_type),
-                is_extern ? decl.name.value
-                          : m_current_scope_prefix + decl.name.value};
-
-            global->setAlignment(
-                m_module->getDataLayout().getPreferredAlign(global));
-
-            result = {{type, global, 1, true}, decl.is_public, m_current_unit};
-        }
     }
 
-    m_current_result = nullptr;
+    if (!value.ok()) {
+        value = {type, llvm::Constant::getNullValue(type->llvm_type)};
+    }
 
+    cast_to_result_or_error(decl.value->offset, type, value);
+
+    m_current_result = nullptr;
     return Value::poisoned();
 }
 
