@@ -246,8 +246,13 @@ Value Codegen::generate(const ast::RangeLiteral& expr) {
 
     bool stack_allocated = m_current_result == nullptr;
 
-    auto* variable =
-        m_current_result ? m_current_result : create_alloca(type->llvm_type);
+    auto* variable = m_current_result
+                         ? m_current_result
+                         : create_alloca_or_error(expr.offset, type->llvm_type);
+
+    if (!variable) {
+        return Value::poisoned();
+    }
 
     auto* begin_ptr = m_builder.CreateStructGEP(
         type->llvm_type, variable, range_member_begin);
@@ -306,9 +311,14 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
             return Value::poisoned();
         }
 
-        auto* variable = m_current_result
-                             ? m_current_result
-                             : create_alloca(union_type->llvm_type);
+        auto* variable =
+            m_current_result
+                ? m_current_result
+                : create_alloca_or_error(expr.offset, union_type->llvm_type);
+
+        if (!variable) {
+            return Value::poisoned();
+        }
 
         auto index = get_index(
             m_members[static_cast<llvm::StructType*>(union_type->llvm_type)],
@@ -407,8 +417,14 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
                       llvm_values)};
     }
 
-    auto* variable = m_current_result ? m_current_result
-                                      : create_alloca(struct_type->llvm_type);
+    auto* variable =
+        m_current_result
+            ? m_current_result
+            : create_alloca_or_error(expr.offset, struct_type->llvm_type);
+
+    if (!variable) {
+        return Value::poisoned();
+    }
 
     for (std::size_t i = 0; i < expr.fields.size(); ++i) {
         const auto& field = expr.fields[i];
@@ -494,8 +510,13 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
             array_type, llvm::ConstantArray::get(llvm_type, llvm_values)};
     }
 
-    auto* variable =
-        m_current_result ? m_current_result : create_alloca(llvm_type);
+    auto* variable = m_current_result
+                         ? m_current_result
+                         : create_alloca_or_error(expr.offset, llvm_type);
+
+    if (!variable) {
+        return Value::poisoned();
+    }
 
     for (std::size_t i = 0; i < expr.elements.size(); ++i) {
         auto& value = values[i];
@@ -574,8 +595,13 @@ Value Codegen::generate(const ast::TupleLiteral& expr) {
             llvm::ConstantStruct::get(struct_type, llvm_values)};
     }
 
-    auto* variable =
-        m_current_result ? m_current_result : create_alloca(struct_type);
+    auto* variable = m_current_result
+                         ? m_current_result
+                         : create_alloca_or_error(expr.offset, struct_type);
+
+    if (!variable) {
+        return Value::poisoned();
+    }
 
     for (std::size_t i = 0; i < values.size(); ++i) {
         auto* pointer = m_builder.CreateStructGEP(struct_type, variable, i);
@@ -1111,7 +1137,13 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
         auto* len_value = m_builder.CreateSub(high.value, low.value);
 
         auto* variable =
-            m_current_result ? m_current_result : create_alloca(m_slice_type);
+            m_current_result
+                ? m_current_result
+                : create_alloca_or_error(expr.offset, m_slice_type);
+
+        if (!variable) {
+            return Value::poisoned();
+        }
 
         auto* ptr_member =
             m_builder.CreateStructGEP(m_slice_type, variable, slice_member_ptr);
@@ -1158,8 +1190,13 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
 
     auto* new_len_value = m_builder.CreateSub(high.value, low.value);
 
-    auto* variable =
-        m_current_result ? m_current_result : create_alloca(llvm_type);
+    auto* variable = m_current_result
+                         ? m_current_result
+                         : create_alloca_or_error(expr.offset, llvm_type);
+
+    if (!variable) {
+        return Value::poisoned();
+    }
 
     auto* new_ptr_member =
         m_builder.CreateStructGEP(llvm_type, variable, slice_member_ptr);

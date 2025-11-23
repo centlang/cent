@@ -382,6 +382,10 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
 
         auto* variable = create_alloca(base_type->llvm_type);
 
+        if (!variable) {
+            return Value::poisoned();
+        }
+
         auto* bool_ptr = m_builder.CreateStructGEP(
             base_type->llvm_type, variable, optional_member_bool);
 
@@ -417,6 +421,10 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
         }
 
         auto* variable = create_alloca(base_type->llvm_type);
+
+        if (!variable) {
+            return Value::poisoned();
+        }
 
         auto* ptr_member = m_builder.CreateStructGEP(
             base_type->llvm_type, variable, slice_member_ptr);
@@ -655,11 +663,25 @@ Value Codegen::load_lvalue(const Value& value) {
 llvm::Value* Codegen::create_alloca(llvm::Type* type) {
     auto* insert_point = m_builder.GetInsertBlock();
 
+    if (!insert_point) {
+        return nullptr;
+    }
+
     m_builder.SetInsertPointPastAllocas(insert_point->getParent());
     auto* result = m_builder.CreateAlloca(type);
     m_builder.SetInsertPoint(insert_point);
 
     return result;
+}
+
+llvm::Value*
+Codegen::create_alloca_or_error(std::size_t offset, llvm::Type* type) {
+    if (auto* result = create_alloca(type)) {
+        return result;
+    }
+
+    error(offset, "could not allocate outside of function");
+    return nullptr;
 }
 
 llvm::Value* Codegen::get_optional_bool(const Value& value) {

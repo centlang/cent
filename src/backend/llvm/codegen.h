@@ -196,6 +196,9 @@ private:
 
     [[nodiscard]] llvm::Value* create_alloca(llvm::Type* type);
 
+    [[nodiscard]] llvm::Value*
+    create_alloca_or_error(std::size_t offset, llvm::Type* type);
+
     [[nodiscard]] llvm::Value* get_optional_bool(const Value& value);
     [[nodiscard]] llvm::Value* get_optional_value(const Value& value);
 
