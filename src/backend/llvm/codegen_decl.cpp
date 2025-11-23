@@ -86,6 +86,8 @@ Value Codegen::generate(const ast::FnDecl& decl) {
     auto* current_function = m_current_function;
     m_current_function = static_cast<types::Function*>(function_type);
 
+    auto current_scope_names = m_current_scope->names;
+
     for (std::size_t i = 0; i < decl.proto.params.size(); ++i) {
         const auto& param = decl.proto.params[i];
 
@@ -105,8 +107,8 @@ Value Codegen::generate(const ast::FnDecl& decl) {
     decl.block->codegen(*this);
 
     m_current_scope_prefix = scope_prefix;
-
     m_current_function = current_function;
+    m_current_scope->names = current_scope_names;
 
     if (m_builder.GetInsertBlock()->getTerminator()) {
         m_builder.SetInsertPoint(insert_point);
