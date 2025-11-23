@@ -34,17 +34,17 @@ void help() {
     fmt::print(R"(USAGE: centc [options] file [-- linker options]
 
 OPTIONS:
+  -h, --help                Print this help message and exit
   -O                        Enable optimizations
   -o <file>                 Place the output into <file>
   --emit <type>             Specify the compiler output type
   --reloc-model <model>     Specify relocation model
   --color                   Force colored output
   --no-color                Disable colored output
-  --target <triple>         Specify the target triple
-  --verbose                 Use verbose output
   --run                     Build and run immediately
-  --help                    Print this help message and exit
-  --version                 Print Cent version and exit
+  -t, --target <triple>     Specify the target triple
+  -v, --verbose             Use verbose output
+  -V, --version             Print Cent version and exit
 )");
 }
 
@@ -162,12 +162,12 @@ get_emit_type(std::string_view type) {
             continue;
         }
 
-        if (arg == "--help") {
+        if (arg == "-h" || arg == "--help") {
             help();
             return false;
         }
 
-        if (arg == "--version") {
+        if (arg == "-V" || arg == "--version") {
             version();
             return false;
         }
@@ -177,7 +177,7 @@ get_emit_type(std::string_view type) {
             continue;
         }
 
-        if (arg == "--verbose") {
+        if (arg == "-v" || arg == "--verbose") {
             cent::g_options.verbose = true;
             continue;
         }
@@ -212,7 +212,7 @@ get_emit_type(std::string_view type) {
             continue;
         }
 
-        if (arg == "--target") {
+        if (arg == "-t" || arg == "--target") {
             expecting_target = true;
             continue;
         }
