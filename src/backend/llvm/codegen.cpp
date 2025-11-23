@@ -23,7 +23,7 @@ Codegen::Codegen(
   m_program{std::move(program)}, m_filename{filename},
   m_units{std::filesystem::path{m_filename}.parent_path()} {
     m_module->setDataLayout(layout);
-    m_module->setTargetTriple(cent::g_options.target_triple);
+    m_module->setTargetTriple(g_options.target_triple);
 }
 
 std::unique_ptr<llvm::Module> Codegen::generate() {
@@ -75,6 +75,10 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
 }
 
 void Codegen::create_main() {
+    if (g_options.emit_type == EmitType::Obj) {
+        return;
+    }
+
     if (m_module->getFunction("main")) {
         return;
     }
