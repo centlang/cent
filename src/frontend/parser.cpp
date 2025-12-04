@@ -1681,8 +1681,11 @@ bool Parser::parse_with(ast::Module& module) {
             search_path.emplace_back(path);
         }
     } else {
-        search_path.emplace_back("/usr/local/lib/cent");
-        search_path.emplace_back("/usr/lib/cent");
+        search_path.emplace_back(
+            std::filesystem::canonical("/proc/self/exe")
+                .parent_path()
+                .parent_path() /
+            "lib" / "cent");
     }
 
     auto module_paths = find_module(path, search_path);
