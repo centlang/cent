@@ -13,6 +13,8 @@ option(CENTC_ZSTD_SHARED "Link zstd dynamically" OFF)
 option(CENTC_NCURSES_SHARED "Link ncurses dynamically" OFF)
 option(CENTC_STATIC "Build static executable" OFF)
 
+set(CENTC_ARCH "${CMAKE_HOST_SYSTEM_PROCESSOR}" CACHE STRING "Target architecture")
+
 if(CENTC_STATIC AND (CENTC_ZLIB_SHARED OR CENTC_ZSTD_SHARED OR CENTC_NCURSES_SHARED))
     message(FATAL_ERROR "CENTC_STATIC=ON requires all dependencies to be linked statically")
 endif()
@@ -21,7 +23,7 @@ message(STATUS "Downloading LLVM...")
 
 FetchContent_Declare(
     llvm
-    URL https://github.com/centlang/llvm-build/releases/download/20.1.8/llvm-linux-x86_64.tar.xz
+    URL "https://github.com/centlang/llvm-build/releases/download/20.1.8/llvm-linux-${CENTC_ARCH}.tar.xz"
 )
 
 FetchContent_MakeAvailable(llvm)
