@@ -349,7 +349,8 @@ std::vector<ast::StructLiteral::Field> Parser::parse_field_values() {
 
         if (auto value = expect_expr(false)) {
             result.emplace_back(
-                OffsetValue{name.value, name.offset}, std::move(value));
+                OffsetValue{.value = name.value, .offset = name.offset},
+                std::move(value));
         }
     };
 
@@ -413,8 +414,8 @@ std::optional<ast::FnProto> Parser::parse_fn_proto() {
         }
 
         params.emplace_back(
-            OffsetValue{name->value, name->offset}, std::move(type),
-            std::move(value), is_mutable);
+            OffsetValue{.value = name->value, .offset = name->offset},
+            std::move(type), std::move(value), is_mutable);
     };
 
     auto parse_params = [&] {
@@ -447,7 +448,10 @@ std::optional<ast::FnProto> Parser::parse_fn_proto() {
         }
     }
 
-    return ast::FnProto{std::move(params), std::move(return_type), variadic};
+    return ast::FnProto{
+        .params = std::move(params),
+        .return_type = std::move(return_type),
+        .variadic = variadic};
 }
 
 std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
@@ -535,7 +539,8 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
         return std::make_unique<ast::Undefined>(token->offset);
     case Identifier: {
         std::vector<OffsetValue<std::string>> value;
-        value.push_back(OffsetValue{token->value, token->offset});
+        value.push_back(
+            OffsetValue{.value = token->value, .offset = token->offset});
 
         while (match_next(ColonColon)) {
             auto name = expect("name", Identifier);
@@ -544,7 +549,8 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
                 return nullptr;
             }
 
-            value.push_back(OffsetValue{name->value, name->offset});
+            value.push_back(
+                OffsetValue{.value = name->value, .offset = name->offset});
         }
 
         if (!is_condition && match_next(LeftBrace)) {
@@ -606,7 +612,8 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
     case Not:
         if (auto value = expect_access_or_call_expr(is_condition)) {
             return std::make_unique<ast::UnaryExpr>(
-                token->offset, OffsetValue{token->type, token->offset},
+                token->offset,
+                OffsetValue{.value = token->type, .offset = token->offset},
                 std::move(value));
         }
 
@@ -750,7 +757,8 @@ Parser::expect_access_or_call_expr(bool is_condition) {
 
             expression = std::make_unique<ast::MethodExpr>(
                 expression->offset, std::move(expression),
-                OffsetValue{member->value, member->offset}, std::move(args));
+                OffsetValue{.value = member->value, .offset = member->offset},
+                std::move(args));
 
             continue;
         }
@@ -792,8 +800,8 @@ Parser::expect_infix(std::unique_ptr<ast::Expression> lhs, bool is_condition) {
     }
 
     return std::make_unique<ast::BinaryExpr>(
-        lhs->offset, OffsetValue{oper.type, oper.offset}, std::move(lhs),
-        std::move(rhs));
+        lhs->offset, OffsetValue{.value = oper.type, .offset = oper.offset},
+        std::move(lhs), std::move(rhs));
 }
 
 std::unique_ptr<ast::Expression>
@@ -1057,7 +1065,8 @@ std::unique_ptr<ast::Type> Parser::expect_type() {
         return nullptr;
     }
 
-    value.push_back(OffsetValue{token->value, token->offset});
+    value.push_back(
+        OffsetValue{.value = token->value, .offset = token->offset});
 
     while (match_next(ColonColon)) {
         auto name = expect("name", Identifier);
@@ -1066,7 +1075,8 @@ std::unique_ptr<ast::Type> Parser::expect_type() {
             return nullptr;
         }
 
-        value.push_back(OffsetValue{name->value, name->offset});
+        value.push_back(
+            OffsetValue{.value = name->value, .offset = name->offset});
     }
 
     auto template_args = parse_template_args();
@@ -1182,7 +1192,9 @@ void Parser::parse_for(ast::BlockStmt& block) {
 
     block.body.push_back(
         std::make_unique<ast::ForLoop>(
-            offset, OffsetValue{std::move(name->value), name->offset},
+            offset,
+            OffsetValue{
+                .value = std::move(name->value), .offset = name->offset},
             std::move(value), std::move(body)));
 }
 
@@ -1215,7 +1227,7 @@ void Parser::parse_assignment(
     block.body.push_back(
         std::make_unique<ast::Assignment>(
             variable->offset, std::move(variable), std::move(value),
-            OffsetValue{oper.type, oper.offset}));
+            OffsetValue{.value = oper.type, .offset = oper.offset}));
 }
 
 std::vector<ast::Struct::Field> Parser::parse_fields() {
@@ -1226,7 +1238,8 @@ std::vector<ast::Struct::Field> Parser::parse_fields() {
 
         if (auto type = expect_var_type()) {
             result.emplace_back(
-                OffsetValue{name.value, name.offset}, std::move(type));
+                OffsetValue{.value = name.value, .offset = name.offset},
+                std::move(type));
         }
     };
 
@@ -1336,9 +1349,11 @@ std::vector<ast::EnumDecl::Field> Parser::parse_enum_fields() {
             }
 
             result.emplace_back(
-                OffsetValue{name.value, name.offset}, std::move(value));
+                OffsetValue{.value = name.value, .offset = name.offset},
+                std::move(value));
         } else {
-            result.emplace_back(OffsetValue{name.value, name.offset});
+            result.emplace_back(
+                OffsetValue{.value = name.value, .offset = name.offset});
         }
     };
 
@@ -1396,7 +1411,8 @@ Parser::parse_var(std::vector<ast::Attribute> attrs, bool is_public) {
         }
 
         return std::make_unique<ast::VarDecl>(
-            offset, mutability, OffsetValue{name->value, name->offset},
+            offset, mutability,
+            OffsetValue{.value = name->value, .offset = name->offset},
             std::move(type), nullptr, std::move(attrs), is_public);
     }
 
@@ -1407,7 +1423,8 @@ Parser::parse_var(std::vector<ast::Attribute> attrs, bool is_public) {
     }
 
     return std::make_unique<ast::VarDecl>(
-        offset, mutability, OffsetValue{name->value, name->offset},
+        offset, mutability,
+        OffsetValue{.value = name->value, .offset = name->offset},
         std::move(type), std::move(value), std::move(attrs), is_public);
 }
 
@@ -1423,7 +1440,7 @@ Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
     }
 
     if (match_next(Token::Type::ColonColon)) {
-        type = {name->value, name->offset};
+        type = {.value = name->value, .offset = name->offset};
         name = expect("function name", Token::Type::Identifier);
 
         if (!name) {
@@ -1462,7 +1479,8 @@ Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
     }
 
     return std::make_unique<ast::FnDecl>(
-        name->offset, std::move(type), OffsetValue{name->value, name->offset},
+        name->offset, std::move(type),
+        OffsetValue{.value = name->value, .offset = name->offset},
         std::move(*proto), std::move(body), std::move(template_params),
         std::move(attrs), is_public);
 }
@@ -1487,8 +1505,9 @@ Parser::parse_struct(std::vector<ast::Attribute> attrs, bool is_public) {
     }
 
     return std::make_unique<ast::Struct>(
-        name->offset, OffsetValue{name->value, name->offset}, std::move(fields),
-        std::move(template_params), std::move(attrs), is_public);
+        name->offset, OffsetValue{.value = name->value, .offset = name->offset},
+        std::move(fields), std::move(template_params), std::move(attrs),
+        is_public);
 }
 
 std::unique_ptr<ast::Union>
@@ -1512,8 +1531,9 @@ Parser::parse_union(std::vector<ast::Attribute> attrs, bool is_public) {
     }
 
     return std::make_unique<ast::Union>(
-        name->offset, OffsetValue{name->value, name->offset}, std::move(fields),
-        std::move(template_params), std::move(attrs), is_public);
+        name->offset, OffsetValue{.value = name->value, .offset = name->offset},
+        std::move(fields), std::move(template_params), std::move(attrs),
+        is_public);
 }
 
 std::unique_ptr<ast::TypeAlias>
@@ -1535,8 +1555,8 @@ Parser::parse_type_alias(std::vector<ast::Attribute> attrs, bool is_public) {
     }
 
     return std::make_unique<ast::TypeAlias>(
-        name->offset, OffsetValue{name->value, name->offset}, std::move(type),
-        std::move(attrs), is_public);
+        name->offset, OffsetValue{.value = name->value, .offset = name->offset},
+        std::move(type), std::move(attrs), is_public);
 }
 
 std::unique_ptr<ast::EnumDecl>
@@ -1568,8 +1588,8 @@ Parser::parse_enum(std::vector<ast::Attribute> attrs, bool is_public) {
     }
 
     return std::make_unique<ast::EnumDecl>(
-        name->offset, OffsetValue{name->value, name->offset}, std::move(type),
-        std::move(fields), std::move(attrs), is_public);
+        name->offset, OffsetValue{.value = name->value, .offset = name->offset},
+        std::move(type), std::move(fields), std::move(attrs), is_public);
 }
 
 std::unique_ptr<ast::Module> Parser::parse_submodule(

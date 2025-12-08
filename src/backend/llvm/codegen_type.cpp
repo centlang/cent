@@ -499,7 +499,7 @@ Value Codegen::inst_generic_fn(
     auto* llvm_function = llvm::Function::Create(
         llvm_fn_type, llvm::Function::PrivateLinkage, name, *m_module);
 
-    generic_fn_inst[types] = {fn_type, llvm_function};
+    generic_fn_inst[types] = {.type = fn_type, .value = llvm_function};
 
     auto* entry = llvm::BasicBlock::Create(m_context, "", llvm_function);
 
@@ -520,7 +520,12 @@ Value Codegen::inst_generic_fn(
         m_builder.CreateStore(value, variable);
 
         m_current_scope->names[param.name] = {
-            m_current_function->param_types[i], variable, 1, param.is_mutable};
+            .element =
+                {.type = m_current_function->param_types[i],
+                 .value = variable,
+                 .ptr_depth = 1,
+                 .is_mutable = param.is_mutable},
+            .unit = m_current_unit};
     }
 
     for (std::size_t i = 0; i < function->template_params.size(); ++i) {
@@ -530,7 +535,7 @@ Value Codegen::inst_generic_fn(
                 types[i], false));
 
         m_current_scope->types[function->template_params[i]->name] = {
-            m_named_types.back().get()};
+            .element = m_named_types.back().get()};
     }
 
     auto scope_prefix = m_current_scope_prefix;
@@ -544,7 +549,7 @@ Value Codegen::inst_generic_fn(
 
     if (m_builder.GetInsertBlock()->getTerminator()) {
         m_builder.SetInsertPoint(insert_point);
-        return Value{fn_type, llvm_function};
+        return Value{.type = fn_type, .value = llvm_function};
     }
 
     if (!m_current_fn_had_error &&
@@ -560,7 +565,7 @@ Value Codegen::inst_generic_fn(
     m_builder.CreateRetVoid();
     m_builder.SetInsertPoint(insert_point);
 
-    return Value{fn_type, llvm_function};
+    return Value{.type = fn_type, .value = llvm_function};
 }
 
 Value Codegen::inst_generic_fn(

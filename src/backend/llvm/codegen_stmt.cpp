@@ -61,9 +61,13 @@ Value Codegen::generate([[maybe_unused]] const ast::Assignment& stmt) {
 
     if (stmt.oper.value != frontend::Token::Type::Equal) {
         value = generate_bin_expr(
-            OffsetValue<const Value&>{var, stmt.variable->offset},
-            OffsetValue<const Value&>{value, stmt.value->offset},
-            OffsetValue{without_equal(stmt.oper.value), stmt.oper.offset});
+            OffsetValue<const Value&>{
+                .value = var, .offset = stmt.variable->offset},
+            OffsetValue<const Value&>{
+                .value = value, .offset = stmt.value->offset},
+            OffsetValue{
+                .value = without_equal(stmt.oper.value),
+                .offset = stmt.oper.offset});
 
         if (!value.ok()) {
             return Value::poisoned();
@@ -181,7 +185,7 @@ Value Codegen::generate(const ast::Switch& stmt) {
         auto* tag_member = load_struct_member(
             union_type->tag_type->llvm_type, value, union_member_tag);
 
-        value = {union_type->tag_type, tag_member};
+        value = {.type = union_type->tag_type, .value = tag_member};
     } else {
         value = load_rvalue(value);
     }
@@ -355,10 +359,13 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
         auto* index_value = m_builder.CreateLoad(usize, index);
 
         m_current_scope->names[stmt.name.value] = {
-            type->type, m_builder.CreateLoad(
-                            llvm_contained_type,
-                            m_builder.CreateGEP(
-                                llvm_contained_type, ptr_value, index_value))};
+            .element =
+                {.type = type->type,
+                 .value = m_builder.CreateLoad(
+                     llvm_contained_type,
+                     m_builder.CreateGEP(
+                         llvm_contained_type, ptr_value, index_value))},
+            .unit = m_current_unit};
 
         stmt.body->codegen(*this);
 
@@ -406,11 +413,13 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
         auto* index_value = m_builder.CreateLoad(usize, index);
 
         m_current_scope->names[stmt.name.value] = {
-            type->type,
-            m_builder.CreateLoad(
-                llvm_contained_type,
-                m_builder.CreateGEP(
-                    llvm_contained_type, value.value, index_value))};
+            .element =
+                {.type = type->type,
+                 .value = m_builder.CreateLoad(
+                     llvm_contained_type,
+                     m_builder.CreateGEP(
+                         llvm_contained_type, value.value, index_value))},
+            .unit = m_current_unit};
 
         stmt.body->codegen(*this);
 
@@ -478,7 +487,10 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
     auto current_scope = *m_current_scope;
 
-    m_current_scope->names[stmt.name.value] = {type->type, variable, 1};
+    m_current_scope->names[stmt.name.value] = {
+        .element = {.type = type->type, .value = variable, .ptr_depth = 1},
+        .unit = m_current_unit};
+
     stmt.body->codegen(*this);
 
     m_builder.CreateBr(m_loop_continue);

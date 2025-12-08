@@ -48,7 +48,8 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
     case Minus:
         if (is_float(base_type)) {
             return Value{
-                value.type, m_builder.CreateFNeg(load_rvalue(value).value)};
+                .type = value.type,
+                .value = m_builder.CreateFNeg(load_rvalue(value).value)};
         }
 
         if (!is_sint(base_type) && !is_uint(base_type)) {
@@ -57,7 +58,9 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
             return Value::poisoned();
         }
 
-        return Value{value.type, m_builder.CreateNeg(load_rvalue(value).value)};
+        return Value{
+            .type = value.type,
+            .value = m_builder.CreateNeg(load_rvalue(value).value)};
     case Bang:
         if (!is<types::Bool>(base_type)) {
             error(expr.offset, "cannot apply `!` to a non-boolean type");
@@ -65,7 +68,9 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
             return Value::poisoned();
         }
 
-        return Value{value.type, m_builder.CreateNot(load_rvalue(value).value)};
+        return Value{
+            .type = value.type,
+            .value = m_builder.CreateNot(load_rvalue(value).value)};
     case Star: {
         auto* pointer = dyn_cast<types::Pointer>(base_type);
 
@@ -76,13 +81,15 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
         }
 
         return Value{
-            pointer->type, value.value,
-            static_cast<std::uint8_t>(value.ptr_depth + 1),
-            pointer->is_mutable};
+            .type = pointer->type,
+            .value = value.value,
+            .ptr_depth = static_cast<std::uint8_t>(value.ptr_depth + 1),
+            .is_mutable = pointer->is_mutable};
     }
     case And:
         if (llvm::isa<llvm::Function>(value.value)) {
-            return Value{get_ptr_type(value.type, false), value.value};
+            return Value{
+                .type = get_ptr_type(value.type, false), .value = value.value};
         }
 
         if (!llvm::isa<llvm::AllocaInst>(value.value) &&
@@ -93,8 +100,9 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
         }
 
         return Value{
-            get_ptr_type(value.type, value.is_mutable), value.value,
-            static_cast<std::uint8_t>(value.ptr_depth - 1)};
+            .type = get_ptr_type(value.type, value.is_mutable),
+            .value = value.value,
+            .ptr_depth = static_cast<std::uint8_t>(value.ptr_depth - 1)};
     case Not:
         if (!is_sint(base_type) && !is_uint(base_type)) {
             error(expr.offset, "cannot apply `~` to a non-integer type");
@@ -102,7 +110,9 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
             return Value::poisoned();
         }
 
-        return Value{value.type, m_builder.CreateNot(load_rvalue(value).value)};
+        return Value{
+            .type = value.type,
+            .value = m_builder.CreateNot(load_rvalue(value).value)};
     default:
         return Value::poisoned();
     }
@@ -112,7 +122,7 @@ Value Codegen::generate(const ast::IntLiteral& expr) {
     std::string_view literal = expr.value;
 
     std::uint8_t base = [&] {
-        enum { Bin = 2, Dec = 10, Oct = 8, Hex = 16 };
+        enum : std::uint8_t { Bin = 2, Dec = 10, Oct = 8, Hex = 16 };
 
         if (literal.starts_with("0x")) {
             literal = literal.substr(2);
@@ -147,23 +157,24 @@ Value Codegen::generate(const ast::IntLiteral& expr) {
 
     if (value <= std::numeric_limits<std::int32_t>::max()) {
         return Value{
-            m_primitive_types["i32"].get(),
-            llvm::ConstantInt::getSigned(
+            .type = m_primitive_types["i32"].get(),
+            .value = llvm::ConstantInt::getSigned(
                 llvm::Type::getInt32Ty(m_context),
                 static_cast<std::int32_t>(value))};
     }
 
     if (value <= std::numeric_limits<std::int64_t>::max()) {
         return Value{
-            m_primitive_types["i64"].get(),
-            llvm::ConstantInt::getSigned(
+            .type = m_primitive_types["i64"].get(),
+            .value = llvm::ConstantInt::getSigned(
                 llvm::Type::getInt64Ty(m_context),
                 static_cast<std::int64_t>(value))};
     }
 
     return Value{
-        m_primitive_types["u64"].get(),
-        llvm::ConstantInt::get(llvm::Type::getInt64Ty(m_context), value)};
+        .type = m_primitive_types["u64"].get(),
+        .value =
+            llvm::ConstantInt::get(llvm::Type::getInt64Ty(m_context), value)};
 }
 
 Value Codegen::generate(const ast::FloatLiteral& expr) {
@@ -178,34 +189,40 @@ Value Codegen::generate(const ast::FloatLiteral& expr) {
     }
 
     return Value{
-        m_primitive_types["f32"].get(),
-        llvm::ConstantFP::get(llvm::Type::getFloatTy(m_context), value)};
+        .type = m_primitive_types["f32"].get(),
+        .value =
+            llvm::ConstantFP::get(llvm::Type::getFloatTy(m_context), value)};
 }
 
 Value Codegen::generate(const ast::StrLiteral& expr) {
     return Value{
-        get_array_type(m_primitive_types["u8"].get(), expr.value.size() + 1),
-        m_builder.CreateGlobalString(expr.value, "", 0, m_module.get())};
+        .type = get_array_type(
+            m_primitive_types["u8"].get(), expr.value.size() + 1),
+        .value =
+            m_builder.CreateGlobalString(expr.value, "", 0, m_module.get())};
 }
 
 Value Codegen::generate(const ast::RuneLiteral& expr) {
     auto* rune = m_primitive_types["rune"].get();
 
-    return Value{rune, llvm::ConstantInt::get(rune->llvm_type, expr.value)};
+    return Value{
+        .type = rune,
+        .value = llvm::ConstantInt::get(rune->llvm_type, expr.value)};
 }
 
 Value Codegen::generate(const ast::BoolLiteral& expr) {
     return Value{
-        m_primitive_types["bool"].get(),
-        llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), expr.value)};
+        .type = m_primitive_types["bool"].get(),
+        .value = llvm::ConstantInt::get(
+            llvm::Type::getInt1Ty(m_context), expr.value)};
 }
 
 Value Codegen::generate([[maybe_unused]] const ast::NullLiteral& expr) {
-    return Value{m_null_type.get(), nullptr};
+    return Value{.type = m_null_type.get(), .value = nullptr};
 }
 
 Value Codegen::generate([[maybe_unused]] const ast::Undefined& expr) {
-    return Value{m_undefined_type.get(), nullptr};
+    return Value{.type = m_undefined_type.get(), .value = nullptr};
 }
 
 Value Codegen::generate(const ast::RangeLiteral& expr) {
@@ -238,9 +255,10 @@ Value Codegen::generate(const ast::RangeLiteral& expr) {
         if (auto* end_constant =
                 llvm::dyn_cast<llvm::Constant>(value_y.value)) {
             return Value{
-                type, llvm::ConstantStruct::get(
-                          static_cast<llvm::StructType*>(type->llvm_type),
-                          {begin_constant, end_constant})};
+                .type = type,
+                .value = llvm::ConstantStruct::get(
+                    static_cast<llvm::StructType*>(type->llvm_type),
+                    {begin_constant, end_constant})};
         }
     }
 
@@ -412,9 +430,10 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
         }
 
         return Value{
-            type, llvm::ConstantStruct::get(
-                      static_cast<llvm::StructType*>(struct_type->llvm_type),
-                      llvm_values)};
+            .type = type,
+            .value = llvm::ConstantStruct::get(
+                static_cast<llvm::StructType*>(struct_type->llvm_type),
+                llvm_values)};
     }
 
     auto* variable =
@@ -507,7 +526,8 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
         }
 
         return Value{
-            array_type, llvm::ConstantArray::get(llvm_type, llvm_values)};
+            .type = array_type,
+            .value = llvm::ConstantArray::get(llvm_type, llvm_values)};
     }
 
     auto* variable = m_current_result
@@ -591,8 +611,8 @@ Value Codegen::generate(const ast::TupleLiteral& expr) {
         }
 
         return Value{
-            get_tuple_type(types),
-            llvm::ConstantStruct::get(struct_type, llvm_values)};
+            .type = get_tuple_type(types),
+            .value = llvm::ConstantStruct::get(struct_type, llvm_values)};
     }
 
     auto* variable = m_current_result
@@ -747,8 +767,8 @@ Value Codegen::generate(const ast::CallExpr& expr) {
         }
 
         return Value{
-            type->return_type,
-            m_builder.CreateCall(
+            .type = type->return_type,
+            .value = m_builder.CreateCall(
                 static_cast<llvm::FunctionType*>(type->llvm_type),
                 function.value, llvm_args)};
     }
@@ -897,8 +917,8 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
     }
 
     return Value{
-        iterator->second.type->return_type,
-        m_builder.CreateCall(iterator->second.function, arguments)};
+        .type = iterator->second.type->return_type,
+        .value = m_builder.CreateCall(iterator->second.function, arguments)};
 }
 
 Value Codegen::generate(const ast::MemberExpr& expr) {
@@ -961,10 +981,11 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
         auto* usize = m_primitive_types["usize"].get();
 
         return Value{
-            usize, m_builder.CreateLoad(
-                       usize->llvm_type,
-                       m_builder.CreateStructGEP(
-                           m_slice_type, parent.value, slice_member_len))};
+            .type = usize,
+            .value = m_builder.CreateLoad(
+                usize->llvm_type,
+                m_builder.CreateStructGEP(
+                    m_slice_type, parent.value, slice_member_len))};
     }
 
     if (auto* union_type = dyn_cast<types::Union>(parent.type)) {
@@ -998,9 +1019,11 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
         }
 
         return Value{
-            type->fields[*index],
-            m_builder.CreateStructGEP(type->llvm_type, parent.value, *index), 1,
-            pointer->is_mutable};
+            .type = type->fields[*index],
+            .value = m_builder.CreateStructGEP(
+                type->llvm_type, parent.value, *index),
+            .ptr_depth = 1,
+            .is_mutable = pointer->is_mutable};
     }
 
     auto* type = dyn_cast<types::Struct>(parent.type);
@@ -1047,9 +1070,11 @@ Value Codegen::generate(const ast::IndexExpr& expr) {
             llvm::PointerType::get(m_context, 0), value, slice_member_ptr);
 
         return Value{
-            type->type,
-            m_builder.CreateGEP(type->type->llvm_type, ptr_value, val.value), 1,
-            type->is_mutable};
+            .type = type->type,
+            .value = m_builder.CreateGEP(
+                type->type->llvm_type, ptr_value, val.value),
+            .ptr_depth = 1,
+            .is_mutable = type->is_mutable};
     }
 
     auto* type = dyn_cast<types::Array>(value.type);
@@ -1061,13 +1086,14 @@ Value Codegen::generate(const ast::IndexExpr& expr) {
     }
 
     return Value{
-        type->type,
-        m_builder.CreateGEP(
+        .type = type->type,
+        .value = m_builder.CreateGEP(
             type->llvm_type, value.value,
             {llvm::ConstantInt::get(
                  m_module->getDataLayout().getIntPtrType(m_context), 0),
              val.value}),
-        1, value.is_mutable};
+        .ptr_depth = 1,
+        .is_mutable = value.is_mutable};
 }
 
 Value Codegen::generate(const ast::SliceExpr& expr) {
@@ -1098,8 +1124,8 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
         }
     } else {
         low = {
-            m_primitive_types["usize"].get(),
-            llvm::ConstantInt::get(
+            .type = m_primitive_types["usize"].get(),
+            .value = llvm::ConstantInt::get(
                 m_module->getDataLayout().getIntPtrType(m_context), 0)};
     }
 
@@ -1125,8 +1151,8 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
     if (auto* type = dyn_cast<types::Array>(value.type)) {
         if (!high.ok()) {
             high = {
-                m_primitive_types["usize"].get(),
-                llvm::ConstantInt::get(
+                .type = m_primitive_types["usize"].get(),
+                .value = llvm::ConstantInt::get(
                     m_module->getDataLayout().getIntPtrType(m_context),
                     type->size)};
         }
@@ -1176,8 +1202,8 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
             m_builder.CreateStructGEP(llvm_type, value.value, slice_member_len);
 
         high = {
-            m_primitive_types["usize"].get(),
-            m_builder.CreateLoad(
+            .type = m_primitive_types["usize"].get(),
+            .value = m_builder.CreateLoad(
                 m_module->getDataLayout().getIntPtrType(m_context),
                 len_member)};
     }
@@ -1240,7 +1266,8 @@ Value Codegen::generate(const ast::SizeofExpr& expr) {
     auto* usize = m_primitive_types["usize"].get();
     auto size = m_module->getDataLayout().getTypeAllocSize(type->llvm_type);
 
-    return Value{usize, llvm::ConstantInt::get(usize->llvm_type, size)};
+    return Value{
+        .type = usize, .value = llvm::ConstantInt::get(usize->llvm_type, size)};
 }
 
 Value Codegen::generate_bin_logical_expr(
@@ -1303,7 +1330,7 @@ Value Codegen::generate_bin_logical_expr(
 
         phi->addIncoming(value_y.value, next);
 
-        return Value{lhs_value.type, phi};
+        return Value{.type = lhs_value.type, .value = phi};
     }
 
     if (oper.value == QuestionQuestion) {
@@ -1356,7 +1383,7 @@ Value Codegen::generate_bin_logical_expr(
         phi->addIncoming(optional_value, bool_true);
         phi->addIncoming(value_y.value, bool_false);
 
-        return Value{optional->type, phi};
+        return Value{.type = optional->type, .value = phi};
     }
 
     auto rhs_value = rhs.codegen(*this);
@@ -1366,8 +1393,9 @@ Value Codegen::generate_bin_logical_expr(
     }
 
     return generate_bin_expr(
-        OffsetValue<const Value&>{lhs_value, lhs.offset},
-        OffsetValue<const Value&>{rhs_value, rhs.offset}, oper);
+        OffsetValue<const Value&>{.value = lhs_value, .offset = lhs.offset},
+        OffsetValue<const Value&>{.value = rhs_value, .offset = rhs.offset},
+        oper);
 }
 
 Value Codegen::generate_bin_expr(
@@ -1400,7 +1428,7 @@ Value Codegen::generate_bin_expr(
                 val = m_builder.CreateNot(val);
             }
 
-            return Value{m_primitive_types["bool"].get(), val};
+            return Value{.type = m_primitive_types["bool"].get(), .value = val};
         }
     }
 
@@ -1461,108 +1489,118 @@ Value Codegen::generate_bin_expr(
     switch (oper.value) {
     case Plus:
         return Value{
-            value_type,
-            is_float(value_base_type)
-                ? m_builder.CreateFAdd(value_x.value, value_y.value)
-                : m_builder.CreateAdd(value_x.value, value_y.value)};
+            .type = value_type,
+            .value = is_float(value_base_type)
+                         ? m_builder.CreateFAdd(value_x.value, value_y.value)
+                         : m_builder.CreateAdd(value_x.value, value_y.value)};
     case Minus:
         return Value{
-            value_type,
-            is_float(value_base_type)
-                ? m_builder.CreateFSub(value_x.value, value_y.value)
-                : m_builder.CreateSub(value_x.value, value_y.value)};
+            .type = value_type,
+            .value = is_float(value_base_type)
+                         ? m_builder.CreateFSub(value_x.value, value_y.value)
+                         : m_builder.CreateSub(value_x.value, value_y.value)};
     case Star:
         return Value{
-            value_type,
-            is_float(value_base_type)
-                ? m_builder.CreateFMul(value_x.value, value_y.value)
-                : m_builder.CreateMul(value_x.value, value_y.value)};
+            .type = value_type,
+            .value = is_float(value_base_type)
+                         ? m_builder.CreateFMul(value_x.value, value_y.value)
+                         : m_builder.CreateMul(value_x.value, value_y.value)};
     case Slash:
         if (is_float(value_base_type)) {
             return Value{
-                value_type, m_builder.CreateFDiv(value_x.value, value_y.value)};
+                .type = value_type,
+                .value = m_builder.CreateFDiv(value_x.value, value_y.value)};
         }
 
         return Value{
-            value_type,
-            is_sint(value_base_type)
-                ? m_builder.CreateSDiv(value_x.value, value_y.value)
-                : m_builder.CreateUDiv(value_x.value, value_y.value)};
+            .type = value_type,
+            .value = is_sint(value_base_type)
+                         ? m_builder.CreateSDiv(value_x.value, value_y.value)
+                         : m_builder.CreateUDiv(value_x.value, value_y.value)};
     case Percent:
         return Value{
-            value_type,
-            is_sint(value_base_type)
-                ? m_builder.CreateSRem(value_x.value, value_y.value)
-                : m_builder.CreateURem(value_x.value, value_y.value)};
+            .type = value_type,
+            .value = is_sint(value_base_type)
+                         ? m_builder.CreateSRem(value_x.value, value_y.value)
+                         : m_builder.CreateURem(value_x.value, value_y.value)};
     case And:
         return Value{
-            value_type, m_builder.CreateAnd(value_x.value, value_y.value)};
+            .type = value_type,
+            .value = m_builder.CreateAnd(value_x.value, value_y.value)};
     case Or:
         return Value{
-            value_type, m_builder.CreateOr(value_x.value, value_y.value)};
+            .type = value_type,
+            .value = m_builder.CreateOr(value_x.value, value_y.value)};
     case Xor:
         return Value{
-            value_type, m_builder.CreateXor(value_x.value, value_y.value)};
+            .type = value_type,
+            .value = m_builder.CreateXor(value_x.value, value_y.value)};
     case Less:
         if (is_float(value_base_type)) {
             return Value{
-                m_primitive_types["bool"].get(),
-                m_builder.CreateFCmpULT(value_x.value, value_y.value)};
+                .type = m_primitive_types["bool"].get(),
+                .value = m_builder.CreateFCmpULT(value_x.value, value_y.value)};
         }
 
         return Value{
-            m_primitive_types["bool"].get(),
-            is_sint(value_base_type)
-                ? m_builder.CreateICmpSLT(value_x.value, value_y.value)
-                : m_builder.CreateICmpULT(value_x.value, value_y.value)};
+            .type = m_primitive_types["bool"].get(),
+            .value =
+                is_sint(value_base_type)
+                    ? m_builder.CreateICmpSLT(value_x.value, value_y.value)
+                    : m_builder.CreateICmpULT(value_x.value, value_y.value)};
     case Greater:
         if (is_float(value_base_type)) {
             return Value{
-                m_primitive_types["bool"].get(),
-                m_builder.CreateFCmpUGT(value_x.value, value_y.value)};
+                .type = m_primitive_types["bool"].get(),
+                .value = m_builder.CreateFCmpUGT(value_x.value, value_y.value)};
         }
 
         return Value{
-            m_primitive_types["bool"].get(),
-            is_sint(value_base_type)
-                ? m_builder.CreateICmpSGT(value_x.value, value_y.value)
-                : m_builder.CreateICmpUGT(value_x.value, value_y.value)};
+            .type = m_primitive_types["bool"].get(),
+            .value =
+                is_sint(value_base_type)
+                    ? m_builder.CreateICmpSGT(value_x.value, value_y.value)
+                    : m_builder.CreateICmpUGT(value_x.value, value_y.value)};
     case EqualEqual:
         return Value{
-            m_primitive_types["bool"].get(),
-            is_float(value_base_type)
-                ? m_builder.CreateFCmpUEQ(value_x.value, value_y.value)
-                : m_builder.CreateICmpEQ(value_x.value, value_y.value)};
+            .type = m_primitive_types["bool"].get(),
+            .value =
+                is_float(value_base_type)
+                    ? m_builder.CreateFCmpUEQ(value_x.value, value_y.value)
+                    : m_builder.CreateICmpEQ(value_x.value, value_y.value)};
     case BangEqual:
         return Value{
-            m_primitive_types["bool"].get(),
-            is_float(value_base_type)
-                ? m_builder.CreateFCmpUNE(value_x.value, value_y.value)
-                : m_builder.CreateICmpNE(value_x.value, value_y.value)};
+            .type = m_primitive_types["bool"].get(),
+            .value =
+                is_float(value_base_type)
+                    ? m_builder.CreateFCmpUNE(value_x.value, value_y.value)
+                    : m_builder.CreateICmpNE(value_x.value, value_y.value)};
     case GreaterEqual:
         if (is_float(value_base_type)) {
             return Value{
-                m_primitive_types["bool"].get(),
-                m_builder.CreateFCmpUGE(value_x.value, value_y.value)};
+                .type = m_primitive_types["bool"].get(),
+                .value = m_builder.CreateFCmpUGE(value_x.value, value_y.value)};
         }
 
         return Value{
-            m_primitive_types["bool"].get(),
-            is_sint(value_base_type)
-                ? m_builder.CreateICmpSGE(value_x.value, value_y.value)
-                : m_builder.CreateICmpUGE(value_x.value, value_y.value)};
+            .type = m_primitive_types["bool"].get(),
+            .value =
+                is_sint(value_base_type)
+                    ? m_builder.CreateICmpSGE(value_x.value, value_y.value)
+                    : m_builder.CreateICmpUGE(value_x.value, value_y.value)};
     case LessEqual:
         if (is_float(value_base_type)) {
             return Value{
-                m_primitive_types["bool"].get(),
-                m_builder.CreateFCmpULE(value_x.value, value_y.value)};
+                .type = m_primitive_types["bool"].get(),
+                .value = m_builder.CreateFCmpULE(value_x.value, value_y.value)};
         }
 
         return Value{
-            m_primitive_types["bool"].get(),
-            is_sint(value_base_type)
-                ? m_builder.CreateICmpSLE(value_x.value, value_y.value)
-                : m_builder.CreateICmpULE(value_x.value, value_y.value)};
+            .type = m_primitive_types["bool"].get(),
+            .value =
+                is_sint(value_base_type)
+                    ? m_builder.CreateICmpSLE(value_x.value, value_y.value)
+                    : m_builder.CreateICmpULE(value_x.value, value_y.value)};
     default:
         return Value::poisoned();
     }

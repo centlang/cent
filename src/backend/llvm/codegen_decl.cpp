@@ -77,8 +77,7 @@ Value Codegen::generate(const ast::FnDecl& decl) {
 
     auto* function = get_llvm_fn();
 
-    auto* entry = llvm::BasicBlock::Create(
-        m_context, "", static_cast<llvm::Function*>(function));
+    auto* entry = llvm::BasicBlock::Create(m_context, "", function);
 
     auto* insert_point = m_builder.GetInsertBlock();
     m_builder.SetInsertPoint(entry);
@@ -97,8 +96,12 @@ Value Codegen::generate(const ast::FnDecl& decl) {
         m_builder.CreateStore(value, variable);
 
         m_current_scope->names[param.name.value] = {
-            {m_current_function->param_types[i], variable, 1, param.is_mutable},
-            true};
+            .element =
+                {.type = m_current_function->param_types[i],
+                 .value = variable,
+                 .ptr_depth = 1,
+                 .is_mutable = param.is_mutable},
+            .unit = m_current_unit};
     }
 
     auto scope_prefix = m_current_scope_prefix;
@@ -151,7 +154,7 @@ Value Codegen::generate(const ast::Struct& decl) {
                 static_cast<types::TemplateParam*>(m_named_types.back().get()));
 
             m_current_scope->types[param.value] = {
-                template_params.back(), true};
+                .element = template_params.back(), .is_public = true};
         }
 
         std::vector<GenericStruct::Field> fields;
@@ -170,10 +173,11 @@ Value Codegen::generate(const ast::Struct& decl) {
         m_current_scope->types = current_scope_types;
 
         m_current_scope->generic_structs[decl.name.value] = {
-            std::make_shared<GenericStruct>(
+            .element = std::make_shared<GenericStruct>(
                 m_current_scope_prefix + decl.name.value, std::move(fields),
                 std::move(template_params)),
-            decl.is_public, m_current_unit};
+            .is_public = decl.is_public,
+            .unit = m_current_unit};
 
         return Value::poisoned();
     }
@@ -210,7 +214,9 @@ Value Codegen::generate(const ast::Struct& decl) {
             std::move(fields)));
 
     m_current_scope->types[decl.name.value] = {
-        m_named_types.back().get(), decl.is_public, m_current_unit};
+        .element = m_named_types.back().get(),
+        .is_public = decl.is_public,
+        .unit = m_current_unit};
 
     return Value::poisoned();
 }
@@ -241,7 +247,7 @@ Value Codegen::generate(const ast::Union& decl) {
                 static_cast<types::TemplateParam*>(m_named_types.back().get()));
 
             m_current_scope->types[param.value] = {
-                template_params.back(), true};
+                .element = template_params.back(), .is_public = true};
         }
 
         std::vector<GenericUnion::Field> fields;
@@ -275,20 +281,23 @@ Value Codegen::generate(const ast::Union& decl) {
             for (std::size_t i = 0; i < decl.fields.size(); ++i) {
                 m_current_scope->scopes[decl.name.value]
                     .names[decl.fields[i].name.value] = {
-                    {tag_type,
-                     llvm::ConstantInt::get(underlying->llvm_type, i)},
-                    decl.is_public,
-                    m_current_unit};
+                    .element =
+                        {.type = tag_type,
+                         .value =
+                             llvm::ConstantInt::get(underlying->llvm_type, i)},
+                    .is_public = decl.is_public,
+                    .unit = m_current_unit};
             }
 
             tag_type = type;
         }
 
         m_current_scope->generic_unions[decl.name.value] = {
-            std::make_shared<GenericUnion>(
+            .element = std::make_shared<GenericUnion>(
                 m_current_scope_prefix + decl.name.value, std::move(fields),
                 std::move(template_params), tag_type),
-            decl.is_public, m_current_unit};
+            .is_public = decl.is_public,
+            .unit = m_current_unit};
 
         return Value::poisoned();
     }
@@ -335,7 +344,9 @@ Value Codegen::generate(const ast::Union& decl) {
                 std::move(fields)));
 
         m_current_scope->types[decl.name.value] = {
-            m_named_types.back().get(), decl.is_public, m_current_unit};
+            .element = m_named_types.back().get(),
+            .is_public = decl.is_public,
+            .unit = m_current_unit};
 
         return Value::poisoned();
     }
@@ -352,9 +363,11 @@ Value Codegen::generate(const ast::Union& decl) {
     for (std::size_t i = 0; i < decl.fields.size(); ++i) {
         m_current_scope->scopes[decl.name.value]
             .names[decl.fields[i].name.value] = {
-            {tag_type, llvm::ConstantInt::get(underlying->llvm_type, i)},
-            decl.is_public,
-            m_current_unit};
+            .element =
+                {.type = tag_type,
+                 .value = llvm::ConstantInt::get(underlying->llvm_type, i)},
+            .is_public = decl.is_public,
+            .unit = m_current_unit};
     }
 
     struct_type->setBody({max_type, underlying->llvm_type});
@@ -365,7 +378,9 @@ Value Codegen::generate(const ast::Union& decl) {
             std::move(fields), tag_type));
 
     m_current_scope->types[decl.name.value] = {
-        m_named_types.back().get(), decl.is_public, m_current_unit};
+        .element = m_named_types.back().get(),
+        .is_public = decl.is_public,
+        .unit = m_current_unit};
 
     return Value::poisoned();
 }
@@ -397,7 +412,9 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
                 type));
 
         m_current_scope->types[decl.name.value] = {
-            m_named_types.back().get(), decl.is_public, m_current_unit};
+            .element = m_named_types.back().get(),
+            .is_public = decl.is_public,
+            .unit = m_current_unit};
     }
 
     auto* underlying = m_primitive_types["i32"].get();
@@ -410,7 +427,7 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
     auto* type = static_cast<types::Enum*>(m_named_types.back().get());
 
     m_current_scope->types[decl.name.value] = {
-        type, decl.is_public, m_current_unit};
+        .element = type, .is_public = decl.is_public, .unit = m_current_unit};
 
     std::uint64_t number = 0;
 
@@ -419,10 +436,12 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
 
         if (!field.value) {
             m_current_scope->scopes[decl.name.value].names[field.name.value] = {
-                {type, llvm::ConstantInt::get(
-                           type->llvm_type, number++, is_sint(type))},
-                decl.is_public,
-                m_current_unit};
+                .element =
+                    {.type = type,
+                     .value = llvm::ConstantInt::get(
+                         type->llvm_type, number++, is_sint(type))},
+                .is_public = decl.is_public,
+                .unit = m_current_unit};
 
             continue;
         }
@@ -436,7 +455,9 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
         if (auto val = cast_or_error(field.value->offset, type->type, value);
             val.ok()) {
             m_current_scope->scopes[decl.name.value].names[field.name.value] = {
-                val, decl.is_public, m_current_unit};
+                .element = val,
+                .is_public = decl.is_public,
+                .unit = m_current_unit};
 
             if (auto* constant = llvm::dyn_cast<llvm::ConstantInt>(val.value)) {
                 number = is_sint(type) ? constant->getSExtValue()
@@ -472,7 +493,9 @@ Value Codegen::generate(const ast::TypeAlias& decl) {
             distinct));
 
     m_current_scope->types[decl.name.value] = {
-        m_named_types.back().get(), decl.is_public, m_current_unit};
+        .element = m_named_types.back().get(),
+        .is_public = decl.is_public,
+        .unit = m_current_unit};
 
     return Value::poisoned();
 }
@@ -482,7 +505,7 @@ Value Codegen::generate(const ast::VarDecl& decl) {
     bool is_extern = attrs.contains("extern");
 
     auto& result = m_current_scope->names[decl.name.value];
-    result = {Value::poisoned()};
+    result = {.element = Value::poisoned()};
 
     if (decl.mutability == ast::VarDecl::Mut::Const) {
         if (!decl.value) {
@@ -515,7 +538,11 @@ Value Codegen::generate(const ast::VarDecl& decl) {
             return Value::poisoned();
         }
 
-        result = {value, decl.is_public, m_current_unit};
+        result = {
+            .element = value,
+            .is_public = decl.is_public,
+            .unit = m_current_unit};
+
         return Value::poisoned();
     }
 
@@ -605,19 +632,27 @@ Value Codegen::generate(const ast::VarDecl& decl) {
         global->setAlignment(
             m_module->getDataLayout().getPreferredAlign(global));
 
-        result = {{type, global, 1, true}, decl.is_public, m_current_unit};
+        result = {
+            .element =
+                {.type = type,
+                 .value = global,
+                 .ptr_depth = 1,
+                 .is_mutable = true},
+            .is_public = decl.is_public,
+            .unit = m_current_unit};
+
         return Value::poisoned();
     }
 
     m_current_result = create_alloca(type->llvm_type);
 
     result = {
-        type, m_current_result, 1, decl.mutability == ast::VarDecl::Mut::Mut};
-
-    if (value.ok() && is<types::Undefined>(value.type)) {
-        m_current_result = nullptr;
-        return Value::poisoned();
-    }
+        .element =
+            {.type = type,
+             .value = m_current_result,
+             .ptr_depth = 1,
+             .is_mutable = decl.mutability == ast::VarDecl::Mut::Mut},
+        .unit = m_current_unit};
 
     if (value.ok()) {
         if (is<types::Undefined>(value.type)) {
@@ -628,15 +663,21 @@ Value Codegen::generate(const ast::VarDecl& decl) {
         if (value.stack_allocated &&
             unwrap_type(type) == unwrap_type(value.type)) {
             result = {
-                type, value.value, value.ptr_depth,
-                decl.mutability == ast::VarDecl::Mut::Mut};
+                .element =
+                    {.type = type,
+                     .value = value.value,
+                     .ptr_depth = value.ptr_depth,
+                     .is_mutable = decl.mutability == ast::VarDecl::Mut::Mut},
+                .unit = m_current_unit};
 
             return Value::poisoned();
         }
     }
 
     if (!value.ok()) {
-        value = {type, llvm::Constant::getNullValue(type->llvm_type)};
+        value = {
+            .type = type,
+            .value = llvm::Constant::getNullValue(type->llvm_type)};
     }
 
     cast_to_result_or_error(decl.value->offset, type, value);
@@ -677,7 +718,8 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
             template_params.emplace_back(
                 static_cast<types::TemplateParam*>(m_named_types.back().get()));
 
-            m_current_scope->types[param.value] = {template_params.back()};
+            m_current_scope->types[param.value] = {
+                .element = template_params.back()};
         }
 
         Type* return_type = m_void_type.get();
@@ -715,11 +757,12 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
         m_current_scope->types = current_scope_types;
 
         m_current_scope->generic_fns[decl.name.value] = {
-            std::make_shared<GenericFunction>(
+            .element = std::make_shared<GenericFunction>(
                 m_current_scope_prefix + decl.name.value, decl.name.offset,
                 return_type, std::move(params), std::move(default_args),
                 decl.block.get(), std::move(template_params)),
-            decl.is_public, m_current_unit};
+            .is_public = decl.is_public,
+            .unit = m_current_unit};
 
         return;
     }
@@ -753,7 +796,9 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
     }
 
     scope.names[decl.name.value] = {
-        {fn_type, function}, decl.is_public, m_current_unit};
+        .element = {.type = fn_type, .value = function},
+        .is_public = decl.is_public,
+        .unit = m_current_unit};
 
     if (!decl.type) {
         return;
@@ -777,14 +822,16 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
     }
 
     if (param_type == type) {
-        m_methods[type][decl.name.value] = {fn_type, function};
+        m_methods[type][decl.name.value] = {
+            .type = fn_type, .function = function};
 
         return;
     }
 
     if (auto* pointer_type = dyn_cast<types::Pointer>(param_type)) {
         if (pointer_type->type == type) {
-            m_methods[type][decl.name.value] = {fn_type, function};
+            m_methods[type][decl.name.value] = {
+                .type = fn_type, .function = function};
         }
     }
 }

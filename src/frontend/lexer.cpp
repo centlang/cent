@@ -10,12 +10,12 @@ void Lexer::next_token() {
     skip_whitespaces();
 
     auto single_char = [&](Token::Type type) {
-        m_token = {type, {}, m_offset};
+        m_token = {.type = type, .value = {}, .offset = m_offset};
         get();
     };
 
     if (eof()) {
-        m_token = {Eof, {}, m_offset};
+        m_token = {.type = Eof, .value = {}, .offset = m_offset};
         return;
     }
 
@@ -97,7 +97,8 @@ void Lexer::next_token() {
         string();
         break;
     case '\'':
-        m_token = {Token::Type::RuneLiteral, {}, m_offset};
+        m_token = {
+            .type = Token::Type::RuneLiteral, .value = {}, .offset = m_offset};
         get();
 
         if (eof()) {
@@ -251,14 +252,16 @@ void Lexer::next_token() {
         auto offset = m_offset;
 
         error(offset, "unexpected character");
-        m_token = {Identifier, std::string{get()}, offset};
+        m_token = {
+            .type = Identifier, .value = std::string{get()}, .offset = offset};
 
         break;
     }
 }
 
 void Lexer::number() {
-    m_token = {Token::Type::IntLiteral, {}, m_offset};
+    m_token = {
+        .type = Token::Type::IntLiteral, .value = {}, .offset = m_offset};
 
     static constexpr auto hex = 16;
     static constexpr auto oct = 8;
@@ -344,7 +347,8 @@ void Lexer::number() {
 
 void Lexer::string() {
     get();
-    m_token = {Token::Type::StrLiteral, {}, m_offset};
+    m_token = {
+        .type = Token::Type::StrLiteral, .value = {}, .offset = m_offset};
 
     while (true) {
         if (eof()) {
@@ -369,7 +373,7 @@ void Lexer::string() {
 void Lexer::ident() {
     using enum Token::Type;
 
-    m_token = {Identifier, {}, m_offset};
+    m_token = {.type = Identifier, .value = {}, .offset = m_offset};
 
     while (!eof() && is_ident(peek())) {
         m_token.value += get();
