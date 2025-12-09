@@ -11,27 +11,51 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        arch: [ x86_64, aarch64 ]
+
     steps:
       - uses: actions/checkout@v5
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build
+          sudo apt-get install -y cmake ninja-build gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu clang lld
 
-      - name: Build
+      - name: Build for ${{ matrix.arch }}
         run: |
-          mkdir install
+          mkdir install build && cd build
 
-          cmake -G Ninja . -DCMAKE_BUILD_TYPE=Release -DCENTC_STATIC=ON \
-            -DCMAKE_INSTALL_PREFIX=install
+          cat - <<EOF > ${{ matrix.arch }}.cmake
+            set(CMAKE_SYSTEM_NAME Linux)
+
+            set(CMAKE_C_COMPILER_TARGET ${{ matrix.arch }}-linux-gnu)
+            set(CMAKE_CXX_COMPILER_TARGET ${{ matrix.arch }}-linux-gnu)
+
+            set(CMAKE_LINKER_TYPE LLD)
+            set(CMAKE_C_COMPILER clang)
+            set(CMAKE_CXX_COMPILER clang++)
+          EOF
+
+          cat ${{ matrix.arch }}.cmake
+
+          cmake -G Ninja .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE=${{ matrix.arch }}.cmake \
+            -DCENTC_ARCH=${{ matrix.arch }} \
+            -DCENTC_STATIC=ON \
+            -DCMAKE_INSTALL_PREFIX=../install/${{ matrix.arch }}
 
           cmake --build . --target install
 
       - name: Create archive and upload
         run: |
-          tar -cJf cent-linux-x86_64.tar.xz -C install .
+          tar -cJf cent-linux-${{ matrix.arch }}.tar.xz -C \
+            install/${{ matrix.arch }} .
+
           gh release upload ${{ github.event.release.tag_name }} \
-            cent-linux-x86_64.tar.xz
+            cent-linux-${{ matrix.arch }}.tar.xz
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

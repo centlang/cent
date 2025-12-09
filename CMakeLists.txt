@@ -8,16 +8,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(FetchContent)
 set(FETCHCONTENT_QUIET OFF)
 
-option(CENTC_ZLIB_SHARED "Link zlib dynamically" OFF)
-option(CENTC_ZSTD_SHARED "Link zstd dynamically" OFF)
-option(CENTC_NCURSES_SHARED "Link ncurses dynamically" OFF)
 option(CENTC_STATIC "Build static executable" OFF)
 
-set(CENTC_ARCH "${CMAKE_HOST_SYSTEM_PROCESSOR}" CACHE STRING "Target architecture")
-
-if(CENTC_STATIC AND (CENTC_ZLIB_SHARED OR CENTC_ZSTD_SHARED OR CENTC_NCURSES_SHARED))
-    message(FATAL_ERROR "CENTC_STATIC=ON requires all dependencies to be linked statically")
-endif()
+set(
+    CENTC_ARCH
+    "${CMAKE_HOST_SYSTEM_PROCESSOR}"
+    CACHE STRING "Target architecture"
+)
 
 message(STATUS "Downloading LLVM...")
 
@@ -31,49 +28,49 @@ FetchContent_MakeAvailable(llvm)
 list(APPEND CMAKE_PREFIX_PATH ${llvm_SOURCE_DIR})
 find_package(LLVM REQUIRED CONFIG)
 
-find_program(LLVM_CONFIG_EXE llvm-config PATHS "${LLVM_TOOLS_BINARY_DIR}" NO_DEFAULT_PATH)
-
-if(NOT LLVM_CONFIG_EXE)
-    message(FATAL_ERROR "llvm-config not found")
-endif()
-
-execute_process(
-    COMMAND "${LLVM_CONFIG_EXE}" --link-static --libfiles core all-targets
-    OUTPUT_VARIABLE LLVM_LIBS
-    OUTPUT_STRIP_TRAILING_WHITESPACE
+llvm_map_components_to_libnames(
+    LLVM_LIBS
+    core
+    aarch64asmparser
+    amdgpuasmparser
+    armasmparser
+    avrasmparser
+    bpfasmparser
+    hexagonasmparser
+    lanaiasmparser
+    loongarchasmparser
+    mipsasmparser
+    msp430asmparser
+    powerpcasmparser
+    riscvasmparser
+    sparcasmparser
+    systemzasmparser
+    veasmparser
+    webassemblyasmparser
+    x86asmparser
+    aarch64codegen
+    amdgpucodegen
+    armcodegen
+    avrcodegen
+    bpfcodegen
+    hexagoncodegen
+    lanaicodegen
+    loongarchcodegen
+    mipscodegen
+    msp430codegen
+    nvptxcodegen
+    powerpccodegen
+    riscvcodegen
+    sparccodegen
+    spirvcodegen
+    systemzcodegen
+    vecodegen
+    webassemblycodegen
+    x86codegen
+    xcorecodegen
 )
 
 string(REPLACE " " ";" LLVM_LIBS "${LLVM_LIBS}")
-
-if(CENTC_ZLIB_SHARED)
-    set(ZLIB "z")
-else()
-    find_library(ZLIB libz.a)
-
-    if(NOT ZLIB)
-        message(FATAL_ERROR "Static zlib not found")
-    endif()
-endif()
-
-if(CENTC_ZSTD_SHARED)
-    set(ZSTD "zstd")
-else()
-    find_library(ZSTD libzstd.a)
-
-    if(NOT ZSTD)
-        message(FATAL_ERROR "Static zstd not found")
-    endif()
-endif()
-
-if(CENTC_NCURSES_SHARED)
-    set(NCURSES "ncursesw")
-else()
-    find_library(NCURSES libncursesw.a)
-
-    if(NOT NCURSES)
-        message(FATAL_ERROR "Static ncurses not found")
-    endif()
-endif()
 
 if(CENTC_STATIC)
     set(BUILD_SHARED_LIBS OFF)
@@ -94,7 +91,7 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
 add_executable(centc ${SOURCES})
 
 target_include_directories(centc PRIVATE src ${LLVM_INCLUDE_DIRS})
-target_link_libraries(centc PRIVATE ${LLVM_LIBS} ${ZLIB} ${ZSTD} ${NCURSES} fmt::fmt)
+target_link_libraries(centc PRIVATE ${LLVM_LIBS} fmt::fmt)
 
 install(TARGETS centc)
 install(DIRECTORY lib/ DESTINATION lib/cent)
@@ -120,7 +117,10 @@ foreach(TEST_SOURCE ${TEST_SOURCES})
         COMMAND "$<TARGET_FILE:centc>" "${TEST_PATH}" -o "${TEST_OUTPUT}"
     )
 
-    set_property(TEST "${BUILD_TEST}" PROPERTY ENVIRONMENT "CENTPATH=${CMAKE_SOURCE_DIR}/lib")
+    set_property(
+        TEST "${BUILD_TEST}" PROPERTY
+        ENVIRONMENT "CENTPATH=${CMAKE_SOURCE_DIR}/lib"
+    )
 
     add_test(NAME "${RUN_TEST}" COMMAND "${TEST_OUTPUT}")
     set_tests_properties("${RUN_TEST}" PROPERTIES DEPENDS "${BUILD_TEST}")
