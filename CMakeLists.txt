@@ -31,23 +31,6 @@ find_package(LLVM REQUIRED CONFIG)
 llvm_map_components_to_libnames(
     LLVM_LIBS
     core
-    aarch64asmparser
-    amdgpuasmparser
-    armasmparser
-    avrasmparser
-    bpfasmparser
-    hexagonasmparser
-    lanaiasmparser
-    loongarchasmparser
-    mipsasmparser
-    msp430asmparser
-    powerpcasmparser
-    riscvasmparser
-    sparcasmparser
-    systemzasmparser
-    veasmparser
-    webassemblyasmparser
-    x86asmparser
     aarch64codegen
     amdgpucodegen
     armcodegen

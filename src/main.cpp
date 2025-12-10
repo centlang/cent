@@ -267,7 +267,6 @@ get_emit_type(std::string_view type) {
     llvm::InitializeAllTargetInfos();
     llvm::InitializeAllTargets();
     llvm::InitializeAllTargetMCs();
-    llvm::InitializeAllAsmParsers();
     llvm::InitializeAllAsmPrinters();
 
     std::string message;
