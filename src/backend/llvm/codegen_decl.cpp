@@ -581,10 +581,12 @@ Value Codegen::generate(const ast::VarDecl& decl) {
         }
 
         if (type) {
-            value = cast_or_error(decl.value->offset, type, value);
+            if (!is<types::Undefined>(value.type)) {
+                value = cast_or_error(decl.value->offset, type, value);
 
-            if (!value.ok()) {
-                return Value::poisoned();
+                if (!value.ok()) {
+                    return Value::poisoned();
+                }
             }
         } else {
             if (is<types::Null, types::Undefined>(value.type)) {
