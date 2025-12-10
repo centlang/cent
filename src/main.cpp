@@ -98,6 +98,10 @@ get_emit_type(std::string_view type) {
         return cent::EmitType::LlvmBc;
     }
 
+    if (type == "asm") {
+        return cent::EmitType::Asm;
+    }
+
     cent::log::error("unrecognized emit type: {}", cent::log::quoted(type));
 
     return std::nullopt;
@@ -351,9 +355,16 @@ compile(llvm::TargetMachine* machine) {
     case cent::EmitType::Obj: {
         auto output = get_output_file(".o");
 
-        if (!cent::backend::emit_obj(
+        if (!cent::backend::emit_obj(*module, *machine, output)) {
+            return std::nullopt;
+        }
 
-                *module, *machine, output)) {
+        return output;
+    }
+    case cent::EmitType::Asm: {
+        auto output = get_output_file(".s");
+
+        if (!cent::backend::emit_asm(*module, *machine, output)) {
             return std::nullopt;
         }
 

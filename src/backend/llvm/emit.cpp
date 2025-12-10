@@ -35,9 +35,9 @@ void optimize_module(llvm::Module& module, llvm::OptimizationLevel opt_level) {
     manager.run(module, module_manager);
 }
 
-bool emit_obj(
+bool emit(
     llvm::Module& module, llvm::TargetMachine& machine,
-    const std::filesystem::path& path) {
+    const std::filesystem::path& path, llvm::CodeGenFileType type) {
     std::error_code code;
     llvm::raw_fd_ostream file{path.string(), code, llvm::sys::fs::OF_None};
 
@@ -49,14 +49,24 @@ bool emit_obj(
     }
 
     llvm::legacy::PassManager manager;
-
-    machine.addPassesToEmitFile(
-        manager, file, nullptr, llvm::CodeGenFileType::ObjectFile);
+    machine.addPassesToEmitFile(manager, file, nullptr, type);
 
     manager.run(module);
     file.flush();
 
     return true;
+}
+
+bool emit_obj(
+    llvm::Module& module, llvm::TargetMachine& machine,
+    const std::filesystem::path& path) {
+    return emit(module, machine, path, llvm::CodeGenFileType::ObjectFile);
+}
+
+bool emit_asm(
+    llvm::Module& module, llvm::TargetMachine& machine,
+    const std::filesystem::path& path) {
+    return emit(module, machine, path, llvm::CodeGenFileType::AssemblyFile);
 }
 
 bool emit_llvm_ir(llvm::Module& module, const std::filesystem::path& path) {

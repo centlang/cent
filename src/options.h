@@ -13,7 +13,7 @@
 
 namespace cent {
 
-enum struct EmitType : std::uint8_t { Obj, Exe, LlvmIr, LlvmBc };
+enum struct EmitType : std::uint8_t { Obj, Exe, LlvmIr, LlvmBc, Asm };
 
 struct Options {
     std::string target_triple = llvm::sys::getDefaultTargetTriple();
