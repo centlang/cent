@@ -197,9 +197,10 @@ inline void log_hint(
     std::string_view hint, fmt::format_string<Args...> message,
     Args&&... args) {
     fmt::print(
-        stderr, "{}:{}:{}: {} {}\n", filename, line, column,
+        stderr, "{} {} {}\n",
+        bold(fmt::format("{}:{}:{}:", filename, line, column)),
         bold(fg(fmt::format("{}:", type), type_fg)),
-        fmt::format(message, std::forward<Args>(args)...));
+        bold(fmt::format(message, std::forward<Args>(args)...)));
 
     fmt::print(stderr, " {} | {}\n", line, code);
 
@@ -207,7 +208,8 @@ inline void log_hint(
         stderr, " {:{}} |{:{}}", "", fmt::formatted_size("{}", line), "",
         column);
 
-    fmt::print(stderr, "{}\n\n", fg(fmt::format("^ hint: {}", hint), Green));
+    fmt::print(
+        stderr, "{}\n\n", bold(fg(fmt::format("^ hint: {}", hint), Green)));
 }
 
 template <typename... Args>
@@ -216,9 +218,10 @@ log(std::string_view type, Color type_fg, std::uint32_t line,
     std::uint32_t column, std::string_view filename, std::string_view code,
     fmt::format_string<Args...> message, Args&&... args) {
     fmt::print(
-        stderr, "{}:{}:{}: {} {}\n", filename, line, column,
+        stderr, "{} {} {}\n",
+        bold(fmt::format("{}:{}:{}:", filename, line, column)),
         bold(fg(fmt::format("{}:", type), type_fg)),
-        fmt::format(message, std::forward<Args>(args)...));
+        bold(fmt::format(message, std::forward<Args>(args)...)));
 
     fmt::print(stderr, " {} | {}\n", line, code);
 
@@ -226,7 +229,7 @@ log(std::string_view type, Color type_fg, std::uint32_t line,
         stderr, " {:{}} |{:{}}", "", fmt::formatted_size("{}", line), "",
         column);
 
-    fmt::print(stderr, "{}\n\n", fg("^", Green));
+    fmt::print(stderr, "{}\n\n", bold(fg("^", Green)));
 }
 
 template <typename... Args>
@@ -235,7 +238,7 @@ log(std::string_view type, Color type_fg, fmt::format_string<Args...> message,
     Args&&... args) {
     fmt::print(
         stderr, "{} {}\n\n", bold(fg(fmt::format("{}:", type), type_fg)),
-        fmt::format(message, std::forward<Args>(args)...));
+        bold(fmt::format(message, std::forward<Args>(args)...)));
 }
 
 template <typename... Args>
