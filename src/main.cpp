@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -298,12 +299,34 @@ compile(llvm::TargetMachine* machine) {
 
     std::string filename = cent::g_options.source_file->string();
 
+    std::chrono::time_point<std::chrono::steady_clock> step_start_time;
+
+    auto start_step = [&] {
+        step_start_time = std::chrono::steady_clock::now();
+    };
+
+    auto end_step = [&](std::string_view step) {
+        cent::log::verbose(
+            "{} finished in {:.3f}s", step,
+            std::chrono::duration_cast<std::chrono::duration<double>>(
+                std::chrono::steady_clock::now() - step_start_time)
+                .count());
+    };
+
+    start_step();
+
     cent::frontend::Parser parser{*code, filename};
     auto program = parser.parse();
 
     if (!program) {
         return std::nullopt;
     }
+
+    if (!parser.had_error()) {
+        end_step("parsing");
+    }
+
+    start_step();
 
     cent::backend::Codegen codegen{
         std::move(program), filename, machine->createDataLayout()};
@@ -318,8 +341,12 @@ compile(llvm::TargetMachine* machine) {
         return std::nullopt;
     }
 
+    end_step("IR codegen");
+
     if (cent::g_options.optimize) {
+        start_step();
         cent::backend::optimize_module(*module, llvm::OptimizationLevel::O3);
+        end_step("optimization");
     }
 
     auto get_output_file = [&](std::string_view extension) {
@@ -396,21 +423,25 @@ compile(llvm::TargetMachine* machine) {
             args.end(), cent::g_options.linker_options.begin(),
             cent::g_options.linker_options.end());
 
+        start_step();
         int exit_code = cent::exec_command("gcc", args);
 
         std::filesystem::remove(object_file);
 
-        if (exit_code == 0) {
-            return output;
+        if (exit_code != 0) {
+            return std::nullopt;
         }
 
-        return std::nullopt;
+        end_step("linking");
+        return output;
     }
 
     return std::nullopt;
 }
 
 int main(int argc, char** argv) {
+    auto start_time = std::chrono::steady_clock::now();
+
     if (!parse_args(std::span<char*>{argv, static_cast<std::size_t>(argc)})) {
         return 1;
     }
@@ -421,6 +452,12 @@ int main(int argc, char** argv) {
     if (!output) {
         return 1;
     }
+
+    cent::log::verbose(
+        "total time: {:.2f}s",
+        std::chrono::duration_cast<std::chrono::duration<double>>(
+            std::chrono::steady_clock::now() - start_time)
+            .count());
 
     if (!cent::g_options.run) {
         return 0;
