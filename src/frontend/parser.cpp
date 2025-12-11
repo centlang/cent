@@ -1642,6 +1642,10 @@ std::unique_ptr<ast::Module> Parser::parse_submodule_dir(
             result->submodules.push_back(std::move(submodule));
         }
 
+        if (entry.path() == m_filename) {
+            continue;
+        }
+
         if (entry.path().extension() != ".cn") {
             continue;
         }
@@ -1718,6 +1722,10 @@ bool Parser::parse_with(ast::Module& module) {
     }
 
     for (const auto& module_path : module_paths) {
+        if (module_path == m_filename) {
+            continue;
+        }
+
         auto submodule = std::filesystem::is_directory(module_path)
                              ? parse_submodule_dir(module_path, module_name)
                              : parse_submodule(module_path, module_name);
