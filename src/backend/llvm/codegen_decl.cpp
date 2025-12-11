@@ -674,15 +674,12 @@ Value Codegen::generate(const ast::VarDecl& decl) {
 
             return Value::poisoned();
         }
-    }
 
-    if (!value.ok()) {
-        value = {
-            .type = type,
-            .value = llvm::Constant::getNullValue(type->llvm_type)};
+        cast_to_result_or_error(decl.value->offset, type, value);
+    } else {
+        m_builder.CreateStore(
+            llvm::Constant::getNullValue(type->llvm_type), m_current_result);
     }
-
-    cast_to_result_or_error(decl.value->offset, type, value);
 
     m_current_result = nullptr;
     return Value::poisoned();
