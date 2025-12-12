@@ -15,15 +15,15 @@ Ensure you have the dependencies installed:
 Clone the repository:
 
 ```sh
-git clone https://github.com/centlang/cent && cd cent
+$ git clone https://github.com/centlang/cent && cd cent
 ```
 
 Build and install:
 
 ```sh
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make && sudo make install
+$ mkdir build && cd build
+$ cmake .. -DCMAKE_BUILD_TYPE=Release
+$ make && sudo make install
 ```
 
 ### "Hello, world!"
@@ -41,15 +41,15 @@ fn main() {
 Build an executable and run it:
 
 ```sh
-centc main.cn
-./main
+$ centc main.cn
+$ ./main
 Hello, world!
 ```
 
-Or use `--run` option:
+Or use the `--run` option:
 
 ```sh
-centc main.cn --run
+$ centc main.cn --run
 Hello, world!
 ```
 
