@@ -21,7 +21,7 @@ Codegen::Codegen(
     const llvm::DataLayout& layout)
 : m_module{std::make_unique<llvm::Module>("", m_context)}, m_builder{m_context},
   m_program{std::move(program)}, m_filename{filename},
-  m_units{std::filesystem::path{m_filename}.parent_path()} {
+  m_units{std::filesystem::absolute(filename).parent_path()} {
     m_module->setDataLayout(layout);
     m_module->setTargetTriple(g_options.target_triple);
 }
