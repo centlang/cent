@@ -1734,7 +1734,7 @@ bool Parser::parse_with(ast::Module& module) {
             return false;
         }
 
-        module.submodules.push_back(std::move(submodule));
+        module.imported_modules.push_back(std::move(submodule));
     }
 
     return true;

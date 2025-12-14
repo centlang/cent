@@ -24,6 +24,7 @@ struct Module : Node {
     std::vector<std::unique_ptr<FnDecl>> functions;
     std::vector<std::unique_ptr<VarDecl>> variables;
 
+    std::vector<std::unique_ptr<Module>> imported_modules;
     std::vector<std::unique_ptr<Module>> submodules;
 
     std::filesystem::path path;
