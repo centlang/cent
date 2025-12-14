@@ -509,6 +509,13 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
     if (const auto* slice = dyn_cast<types::Slice>(base_type)) {
         auto* base_slice_contained_type = unwrap_type(slice->type);
 
+        if (!implicit && is<types::Slice>(base_value_type)) {
+            return Value{
+                .type = type,
+                .value = value.value,
+                .ptr_depth = value.ptr_depth};
+        }
+
         const auto* array_type = dyn_cast<types::Array>(base_value_type);
 
         if (!array_type) {
@@ -625,6 +632,11 @@ bool Codegen::cast_to_result(Type* type, const Value& value, bool implicit) {
 
     if (const auto* slice = dyn_cast<types::Slice>(base_type)) {
         auto* base_slice_contained_type = unwrap_type(slice->type);
+
+        if (!implicit && is<types::Slice>(base_value_type)) {
+            m_builder.CreateStore(load_rvalue(value).value, m_current_result);
+            return true;
+        }
 
         const auto* array_type = dyn_cast<types::Array>(base_value_type);
 
