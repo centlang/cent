@@ -158,6 +158,7 @@ public:
     Value generate(const ast::VarDecl& decl);
 
 private:
+    void create_intrinsics();
     void create_main();
 
     void generate(const ast::Module& module);
@@ -237,7 +238,7 @@ private:
 
     [[nodiscard]] types::Function* get_fn_type(
         Type* return_type, std::vector<Type*> param_types,
-        std::vector<llvm::Constant*> default_args, bool variadic);
+        std::vector<llvm::Constant*> default_args = {}, bool variadic = false);
 
     [[nodiscard]] types::Struct*
     inst_generic_struct(GenericStruct* type, const std::vector<Type*>& types);

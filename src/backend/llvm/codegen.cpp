@@ -67,11 +67,79 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
         {llvm::PointerType::get(m_context, 0),
          m_module->getDataLayout().getIntPtrType(m_context)});
 
+    create_intrinsics();
     generate(*m_program);
 
     create_main();
 
     return std::move(m_module);
+}
+
+void Codegen::create_intrinsics() {
+    auto* u8_type = m_primitive_types["u8"].get();
+    auto* usize = m_primitive_types["usize"].get();
+
+    auto* as_mut_u8_slice_type = get_fn_type(
+        get_slice_type(u8_type, true), {get_ptr_type(u8_type, true), usize});
+
+    auto* as_mut_u8_slice = llvm::Function::Create(
+        static_cast<llvm::FunctionType*>(as_mut_u8_slice_type->llvm_type),
+        llvm::Function::PrivateLinkage, "core::ptr::as_mut_u8_slice",
+        *m_module);
+
+    auto* as_mut_u8_slice_entry =
+        llvm::BasicBlock::Create(m_context, "", as_mut_u8_slice);
+
+    m_builder.SetInsertPoint(as_mut_u8_slice_entry);
+
+    auto* as_mut_u8_slice_result = create_alloca(m_slice_type);
+
+    auto* as_mut_u8_slice_ptr_member = m_builder.CreateStructGEP(
+        m_slice_type, as_mut_u8_slice_result, slice_member_ptr);
+
+    auto* as_mut_u8_slice_len_member = m_builder.CreateStructGEP(
+        m_slice_type, as_mut_u8_slice_result, slice_member_len);
+
+    m_builder.CreateStore(
+        as_mut_u8_slice->getArg(0), as_mut_u8_slice_ptr_member);
+    m_builder.CreateStore(
+        as_mut_u8_slice->getArg(1), as_mut_u8_slice_len_member);
+
+    m_builder.CreateRet(
+        m_builder.CreateLoad(m_slice_type, as_mut_u8_slice_result));
+
+    m_current_scope->scopes["core"].scopes["ptr"].names["as_mut_u8_slice"] = {
+        .element = {.type = as_mut_u8_slice_type, .value = as_mut_u8_slice},
+        .is_public = true};
+
+    auto* as_u8_slice_type = get_fn_type(
+        get_slice_type(u8_type, false), {get_ptr_type(u8_type, false), usize});
+
+    auto* as_u8_slice = llvm::Function::Create(
+        static_cast<llvm::FunctionType*>(as_u8_slice_type->llvm_type),
+        llvm::Function::PrivateLinkage, "core::ptr::as_u8_slice", *m_module);
+
+    auto* as_u8_slice_entry =
+        llvm::BasicBlock::Create(m_context, "", as_u8_slice);
+
+    m_builder.SetInsertPoint(as_u8_slice_entry);
+
+    auto* as_u8_slice_result = create_alloca(m_slice_type);
+
+    auto* as_u8_slice_ptr_member = m_builder.CreateStructGEP(
+        m_slice_type, as_u8_slice_result, slice_member_ptr);
+
+    auto* as_u8_slice_len_member = m_builder.CreateStructGEP(
+        m_slice_type, as_u8_slice_result, slice_member_len);
+
+    m_builder.CreateStore(as_u8_slice->getArg(0), as_u8_slice_ptr_member);
+    m_builder.CreateStore(as_u8_slice->getArg(1), as_u8_slice_len_member);
+
+    m_builder.CreateRet(m_builder.CreateLoad(m_slice_type, as_u8_slice_result));
+
+    m_current_scope->scopes["core"].scopes["ptr"].names["as_u8_slice"] = {
+        .element = {.type = as_u8_slice_type, .value = as_u8_slice},
+        .is_public = true};
 }
 
 void Codegen::create_main() {
