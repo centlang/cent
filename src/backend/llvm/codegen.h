@@ -358,6 +358,7 @@ private:
     llvm::IRBuilder<> m_builder;
 
     Scope m_scope;
+    Scope m_core_module;
 
     std::map<std::string_view, std::unique_ptr<Type>> m_primitive_types;
 

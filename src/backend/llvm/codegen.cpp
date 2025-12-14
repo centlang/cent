@@ -108,10 +108,6 @@ void Codegen::create_intrinsics() {
     m_builder.CreateRet(
         m_builder.CreateLoad(m_slice_type, as_mut_u8_slice_result));
 
-    m_current_scope->scopes["core"].scopes["ptr"].names["as_mut_u8_slice"] = {
-        .element = {.type = as_mut_u8_slice_type, .value = as_mut_u8_slice},
-        .is_public = true};
-
     auto* as_u8_slice_type = get_fn_type(
         get_slice_type(u8_type, false), {get_ptr_type(u8_type, false), usize});
 
@@ -137,9 +133,13 @@ void Codegen::create_intrinsics() {
 
     m_builder.CreateRet(m_builder.CreateLoad(m_slice_type, as_u8_slice_result));
 
-    m_current_scope->scopes["core"].scopes["ptr"].names["as_u8_slice"] = {
-        .element = {.type = as_u8_slice_type, .value = as_u8_slice},
-        .is_public = true};
+    m_core_module.scopes["ptr"].names = {
+        {"as_mut_u8_slice",
+         {.element = {.type = as_mut_u8_slice_type, .value = as_mut_u8_slice},
+          .is_public = true}},
+        {"as_u8_slice",
+         {.element = {.type = as_u8_slice_type, .value = as_u8_slice},
+          .is_public = true}}};
 }
 
 void Codegen::create_main() {
@@ -197,10 +197,13 @@ void Codegen::generate(const ast::Module& module) {
     auto scope_prefix = m_current_scope_prefix;
     auto unit = m_current_unit;
 
+    m_current_scope->scopes["core"] = m_core_module;
+
     for (const auto& submodule : module.submodules) {
         m_filename = submodule->path.string();
         m_current_scope = &scope->scopes[*submodule->name];
         m_current_scope_prefix = scope_prefix + *submodule->name + "::";
+        m_current_unit = get_unit(m_filename);
 
         generate(*submodule);
     }
