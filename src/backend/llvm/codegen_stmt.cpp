@@ -285,12 +285,6 @@ Value Codegen::generate(const ast::ReturnStmt& stmt) {
 }
 
 Value Codegen::generate(const ast::WhileLoop& stmt) {
-    auto condition = stmt.condition->codegen(*this);
-
-    if (!condition.ok()) {
-        return Value::poisoned();
-    }
-
     auto* function = m_builder.GetInsertBlock()->getParent();
 
     auto* loop_continue = m_loop_continue;
@@ -299,16 +293,23 @@ Value Codegen::generate(const ast::WhileLoop& stmt) {
     m_loop_continue = llvm::BasicBlock::Create(m_context, "", function);
     m_loop_end = llvm::BasicBlock::Create(m_context, "", function);
 
-    m_builder.CreateCondBr(
-        load_rvalue(condition).value, m_loop_continue, m_loop_end);
+    auto* loop_body = llvm::BasicBlock::Create(m_context, "", function);
 
+    m_builder.CreateBr(m_loop_continue);
     m_builder.SetInsertPoint(m_loop_continue);
+
+    auto condition = stmt.condition->codegen(*this);
+
+    if (!condition.ok()) {
+        return Value::poisoned();
+    }
+
+    m_builder.CreateCondBr(load_rvalue(condition).value, loop_body, m_loop_end);
+
+    m_builder.SetInsertPoint(loop_body);
+
     stmt.body->codegen(*this);
-
-    condition = stmt.condition->codegen(*this);
-
-    m_builder.CreateCondBr(
-        load_rvalue(condition).value, m_loop_continue, m_loop_end);
+    m_builder.CreateBr(m_loop_continue);
 
     m_builder.SetInsertPoint(m_loop_end);
 
