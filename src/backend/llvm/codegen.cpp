@@ -223,7 +223,9 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
                 return Value{
                     .type = type,
                     .value = llvm::ConstantInt::get(
-                        base_type->llvm_type, val.getZExtValue())};
+                        base_type->llvm_type, type_is_sint
+                                                  ? val.getSExtValue()
+                                                  : val.getZExtValue())};
             }
         }
     }
