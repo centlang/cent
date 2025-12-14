@@ -1442,13 +1442,13 @@ Value Codegen::generate_bin_expr(
     auto value_y = cast(lhs_base_type, rhs_value);
 
     if (!value_y.ok()) {
-        value_y = cast_or_error(rhs.offset, rhs_base_type, lhs_value);
+        value_x = cast_or_error(rhs.offset, rhs_base_type, lhs_value);
 
-        if (!value_y.ok()) {
+        if (!value_x.ok()) {
             return Value::poisoned();
         }
 
-        value_x = rhs_value;
+        value_y = rhs_value;
         value_base_type = rhs_base_type;
         value_type = rhs.value.type;
     }
