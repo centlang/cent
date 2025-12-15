@@ -401,6 +401,8 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
             return Value::poisoned();
         }
 
+        value = load_rvalue(value);
+
         if (!llvm::isa<llvm::Constant>(value.value)) {
             is_const = false;
         } else {
