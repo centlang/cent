@@ -185,12 +185,68 @@ void Lexer::next_token() {
     case '~':
         single_char(Not);
         break;
-    case '+':
-        with_equal(Plus, PlusEqual);
+    case '+': {
+        m_token.offset = m_offset;
+        m_token.value = {};
+
+        get();
+
+        if (eof()) {
+            m_token.type = Plus;
+            return;
+        }
+
+        if (peek() == '=') {
+            get();
+
+            m_token.type = PlusEqual;
+            return;
+        }
+
+        m_token.type = Plus;
+
+        if (peek() == '+') {
+            error_hint(
+                m_token.offset, "use `x += 1` instead",
+                "increment operators are not allowed");
+
+            get();
+            return;
+        }
+
         break;
-    case '-':
-        with_equal(Minus, MinusEqual);
+    }
+    case '-': {
+        m_token.offset = m_offset;
+        m_token.value = {};
+
+        get();
+
+        if (eof()) {
+            m_token.type = Minus;
+            return;
+        }
+
+        if (peek() == '=') {
+            get();
+
+            m_token.type = MinusEqual;
+            return;
+        }
+
+        m_token.type = Minus;
+
+        if (peek() == '-') {
+            error_hint(
+                m_token.offset, "use `x -= 1` instead",
+                "decrement operators are not allowed");
+
+            get();
+            return;
+        }
+
         break;
+    }
     case '*':
         with_equal(Star, StarEqual);
         break;

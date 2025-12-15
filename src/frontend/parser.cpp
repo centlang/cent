@@ -1607,8 +1607,8 @@ std::unique_ptr<ast::Module> Parser::parse_submodule(
 
     auto submodule = parser.parse();
 
-    if (!submodule) {
-        return nullptr;
+    if (parser.had_error()) {
+        m_had_error = true;
     }
 
     submodule_visiting = false;

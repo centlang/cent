@@ -81,6 +81,7 @@ private:
         std::size_t offset, fmt::format_string<Args...> message,
         Args&&... args) {
         auto loc = cent::offset_to_loc(m_source, offset);
+
         log::error(
             loc.line, loc.column, m_filename, loc.code, message,
             std::forward<Args>(args)...);
@@ -91,6 +92,19 @@ private:
     template <typename... Args>
     void error(fmt::format_string<Args...> message, Args&&... args) {
         error(m_offset, message, std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    void error_hint(
+        std::size_t offset, std::string_view hint,
+        fmt::format_string<Args...> message, Args&&... args) {
+        auto loc = cent::offset_to_loc(m_source, offset);
+
+        log::error_hint(
+            loc.line, loc.column, m_filename, loc.code, hint, message,
+            std::forward<Args>(args)...);
+
+        m_had_error = true;
     }
 
     [[nodiscard]] static bool is_ident(char character) {
