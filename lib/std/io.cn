@@ -12,6 +12,50 @@ pub fn Fd::write(self: Fd, data: []u8) {
     c::fwrite(&data[0] as *c::types::void, 1, data.len, self._file);
 }
 
+pub fn print_rune(value: rune) {
+    write_rune(stdout(), value);
+}
+
+pub fn eprint_rune(value: rune) {
+    write_rune(stderr(), value);
+}
+
+pub fn print_uint(value: u64) {
+    write_uint(stdout(), value);
+}
+
+pub fn eprint_uint(value: u64) {
+    write_uint(stderr(), value);
+}
+
+pub fn print_int(value: i64) {
+    write_int(stdout(), value);
+}
+
+pub fn eprint_int(value: i64) {
+    write_int(stderr(), value);
+}
+
+pub fn print(str: []u8) {
+    stdout().write(str);
+}
+
+pub fn eprint(str: []u8) {
+    stderr().write(str);
+}
+
+pub fn println(str: []u8) {
+    let fd = stdout();
+    fd.write(str);
+    fd.write_u8('\n' as u8);
+}
+
+pub fn eprintln(str: []u8) {
+    let fd = stderr();
+    fd.write(str);
+    fd.write_u8('\n' as u8);
+}
+
 pub fn write_rune(fd: Fd, value: rune) {
     let r = value as u32;
 
@@ -75,19 +119,10 @@ pub fn write_int(fd: Fd, value: i64) {
     write_uint(fd, value as u64);
 }
 
-pub fn print(s: []u8) {
-    c::fputs(c::to_cstr(s), c::stdout);
+pub fn stdout() Fd {
+    return Fd { _file: c::stdout };
 }
 
-pub fn eprint(s: []u8) {
-    c::fputs(c::to_cstr(s), c::stderr);
-}
-
-pub fn println(s: []u8) {
-    c::puts(c::to_cstr(s));
-}
-
-pub fn eprintln(s: []u8) {
-    c::fputs(c::to_cstr(s), c::stderr);
-    c::fputc('\n' as c::types::int, c::stderr);
+pub fn stderr() Fd {
+    return Fd { _file: c::stderr };
 }
