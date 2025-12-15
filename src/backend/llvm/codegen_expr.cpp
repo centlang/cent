@@ -1191,6 +1191,7 @@ Value Codegen::generate_bin_logical_expr(
         }
 
         m_builder.CreateBr(end);
+        auto* rhs_pred = m_builder.GetInsertBlock();
 
         m_builder.SetInsertPoint(end);
 
@@ -1201,7 +1202,7 @@ Value Codegen::generate_bin_logical_expr(
                 lhs_base_type->llvm_type, oper.value == OrOr),
             root);
 
-        phi->addIncoming(value_y.value, next);
+        phi->addIncoming(value_y.value, rhs_pred);
 
         return Value{.type = lhs_value.type, .value = phi};
     }
