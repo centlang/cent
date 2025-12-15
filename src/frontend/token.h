@@ -65,6 +65,9 @@ struct Token {
         GreaterEqual,
         LessEqual,
 
+        LessLess,
+        GreaterGreater,
+
         Eof,
 
         IntLiteral,

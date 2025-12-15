@@ -201,6 +201,7 @@ private:
             PXor,
             PAnd,
             PCmp,
+            PShift,
             PAdd,
             PMul
         };
@@ -225,6 +226,9 @@ private:
         case GreaterEqual:
         case LessEqual:
             return PCmp;
+        case LessLess:
+        case GreaterGreater:
+            return PShift;
         case Plus:
         case Minus:
             return PAdd;

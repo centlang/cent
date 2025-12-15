@@ -234,10 +234,10 @@ void Lexer::next_token() {
         with_equal(Bang, BangEqual);
         break;
     case '>':
-        with_equal(Greater, GreaterEqual);
+        twice_or_with_equal(Greater, GreaterGreater, GreaterEqual);
         break;
     case '<':
-        with_equal(Less, LessEqual);
+        twice_or_with_equal(Less, LessLess, LessEqual);
         break;
     case '&':
         twice_or_with_equal(And, AndAnd, AndEqual);

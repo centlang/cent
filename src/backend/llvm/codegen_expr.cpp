@@ -1349,9 +1349,10 @@ Value Codegen::generate_bin_expr(
     case And:
     case Or:
     case Xor:
+    case LessLess:
+    case GreaterGreater:
         if (!is_sint(value_base_type) && !is_uint(value_base_type)) {
             error(lhs.offset, "type mismatch");
-
             return Value::poisoned();
         }
 
@@ -1409,6 +1410,16 @@ Value Codegen::generate_bin_expr(
         return Value{
             .type = value_type,
             .value = m_builder.CreateXor(value_x.value, value_y.value)};
+    case LessLess:
+        return Value{
+            .type = value_type,
+            .value = m_builder.CreateShl(value_x.value, value_y.value)};
+    case GreaterGreater:
+        return Value{
+            .type = value_type,
+            .value = is_sint(value_base_type)
+                         ? m_builder.CreateAShr(value_x.value, value_y.value)
+                         : m_builder.CreateLShr(value_x.value, value_y.value)};
     case Less:
         if (is_float(value_base_type)) {
             return Value{
