@@ -21,10 +21,7 @@
 
 #include "backend/llvm/types/function.h"
 #include "backend/llvm/types/primitive.h"
-#include "backend/llvm/types/struct.h"
-#include "backend/llvm/types/union.h"
 
-#include "backend/llvm/generics.h"
 #include "backend/llvm/scope.h"
 
 namespace cent::ast {
@@ -225,9 +222,6 @@ private:
     [[nodiscard]] Value*
     get_name(std::size_t offset, std::string_view name, Scope& parent);
 
-    [[nodiscard]] GenericFunction*
-    get_generic_fn(std::size_t offset, std::string_view name, Scope& parent);
-
     [[nodiscard]] Scope*
     get_scope(std::size_t offset, std::string_view name, Scope& parent);
 
@@ -239,26 +233,6 @@ private:
     [[nodiscard]] types::Function* get_fn_type(
         Type* return_type, std::vector<Type*> param_types,
         std::vector<llvm::Constant*> default_args = {}, bool variadic = false);
-
-    [[nodiscard]] types::Struct*
-    inst_generic_struct(GenericStruct* type, const std::vector<Type*>& types);
-
-    [[nodiscard]] types::Union*
-    inst_generic_union(GenericUnion* type, const std::vector<Type*>& types);
-
-    [[nodiscard]] Value
-    inst_generic_fn(GenericFunction* function, const std::vector<Type*>& types);
-
-    [[nodiscard]] Value
-    inst_generic_fn(GenericFunction* function, const std::vector<Value>& args);
-
-    [[nodiscard]] bool deduce_template_arg(
-        Type* param, Type* arg,
-        std::map<types::TemplateParam*, Type*>& deduced);
-
-    [[nodiscard]] Type* inst_template_param(
-        const std::vector<types::TemplateParam*>& params,
-        const std::vector<Type*>& args, Type* type);
 
     [[nodiscard]] types::Pointer* get_ptr_type(Type* type, bool is_mutable);
     [[nodiscard]] types::Slice* get_slice_type(Type* type, bool is_mutable);
@@ -333,6 +307,15 @@ private:
         }
     }
 
+    template <typename... Args>
+    void not_implemented(
+        std::size_t offset, fmt::format_string<Args...> message,
+        Args&&... args) {
+        error(
+            offset, "not implemented: {}",
+            fmt::format(message, std::forward(args)...));
+    }
+
     [[nodiscard]] Attributes parse_attrs(
         const ast::Declaration& decl,
         const std::set<std::string_view>& allowed);
@@ -394,19 +377,6 @@ private:
 
     std::unique_ptr<ast::Module> m_program;
     std::string m_filename;
-
-    std::map<
-        GenericStruct*,
-        std::map<std::vector<Type*>, std::unique_ptr<types::Struct>>>
-        m_generic_struct_inst;
-
-    std::map<
-        GenericUnion*,
-        std::map<std::vector<Type*>, std::unique_ptr<types::Union>>>
-        m_generic_union_inst;
-
-    std::map<GenericFunction*, std::map<std::vector<Type*>, Value>>
-        m_generic_fns_inst;
 
     std::map<std::pair<Type*, bool>, std::unique_ptr<types::Pointer>>
         m_ptr_types;

@@ -5,8 +5,6 @@
 #include <map>
 #include <string_view>
 
-#include "generics.h"
-
 namespace cent::backend {
 
 struct Type;
@@ -26,10 +24,6 @@ struct Scope {
 
     NamesMap<Type*> types;
     NamesMap<Value> names;
-
-    NamesMap<std::shared_ptr<GenericStruct>> generic_structs;
-    NamesMap<std::shared_ptr<GenericUnion>> generic_unions;
-    NamesMap<std::shared_ptr<GenericFunction>> generic_fns;
 
     std::map<std::string_view, Scope> scopes;
 };

@@ -40,11 +40,7 @@ struct Type {
         Struct,
         Union,
         Function,
-        Alias,
-
-        TemplateParam,
-        TemplateStructInst,
-        TemplateUnionInst
+        Alias
     };
 
     [[nodiscard]] Type(Kind kind, llvm::Type* llvm_type)

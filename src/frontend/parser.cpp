@@ -1299,8 +1299,6 @@ std::vector<std::unique_ptr<ast::Type>> Parser::parse_template_args() {
 }
 
 std::vector<OffsetValue<std::string>> Parser::parse_template_params() {
-    static bool had_warning = false;
-
     auto offset = peek().offset;
 
     std::vector<OffsetValue<std::string>> result;
@@ -1311,11 +1309,6 @@ std::vector<OffsetValue<std::string>> Parser::parse_template_params() {
 
     if (!expect("`<`", Token::Type::Less)) {
         return result;
-    }
-
-    if (!had_warning) {
-        warning(offset, "generics are work-in-progress");
-        had_warning = true;
     }
 
     while (match(Token::Type::Identifier)) {

@@ -13,7 +13,6 @@
 #include "ast/decl/var_decl.h"
 
 #include "backend/llvm/types/alias.h"
-#include "backend/llvm/types/generic.h"
 #include "backend/llvm/types/struct.h"
 #include "backend/llvm/types/union.h"
 
@@ -132,9 +131,7 @@ Value Codegen::generate(const ast::FnDecl& decl) {
 }
 
 Value Codegen::generate(const ast::Struct& decl) {
-    if (m_current_scope->types.contains(decl.name.value) ||
-        m_current_scope->generic_structs.contains(decl.name.value) ||
-        m_current_scope->generic_unions.contains(decl.name.value)) {
+    if (m_current_scope->types.contains(decl.name.value)) {
         error(
             decl.name.offset, "{} is already defined",
             log::quoted(decl.name.value));
@@ -143,42 +140,7 @@ Value Codegen::generate(const ast::Struct& decl) {
     }
 
     if (!decl.template_params.empty()) {
-        std::vector<types::TemplateParam*> template_params;
-        auto current_scope_types = m_current_scope->types;
-
-        for (const auto& param : decl.template_params) {
-            m_named_types.push_back(
-                std::make_unique<types::TemplateParam>(param.value));
-
-            template_params.push_back(
-                static_cast<types::TemplateParam*>(m_named_types.back().get()));
-
-            m_current_scope->types[param.value] = {
-                .element = template_params.back(), .is_public = true};
-        }
-
-        std::vector<GenericStruct::Field> fields;
-        fields.reserve(decl.fields.size());
-
-        for (const auto& field : decl.fields) {
-            auto* type = field.type->codegen(*this);
-
-            if (!type) {
-                return Value::poisoned();
-            }
-
-            fields.emplace_back(field.name.value, type);
-        }
-
-        m_current_scope->types = current_scope_types;
-
-        m_current_scope->generic_structs[decl.name.value] = {
-            .element = std::make_shared<GenericStruct>(
-                m_current_scope_prefix + decl.name.value, std::move(fields),
-                std::move(template_params)),
-            .is_public = decl.is_public,
-            .unit = m_current_unit};
-
+        not_implemented(decl.template_params[0].offset, "generic structs");
         return Value::poisoned();
     }
 
@@ -225,9 +187,7 @@ Value Codegen::generate(const ast::Union& decl) {
     auto attrs = parse_attrs(decl, {"untagged"});
     bool untagged = attrs.contains("untagged");
 
-    if (m_current_scope->types.contains(decl.name.value) ||
-        m_current_scope->generic_structs.contains(decl.name.value) ||
-        m_current_scope->generic_unions.contains(decl.name.value)) {
+    if (m_current_scope->types.contains(decl.name.value)) {
         error(
             decl.name.offset, "{} is already defined",
             log::quoted(decl.name.value));
@@ -236,69 +196,7 @@ Value Codegen::generate(const ast::Union& decl) {
     }
 
     if (!decl.template_params.empty()) {
-        std::vector<types::TemplateParam*> template_params;
-        auto current_scope_types = m_current_scope->types;
-
-        for (const auto& param : decl.template_params) {
-            m_named_types.push_back(
-                std::make_unique<types::TemplateParam>(param.value));
-
-            template_params.push_back(
-                static_cast<types::TemplateParam*>(m_named_types.back().get()));
-
-            m_current_scope->types[param.value] = {
-                .element = template_params.back(), .is_public = true};
-        }
-
-        std::vector<GenericUnion::Field> fields;
-        fields.reserve(decl.fields.size());
-
-        for (const auto& field : decl.fields) {
-            auto* type = field.type->codegen(*this);
-
-            if (!type) {
-                return Value::poisoned();
-            }
-
-            fields.emplace_back(field.name.value, type);
-        }
-
-        m_current_scope->types = current_scope_types;
-
-        types::Enum* tag_type = nullptr;
-
-        if (!untagged) {
-            auto* underlying = m_primitive_types["i32"].get();
-
-            m_named_types.push_back(
-                std::make_unique<types::Enum>(
-                    underlying->llvm_type,
-                    m_current_scope_prefix + decl.name.value + "(tag)",
-                    underlying));
-
-            auto* type = static_cast<types::Enum*>(m_named_types.back().get());
-
-            for (std::size_t i = 0; i < decl.fields.size(); ++i) {
-                m_current_scope->scopes[decl.name.value]
-                    .names[decl.fields[i].name.value] = {
-                    .element =
-                        {.type = tag_type,
-                         .value =
-                             llvm::ConstantInt::get(underlying->llvm_type, i)},
-                    .is_public = decl.is_public,
-                    .unit = m_current_unit};
-            }
-
-            tag_type = type;
-        }
-
-        m_current_scope->generic_unions[decl.name.value] = {
-            .element = std::make_shared<GenericUnion>(
-                m_current_scope_prefix + decl.name.value, std::move(fields),
-                std::move(template_params), tag_type),
-            .is_public = decl.is_public,
-            .unit = m_current_unit};
-
+        not_implemented(decl.template_params[0].offset, "generic unions");
         return Value::poisoned();
     }
 
@@ -691,7 +589,6 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
 
     if (!is_extern && !decl.block) {
         error(decl.name.offset, "{} has no body", log::quoted(decl.name.value));
-
         return;
     }
 
@@ -707,62 +604,7 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
     }
 
     if (!decl.template_params.empty()) {
-        std::vector<types::TemplateParam*> template_params;
-        auto current_scope_types = m_current_scope->types;
-
-        for (const auto& param : decl.template_params) {
-            m_named_types.push_back(
-                std::make_unique<types::TemplateParam>(param.value));
-
-            template_params.emplace_back(
-                static_cast<types::TemplateParam*>(m_named_types.back().get()));
-
-            m_current_scope->types[param.value] = {
-                .element = template_params.back()};
-        }
-
-        Type* return_type = m_void_type.get();
-
-        if (decl.proto.return_type) {
-            return_type = decl.proto.return_type->codegen(*this);
-
-            if (!return_type) {
-                return;
-            }
-        }
-
-        std::vector<GenericFunction::Param> params;
-        std::vector<const ast::Expression*> default_args;
-
-        params.reserve(decl.proto.params.size());
-
-        for (const auto& parameter : decl.proto.params) {
-            auto* type = parameter.type->codegen(*this);
-
-            if (!type) {
-                return;
-            }
-
-            params.emplace_back(
-                parameter.name.value, type, parameter.is_mutable);
-
-            if (!parameter.value) {
-                continue;
-            }
-
-            default_args.push_back(parameter.value.get());
-        }
-
-        m_current_scope->types = current_scope_types;
-
-        m_current_scope->generic_fns[decl.name.value] = {
-            .element = std::make_shared<GenericFunction>(
-                m_current_scope_prefix + decl.name.value, decl.name.offset,
-                return_type, std::move(params), std::move(default_args),
-                decl.block.get(), std::move(template_params)),
-            .is_public = decl.is_public,
-            .unit = m_current_unit};
-
+        not_implemented(decl.template_params[0].offset, "generic functions");
         return;
     }
 

@@ -680,99 +680,6 @@ Value Codegen::generate(const ast::CallExpr& expr) {
         return Value::poisoned();
     };
 
-    if (auto* identifier =
-            dynamic_cast<ast::Identifier*>(expr.identifier.get())) {
-        auto* scope = resolve_scope(identifier->value);
-
-        if (!scope) {
-            return Value::poisoned();
-        }
-
-        auto [name, offset] = identifier->value.back();
-
-        if (auto value = scope->names.find(name); value != scope->names.end()) {
-            if (!is_accessible(value->second, m_current_unit)) {
-                error(offset, "{} is private", log::quoted(name));
-                return Value::poisoned();
-            }
-
-            auto function = load_rvalue(value->second.element);
-
-            return create_fn_call(function);
-        }
-
-        auto* generic_fn = get_generic_fn(offset, name, *scope);
-
-        if (!generic_fn) {
-            return Value::poisoned();
-        }
-
-        auto params_size = generic_fn->params.size();
-        auto args_size = expr.arguments.size();
-        auto default_args_size = generic_fn->default_args.size();
-
-        if (args_size < params_size - default_args_size ||
-            args_size > params_size) {
-            error(
-                expr.identifier->offset,
-                "incorrect number of arguments passed");
-
-            return Value::poisoned();
-        }
-
-        std::vector<Value> arguments;
-        arguments.reserve(params_size);
-
-        for (std::size_t i = 0; i < args_size; ++i) {
-            auto value = expr.arguments[i]->codegen(*this);
-
-            if (!value.ok()) {
-                return Value::poisoned();
-            }
-
-            if (auto val = cast_or_error(
-                    expr.arguments[i]->offset, generic_fn->params[i].type,
-                    value);
-                val.ok()) {
-                arguments.push_back(load_rvalue(val));
-            } else {
-                return Value::poisoned();
-            }
-        }
-
-        for (std::size_t i = default_args_size - (params_size - args_size);
-             i < default_args_size; ++i) {
-            auto arg = generic_fn->default_args[i]->codegen(*this);
-
-            if (!arg.ok()) {
-                return Value::poisoned();
-            }
-
-            arguments.push_back(arg);
-        }
-
-        auto function = inst_generic_fn(generic_fn, arguments);
-
-        if (!function.ok()) {
-            return Value::poisoned();
-        }
-
-        auto* type = static_cast<types::Function*>(function.type);
-
-        std::vector<llvm::Value*> llvm_args;
-        llvm_args.reserve(params_size);
-
-        for (auto arg : arguments) {
-            llvm_args.push_back(arg.value);
-        }
-
-        return Value{
-            .type = type->return_type,
-            .value = m_builder.CreateCall(
-                static_cast<llvm::FunctionType*>(type->llvm_type),
-                function.value, llvm_args)};
-    }
-
     auto value = expr.identifier->codegen(*this);
 
     if (!value.ok()) {
@@ -785,42 +692,8 @@ Value Codegen::generate(const ast::CallExpr& expr) {
 }
 
 Value Codegen::generate(const ast::CallExprGeneric& expr) {
-    auto* scope = resolve_scope(expr.identifier->value);
-
-    if (!scope) {
-        return Value::poisoned();
-    }
-
-    auto [name, offset] = expr.identifier->value.back();
-
-    auto* generic_fn = get_generic_fn(offset, name, *scope);
-
-    if (!generic_fn) {
-        return Value::poisoned();
-    }
-
-    std::vector<Type*> template_args;
-    template_args.reserve(expr.template_args.size());
-
-    for (const auto& arg : expr.template_args) {
-        auto* type = arg->codegen(*this);
-
-        if (!type) {
-            return Value::poisoned();
-        }
-
-        template_args.push_back(type);
-    }
-
-    auto function = inst_generic_fn(generic_fn, template_args);
-
-    if (!function.ok()) {
-        return Value::poisoned();
-    }
-
-    return create_call(
-        expr.identifier->offset, static_cast<types::Function*>(function.type),
-        function.value, expr.arguments);
+    not_implemented(expr.identifier->offset, "generic function calls");
+    return Value::poisoned();
 }
 
 Value Codegen::generate(const ast::MethodExpr& expr) {

@@ -8,7 +8,6 @@
 #include "ast/decl/var_decl.h"
 
 #include "backend/llvm/types/enum.h"
-#include "backend/llvm/types/generic.h"
 
 #include "backend/llvm/codegen.h"
 
@@ -427,10 +426,6 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
     if (base_type == base_value_type) {
         return Value{
             .type = type, .value = value.value, .ptr_depth = value.ptr_depth};
-    }
-
-    if (is<types::TemplateParam>(base_type)) {
-        return value;
     }
 
     if (is<types::Void>(base_type)) {
@@ -886,30 +881,6 @@ Codegen::get_name(std::size_t offset, std::string_view name, Scope& parent) {
 
     if (is_accessible(iterator->second, m_current_unit)) {
         return &iterator->second.element;
-    }
-
-    error(offset, "{} is private", log::quoted(name));
-
-    return nullptr;
-}
-
-GenericFunction* Codegen::get_generic_fn(
-    std::size_t offset, std::string_view name, Scope& parent) {
-    auto iterator = parent.generic_fns.find(name);
-
-    if (iterator == parent.generic_fns.end()) {
-        if (auto hint = did_you_mean_hint(name, parent.names)) {
-            error_hint(
-                offset, *hint, "undeclared function: {}", log::quoted(name));
-        } else {
-            error(offset, "undeclared function: {}", log::quoted(name));
-        }
-
-        return nullptr;
-    }
-
-    if (is_accessible(iterator->second, m_current_unit)) {
-        return iterator->second.element.get();
     }
 
     error(offset, "{} is private", log::quoted(name));
