@@ -403,7 +403,6 @@ Value Codegen::generate(const ast::VarDecl& decl) {
     bool is_extern = attrs.contains("extern");
 
     auto& result = m_current_scope->names[decl.name.value];
-    result = {.element = Value::poisoned()};
 
     if (decl.mutability == ast::VarDecl::Mut::Const) {
         if (!decl.value) {
