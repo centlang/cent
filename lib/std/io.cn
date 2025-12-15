@@ -12,6 +12,69 @@ pub fn Fd::write(self: Fd, data: []u8) {
     c::fwrite(&data[0] as *c::types::void, 1, data.len, self._file);
 }
 
+pub fn write_rune(fd: Fd, value: rune) {
+    let r = value as u32;
+
+    if r > 0x10ffff || (r >= 0xd800 && r <= 0xdfff) {
+        return;
+    }
+
+    if r <= 0x7f {
+        fd.write_u8((r) as u8);
+        return;
+    }
+
+    if r <= 0x7ff {
+        fd.write_u8((0xc0 | (r >> 6)) as u8);
+        fd.write_u8((0x80 | (r & 0x3f)) as u8);
+        return;
+    }
+
+    if r <= 0xffff {
+        fd.write_u8((0xe0 | (r >> 12)) as u8);
+        fd.write_u8((0x80 | ((r >> 6) & 0x3f)) as u8);
+        fd.write_u8((0x80 | (r & 0x3f)) as u8);
+        return;
+    }
+
+    fd.write_u8((0xf0 | (r >> 18)) as u8);
+    fd.write_u8((0x80 | ((r >> 12) & 0x3f)) as u8);
+    fd.write_u8((0x80 | ((r >> 6) & 0x3f)) as u8);
+    fd.write_u8((0x80 | (r & 0x3f)) as u8);
+}
+
+pub fn write_uint(fd: Fd, mut value: u64) {
+    mut buf: [20]u8 = undefined;
+    mut i: usize;
+
+    if value == 0 {
+        fd.write_u8('0' as u8);
+        return;
+    }
+
+    while value > 0 {
+        buf[i] = ('0' as u8 + (value % 10) as u8);
+
+        value /= 10;
+        i += 1;
+    }
+
+    while i > 0 {
+        fd.write_u8(buf[i - 1] as u8);
+        i -= 1;
+    }
+}
+
+pub fn write_int(fd: Fd, value: i64) {
+    if value < 0 {
+        fd.write_u8('-' as u8);
+        write_uint(fd, (-(value + 1) + 1) as u64);
+        return;
+    }
+
+    write_uint(fd, value as u64);
+}
+
 pub fn print(s: []u8) {
     c::fputs(c::to_cstr(s), c::stdout);
 }
