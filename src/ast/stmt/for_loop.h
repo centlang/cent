@@ -13,11 +13,12 @@ namespace cent::ast {
 
 struct ForLoop : detail::Stmt<ForLoop> {
     [[nodiscard]] ForLoop(
-        std::size_t offset, OffsetValue<std::string> name,
+        std::size_t offset, bool is_mutable, OffsetValue<std::string> name,
         std::unique_ptr<Expression> value, std::unique_ptr<BlockStmt> body)
-    : Stmt{offset}, name{std::move(name)}, value{std::move(value)},
-      body{std::move(body)} {}
+    : Stmt{offset}, is_mutable{is_mutable}, name{std::move(name)},
+      value{std::move(value)}, body{std::move(body)} {}
 
+    bool is_mutable;
     OffsetValue<std::string> name;
 
     std::unique_ptr<Expression> value;

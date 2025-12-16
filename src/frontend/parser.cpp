@@ -1168,6 +1168,13 @@ void Parser::parse_while(ast::BlockStmt& block) {
 
 void Parser::parse_for(ast::BlockStmt& block) {
     auto offset = get().offset;
+
+    bool is_mutable = false;
+
+    if (match_next(Token::Type::Mut)) {
+        is_mutable = true;
+    }
+
     auto name = expect("variable name", Token::Type::Identifier);
 
     if (!name) {
@@ -1192,7 +1199,7 @@ void Parser::parse_for(ast::BlockStmt& block) {
 
     block.body.push_back(
         std::make_unique<ast::ForLoop>(
-            offset,
+            offset, is_mutable,
             OffsetValue{
                 .value = std::move(name->value), .offset = name->offset},
             std::move(value), std::move(body)));

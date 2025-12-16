@@ -337,6 +337,11 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
     m_loop_end = llvm::BasicBlock::Create(m_context, "", function);
 
     if (auto* type = dyn_cast<types::Slice>(value.type)) {
+        if (stmt.is_mutable && !type->is_mutable) {
+            error(stmt.value->offset, "slice is not mutable");
+            return Value::poisoned();
+        }
+
         auto* llvm_contained_type = type->type->llvm_type;
 
         auto* usize = m_module->getDataLayout().getIntPtrType(m_context);
@@ -362,10 +367,10 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
         m_current_scope->names[stmt.name.value] = {
             .element =
                 {.type = type->type,
-                 .value = m_builder.CreateLoad(
-                     llvm_contained_type,
-                     m_builder.CreateGEP(
-                         llvm_contained_type, ptr_value, index_value))},
+                 .value = m_builder.CreateGEP(
+                     llvm_contained_type, ptr_value, index_value),
+                 .ptr_depth = 1,
+                 .is_mutable = stmt.is_mutable},
             .unit = m_current_unit};
 
         stmt.body->codegen(*this);
@@ -394,6 +399,11 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
     }
 
     if (auto* type = dyn_cast<types::Array>(value.type)) {
+        if (stmt.is_mutable && !value.is_mutable) {
+            error(stmt.value->offset, "array is not mutable");
+            return Value::poisoned();
+        }
+
         auto* llvm_contained_type = type->type->llvm_type;
 
         auto* usize = m_module->getDataLayout().getIntPtrType(m_context);
@@ -416,10 +426,10 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
         m_current_scope->names[stmt.name.value] = {
             .element =
                 {.type = type->type,
-                 .value = m_builder.CreateLoad(
-                     llvm_contained_type,
-                     m_builder.CreateGEP(
-                         llvm_contained_type, value.value, index_value))},
+                 .value = m_builder.CreateGEP(
+                     llvm_contained_type, value.value, index_value),
+                 .ptr_depth = 1,
+                 .is_mutable = stmt.is_mutable},
             .unit = m_current_unit};
 
         stmt.body->codegen(*this);
@@ -451,7 +461,11 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
     if (!type) {
         error(stmt.value->offset, "not iterable");
+        return Value::poisoned();
+    }
 
+    if (stmt.is_mutable) {
+        error(stmt.value->offset, "ranges are not mutable");
         return Value::poisoned();
     }
 
@@ -465,7 +479,6 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
     if (!is_sint(type->type) && !is_uint(type->type)) {
         error(stmt.value->offset, "type mismatch");
-
         return Value::poisoned();
     }
 
