@@ -18,6 +18,7 @@
 #include "ast/expr/sizeof_expr.h"
 #include "ast/expr/slice_expr.h"
 #include "ast/expr/unary_expr.h"
+#include "ast/expr/unwrap_expr.h"
 
 #include "ast/type/array_type.h"
 #include "ast/type/named_type.h"
@@ -54,7 +55,6 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
 
         if (!is_sint(base_type) && !is_uint(base_type)) {
             error(expr.offset, "cannot apply `-` to a non-number type");
-
             return Value::poisoned();
         }
 
@@ -64,7 +64,6 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
     case Bang:
         if (!is<types::Bool>(base_type)) {
             error(expr.offset, "cannot apply `!` to a non-boolean type");
-
             return Value::poisoned();
         }
 
@@ -76,7 +75,6 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
 
         if (!pointer) {
             error(expr.offset, "dereference of a non-pointer type");
-
             return Value::poisoned();
         }
 
@@ -95,7 +93,6 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
         if (!llvm::isa<llvm::AllocaInst>(value.value) &&
             !llvm::isa<llvm::GetElementPtrInst>(value.value)) {
             error(expr.offset, "taking the reference of a non-variable value");
-
             return Value::poisoned();
         }
 
@@ -106,7 +103,6 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
     case Not:
         if (!is_sint(base_type) && !is_uint(base_type)) {
             error(expr.offset, "cannot apply `~` to a non-integer type");
-
             return Value::poisoned();
         }
 
@@ -116,6 +112,23 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
     default:
         return Value::poisoned();
     }
+}
+
+Value Codegen::generate(const ast::UnwrapExpr& expr) {
+    auto value = expr.value->codegen(*this);
+
+    if (!value.ok()) {
+        return Value::poisoned();
+    }
+
+    auto* optional = dyn_cast<types::Optional>(unwrap_type(value.type));
+
+    if (!optional) {
+        error(expr.offset, "cannot apply `.!` to a non-optional type");
+        return Value::poisoned();
+    }
+
+    return Value{.type = optional->type, .value = get_optional_value(value)};
 }
 
 Value Codegen::generate(const ast::IntLiteral& expr) {

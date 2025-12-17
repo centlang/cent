@@ -49,6 +49,7 @@ struct Unreachable;
 
 struct BinaryExpr;
 struct UnaryExpr;
+struct UnwrapExpr;
 struct IntLiteral;
 struct FloatLiteral;
 struct StrLiteral;
@@ -123,6 +124,7 @@ public:
 
     [[nodiscard]] Value generate(const ast::BinaryExpr& expr);
     [[nodiscard]] Value generate(const ast::UnaryExpr& expr);
+    [[nodiscard]] Value generate(const ast::UnwrapExpr& expr);
     [[nodiscard]] Value generate(const ast::IntLiteral& expr);
     [[nodiscard]] Value generate(const ast::FloatLiteral& expr);
     [[nodiscard]] Value generate(const ast::StrLiteral& expr);

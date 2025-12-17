@@ -8,6 +8,7 @@
 #include "ast/expr/sizeof_expr.h"
 #include "ast/expr/slice_expr.h"
 #include "ast/expr/unary_expr.h"
+#include "ast/expr/unwrap_expr.h"
 
 #include "ast/stmt/assignment.h"
 #include "ast/stmt/break_stmt.h"
@@ -740,6 +741,13 @@ Parser::expect_access_or_call_expr(bool is_condition) {
 
         if (!match_next(Dot)) {
             return expression;
+        }
+
+        if (match_next(Bang)) {
+            expression = std::make_unique<ast::UnwrapExpr>(
+                expression->offset, std::move(expression));
+
+            continue;
         }
 
         auto member = expect("member name", Identifier, IntLiteral);
