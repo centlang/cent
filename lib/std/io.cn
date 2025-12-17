@@ -22,6 +22,26 @@ pub fn Fd::read_u8(self: Fd) ?u8 {
     return c as u8;
 }
 
+pub fn Fd::read_line_to(self: Fd, data: []mut u8) ?[]mut u8 {
+    for i in 0..data.len {
+        let c = self.read_u8();
+
+        if c == null {
+            return data[:i];
+        }
+
+        let c = c.! as u8;
+
+        if c == '\n' as u8 {
+            return data[:i];
+        }
+
+        data[i] = c;
+    }
+
+    return null;
+}
+
 pub fn print_rune(value: rune) {
     write_rune(stdout(), value);
 }
