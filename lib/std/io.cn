@@ -86,6 +86,18 @@ pub fn eprintln(str: []u8) {
     fd.write_u8('\n' as u8);
 }
 
+pub fn input_line_to(buf: []mut u8) ?[]mut u8 {
+    return stdin().read_line_to(buf);
+}
+
+pub fn input_uint() ?u64 {
+    return read_uint(stdin());
+}
+
+pub fn input_int() ?i64 {
+    return read_int(stdin());
+}
+
 pub fn write_rune(fd: Fd, value: rune) {
     let r = value as u32;
 
@@ -147,6 +159,30 @@ pub fn write_int(fd: Fd, value: i64) {
     }
 
     write_uint(fd, value as u64);
+}
+
+pub fn read_uint(fd: Fd) ?u64 {
+    // TODO: do not rely on fscanf
+
+    mut r: u64 = undefined;
+
+    if c::fscanf(fd._file, c::to_cstr("%llu"), &r) != 1 {
+        return null;
+    }
+
+    return r;
+}
+
+pub fn read_int(fd: Fd) ?i64 {
+    // TODO: do not rely on fscanf
+
+    mut r: i64 = undefined;
+
+    if c::fscanf(fd._file, c::to_cstr("%lli"), &r) != 1 {
+        return null;
+    }
+
+    return r;
 }
 
 pub fn stdout() Fd {
