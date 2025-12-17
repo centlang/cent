@@ -3,7 +3,10 @@ with c::types;
 pub const EXIT_SUCCESS = 0;
 pub const EXIT_FAILURE = 1;
 
+pub const EOF = -1;
+
 !(extern) pub mut stdout: *mut types::FILE;
+!(extern) pub mut stdin: *mut types::FILE;
 !(extern) pub mut stderr: *mut types::FILE;
 
 pub fn to_cstr(s: []u8) *types::char {
@@ -67,6 +70,7 @@ pub fn to_cstr(s: []u8) *types::char {
 
 !(extern) pub fn printf(format: *types::char, ...) types::int;
 !(extern) pub fn putchar(c: types::int) types::int;
+!(extern) pub fn getchar() types::int;
 
 !(extern) pub fn sprintf(
     str: *mut types::char, format: *types::char, ...
@@ -103,6 +107,9 @@ pub fn to_cstr(s: []u8) *types::char {
 !(extern) pub fn fgets(
     s: *mut types::char, size: types::int, stream: *mut types::FILE
 ) ?*mut types::char;
+
+!(extern) pub fn fgetc(stream: *mut types::FILE) types::int;
+!(extern) pub fn getc(stream: *mut types::FILE) types::int;
 
 !(extern) pub fn fputs(s: *types::char, stream: *mut types::FILE) types::int;
 !(extern) pub fn fputc(c: types::int, stream: *mut types::FILE) types::int;
