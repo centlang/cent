@@ -14,5 +14,5 @@ pub type ulonglong = u64;
 pub type float = f32;
 pub type double = f64;
 
-pub type time = i64;
+pub type time_t = i64;
 pub type FILE = void;

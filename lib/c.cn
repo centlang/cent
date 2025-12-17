@@ -16,7 +16,7 @@ pub fn to_cstr(s: []u8) *types::char {
 !(extern) pub fn exit(status: types::int) never;
 !(extern) pub fn rand() types::int;
 !(extern) pub fn srand(seed: types::uint);
-!(extern) pub fn time(tloc: ?*types::time) types::time;
+!(extern) pub fn time(tloc: ?*types::time_t) types::time_t;
 !(extern) pub fn malloc(size: usize) ?*mut types::void;
 !(extern) pub fn calloc(n: usize, size: usize) ?*mut types::void;
 !(extern) pub fn realloc(p: ?*mut types::void, size: usize) ?*mut types::void;

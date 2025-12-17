@@ -1,0 +1,51 @@
+with posix::types;
+with c;
+
+pub const STDIN_FILENO = 0;
+pub const STDOUT_FILENO = 1;
+pub const STDERR_FILENO = 2;
+
+pub const SIGINT = 2;
+pub const SIGKILL = 9;
+pub const SIGTERM = 15;
+
+pub const O_RDONLY = 0;
+pub const O_WRONLY = 1;
+pub const O_RDWR = 2;
+
+!(extern) pub fn open(
+    path: *c::types::char, flags: c::types::int, mode: types::mode_t
+);
+
+!(extern) pub fn close(fd: c::types::int) c::types::int;
+
+!(extern) pub fn read(
+    fd: c::types::int, buf: *mut c::types::void, count: usize
+) isize;
+
+!(extern) pub fn write(
+    fd: c::types::int, buf: *c::types::void, count: usize
+) isize;
+
+!(extern) pub fn fork() types::pid_t;
+
+!(extern) pub fn execve(
+    path: *c::types::char, argv: *mut ?*c::types::char,
+    envp: *mut ?*c::types::char
+) c::types::int;
+
+!(extern) pub fn waitpid(
+    pid: types::pid_t, wstatus: ?*c::types::int, options: c::types::int
+) types::pid_t;
+
+!(extern) pub fn _exit(status: c::types::int);
+!(extern) pub fn kill(pid: types::pid_t, sig: c::types::int) c::types::int;
+
+!(extern) pub fn mmap(
+    addr: *mut c::types::void, length: usize, prot: c::types::int,
+    flags: c::types::int, fd: c::types::int, offset: types::off_t
+) *mut c::types::void;
+
+!(extern) pub fn munmap(
+    length: usize, addr: *mut c::types::void, length: usize
+) c::types::int;
