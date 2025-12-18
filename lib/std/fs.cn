@@ -1,0 +1,51 @@
+with io;
+with c;
+with posix;
+
+pub enum Mode u8 {
+    read = 1 << 0,
+    write = 1 << 1,
+    append = 1 << 2,
+    trunc = 1 << 3,
+    create = 1 << 4,
+}
+
+pub fn open(path: []u8, mode: Mode) ?io::Fd {
+    let file = c::fopen(c::to_cstr(path), c::to_cstr(to_libc_mode(mode)));
+
+    if file == null {
+        return null;
+    }
+
+    return io::Fd { _file: file.! };
+}
+
+pub fn mkdir(path: []u8) bool {
+    return posix::mkdir(
+        c::to_cstr(path), posix::S_IRWXU | posix::S_IRWXG | posix::S_IRWXO
+    ) == 0;
+}
+
+fn to_libc_mode(mode: Mode) []u8 {
+    if (mode & Mode::read) as u8 != 0 && (mode & Mode::write) as u8 == 0 {
+        return "rb";
+    }
+
+    if (mode & Mode::read) as u8 == 0 && (mode & Mode::write) as u8 != 0 {
+        if (mode & Mode::append) as u8 != 0 {
+            return "ab";
+        }
+
+        return "wb";
+    }
+
+    if (mode & Mode::append) as u8 != 0 {
+        return "a+b";
+    }
+
+    if (mode & Mode::trunc) as u8 != 0 {
+        return "w+b";
+    }
+
+    return "r+b";
+}
