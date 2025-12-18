@@ -292,6 +292,8 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
         return Value::poisoned();
     }
 
+    auto* underlying = m_primitive_types["i32"].get();
+
     if (decl.type) {
         auto* type = decl.type->codegen(*this);
 
@@ -304,28 +306,20 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
             return Value::poisoned();
         }
 
-        m_named_types.push_back(
-            std::make_unique<types::Enum>(
-                type->llvm_type, m_current_scope_prefix + decl.name.value,
-                type));
-
-        m_current_scope->types[decl.name.value] = {
-            .element = m_named_types.back().get(),
-            .is_public = decl.is_public,
-            .unit = m_current_unit};
+        underlying = type;
     }
-
-    auto* underlying = m_primitive_types["i32"].get();
 
     m_named_types.push_back(
         std::make_unique<types::Enum>(
             underlying->llvm_type, m_current_scope_prefix + decl.name.value,
             underlying));
 
-    auto* type = static_cast<types::Enum*>(m_named_types.back().get());
-
     m_current_scope->types[decl.name.value] = {
-        .element = type, .is_public = decl.is_public, .unit = m_current_unit};
+        .element = m_named_types.back().get(),
+        .is_public = decl.is_public,
+        .unit = m_current_unit};
+
+    auto* type = static_cast<types::Enum*>(m_named_types.back().get());
 
     std::uint64_t number = 0;
 
@@ -337,7 +331,7 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
                 .element =
                     {.type = type,
                      .value = llvm::ConstantInt::get(
-                         type->llvm_type, number++, is_sint(type))},
+                         underlying->llvm_type, number++, is_sint(underlying))},
                 .is_public = decl.is_public,
                 .unit = m_current_unit};
 
@@ -350,10 +344,10 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
             return Value::poisoned();
         }
 
-        if (auto val = cast_or_error(field.value->offset, type->type, value);
+        if (auto val = cast_or_error(field.value->offset, underlying, value);
             val.ok()) {
             m_current_scope->scopes[decl.name.value].names[field.name.value] = {
-                .element = val,
+                .element = {.type = type, .value = val.value},
                 .is_public = decl.is_public,
                 .unit = m_current_unit};
 
@@ -362,7 +356,6 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
                                        : constant->getZExtValue();
             } else {
                 error(field.value->offset, "not a constant");
-
                 return Value::poisoned();
             }
         } else {

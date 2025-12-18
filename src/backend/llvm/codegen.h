@@ -375,7 +375,6 @@ private:
     std::unique_ptr<types::Void> m_void_type;
 
     llvm::StructType* m_slice_type{};
-    llvm::Function* m_panic_fn{};
 
     std::unique_ptr<ast::Module> m_program;
     std::string m_filename;
