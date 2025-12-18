@@ -1361,12 +1361,19 @@ Value Codegen::generate_bin_expr(
         break;
     }
     case Percent:
-    case And:
-    case Or:
-    case Xor:
     case LessLess:
     case GreaterGreater:
         if (!is_sint(value_base_type) && !is_uint(value_base_type)) {
+            error(lhs.offset, "type mismatch");
+            return Value::poisoned();
+        }
+
+        break;
+    case And:
+    case Or:
+    case Xor:
+        if (!is_sint(value_base_type) && !is_uint(value_base_type) &&
+            !is<types::Enum>(value_base_type)) {
             error(lhs.offset, "type mismatch");
             return Value::poisoned();
         }
