@@ -275,11 +275,7 @@ Value Codegen::generate(const ast::RangeLiteral& expr) {
         }
     }
 
-    bool stack_allocated = m_current_result == nullptr;
-
-    auto* variable = m_current_result
-                         ? m_current_result
-                         : create_alloca_or_error(expr.offset, type->llvm_type);
+    auto* variable = create_alloca_or_error(expr.offset, type->llvm_type);
 
     if (!variable) {
         return Value::poisoned();
@@ -291,14 +287,11 @@ Value Codegen::generate(const ast::RangeLiteral& expr) {
     auto* end_ptr =
         m_builder.CreateStructGEP(type->llvm_type, variable, range_member_end);
 
-    m_builder.CreateStore(value_x.value, begin_ptr);
-    m_builder.CreateStore(value_y.value, end_ptr);
+    create_store(value_x, begin_ptr);
+    create_store(value_y, end_ptr);
 
     return Value{
-        .type = type,
-        .value = variable,
-        .ptr_depth = 1,
-        .stack_allocated = stack_allocated};
+        .type = type, .value = variable, .ptr_depth = 1, .memcpy = true};
 }
 
 Value Codegen::generate(const ast::StructLiteral& expr) {
@@ -325,8 +318,6 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
     };
 
     if (auto* union_type = dyn_cast<types::Union>(type)) {
-        bool stack_allocated = m_current_result == nullptr;
-
         if (expr.fields.size() != 1) {
             error(
                 expr.type->offset,
@@ -343,9 +334,7 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
         }
 
         auto* variable =
-            m_current_result
-                ? m_current_result
-                : create_alloca_or_error(expr.offset, union_type->llvm_type);
+            create_alloca_or_error(expr.offset, union_type->llvm_type);
 
         if (!variable) {
             return Value::poisoned();
@@ -359,14 +348,17 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
             return Value::poisoned();
         }
 
-        m_current_result = m_builder.CreateStructGEP(
+        auto* value_ptr = m_builder.CreateStructGEP(
             union_type->llvm_type, variable, union_member_value);
 
-        if (!cast_to_result_or_error(
-                field.value->offset, union_type->fields[*index], value)) {
-            m_current_result = nullptr;
+        auto val = cast_or_error(
+            field.value->offset, union_type->fields[*index], value);
+
+        if (!val.ok()) {
             return Value::poisoned();
         }
+
+        create_store(val, value_ptr);
 
         if (union_type->tag_type) {
             auto* tag_member = m_builder.CreateStructGEP(
@@ -377,30 +369,21 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
                 tag_member);
         }
 
-        m_current_result = nullptr;
-
         return Value{
-            .type = type,
-            .value = variable,
-            .ptr_depth = 1,
-            .stack_allocated = stack_allocated};
+            .type = type, .value = variable, .ptr_depth = 1, .memcpy = true};
     }
 
     auto* struct_type = dyn_cast<types::Struct>(type);
 
     if (!struct_type) {
         error(expr.type->offset, "not a structure");
-
         return Value::poisoned();
     }
 
     bool is_const = true;
 
-    bool stack_allocated = m_current_result == nullptr;
-
     if (expr.fields.size() != struct_type->fields.size()) {
         error(expr.type->offset, "incorrect number of fields initialized");
-
         return Value::poisoned();
     }
 
@@ -452,9 +435,7 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
     }
 
     auto* variable =
-        m_current_result
-            ? m_current_result
-            : create_alloca_or_error(expr.offset, struct_type->llvm_type);
+        create_alloca_or_error(expr.offset, struct_type->llvm_type);
 
     if (!variable) {
         return Value::poisoned();
@@ -472,23 +453,21 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
             return Value::poisoned();
         }
 
-        m_current_result =
+        auto* member =
             m_builder.CreateStructGEP(struct_type->llvm_type, variable, *index);
 
-        if (!cast_to_result_or_error(
-                field.value->offset, struct_type->fields[*index], value)) {
-            m_current_result = nullptr;
+        auto val = cast_or_error(
+            field.value->offset, struct_type->fields[*index], value);
+
+        if (!val.ok()) {
             return Value::poisoned();
         }
 
-        m_current_result = nullptr;
+        create_store(val, member);
     }
 
     return Value{
-        .type = type,
-        .value = variable,
-        .ptr_depth = 1,
-        .stack_allocated = stack_allocated};
+        .type = type, .value = variable, .ptr_depth = 1, .memcpy = true};
 }
 
 Value Codegen::generate(const ast::ArrayLiteral& expr) {
@@ -503,8 +482,6 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
                    : type->codegen(*this, expr.elements.size()));
 
     auto* llvm_type = static_cast<llvm::ArrayType*>(array_type->llvm_type);
-
-    bool stack_allocated = m_current_result == nullptr;
 
     bool is_const = true;
 
@@ -545,9 +522,7 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
             .value = llvm::ConstantArray::get(llvm_type, llvm_values)};
     }
 
-    auto* variable = m_current_result
-                         ? m_current_result
-                         : create_alloca_or_error(expr.offset, llvm_type);
+    auto* variable = create_alloca_or_error(expr.offset, llvm_type);
 
     if (!variable) {
         return Value::poisoned();
@@ -558,25 +533,23 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
 
         auto* intptr = m_module->getDataLayout().getIntPtrType(m_context);
 
-        m_current_result = m_builder.CreateGEP(
+        auto* ptr = m_builder.CreateGEP(
             llvm_type, variable,
             {llvm::ConstantInt::get(intptr, 0),
              llvm::ConstantInt::get(intptr, i)});
 
-        if (!cast_to_result_or_error(
-                expr.elements[i]->offset, array_type->type, value)) {
-            m_current_result = nullptr;
+        auto val =
+            cast_or_error(expr.elements[i]->offset, array_type->type, value);
+
+        if (!val.ok()) {
             return Value::poisoned();
         }
 
-        m_current_result = nullptr;
+        create_store(val, ptr);
     }
 
     return Value{
-        .type = array_type,
-        .value = variable,
-        .ptr_depth = 1,
-        .stack_allocated = stack_allocated};
+        .type = array_type, .value = variable, .ptr_depth = 1, .memcpy = true};
 }
 
 Value Codegen::generate(const ast::TupleLiteral& expr) {
@@ -615,8 +588,6 @@ Value Codegen::generate(const ast::TupleLiteral& expr) {
 
     auto* struct_type = llvm::StructType::create(llvm_types);
 
-    bool stack_allocated = m_current_result == nullptr;
-
     if (is_const) {
         std::vector<llvm::Constant*> llvm_values;
         llvm_values.reserve(expr.elements.size());
@@ -630,25 +601,22 @@ Value Codegen::generate(const ast::TupleLiteral& expr) {
             .value = llvm::ConstantStruct::get(struct_type, llvm_values)};
     }
 
-    auto* variable = m_current_result
-                         ? m_current_result
-                         : create_alloca_or_error(expr.offset, struct_type);
+    auto* variable = create_alloca_or_error(expr.offset, struct_type);
 
     if (!variable) {
         return Value::poisoned();
     }
 
     for (std::size_t i = 0; i < values.size(); ++i) {
-        auto* pointer = m_builder.CreateStructGEP(struct_type, variable, i);
-
-        m_builder.CreateStore(load_rvalue(values[i]).value, pointer);
+        auto* ptr = m_builder.CreateStructGEP(struct_type, variable, i);
+        create_store(values[i], ptr);
     }
 
     return Value{
         .type = get_tuple_type(types),
         .value = variable,
         .ptr_depth = 1,
-        .stack_allocated = stack_allocated};
+        .memcpy = true};
 }
 
 Value Codegen::generate(const ast::Identifier& expr) {
@@ -1050,10 +1018,7 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
 
         auto* len_value = m_builder.CreateSub(high.value, low.value);
 
-        auto* variable =
-            m_current_result
-                ? m_current_result
-                : create_alloca_or_error(expr.offset, m_slice_type);
+        auto* variable = create_alloca_or_error(expr.offset, m_slice_type);
 
         if (!variable) {
             return Value::poisoned();
@@ -1072,7 +1037,7 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
             .type = get_slice_type(type->type, value.is_mutable),
             .value = variable,
             .ptr_depth = 1,
-            .stack_allocated = m_current_result == nullptr};
+            .memcpy = true};
     }
 
     auto* type = dyn_cast<types::Slice>(value.type);
@@ -1104,9 +1069,7 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
 
     auto* new_len_value = m_builder.CreateSub(high.value, low.value);
 
-    auto* variable = m_current_result
-                         ? m_current_result
-                         : create_alloca_or_error(expr.offset, llvm_type);
+    auto* variable = create_alloca_or_error(expr.offset, llvm_type);
 
     if (!variable) {
         return Value::poisoned();
@@ -1122,10 +1085,7 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
     m_builder.CreateStore(new_len_value, new_len_member);
 
     return Value{
-        .type = type,
-        .value = variable,
-        .ptr_depth = 1,
-        .stack_allocated = m_current_result == nullptr};
+        .type = type, .value = variable, .ptr_depth = 1, .memcpy = true};
 }
 
 Value Codegen::generate(const ast::AsExpr& expr) {

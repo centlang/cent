@@ -425,7 +425,10 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
 
     if (base_type == base_value_type) {
         return Value{
-            .type = type, .value = value.value, .ptr_depth = value.ptr_depth};
+            .type = type,
+            .value = value.value,
+            .ptr_depth = value.ptr_depth,
+            .memcpy = value.memcpy};
     }
 
     if (is<types::Void>(base_type)) {
@@ -452,7 +455,8 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
                     is<types::Null>(base_value_type)
                         ? llvm::Constant::getNullValue(base_type->llvm_type)
                         : value.value,
-                .ptr_depth = value.ptr_depth};
+                .ptr_depth = value.ptr_depth,
+                .memcpy = value.memcpy};
         }
 
         if (auto* val = llvm::dyn_cast<llvm::Constant>(value.value)) {
@@ -483,10 +487,7 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
             bool_ptr);
 
         return Value{
-            .type = type,
-            .value = variable,
-            .ptr_depth = 1,
-            .stack_allocated = true};
+            .type = type, .value = variable, .ptr_depth = 1, .memcpy = true};
     }
 
     if (const auto* slice = dyn_cast<types::Slice>(base_type)) {
@@ -497,7 +498,8 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
                 return Value{
                     .type = type,
                     .value = value.value,
-                    .ptr_depth = value.ptr_depth};
+                    .ptr_depth = value.ptr_depth,
+                    .memcpy = value.memcpy};
             }
 
             if (base_slice_contained_type == unwrap_type(slice_value->type) &&
@@ -505,7 +507,8 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
                 return Value{
                     .type = type,
                     .value = value.value,
-                    .ptr_depth = value.ptr_depth};
+                    .ptr_depth = value.ptr_depth,
+                    .memcpy = value.memcpy};
             }
 
             return Value::poisoned();
@@ -547,130 +550,10 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
             llvm::ConstantInt::get(intptr, array_type->size), len_member);
 
         return Value{
-            .type = type,
-            .value = variable,
-            .ptr_depth = 1,
-            .stack_allocated = true};
+            .type = type, .value = variable, .ptr_depth = 1, .memcpy = true};
     }
 
     return primitive_cast(type, value, implicit);
-}
-
-bool Codegen::cast_to_result(Type* type, const Value& value, bool implicit) {
-    auto* base_type = unwrap_type(type);
-    auto* base_value_type = unwrap_type(value.type);
-
-    if (base_type == base_value_type) {
-        m_builder.CreateStore(load_rvalue(value).value, m_current_result);
-        return true;
-    }
-
-    if (is<types::Never>(base_value_type)) {
-        m_builder.CreateUnreachable();
-        return true;
-    }
-
-    if (is<types::Void>(base_type)) {
-        return false;
-    }
-
-    if (const auto* optional = dyn_cast<types::Optional>(base_type)) {
-        auto* base_contained_type = unwrap_type(optional->type);
-
-        if (is<types::Null>(base_value_type)) {
-            m_builder.CreateStore(
-                llvm::Constant::getNullValue(base_type->llvm_type),
-                m_current_result);
-
-            return true;
-        }
-
-        if (base_contained_type != base_value_type) {
-            return false;
-        }
-
-        if (is<types::Pointer>(base_contained_type)) {
-            m_builder.CreateStore(
-                is<types::Null>(base_value_type)
-                    ? llvm::Constant::getNullValue(base_type->llvm_type)
-                    : load_rvalue(value).value,
-                m_current_result);
-
-            return true;
-        }
-
-        if (auto* val = llvm::dyn_cast<llvm::Constant>(value.value)) {
-            m_builder.CreateStore(
-                llvm::ConstantStruct::get(
-                    static_cast<llvm::StructType*>(base_type->llvm_type),
-                    {val, llvm::ConstantInt::get(
-                              llvm::Type::getInt1Ty(m_context), true)}),
-                m_current_result);
-
-            return true;
-        }
-
-        auto* bool_ptr = m_builder.CreateStructGEP(
-            base_type->llvm_type, m_current_result, optional_member_bool);
-
-        auto* value_ptr = m_builder.CreateStructGEP(
-            base_type->llvm_type, m_current_result, optional_member_value);
-
-        m_builder.CreateStore(load_rvalue(value).value, value_ptr);
-
-        m_builder.CreateStore(
-            llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), true),
-            bool_ptr);
-
-        return true;
-    }
-
-    if (const auto* slice = dyn_cast<types::Slice>(base_type)) {
-        auto* base_slice_contained_type = unwrap_type(slice->type);
-
-        if (!implicit && is<types::Slice>(base_value_type)) {
-            m_builder.CreateStore(load_rvalue(value).value, m_current_result);
-            return true;
-        }
-
-        const auto* array_type = dyn_cast<types::Array>(base_value_type);
-
-        if (!array_type) {
-            return false;
-        }
-
-        auto* base_array_contained_type = unwrap_type(array_type->type);
-
-        if (base_slice_contained_type != base_array_contained_type) {
-            return false;
-        }
-
-        auto* ptr_member = m_builder.CreateStructGEP(
-            base_type->llvm_type, m_current_result, slice_member_ptr);
-
-        auto* len_member = m_builder.CreateStructGEP(
-            base_type->llvm_type, m_current_result, slice_member_len);
-
-        auto* intptr = m_module->getDataLayout().getIntPtrType(m_context);
-
-        auto* ptr_value = m_builder.CreateGEP(
-            base_slice_contained_type->llvm_type, value.value,
-            llvm::ConstantInt::get(intptr, 0));
-
-        m_builder.CreateStore(ptr_value, ptr_member);
-
-        m_builder.CreateStore(
-            llvm::ConstantInt::get(intptr, array_type->size), len_member);
-
-        return true;
-    }
-
-    if (auto val = primitive_cast(type, value, implicit); val.ok()) {
-        m_builder.CreateStore(val.value, m_current_result);
-        return true;
-    }
-
-    return false;
 }
 
 Value Codegen::cast_or_error(
@@ -682,16 +565,6 @@ Value Codegen::cast_or_error(
     }
 
     return result;
-}
-
-bool Codegen::cast_to_result_or_error(
-    std::size_t offset, Type* type, const Value& value, bool implicit) {
-    if (cast_to_result(type, value, implicit)) {
-        return true;
-    }
-
-    type_mismatch(offset, type, value.type);
-    return false;
 }
 
 Value Codegen::create_call(
@@ -780,6 +653,18 @@ llvm::Value* Codegen::create_alloca(llvm::Type* type) {
     m_builder.SetInsertPoint(insert_point);
 
     return result;
+}
+
+void Codegen::create_store(const Value& src, llvm::Value* dest) {
+    if (src.memcpy) {
+        m_builder.CreateMemCpy(
+            dest, std::nullopt, src.value, std::nullopt,
+            m_module->getDataLayout().getTypeAllocSize(src.type->llvm_type));
+
+        return;
+    }
+
+    m_builder.CreateStore(load_rvalue(src).value, dest);
 }
 
 llvm::Value*

@@ -14,7 +14,7 @@ struct Value {
     std::uint8_t ptr_depth = 0;
 
     bool is_mutable = false;
-    bool stack_allocated = false;
+    bool memcpy = false;
 
     [[nodiscard]] bool ok() const { return type; }
 

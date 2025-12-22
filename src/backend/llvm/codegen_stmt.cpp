@@ -76,21 +76,19 @@ Value Codegen::generate([[maybe_unused]] const ast::Assignment& stmt) {
 
     if (var.ptr_depth < 1) {
         error(stmt.variable->offset, "cannot assign to an rvalue");
-
         return Value::poisoned();
     }
 
     if (!var.is_mutable) {
         error(stmt.value->offset, "cannot assign to an immutable value");
-
         return Value::poisoned();
     }
 
-    m_current_result = var.value;
+    auto val = cast_or_error(stmt.value->offset, var.type, value);
 
-    cast_to_result_or_error(stmt.value->offset, var.type, value);
-
-    m_current_result = nullptr;
+    if (val.ok()) {
+        create_store(val, var.value);
+    }
 
     return Value::poisoned();
 }

@@ -536,42 +536,34 @@ Value Codegen::generate(const ast::VarDecl& decl) {
         return Value::poisoned();
     }
 
-    m_current_result = create_alloca(type->llvm_type);
+    auto* variable = create_alloca(type->llvm_type);
 
     result = {
         .element =
             {.type = type,
-             .value = m_current_result,
+             .value = variable,
              .ptr_depth = 1,
              .is_mutable = decl.mutability == ast::VarDecl::Mut::Mut},
         .unit = m_current_unit};
 
     if (value.ok()) {
         if (is<types::Undefined>(value.type)) {
-            m_current_result = nullptr;
             return Value::poisoned();
         }
 
-        if (value.stack_allocated &&
-            unwrap_type(type) == unwrap_type(value.type)) {
-            result = {
-                .element =
-                    {.type = type,
-                     .value = value.value,
-                     .ptr_depth = value.ptr_depth,
-                     .is_mutable = decl.mutability == ast::VarDecl::Mut::Mut},
-                .unit = m_current_unit};
+        auto val = cast_or_error(decl.value->offset, type, value);
 
+        if (!val.ok()) {
             return Value::poisoned();
         }
 
-        cast_to_result_or_error(decl.value->offset, type, value);
-    } else {
-        m_builder.CreateStore(
-            llvm::Constant::getNullValue(type->llvm_type), m_current_result);
+        create_store(val, variable);
+        return Value::poisoned();
     }
 
-    m_current_result = nullptr;
+    m_builder.CreateStore(
+        llvm::Constant::getNullValue(type->llvm_type), variable);
+
     return Value::poisoned();
 }
 

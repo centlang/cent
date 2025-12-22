@@ -168,14 +168,7 @@ private:
     [[nodiscard]] Value
     cast(Type* type, const Value& value, bool implicit = true);
 
-    [[nodiscard]] bool
-    cast_to_result(Type* type, const Value& value, bool implicit = true);
-
     [[nodiscard]] Value cast_or_error(
-        std::size_t offset, Type* type, const Value& value,
-        bool implicit = true);
-
-    bool cast_to_result_or_error(
         std::size_t offset, Type* type, const Value& value,
         bool implicit = true);
 
@@ -195,6 +188,7 @@ private:
     [[nodiscard]] Value load_lvalue(const Value& value);
 
     [[nodiscard]] llvm::Value* create_alloca(llvm::Type* type);
+    void create_store(const Value& src, llvm::Value* dest);
 
     [[nodiscard]] llvm::Value*
     create_alloca_or_error(std::size_t offset, llvm::Type* type);
@@ -349,7 +343,6 @@ private:
 
     Scope* m_current_scope{&m_scope};
     types::Function* m_current_function{nullptr};
-    llvm::Value* m_current_result{nullptr};
     TranslationUnit m_current_unit{0};
     bool m_current_fn_had_error{false};
 
