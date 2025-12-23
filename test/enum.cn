@@ -1,0 +1,57 @@
+with std;
+
+enum Enum {
+    zero,
+    one,
+    two,
+    three,
+    four,
+}
+
+enum EnumU8 u8 {
+    zero,
+    one,
+    three = 3,
+    four,
+}
+
+enum EnumExplicit {
+    zero = 0,
+    one = 1,
+    three = 3,
+    four = 4,
+}
+
+enum Flags u8 {
+    flag1 = 1 << 0,
+    flag2 = 1 << 1,
+    flag3 = 1 << 2,
+    flag4 = 1 << 4,
+}
+
+fn main() i32 {
+    std::assert(Enum::zero as i32 == 0);
+    std::assert(Enum::one as i32 == 1);
+    std::assert(Enum::three as i32 == 3);
+    std::assert(Enum::four as i32 == 4);
+
+    std::assert(EnumU8::zero as u8 == 0);
+    std::assert(EnumU8::one as u8 == 1);
+    std::assert(EnumU8::three as u8 == 3);
+    std::assert(EnumU8::four as u8 == 4);
+
+    std::assert(EnumExplicit::zero as u8 == 0);
+    std::assert(EnumExplicit::one as u8 == 1);
+    std::assert(EnumExplicit::three as u8 == 3);
+    std::assert(EnumExplicit::four as u8 == 4);
+
+    std::assert((Flags::flag1 | Flags::flag4) as u8 == 0b10001);
+
+    std::assert((Flags::flag1 | Flags::flag3 | Flags::flag1) as u8 == 0b101);
+    std::assert((Flags::flag1 | Flags::flag3 | Flags::flag2) as u8 == 0b111);
+    std::assert(((Flags::flag1 | Flags::flag3) & Flags::flag1) as u8 == 0b1);
+    std::assert((Flags::flag1 & Flags::flag3 | Flags::flag2) == Flags::flag2);
+    std::assert((Flags::flag1 & Flags::flag3 & Flags::flag1) != Flags::flag1);
+
+    return 0;
+}
