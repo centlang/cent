@@ -214,6 +214,11 @@ Value Codegen::generate(const ast::Switch& stmt) {
 
         for (const auto& case_value : case_stmt.values) {
             auto case_val = case_value->codegen(*this);
+
+            if (!case_val.ok()) {
+                continue;
+            }
+
             auto val = cast_or_error(stmt.offset, value.type, case_val);
 
             if (!val.ok()) {
