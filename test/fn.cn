@@ -1,0 +1,68 @@
+with std;
+
+enum OperKind u8 {
+    add,
+    sub,
+    mul,
+    div,
+}
+
+type BinExpr {
+    x: i32,
+    y: i32,
+    kind: OperKind,
+}
+
+fn BinExpr::eval(self: BinExpr) i32 {
+    switch self.kind {
+        OperKind::add { return self.x + self.y; }
+        OperKind::sub { return self.x - self.y; }
+        OperKind::mul { return self.x * self.y; }
+        OperKind::div { return self.x / self.y; }
+        else { unreachable; }
+    }
+}
+
+fn BinExpr::add(x: i32, y: i32) BinExpr {
+    return BinExpr { x: x, y: y, kind: OperKind::add };
+}
+
+fn sum(x: i32, y: f32, z: i32, w: f32) f32 {
+    return x + y + z + w;
+}
+
+fn default_args(x: i32, mut y: f32 = 3.5, mut z: i32 = 3) f32 {
+    z += 1;
+
+    for _ in 0..x {
+        y += z;
+    }
+
+    return y;
+}
+
+mut global: i32 = 0;
+
+fn change_global() {
+    global = 42;
+}
+
+fn main() {
+    let expr = BinExpr::add(2, 5);
+
+    std::assert(expr.eval() == 7);
+    std::assert(BinExpr::eval(expr) == 7);
+
+    std::assert(sum(1, 3.5, 4, 3.5) == 12);
+
+    std::assert(default_args(5) == 23.5);
+    std::assert(default_args(5, 3.5) == 23.5);
+    std::assert(default_args(5, 3.5, 3) == 23.5);
+
+    std::assert(default_args(5, 3.5, 4) == 28.5);
+    std::assert(default_args(3, 4.5, 4) == 19.5);
+
+    std::assert(global == 0);
+    change_global();
+    std::assert(global == 42);
+}
