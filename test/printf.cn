@@ -1,6 +1,5 @@
 with c;
 
-fn main() i32 {
+fn main() {
     c::printf(c::to_cstr("Hello, %s!\n"), c::to_cstr("world"));
-    return 0;
 }

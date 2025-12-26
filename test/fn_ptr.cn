@@ -20,7 +20,7 @@ fn call(func: *fn(a: i32, b: i32) i32, a: i32, b: i32) i32 {
     return func(a, b);
 }
 
-fn main() i32 {
+fn main() {
     let add_func = &add;
 
     std::assert(call(&add, 42, 42) == 84);
@@ -38,6 +38,4 @@ fn main() i32 {
     std::assert(call(max_func, -42, 42) == 42);
     std::assert(call(&max, 42, -42) == 42);
     std::assert(max_func(-42, 42) == 42);
-
-    return 0;
 }

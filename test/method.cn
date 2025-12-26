@@ -9,11 +9,9 @@ fn Vector2::sum(self: Vector2) i32 {
     return self.x + self.y;
 }
 
-fn main() i32 {
+fn main() {
     mut v = Vector2 { x: 1, y: 2 };
 
     std::assert(v.sum() == 3);
     std::assert(Vector2::sum(v) == 3);
-
-    return 0;
 }

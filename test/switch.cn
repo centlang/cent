@@ -2,7 +2,14 @@ fn main() i32 {
     let n = 42;
 
     switch n {
+        42 {}
+        else { return 1; }
+    }
+
+    switch n {
         1 { return 1; }
+        2, 3 { return 1; }
+        5, 10, 45 { return 1; }
         42 { return 0; }
         else { return 1; }
     }

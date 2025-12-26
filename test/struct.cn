@@ -6,7 +6,7 @@ type Vector3 {
     z: i32,
 }
 
-fn main() i32 {
+fn main() {
     mut v = Vector3 { x: 1, y: 2, z: 3 };
 
     v.x += 1;
@@ -17,6 +17,4 @@ fn main() i32 {
 
     v.z = v.x + v.y;
     std::assert(v.z == 5);
-
-    return 0;
 }

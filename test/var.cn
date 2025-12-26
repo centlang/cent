@@ -1,6 +1,6 @@
 with std;
 
-fn main() i32 {
+fn main() {
     let var = 3;
     std::assert(var == 3);
 
@@ -12,6 +12,4 @@ fn main() i32 {
 
     let var: i32 = var + 3;
     std::assert(var == 5);
-
-    return 0;
 }
