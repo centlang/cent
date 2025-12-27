@@ -399,25 +399,25 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
         }
 
         value = load_rvalue(value);
+        values.push_back(value);
 
-        if (!llvm::isa<llvm::Constant>(value.value)) {
+        if (!llvm::isa<llvm::Constant>(value.value) || value.ptr_depth > 0 ||
+            value.memcpy) {
             is_const = false;
-        } else {
-            auto index = get_index(
-                m_members[static_cast<llvm::StructType*>(
-                    struct_type->llvm_type)],
-                field);
-
-            if (!index) {
-                return Value::poisoned();
-            }
-
-            if (struct_type->fields[*index] != value.type) {
-                is_const = false;
-            }
+            continue;
         }
 
-        values.push_back(value);
+        auto index = get_index(
+            m_members[static_cast<llvm::StructType*>(struct_type->llvm_type)],
+            field);
+
+        if (!index) {
+            return Value::poisoned();
+        }
+
+        if (struct_type->fields[*index] != value.type) {
+            is_const = false;
+        }
     }
 
     if (is_const) {
@@ -503,7 +503,7 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
         }
 
         if (!llvm::isa<llvm::Constant>(value.value) ||
-            array_type != value.type) {
+            array_type != value.type || value.ptr_depth > 0 || value.memcpy) {
             is_const = false;
         }
 
@@ -566,7 +566,8 @@ Value Codegen::generate(const ast::TupleLiteral& expr) {
             return Value::poisoned();
         }
 
-        if (!llvm::isa<llvm::Constant>(value.value)) {
+        if (!llvm::isa<llvm::Constant>(value.value) || value.ptr_depth > 0 ||
+            value.memcpy) {
             is_const = false;
         }
 
