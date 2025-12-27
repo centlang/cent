@@ -237,7 +237,7 @@ private:
     [[nodiscard]] types::Optional* get_optional_type(Type* type);
     [[nodiscard]] types::Range* get_range_type(Type* type, bool inclusive);
 
-    [[nodiscard]] Type* unwrap_type(Type* type);
+    [[nodiscard]] Type* unwrap_type(Type* type, bool ignore_distinct = false);
 
     [[nodiscard]] TranslationUnit get_unit(const std::filesystem::path& path) {
         auto directory = std::filesystem::absolute(path);

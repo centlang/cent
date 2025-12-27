@@ -236,8 +236,8 @@ void Codegen::generate(const ast::Module& module) {
 Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
     using enum llvm::Instruction::CastOps;
 
-    auto* base_type = unwrap_type(type);
-    auto* base_value_type = unwrap_type(value.type);
+    auto* base_type = unwrap_type(type, !implicit);
+    auto* base_value_type = unwrap_type(value.type, !implicit);
 
     bool value_is_rune = is<types::Rune>(base_value_type);
     bool type_is_rune = is<types::Rune>(base_type);
@@ -415,8 +415,8 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
 }
 
 Value Codegen::cast(Type* type, const Value& value, bool implicit) {
-    auto* base_type = unwrap_type(type);
-    auto* base_value_type = unwrap_type(value.type);
+    auto* base_type = unwrap_type(type, !implicit);
+    auto* base_value_type = unwrap_type(value.type, !implicit);
 
     if (is<types::Never>(base_value_type)) {
         m_builder.CreateUnreachable();
@@ -577,7 +577,6 @@ Value Codegen::create_call(
     if (!type->variadic && (args_size < params_size - default_args_size ||
                             args_size > params_size)) {
         error(offset, "incorrect number of arguments passed");
-
         return Value::poisoned();
     }
 

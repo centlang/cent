@@ -305,9 +305,9 @@ types::Range* Codegen::get_range_type(Type* type, bool inclusive) {
     return result.get();
 }
 
-Type* Codegen::unwrap_type(Type* type) {
+Type* Codegen::unwrap_type(Type* type, bool ignore_distinct) {
     if (auto* alias = dyn_cast<types::Alias>(type)) {
-        if (alias->distinct) {
+        if (alias->distinct && !ignore_distinct) {
             return type;
         }
 
