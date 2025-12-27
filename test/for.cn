@@ -1,0 +1,98 @@
+with std;
+
+fn main() {
+    mut last = 0;
+
+    for i in 0..10 {
+        last = i;
+    }
+
+    std::assert(last == 9);
+
+    for i in 0..=10 {
+        last = i;
+    }
+
+    std::assert(last == 10);
+
+    mut data: [10]i32 = undefined;
+
+    for mut x in data {
+        x = 1;
+    }
+
+    std::assert(data[0] == 1);
+    std::assert(data[3] == 1);
+    std::assert(data[9] == 1);
+
+    for mut x in data {
+        if x == 1 {
+            break;
+        }
+
+        x = 2;
+    }
+
+    std::assert(data[0] == 1);
+    std::assert(data[3] == 1);
+    std::assert(data[9] == 1);
+
+    for mut x in data {
+        if x == 1 {
+            continue;
+        }
+
+        x = 2;
+    }
+
+    std::assert(data[0] == 1);
+    std::assert(data[3] == 1);
+    std::assert(data[9] == 1);
+
+    for mut x in data {
+        x += 1;
+
+        if x == 2 {
+            break;
+        }
+    }
+
+    std::assert(data[0] == 2);
+    std::assert(data[3] == 1);
+    std::assert(data[9] == 1);
+
+    for i in 0..data.len {
+        data[i as usize] += 1;
+
+        if i % 3 == 0 {
+            continue;
+        }
+
+        data[i as usize] = 10;
+    }
+
+    std::assert(data[0] == 3);
+    std::assert(data[3] == 2);
+    std::assert(data[6] == 2);
+    std::assert(data[9] == 2);
+    std::assert(data[1] == 10);
+    std::assert(data[2] == 10);
+    std::assert(data[7] == 10);
+
+    for i in 0..data.len {
+        data[i as usize] += 2;
+
+        if (i + 1) % 5 == 0 {
+            break;
+        }
+
+        data[i as usize] -= 1;
+    }
+
+    std::assert(data[0] == 4);
+    std::assert(data[1] == 11);
+    std::assert(data[2] == 11);
+    std::assert(data[3] == 3);
+    std::assert(data[4] == 12);
+    std::assert(data[5] == 10);
+}
