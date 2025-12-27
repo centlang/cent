@@ -7,7 +7,7 @@ type User {
     id: u64,
 }
 
-!(distinct) type UserId = u64;
+#(distinct) type UserId = u64;
 
 fn User::print_user(self: *User) {
     c::puts(c::to_cstr("User:")); 

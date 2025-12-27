@@ -1,6 +1,6 @@
 with std;
 
-!(untagged)
+#(untagged)
 union Untagged {
     a: i32,
     b: i64,

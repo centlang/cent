@@ -5,19 +5,19 @@ type Color = u32;
 const RAYWHITE: Color = 0xfff5f5f5;
 const LIGHTGRAY: Color = 0xffc8c8c8;
 
-!(extern) fn InitWindow(
+#(extern) fn InitWindow(
     width: c::types::int, height: c::types::int, title: *c::types::char
 );
 
-!(extern) fn CloseWindow();
-!(extern) fn WindowShouldClose() bool;
+#(extern) fn CloseWindow();
+#(extern) fn WindowShouldClose() bool;
 
-!(extern) fn BeginDrawing();
-!(extern) fn EndDrawing();
+#(extern) fn BeginDrawing();
+#(extern) fn EndDrawing();
 
-!(extern) fn ClearBackground(color: Color);
+#(extern) fn ClearBackground(color: Color);
 
-!(extern) fn DrawText(
+#(extern) fn DrawText(
     text: *c::types::char, pos_x: c::types::int, pos_y: c::types::int,
     font_size: c::types::int, color: Color
 );

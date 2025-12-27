@@ -3,7 +3,7 @@ with std;
 type Id = u16;
 type F32 = f32;
 
-!(distinct) type DistinctId = u16;
+#(distinct) type DistinctId = u16;
 
 fn main() {
     let a: Id = 42;

@@ -39,6 +39,7 @@ struct Token {
         SlashEqual,
         PercentEqual,
 
+        Hash,
         Bang,
         Question,
         QuestionQuestion,

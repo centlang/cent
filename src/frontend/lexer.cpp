@@ -185,6 +185,9 @@ void Lexer::next_token() {
     case '~':
         single_char(Not);
         break;
+    case '#':
+        single_char(Hash);
+        break;
     case '+': {
         m_token.offset = m_offset;
         m_token.value = {};

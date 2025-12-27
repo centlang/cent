@@ -281,7 +281,7 @@ void Parser::expect_stmt(ast::BlockStmt& block) {
 std::vector<ast::Attribute> Parser::parse_attrs() {
     std::vector<ast::Attribute> result;
 
-    if (!match_next(Token::Type::Bang)) {
+    if (!match_next(Token::Type::Hash)) {
         return {};
     }
 
