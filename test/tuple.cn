@@ -1,0 +1,28 @@
+with c;
+with std;
+
+fn main() {
+    mut tuple = (1, 3.4, "Hello, world!", false);
+
+    std::assert(tuple.0 == 1);
+    std::assert(tuple.1 == 3.4);
+    std::assert(c::strcmp(c::to_cstr(tuple.2), c::to_cstr("Hello, world!")) == 0);
+    std::assert(tuple.3 != true);
+
+    mut tuple: (i32, f32, []u8, bool) = (1, 3.4, "Hello, world!" as []u8, false);
+
+    std::assert(tuple.0 == 1);
+    std::assert(tuple.1 == 3.4);
+    std::assert(c::strcmp(c::to_cstr(tuple.2), c::to_cstr("Hello, world!")) == 0);
+    std::assert(tuple.3 != true);
+
+    tuple.0 = 6;
+    tuple.1 = 3.5;
+    tuple.2 = "Hi!";
+    tuple.3 = !tuple.3;
+
+    std::assert(tuple.0 == 6);
+    std::assert(tuple.1 == 3.5);
+    std::assert(c::strcmp(c::to_cstr(tuple.2), c::to_cstr("Hi!")) == 0);
+    std::assert(tuple.3 == true);
+}
