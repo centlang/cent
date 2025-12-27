@@ -1,6 +1,9 @@
 with std;
 
 fn main() {
+    mut var: i32;
+    std::assert(var == 0);
+
     let var = 3;
     std::assert(var == 3);
 
