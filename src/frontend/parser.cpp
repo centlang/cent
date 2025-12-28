@@ -1,3 +1,5 @@
+#include "unicode.h"
+
 #include "ast/expr/as_expr.h"
 #include "ast/expr/call_expr.h"
 #include "ast/expr/identifier.h"
@@ -529,7 +531,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
         return std::make_unique<ast::StrLiteral>(token->offset, token->value);
     case RuneLiteral:
         return std::make_unique<ast::RuneLiteral>(
-            token->offset, token->value[0]);
+            token->offset, get_utf8(token->value));
     case True:
         return std::make_unique<ast::BoolLiteral>(token->offset, true);
     case False:

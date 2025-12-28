@@ -29,43 +29,7 @@ private:
 
     char get() { return m_source[m_offset++]; }
 
-    void escape_seq() {
-        get();
-
-        if (eof()) {
-            error("expected escape sequence");
-            return;
-        }
-
-        switch (peek()) {
-        case '\\':
-            m_token.value += '\\';
-            break;
-        case 'n':
-            m_token.value += '\n';
-            break;
-        case 'r':
-            m_token.value += '\r';
-            break;
-        case 't':
-            m_token.value += '\t';
-            break;
-        case '\'':
-            m_token.value += '\'';
-            break;
-        case '"':
-            m_token.value += '"';
-            break;
-        case '0':
-            m_token.value += '\0';
-            break;
-        default:
-            error("invalid escape sequence");
-            break;
-        }
-
-        get();
-    }
+    void escape_seq();
 
     [[nodiscard]] bool eof() const { return m_offset == m_source.size(); }
 

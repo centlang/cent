@@ -1,4 +1,7 @@
+#include <charconv>
 #include <cstdint>
+
+#include "unicode.h"
 
 #include "frontend/lexer.h"
 
@@ -316,6 +319,90 @@ void Lexer::next_token() {
 
         break;
     }
+}
+
+void Lexer::escape_seq() {
+    get();
+
+    if (eof()) {
+        error("expected escape sequence");
+        return;
+    }
+
+    auto invalid_unicode = [&] { error("invalid unicode escape character"); };
+
+    if (peek() == 'u') {
+        get();
+
+        std::string hex;
+        hex.reserve(4);
+
+        for (std::uint8_t i = 0; i < 4; ++i) {
+            if (eof() || !std::isxdigit(peek())) {
+                invalid_unicode();
+                return;
+            }
+
+            hex += get();
+        }
+
+        std::uint32_t value{};
+        std::from_chars(hex.cbegin().base(), hex.cend().base(), value, 16);
+
+        append_utf8(m_token.value, value);
+        return;
+    }
+
+    if (peek() == 'U') {
+        get();
+
+        std::string hex;
+        hex.reserve(8);
+
+        for (std::uint8_t i = 0; i < 8; ++i) {
+            if (eof() || !std::isxdigit(peek())) {
+                invalid_unicode();
+                return;
+            }
+
+            hex += get();
+        }
+
+        std::uint32_t value{};
+        std::from_chars(hex.cbegin().base(), hex.cend().base(), value, 16);
+
+        append_utf8(m_token.value, value);
+        return;
+    }
+
+    switch (peek()) {
+    case '\\':
+        m_token.value += '\\';
+        break;
+    case 'n':
+        m_token.value += '\n';
+        break;
+    case 'r':
+        m_token.value += '\r';
+        break;
+    case 't':
+        m_token.value += '\t';
+        break;
+    case '\'':
+        m_token.value += '\'';
+        break;
+    case '"':
+        m_token.value += '"';
+        break;
+    case '0':
+        m_token.value += '\0';
+        break;
+    default:
+        error("invalid escape sequence");
+        break;
+    }
+
+    get();
 }
 
 void Lexer::number() {
