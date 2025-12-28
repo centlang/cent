@@ -56,6 +56,9 @@ private:
         case '"':
             m_token.value += '"';
             break;
+        case '0':
+            m_token.value += '\0';
+            break;
         default:
             error("invalid escape sequence");
             break;
