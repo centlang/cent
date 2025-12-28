@@ -43,6 +43,8 @@ private:
     void string();
     void ident();
 
+    void utf8_char();
+
     template <typename... Args>
     void error(
         std::size_t offset, fmt::format_string<Args...> message,

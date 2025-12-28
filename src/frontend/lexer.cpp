@@ -103,6 +103,7 @@ void Lexer::next_token() {
     case '\'':
         m_token = {
             .type = Token::Type::RuneLiteral, .value = {}, .offset = m_offset};
+
         get();
 
         if (eof()) {
@@ -113,7 +114,7 @@ void Lexer::next_token() {
         if (peek() == '\\') {
             escape_seq();
         } else {
-            m_token.value = get();
+            utf8_char();
         }
 
         if (eof() || peek() != '\'') {
@@ -332,8 +333,8 @@ void Lexer::escape_seq() {
 
     auto invalid_unicode = [&] { error("invalid unicode escape character"); };
 
-    auto get_hex =
-        [&]<typename ValueType>(std::size_t count) -> std::optional<ValueType> {
+    auto get_hex = [&]<typename ValueType>(
+                       std::uint8_t count) -> std::optional<ValueType> {
         std::string hex;
         hex.reserve(count);
 
@@ -505,9 +506,10 @@ void Lexer::number() {
 }
 
 void Lexer::string() {
-    get();
     m_token = {
         .type = Token::Type::StrLiteral, .value = {}, .offset = m_offset};
+
+    get();
 
     while (true) {
         if (eof()) {
@@ -525,7 +527,7 @@ void Lexer::string() {
             continue;
         }
 
-        m_token.value += get();
+        utf8_char();
     }
 }
 
@@ -666,6 +668,32 @@ void Lexer::ident() {
     if (m_token.value == "sizeof") {
         keyword(Sizeof);
         return;
+    }
+}
+
+void Lexer::utf8_char() {
+    m_token.value += peek();
+    auto lead = static_cast<unsigned char>(get());
+
+    std::uint8_t length{};
+
+    if ((lead & 0x80) == 0x00) {
+        length = 0;
+    } else if ((lead & 0xe0) == 0xc0) {
+        length = 1;
+    } else if ((lead & 0xf0) == 0xe0) {
+        length = 2;
+    } else {
+        length = 3;
+    }
+
+    for (std::uint8_t i = 0; i < length; ++i) {
+        if (eof()) {
+            error("invalid UTF-8 character");
+            break;
+        }
+
+        m_token.value += get();
     }
 }
 
