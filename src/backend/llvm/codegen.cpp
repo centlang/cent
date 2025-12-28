@@ -541,7 +541,7 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
         auto* intptr = m_module->getDataLayout().getIntPtrType(m_context);
 
         auto* ptr_value = m_builder.CreateGEP(
-            base_slice_contained_type->llvm_type, value.value,
+            base_slice_contained_type->llvm_type, load_lvalue(value).value,
             llvm::ConstantInt::get(intptr, 0));
 
         m_builder.CreateStore(ptr_value, ptr_member);
@@ -591,7 +591,46 @@ Value Codegen::create_call(
         }
 
         if (type->variadic && i >= params_size) {
-            llvm_args.push_back(load_rvalue(value).value);
+            static constexpr auto int_bitwidth = 32;
+
+            if (is<types::Pointer>(value.type)) {
+                llvm_args.push_back(load_rvalue(value).value);
+                continue;
+            }
+
+            if (is_float(value.type)) {
+                llvm_args.push_back(
+                    primitive_cast(m_primitive_types["f64"].get(), value)
+                        .value);
+
+                continue;
+            }
+
+            if (!is_sint(value.type) && !is_uint(value.type)) {
+                warning(
+                    arguments[i]->offset,
+                    "passing argument of type `{}` to a variadic function is "
+                    "undefined behavior",
+                    value.type->to_string());
+
+                llvm_args.push_back(load_rvalue(value).value);
+                continue;
+            }
+
+            auto bitwidth = value.type->llvm_type->getIntegerBitWidth();
+
+            if (bitwidth > int_bitwidth) {
+                llvm_args.push_back(load_rvalue(value).value);
+                continue;
+            }
+
+            auto val = primitive_cast(m_primitive_types["i32"].get(), value);
+
+            if (!val.ok()) {
+                val = primitive_cast(m_primitive_types["u32"].get(), value);
+            }
+
+            llvm_args.push_back(val.value);
             continue;
         }
 

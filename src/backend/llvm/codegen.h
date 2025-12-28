@@ -304,6 +304,18 @@ private:
     }
 
     template <typename... Args>
+    void warning(
+        std::size_t offset, fmt::format_string<Args...> message,
+        Args&&... args) {
+        auto src = read_file(m_filename);
+        auto loc = offset_to_loc(*src, offset);
+
+        log::warning(
+            loc.line, loc.column, m_filename, loc.code, message,
+            std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
     void not_implemented(
         std::size_t offset, fmt::format_string<Args...> message,
         Args&&... args) {
