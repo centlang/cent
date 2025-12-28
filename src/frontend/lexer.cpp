@@ -1,5 +1,6 @@
 #include <charconv>
 #include <cstdint>
+#include <optional>
 
 #include "unicode.h"
 
@@ -331,47 +332,59 @@ void Lexer::escape_seq() {
 
     auto invalid_unicode = [&] { error("invalid unicode escape character"); };
 
-    if (peek() == 'u') {
-        get();
-
+    auto get_hex =
+        [&]<typename ValueType>(std::size_t count) -> std::optional<ValueType> {
         std::string hex;
-        hex.reserve(4);
+        hex.reserve(count);
 
-        for (std::uint8_t i = 0; i < 4; ++i) {
+        for (std::uint8_t i = 0; i < count; ++i) {
             if (eof() || !std::isxdigit(peek())) {
                 invalid_unicode();
-                return;
+                return std::nullopt;
             }
 
             hex += get();
         }
 
-        std::uint32_t value{};
+        ValueType value{};
         std::from_chars(hex.cbegin().base(), hex.cend().base(), value, 16);
 
-        append_utf8(m_token.value, value);
+        return value;
+    };
+
+    if (peek() == 'u') {
+        get();
+        auto value = get_hex.template operator()<std::uint32_t>(4);
+
+        if (!value) {
+            return;
+        }
+
+        append_utf8(m_token.value, *value);
         return;
     }
 
     if (peek() == 'U') {
         get();
+        auto value = get_hex.template operator()<std::uint32_t>(8);
 
-        std::string hex;
-        hex.reserve(8);
-
-        for (std::uint8_t i = 0; i < 8; ++i) {
-            if (eof() || !std::isxdigit(peek())) {
-                invalid_unicode();
-                return;
-            }
-
-            hex += get();
+        if (!value) {
+            return;
         }
 
-        std::uint32_t value{};
-        std::from_chars(hex.cbegin().base(), hex.cend().base(), value, 16);
+        append_utf8(m_token.value, *value);
+        return;
+    }
 
-        append_utf8(m_token.value, value);
+    if (peek() == 'x') {
+        get();
+        auto value = get_hex.template operator()<char>(2);
+
+        if (!value) {
+            return;
+        }
+
+        m_token.value += *value;
         return;
     }
 
