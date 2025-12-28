@@ -598,6 +598,14 @@ Value Codegen::create_call(
                 continue;
             }
 
+            if (is<types::Bool>(value.type)) {
+                llvm_args.push_back(
+                    primitive_cast(m_primitive_types["i32"].get(), value, false)
+                        .value);
+
+                continue;
+            }
+
             if (is_float(value.type)) {
                 llvm_args.push_back(
                     primitive_cast(m_primitive_types["f64"].get(), value)
