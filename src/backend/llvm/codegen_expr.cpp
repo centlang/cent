@@ -428,6 +428,13 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
             llvm_values.push_back(static_cast<llvm::Constant*>(value.value));
         }
 
+        if (struct_type->has_tail) {
+            llvm_values.push_back(
+                llvm::UndefValue::get(
+                    static_cast<llvm::StructType*>(struct_type->llvm_type)
+                        ->getElementType(struct_type->fields.size())));
+        }
+
         return Value{
             .type = type,
             .value = llvm::ConstantStruct::get(
@@ -701,7 +708,6 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
 
         if (!type) {
             no_such_method();
-
             return Value::poisoned();
         }
 
@@ -709,7 +715,6 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
 
         if (iterator == m_methods[type->type].end()) {
             no_such_method();
-
             return Value::poisoned();
         }
     }
@@ -718,7 +723,6 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
 
     if (arg_size - 1 != expr.arguments.size()) {
         error(expr.name.offset, "incorrect number of arguments passed");
-
         return Value::poisoned();
     }
 
@@ -740,7 +744,6 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
         } else {
             if (!value.value->getType()->isPointerTy()) {
                 error(expr.value->offset, "type mismatch");
-
                 return Value::poisoned();
             }
 
@@ -798,7 +801,6 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
 
         if (iterator == m_members[type].end()) {
             no_such_member();
-
             return std::nullopt;
         }
 
@@ -808,7 +810,6 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
     if (auto* tuple = dyn_cast<types::Tuple>(parent.type)) {
         if (expr.member.type != frontend::Token::Type::IntLiteral) {
             no_such_member();
-
             return Value::poisoned();
         }
 
@@ -819,7 +820,6 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
 
         if (value >= tuple->types.size()) {
             no_such_member();
-
             return Value::poisoned();
         }
 
@@ -876,7 +876,6 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
 
         if (!type) {
             not_a_struct();
-
             return Value::poisoned();
         }
 
@@ -952,7 +951,6 @@ Value Codegen::generate(const ast::IndexExpr& expr) {
 
     if (!type) {
         error(expr.value->offset, "index access of a non-array type");
-
         return Value::poisoned();
     }
 
@@ -1059,7 +1057,6 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
 
     if (!type) {
         error(expr.value->offset, "slice expression of a non-slice type");
-
         return Value::poisoned();
     }
 
@@ -1149,7 +1146,6 @@ Value Codegen::generate_bin_logical_expr(
     if (oper.value == AndAnd || oper.value == OrOr) {
         if (!is<types::Bool>(lhs_base_type)) {
             error(lhs.offset, "type mismatch");
-
             return Value::poisoned();
         }
 
@@ -1202,7 +1198,6 @@ Value Codegen::generate_bin_logical_expr(
 
         if (!optional) {
             error(lhs.offset, "type mismatch");
-
             return Value::poisoned();
         }
 
@@ -1329,7 +1324,6 @@ Value Codegen::generate_bin_expr(
         if (!is_sint(value_base_type) && !is_uint(value_base_type) &&
             !is_float(value_base_type)) {
             error(lhs.offset, "type mismatch");
-
             return Value::poisoned();
         }
 

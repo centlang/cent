@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 
@@ -147,33 +148,68 @@ Value Codegen::generate(const ast::Struct& decl) {
     auto* struct_type = llvm::StructType::create(
         m_context, m_current_scope_prefix + decl.name.value);
 
-    std::vector<llvm::Type*> llvm_fields;
-    std::vector<Type*> fields;
+    struct Field {
+        Type* type;
+        std::string_view name;
+        std::size_t size;
+    };
 
-    llvm_fields.reserve(decl.fields.size());
+    std::vector<Field> fields;
     fields.reserve(decl.fields.size());
 
-    for (std::size_t i = 0; i < decl.fields.size(); ++i) {
-        const auto& field = decl.fields[i];
-
+    for (const auto& field : decl.fields) {
         auto* type = field.type->codegen(*this);
 
         if (!type) {
             return Value::poisoned();
         }
 
-        llvm_fields.push_back(type->llvm_type);
-        fields.push_back(type);
-
-        m_members[struct_type][field.name.value] = i;
+        auto size = m_module->getDataLayout().getTypeAllocSize(type->llvm_type);
+        fields.emplace_back(type, field.name.value, size);
     }
 
+    std::ranges::sort(fields, [](const auto& left, const auto& right) {
+        return left.size > right.size;
+    });
+
+    std::vector<llvm::Type*> llvm_fields;
+    std::vector<Type*> type_fields;
+
+    llvm_fields.reserve(fields.size());
+    type_fields.reserve(fields.size());
+
+    std::size_t max_element = 0;
+    std::size_t total_size = 0;
+
+    for (std::size_t i = 0; i < fields.size(); ++i) {
+        const auto& field = fields[i];
+
+        llvm_fields.push_back(field.type->llvm_type);
+        type_fields.push_back(field.type);
+
+        max_element = std::max(field.size, max_element);
+        total_size += field.size;
+
+        m_members[struct_type][field.name] = i;
+    }
+
+    if (max_element > 0) {
+        auto rem = total_size % max_element;
+
+        if (rem != 0) {
+            llvm_fields.push_back(
+                llvm::ArrayType::get(
+                    llvm::Type::getInt8Ty(m_context), max_element - rem));
+        }
+    }
+
+    bool has_tail = llvm_fields.size() != type_fields.size();
     struct_type->setBody(llvm_fields);
 
     m_named_types.push_back(
         std::make_unique<types::Struct>(
             struct_type, m_current_scope_prefix + decl.name.value,
-            std::move(fields)));
+            std::move(type_fields), has_tail));
 
     m_current_scope->types[decl.name.value] = {
         .element = m_named_types.back().get(),
