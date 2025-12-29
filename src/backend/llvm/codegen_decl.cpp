@@ -132,8 +132,10 @@ Value Codegen::generate(const ast::FnDecl& decl) {
 }
 
 Value Codegen::generate(const ast::Struct& decl) {
-    auto attrs = parse_attrs(decl, {"extern"});
+    auto attrs = parse_attrs(decl, {"extern", "packed"});
+
     bool is_extern = attrs.contains("extern");
+    bool packed = attrs.contains("packed");
 
     if (m_current_scope->types.contains(decl.name.value)) {
         error(
@@ -171,7 +173,7 @@ Value Codegen::generate(const ast::Struct& decl) {
         fields.emplace_back(type, field.name.value, size);
     }
 
-    if (!is_extern) {
+    if (!is_extern && !packed) {
         std::ranges::sort(fields, [](const auto& left, const auto& right) {
             return left.size > right.size;
         });
@@ -198,7 +200,7 @@ Value Codegen::generate(const ast::Struct& decl) {
         m_members[struct_type][field.name] = i;
     }
 
-    if (!is_extern && max_element > 0) {
+    if (!is_extern && !packed && max_element > 0) {
         auto rem = total_size % max_element;
 
         if (rem != 0) {
@@ -209,7 +211,7 @@ Value Codegen::generate(const ast::Struct& decl) {
     }
 
     bool has_tail = llvm_fields.size() != type_fields.size();
-    struct_type->setBody(llvm_fields);
+    struct_type->setBody(llvm_fields, packed);
 
     m_named_types.push_back(
         std::make_unique<types::Struct>(
