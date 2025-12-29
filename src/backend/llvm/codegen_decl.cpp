@@ -132,6 +132,9 @@ Value Codegen::generate(const ast::FnDecl& decl) {
 }
 
 Value Codegen::generate(const ast::Struct& decl) {
+    auto attrs = parse_attrs(decl, {"extern"});
+    bool is_extern = attrs.contains("extern");
+
     if (m_current_scope->types.contains(decl.name.value)) {
         error(
             decl.name.offset, "{} is already defined",
@@ -168,9 +171,11 @@ Value Codegen::generate(const ast::Struct& decl) {
         fields.emplace_back(type, field.name.value, size);
     }
 
-    std::ranges::sort(fields, [](const auto& left, const auto& right) {
-        return left.size > right.size;
-    });
+    if (!is_extern) {
+        std::ranges::sort(fields, [](const auto& left, const auto& right) {
+            return left.size > right.size;
+        });
+    }
 
     std::vector<llvm::Type*> llvm_fields;
     std::vector<Type*> type_fields;
@@ -193,7 +198,7 @@ Value Codegen::generate(const ast::Struct& decl) {
         m_members[struct_type][field.name] = i;
     }
 
-    if (max_element > 0) {
+    if (!is_extern && max_element > 0) {
         auto rem = total_size % max_element;
 
         if (rem != 0) {
