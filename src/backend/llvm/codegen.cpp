@@ -637,9 +637,9 @@ Value Codegen::create_call(
             if (!is_sint(value.type) && !is_uint(value.type)) {
                 warning(
                     arguments[i]->offset,
-                    "passing argument of type `{}` to a variadic function is "
+                    "passing argument of type {} to a variadic function is "
                     "undefined behavior",
-                    value.type->to_string());
+                    log::quoted(value.type->to_string()));
 
                 llvm_args.push_back(load_rvalue(value).value);
                 continue;

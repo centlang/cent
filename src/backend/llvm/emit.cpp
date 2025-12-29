@@ -46,7 +46,8 @@ bool emit(
 
     if (code) {
         log::error(
-            "could not open file `{}`: {}", path.string(), code.message());
+            "could not open file {}: {}", log::quoted(path.string()),
+            code.message());
 
         return false;
     }
@@ -78,7 +79,8 @@ bool emit_llvm_ir(llvm::Module& module, const std::filesystem::path& path) {
 
     if (code) {
         log::error(
-            "could not open file `{}`: {}", path.string(), code.message());
+            "could not open file {}: {}", log::quoted(path.string()),
+            code.message());
 
         return false;
     }
@@ -94,7 +96,8 @@ bool emit_llvm_bc(llvm::Module& module, const std::filesystem::path& path) {
 
     if (code) {
         log::error(
-            "could not open file `{}`: {}", path.string(), code.message());
+            "could not open file {}: {}", log::quoted(path.string()),
+            code.message());
 
         return false;
     }

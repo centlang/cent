@@ -82,7 +82,8 @@ read_file(const std::string& filename) {
 
     if (!file) {
         log::error(
-            "could not open file `{}`: {}", filename, std::strerror(errno));
+            "could not open file {}: {}", log::quoted(filename),
+            std::strerror(errno));
 
         return std::nullopt;
     }

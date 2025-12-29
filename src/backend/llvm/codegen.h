@@ -208,7 +208,7 @@ private:
     [[nodiscard]] std::optional<std::string>
     did_you_mean_hint(std::string_view name, const Maps&... maps) {
         if (auto match = closest_match(name, maps...)) {
-            return fmt::format("did you mean `{}`?", *match);
+            return fmt::format("did you mean {}?", log::quoted(*match));
         }
 
         return std::nullopt;

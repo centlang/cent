@@ -568,11 +568,21 @@ Value Codegen::generate(const ast::VarDecl& decl) {
 }
 
 void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
-    auto attrs = parse_attrs(decl, {"extern"});
+    auto attrs = parse_attrs(decl, {"extern", "alwaysinline"});
+
     bool is_extern = attrs.contains("extern");
+    bool alwaysinline = attrs.contains("alwaysinline");
 
     if (!is_extern && !decl.block) {
         error(decl.name.offset, "{} has no body", log::quoted(decl.name.value));
+        return;
+    }
+
+    if (is_extern && alwaysinline) {
+        error(
+            decl.name.offset, "extern function {} cannot be `alwaysinline`",
+            log::quoted(decl.name.value));
+
         return;
     }
 
@@ -618,6 +628,10 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
                             (decl.type ? decl.type->value + "::" : "") +
                             decl.name.value,
             *m_module);
+    }
+
+    if (alwaysinline) {
+        function->addFnAttr(llvm::Attribute::AlwaysInline);
     }
 
     scope.names[decl.name.value] = {
