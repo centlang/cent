@@ -196,7 +196,7 @@ Value Codegen::generate(const ast::Struct& decl) {
 
         max_element = std::max(
             std::min<std::size_t>(
-                field.size, m_module->getDataLayout().getPointerSize()),
+                field.size, m_module->getDataLayout().getTypeAllocSize(m_size)),
             max_element);
 
         total_size += field.size;
@@ -655,7 +655,6 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
     }
 
     auto* llvm_fn_type = static_cast<llvm::FunctionType*>(fn_type->llvm_type);
-
     llvm::Function* function = nullptr;
 
     if (is_extern) {
@@ -678,6 +677,12 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
 
     if (alwaysinline) {
         function->addFnAttr(llvm::Attribute::AlwaysInline);
+    }
+
+    if (fn_type->sret) {
+        function->addParamAttr(
+            0, llvm::Attribute::getWithStructRetType(
+                   m_context, fn_type->return_type->llvm_type));
     }
 
     scope.names[decl.name.value] = {

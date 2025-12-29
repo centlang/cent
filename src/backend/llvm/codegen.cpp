@@ -30,19 +30,20 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
     auto* int16 = llvm::Type::getInt16Ty(m_context);
     auto* int32 = llvm::Type::getInt32Ty(m_context);
     auto* int64 = llvm::Type::getInt64Ty(m_context);
-    auto* size = m_module->getDataLayout().getIntPtrType(m_context);
     auto* void_type = llvm::Type::getVoidTy(m_context);
+
+    m_size = m_module->getDataLayout().getIntPtrType(m_context);
 
     m_primitive_types["i8"] = std::make_unique<types::I8>(int8);
     m_primitive_types["i16"] = std::make_unique<types::I16>(int16);
     m_primitive_types["i32"] = std::make_unique<types::I32>(int32);
     m_primitive_types["i64"] = std::make_unique<types::I64>(int64);
-    m_primitive_types["isize"] = std::make_unique<types::ISize>(size);
+    m_primitive_types["isize"] = std::make_unique<types::ISize>(m_size);
     m_primitive_types["u8"] = std::make_unique<types::U8>(int8);
     m_primitive_types["u16"] = std::make_unique<types::U16>(int16);
     m_primitive_types["u32"] = std::make_unique<types::U32>(int32);
     m_primitive_types["u64"] = std::make_unique<types::U64>(int64);
-    m_primitive_types["usize"] = std::make_unique<types::USize>(size);
+    m_primitive_types["usize"] = std::make_unique<types::USize>(m_size);
 
     m_primitive_types["rune"] = std::make_unique<types::Rune>(int32);
 
@@ -63,8 +64,7 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
     m_void_type = std::make_unique<types::Void>(void_type);
 
     m_slice_type = llvm::StructType::create(
-        {llvm::PointerType::get(m_context, 0),
-         m_module->getDataLayout().getIntPtrType(m_context)});
+        {llvm::PointerType::get(m_context, 0), m_size});
 
     create_intrinsics();
     generate(*m_program);
@@ -558,16 +558,14 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
         auto* len_member = m_builder.CreateStructGEP(
             base_type->llvm_type, variable, slice_member_len);
 
-        auto* intptr = m_module->getDataLayout().getIntPtrType(m_context);
-
         auto* ptr_value = m_builder.CreateGEP(
             base_slice_contained_type->llvm_type, load_lvalue(value).value,
-            llvm::ConstantInt::get(intptr, 0));
+            llvm::ConstantInt::get(m_size, 0));
 
         m_builder.CreateStore(ptr_value, ptr_member);
 
         m_builder.CreateStore(
-            llvm::ConstantInt::get(intptr, array_type->size), len_member);
+            llvm::ConstantInt::get(m_size, array_type->size), len_member);
 
         return Value{
             .type = type, .value = variable, .ptr_depth = 1, .memcpy = true};
@@ -601,7 +599,16 @@ Value Codegen::create_call(
     }
 
     std::vector<llvm::Value*> llvm_args;
-    llvm_args.reserve(params_size);
+    llvm::Value* sret_result = nullptr;
+
+    if (type->sret) {
+        sret_result = create_alloca(type->return_type->llvm_type);
+
+        llvm_args.reserve(params_size + 1);
+        llvm_args.push_back(sret_result);
+    } else {
+        llvm_args.reserve(params_size);
+    }
 
     for (std::size_t i = 0; i < args_size; ++i) {
         auto value = arguments[i]->codegen(*this);
@@ -676,11 +683,13 @@ Value Codegen::create_call(
         llvm_args.push_back(type->default_args[i]);
     }
 
+    auto* call = m_builder.CreateCall(
+        static_cast<llvm::FunctionType*>(type->llvm_type), function, llvm_args);
+
     return Value{
         .type = type->return_type,
-        .value = m_builder.CreateCall(
-            static_cast<llvm::FunctionType*>(type->llvm_type), function,
-            llvm_args)};
+        .value = sret_result ? sret_result : call,
+        .memcpy = type->sret};
 }
 
 Value Codegen::load_rvalue(const Value& value) {

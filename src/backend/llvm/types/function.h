@@ -14,10 +14,10 @@ struct Function : detail::Ty<Function, Type::Kind::Function> {
     [[nodiscard]] Function(
         llvm::Type* llvm_type, Type* return_type,
         std::vector<Type*> param_types,
-        std::vector<llvm::Constant*> default_args, bool variadic)
+        std::vector<llvm::Constant*> default_args, bool variadic, bool sret)
     : Ty{llvm_type}, return_type{return_type},
       param_types{std::move(param_types)},
-      default_args{std::move(default_args)}, variadic{variadic} {}
+      default_args{std::move(default_args)}, variadic{variadic}, sret{sret} {}
 
     [[nodiscard]] std::string to_string() const override {
         std::string result = "fn(";
@@ -38,6 +38,8 @@ struct Function : detail::Ty<Function, Type::Kind::Function> {
 
     std::vector<llvm::Constant*> default_args;
     bool variadic;
+
+    bool sret;
 };
 
 } // namespace cent::backend::types

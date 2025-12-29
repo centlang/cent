@@ -193,19 +193,34 @@ types::Function* Codegen::get_fn_type(
         return result.get();
     }
 
+    bool sret = false;
     std::vector<llvm::Type*> llvm_param_types;
-    llvm_param_types.reserve(param_types.size());
+
+    const auto& layout = m_module->getDataLayout();
+
+    if (!is<types::Void, types::Never>(return_type) &&
+        layout.getTypeAllocSize(return_type->llvm_type) >
+            layout.getTypeAllocSize(m_size) * 2) {
+        sret = true;
+        llvm_param_types.reserve(param_types.size() + 1);
+
+        llvm_param_types.push_back(
+            llvm::PointerType::get(return_type->llvm_type, 0));
+    } else {
+        llvm_param_types.reserve(param_types.size());
+    }
 
     for (const auto& parameter : param_types) {
         llvm_param_types.push_back(parameter->llvm_type);
     }
 
     auto* llvm_type = llvm::FunctionType::get(
-        return_type->llvm_type, llvm_param_types, variadic);
+        sret ? m_void_type->llvm_type : return_type->llvm_type,
+        llvm_param_types, variadic);
 
     result = std::make_unique<types::Function>(
         llvm_type, return_type, std::move(param_types), std::move(default_args),
-        variadic);
+        variadic, sret);
 
     return result.get();
 }

@@ -495,7 +495,6 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
 
     if (expr.elements.size() != array_type->size) {
         error(expr.type->offset, "incorrect number of elements");
-
         return Value::poisoned();
     }
 
@@ -539,12 +538,10 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
     for (std::size_t i = 0; i < expr.elements.size(); ++i) {
         auto& value = values[i];
 
-        auto* intptr = m_module->getDataLayout().getIntPtrType(m_context);
-
         auto* ptr = m_builder.CreateGEP(
             llvm_type, variable,
-            {llvm::ConstantInt::get(intptr, 0),
-             llvm::ConstantInt::get(intptr, i)});
+            {llvm::ConstantInt::get(m_size, 0),
+             llvm::ConstantInt::get(m_size, i)});
 
         auto val =
             cast_or_error(expr.elements[i]->offset, array_type->type, value);
@@ -719,7 +716,7 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
         }
     }
 
-    auto arg_size = iterator->second.function->arg_size();
+    auto arg_size = iterator->second.type->param_types.size();
 
     if (arg_size - 1 != expr.arguments.size()) {
         error(expr.name.offset, "incorrect number of arguments passed");
@@ -727,7 +724,17 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
     }
 
     std::vector<llvm::Value*> arguments;
-    arguments.reserve(arg_size);
+    llvm::Value* sret_result = nullptr;
+
+    if (iterator->second.type->sret) {
+        sret_result =
+            create_alloca(iterator->second.type->return_type->llvm_type);
+
+        arguments.reserve(arg_size + 1);
+        arguments.push_back(sret_result);
+    } else {
+        arguments.reserve(arg_size);
+    }
 
     if (auto* type =
             dyn_cast<types::Pointer>(iterator->second.type->param_types[0])) {
@@ -777,9 +784,12 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
         }
     }
 
+    auto* call = m_builder.CreateCall(iterator->second.function, arguments);
+
     return Value{
         .type = iterator->second.type->return_type,
-        .value = m_builder.CreateCall(iterator->second.function, arguments)};
+        .value = sret_result ? sret_result : call,
+        .memcpy = iterator->second.type->sret};
 }
 
 Value Codegen::generate(const ast::MemberExpr& expr) {
@@ -958,9 +968,7 @@ Value Codegen::generate(const ast::IndexExpr& expr) {
         .type = type->type,
         .value = m_builder.CreateGEP(
             type->llvm_type, value.value,
-            {llvm::ConstantInt::get(
-                 m_module->getDataLayout().getIntPtrType(m_context), 0),
-             val.value}),
+            {llvm::ConstantInt::get(m_size, 0), val.value}),
         .ptr_depth = 1,
         .is_mutable = value.is_mutable};
 }
@@ -994,8 +1002,7 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
     } else {
         low = {
             .type = m_primitive_types["usize"].get(),
-            .value = llvm::ConstantInt::get(
-                m_module->getDataLayout().getIntPtrType(m_context), 0)};
+            .value = llvm::ConstantInt::get(m_size, 0)};
     }
 
     Value high = Value::poisoned();
@@ -1021,9 +1028,7 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
         if (!high.ok()) {
             high = {
                 .type = m_primitive_types["usize"].get(),
-                .value = llvm::ConstantInt::get(
-                    m_module->getDataLayout().getIntPtrType(m_context),
-                    type->size)};
+                .value = llvm::ConstantInt::get(m_size, type->size)};
         }
 
         auto* ptr_value =
@@ -1068,9 +1073,7 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
 
         high = {
             .type = m_primitive_types["usize"].get(),
-            .value = m_builder.CreateLoad(
-                m_module->getDataLayout().getIntPtrType(m_context),
-                len_member)};
+            .value = m_builder.CreateLoad(m_size, len_member)};
     }
 
     auto* ptr_value = load_struct_member(

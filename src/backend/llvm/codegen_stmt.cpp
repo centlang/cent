@@ -257,9 +257,8 @@ Value Codegen::generate(const ast::ReturnStmt& stmt) {
     auto* function = m_builder.GetInsertBlock()->getParent();
 
     if (!stmt.value) {
-        if (!function->getReturnType()->isVoidTy()) {
+        if (!is<types::Void>(m_current_function->return_type)) {
             error(stmt.offset, "type mismatch");
-
             return Value::poisoned();
         }
 
@@ -276,14 +275,27 @@ Value Codegen::generate(const ast::ReturnStmt& stmt) {
         return Value::poisoned();
     }
 
-    if (auto val =
-            cast_or_error(stmt.offset, m_current_function->return_type, value);
-        val.ok()) {
-        if (!m_builder.GetInsertBlock()->getTerminator()) {
-            m_builder.CreateRet(load_rvalue(val).value);
-        }
+    auto val =
+        cast_or_error(stmt.offset, m_current_function->return_type, value);
+
+    if (!val.ok()) {
+        return Value::poisoned();
     }
 
+    if (m_builder.GetInsertBlock()->getTerminator()) {
+        return Value::poisoned();
+    }
+
+    if (m_current_function->sret) {
+        auto* function = m_builder.GetInsertBlock()->getParent();
+
+        m_builder.CreateStore(load_rvalue(val).value, function->getArg(0));
+        m_builder.CreateRetVoid();
+
+        return Value::poisoned();
+    }
+
+    m_builder.CreateRet(load_rvalue(val).value);
     return Value::poisoned();
 }
 
@@ -347,13 +359,12 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
         auto* llvm_contained_type = type->type->llvm_type;
 
-        auto* usize = m_module->getDataLayout().getIntPtrType(m_context);
-        auto* usize_null = llvm::ConstantInt::get(usize, 0);
+        auto* usize_null = llvm::ConstantInt::get(m_size, 0);
 
-        auto* index = create_alloca(usize);
+        auto* index = create_alloca(m_size);
         m_builder.CreateStore(usize_null, index);
 
-        auto* length = load_struct_member(usize, value, slice_member_len);
+        auto* length = load_struct_member(m_size, value, slice_member_len);
 
         m_builder.CreateCondBr(
             m_builder.CreateICmpULT(usize_null, length), loop_body, m_loop_end);
@@ -365,7 +376,7 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
         auto* ptr_value = load_struct_member(
             llvm::PointerType::get(m_context, 0), value, slice_member_ptr);
 
-        auto* index_value = m_builder.CreateLoad(usize, index);
+        auto* index_value = m_builder.CreateLoad(m_size, index);
 
         m_current_scope->names[stmt.name.value] = {
             .element =
@@ -385,7 +396,7 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
         m_builder.SetInsertPoint(m_loop_continue);
 
         auto* incremented =
-            m_builder.CreateAdd(index_value, llvm::ConstantInt::get(usize, 1));
+            m_builder.CreateAdd(index_value, llvm::ConstantInt::get(m_size, 1));
 
         m_builder.CreateStore(incremented, index);
 
@@ -409,13 +420,12 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
         auto* llvm_contained_type = type->type->llvm_type;
 
-        auto* usize = m_module->getDataLayout().getIntPtrType(m_context);
-        auto* usize_null = llvm::ConstantInt::get(usize, 0);
+        auto* usize_null = llvm::ConstantInt::get(m_size, 0);
 
-        auto* index = create_alloca(usize);
+        auto* index = create_alloca(m_size);
         m_builder.CreateStore(usize_null, index);
 
-        auto* length = llvm::ConstantInt::get(usize, type->size);
+        auto* length = llvm::ConstantInt::get(m_size, type->size);
 
         m_builder.CreateCondBr(
             m_builder.CreateICmpULT(usize_null, length), loop_body, m_loop_end);
@@ -424,7 +434,7 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
         auto current_scope = *m_current_scope;
 
-        auto* index_value = m_builder.CreateLoad(usize, index);
+        auto* index_value = m_builder.CreateLoad(m_size, index);
 
         m_current_scope->names[stmt.name.value] = {
             .element =
@@ -444,7 +454,7 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
         m_builder.SetInsertPoint(m_loop_continue);
 
         auto* incremented =
-            m_builder.CreateAdd(index_value, llvm::ConstantInt::get(usize, 1));
+            m_builder.CreateAdd(index_value, llvm::ConstantInt::get(m_size, 1));
 
         m_builder.CreateStore(incremented, index);
 
