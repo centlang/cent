@@ -6,6 +6,7 @@
 
 #include <llvm/Analysis/CGSCCPassManager.h>
 #include <llvm/Analysis/LoopAnalysisManager.h>
+#include <llvm/Transforms/IPO/AlwaysInliner.h>
 
 #include <llvm/Bitcode/BitcodeWriter.h>
 
@@ -32,6 +33,8 @@ void optimize_module(llvm::Module& module, llvm::OptimizationLevel opt_level) {
         loop_manager, function_manager, cg_manager, module_manager);
 
     auto manager = builder.buildPerModuleDefaultPipeline(opt_level);
+
+    manager.addPass(llvm::AlwaysInlinerPass());
     manager.run(module, module_manager);
 }
 

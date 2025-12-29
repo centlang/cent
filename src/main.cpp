@@ -343,11 +343,13 @@ compile(llvm::TargetMachine* machine) {
 
     end_step("IR codegen");
 
-    if (cent::g_options.optimize) {
-        start_step();
-        cent::backend::optimize_module(*module, llvm::OptimizationLevel::O3);
-        end_step("optimization");
-    }
+    start_step();
+
+    cent::backend::optimize_module(
+        *module, cent::g_options.optimize ? llvm::OptimizationLevel::O3
+                                          : llvm::OptimizationLevel::O0);
+
+    end_step("optimization");
 
     auto get_output_file = [&](std::string_view extension) {
         if (cent::g_options.output_file) {
