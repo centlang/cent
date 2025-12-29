@@ -194,9 +194,12 @@ Value Codegen::generate(const ast::Struct& decl) {
         llvm_fields.push_back(field.type->llvm_type);
         type_fields.push_back(field.type);
 
-        max_element = std::max(field.size, max_element);
-        total_size += field.size;
+        max_element = std::max(
+            std::min<std::size_t>(
+                field.size, m_module->getDataLayout().getPointerSize()),
+            max_element);
 
+        total_size += field.size;
         m_members[struct_type][field.name] = i;
     }
 
