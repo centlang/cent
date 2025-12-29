@@ -76,14 +76,15 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
 
 void Codegen::create_intrinsics() {
     auto* u8_type = m_primitive_types["u8"].get();
+    auto* mut_u8_ptr = get_ptr_type(u8_type, true);
     auto* usize = m_primitive_types["usize"].get();
 
-    auto* as_mut_u8_slice_type = get_fn_type(
-        get_slice_type(u8_type, true), {get_ptr_type(u8_type, true), usize});
+    auto* as_mut_u8_slice_type =
+        get_fn_type(get_slice_type(u8_type, true), {mut_u8_ptr, usize});
 
     auto* as_mut_u8_slice = llvm::Function::Create(
         static_cast<llvm::FunctionType*>(as_mut_u8_slice_type->llvm_type),
-        llvm::Function::PrivateLinkage, "core::ptr::as_mut_u8_slice",
+        llvm::Function::PrivateLinkage, "core::mem::as_mut_u8_slice",
         *m_module);
 
     auto* as_mut_u8_slice_entry =
@@ -112,7 +113,7 @@ void Codegen::create_intrinsics() {
 
     auto* as_u8_slice = llvm::Function::Create(
         static_cast<llvm::FunctionType*>(as_u8_slice_type->llvm_type),
-        llvm::Function::PrivateLinkage, "core::ptr::as_u8_slice", *m_module);
+        llvm::Function::PrivateLinkage, "core::mem::as_u8_slice", *m_module);
 
     auto* as_u8_slice_entry =
         llvm::BasicBlock::Create(m_context, "", as_u8_slice);
@@ -132,13 +133,32 @@ void Codegen::create_intrinsics() {
 
     m_builder.CreateRet(m_builder.CreateLoad(m_slice_type, as_u8_slice_result));
 
-    m_core_module.scopes["ptr"].names = {
+    auto* alloca_u8_type = get_fn_type(mut_u8_ptr, {usize});
+
+    auto* alloca_u8 = llvm::Function::Create(
+        static_cast<llvm::FunctionType*>(alloca_u8_type->llvm_type),
+        llvm::Function::PrivateLinkage, "core::mem::alloca_u8", *m_module);
+
+    alloca_u8->addFnAttr(llvm::Attribute::AlwaysInline);
+
+    auto* alloca_u8_entry = llvm::BasicBlock::Create(m_context, "", alloca_u8);
+
+    m_builder.SetInsertPoint(alloca_u8_entry);
+
+    m_builder.CreateRet(
+        create_alloca(u8_type->llvm_type, alloca_u8->getArg(0)));
+
+    m_core_module.scopes["mem"].names = {
         {"as_mut_u8_slice",
          {.element = {.type = as_mut_u8_slice_type, .value = as_mut_u8_slice},
           .is_public = true}},
         {"as_u8_slice",
          {.element = {.type = as_u8_slice_type, .value = as_u8_slice},
-          .is_public = true}}};
+          .is_public = true}},
+        {"alloca_u8",
+         {.element = {.type = alloca_u8_type, .value = alloca_u8},
+          .is_public = true}},
+    };
 }
 
 void Codegen::create_main() {
@@ -687,7 +707,7 @@ Value Codegen::load_lvalue(const Value& value) {
     return result;
 }
 
-llvm::Value* Codegen::create_alloca(llvm::Type* type) {
+llvm::Value* Codegen::create_alloca(llvm::Type* type, llvm::Value* size) {
     auto* insert_point = m_builder.GetInsertBlock();
 
     if (!insert_point) {
@@ -695,9 +715,9 @@ llvm::Value* Codegen::create_alloca(llvm::Type* type) {
     }
 
     m_builder.SetInsertPointPastAllocas(insert_point->getParent());
-    auto* result = m_builder.CreateAlloca(type);
-    m_builder.SetInsertPoint(insert_point);
+    auto* result = m_builder.CreateAlloca(type, size);
 
+    m_builder.SetInsertPoint(insert_point);
     return result;
 }
 

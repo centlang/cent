@@ -187,7 +187,9 @@ private:
     [[nodiscard]] Value load_rvalue(const Value& value);
     [[nodiscard]] Value load_lvalue(const Value& value);
 
-    [[nodiscard]] llvm::Value* create_alloca(llvm::Type* type);
+    [[nodiscard]] llvm::Value*
+    create_alloca(llvm::Type* type, llvm::Value* size = nullptr);
+
     void create_store(const Value& src, llvm::Value* dest);
 
     [[nodiscard]] llvm::Value*
