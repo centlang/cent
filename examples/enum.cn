@@ -20,7 +20,7 @@ fn handle_event(e: WindowEvent) {
     switch e {
         WindowEvent::closed { io::println("goodbye!"); c::exit(0); }
         WindowEvent::maximized { io::println("hello!"); }
-        else { c::printf(c::to_cstr("ignoring event %d\n"), e as u8); }
+        else { c::printf(c::to_cstr("ignoring event %d\n\0"), e as u8); }
     }
 }
 

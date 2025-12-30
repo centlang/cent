@@ -26,8 +26,8 @@ fn fib_recursive(n: u64) u64 {
 }
 
 fn main() {
-    c::puts(c::to_cstr("fib(36):"));
+    c::puts(c::to_cstr("fib(36):\0"));
 
-    c::printf(c::to_cstr("  fib_iterative: %llu\n"), fib_iterative(36));
-    c::printf(c::to_cstr("  fib_recursive: %llu\n"), fib_recursive(36));
+    c::printf(c::to_cstr("  fib_iterative: %llu\n\0"), fib_iterative(36));
+    c::printf(c::to_cstr("  fib_recursive: %llu\n\0"), fib_recursive(36));
 }

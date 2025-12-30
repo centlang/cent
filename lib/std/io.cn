@@ -166,7 +166,7 @@ pub fn read_uint(fd: Fd) ?u64 {
 
     mut r: u64 = undefined;
 
-    if c::fscanf(fd._file, c::to_cstr("%llu"), &r) != 1 {
+    if c::fscanf(fd._file, c::to_cstr("%llu\0"), &r) != 1 {
         return null;
     }
 
@@ -178,7 +178,7 @@ pub fn read_int(fd: Fd) ?i64 {
 
     mut r: i64 = undefined;
 
-    if c::fscanf(fd._file, c::to_cstr("%lli"), &r) != 1 {
+    if c::fscanf(fd._file, c::to_cstr("%lli\0"), &r) != 1 {
         return null;
     }
 

@@ -23,5 +23,5 @@ fn main() {
     apply_to(&a, 27, &add);
     apply_to(&a, 6, &mul);
 
-    c::printf(c::to_cstr("a is %d"), a);
+    c::printf(c::to_cstr("a is %d\0"), a);
 }

@@ -12,5 +12,5 @@ fn find(data: []i32, x: i32) ?usize {
 
 fn main() {
     let data = [_]i32 { 42, 42, 420, 4242, 69 };
-    c::printf(c::to_cstr("4242 is at data[%zu]\n"), find(data, 4242) ?? 0);
+    c::printf(c::to_cstr("4242 is at data[%zu]\n\0"), find(data, 4242) ?? 0);
 }

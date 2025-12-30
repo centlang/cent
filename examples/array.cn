@@ -7,10 +7,10 @@ fn main() {
         squares[i as usize - 1] = i * i;
     }
 
-    c::puts(c::to_cstr("Squares:"));
+    c::puts(c::to_cstr("Squares:\0"));
 
     for x in squares {
-        c::printf(c::to_cstr("  %u\n"), x);
+        c::printf(c::to_cstr("  %u\n\0"), x);
     }
 
     c::putchar('\n' as i32);

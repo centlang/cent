@@ -2,5 +2,5 @@ with std;
 with c;
 
 fn main() {
-    std::assert(c::strlen(c::to_cstr("Hello, world!")) == 13);
+    std::assert(c::strlen(c::to_cstr("Hello, world!\0")) == 13);
 }

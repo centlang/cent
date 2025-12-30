@@ -10,11 +10,11 @@ type User {
 #(distinct) type UserId = u64;
 
 fn User::print_user(self: *User) {
-    c::puts(c::to_cstr("User:")); 
-    c::printf(c::to_cstr("  username: %s\n"), c::to_cstr(self.username));
-    c::printf(c::to_cstr("  email: %s\n"), c::to_cstr(self.email));
-    c::printf(c::to_cstr("  age: %d\n"), self.age as i32);
-    c::printf(c::to_cstr("  id: %llu\n"), self.id);
+    c::puts(c::to_cstr("User:\0"));
+    c::printf(c::to_cstr("  username: %s\n\0"), c::to_cstr(self.username));
+    c::printf(c::to_cstr("  email: %s\n\0"), c::to_cstr(self.email));
+    c::printf(c::to_cstr("  age: %d\n\0"), self.age as i32);
+    c::printf(c::to_cstr("  id: %llu\n\0"), self.id);
 }
 
 fn main() {

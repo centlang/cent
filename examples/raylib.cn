@@ -23,13 +23,13 @@ const LIGHTGRAY: Color = 0xffc8c8c8;
 );
 
 fn main() {
-    InitWindow(800, 600, c::to_cstr("raylib example"));
+    InitWindow(800, 600, c::to_cstr("raylib example\0"));
 
     while !WindowShouldClose() {
         BeginDrawing();
 
         ClearBackground(RAYWHITE);
-        DrawText(c::to_cstr("Hello from Cent!"), 250, 250, 36, LIGHTGRAY);
+        DrawText(c::to_cstr("Hello from Cent!\0"), 250, 250, 36, LIGHTGRAY);
 
         EndDrawing();
     }

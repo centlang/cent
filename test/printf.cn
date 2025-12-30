@@ -1,5 +1,5 @@
 with c;
 
 fn main() {
-    c::printf(c::to_cstr("Hello, %s!\n"), c::to_cstr("world"));
+    c::printf(c::to_cstr("Hello, %s!\n"), c::to_cstr("world\0"));
 }
