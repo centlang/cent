@@ -1,4 +1,6 @@
 with std::io;
+
+with std::ffi;
 with c;
 
 fn hello_world() {
@@ -23,5 +25,5 @@ fn main() {
     apply_to(&a, 27, &add);
     apply_to(&a, 6, &mul);
 
-    c::printf(c::to_cstr("a is %d\0"), a);
+    c::printf(ffi::as_cstr("a is %d\0"), a);
 }

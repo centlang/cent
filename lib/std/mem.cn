@@ -1,4 +1,5 @@
 with c;
+with std;
 
 pub fn equal(a: []u8, b: []u8) bool {
     return a.len == b.len && c::memcmp(

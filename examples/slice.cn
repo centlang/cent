@@ -1,3 +1,4 @@
+with std::ffi;
 with c;
 
 fn main() {
@@ -5,10 +6,10 @@ fn main() {
     mut slice: []mut i32 = array;
 
     slice[0] = 42;
-    c::printf(c::to_cstr("slice[0] = %d\n\0"), slice[0]);
-    c::printf(c::to_cstr("slice.len = %zu\n\0"), slice.len);
+    c::printf(ffi::as_cstr("slice[0] = %d\n\0"), slice[0]);
+    c::printf(ffi::as_cstr("slice.len = %zu\n\0"), slice.len);
 
     slice = slice[1:3];
-    c::printf(c::to_cstr("slice[0] = %d\n\0"), slice[0]);
-    c::printf(c::to_cstr("slice.len = %zu\n\0"), slice.len);
+    c::printf(ffi::as_cstr("slice[0] = %d\n\0"), slice[0]);
+    c::printf(ffi::as_cstr("slice.len = %zu\n\0"), slice.len);
 }

@@ -2,6 +2,9 @@ with io;
 with c;
 with posix;
 
+with std::alloc;
+with std::ffi;
+
 pub enum Mode u8 {
     read = 1 << 0,
     write = 1 << 1,
@@ -11,7 +14,17 @@ pub enum Mode u8 {
 }
 
 pub fn open(path: []u8, mode: Mode) ?io::Fd {
-    let file = c::fopen(c::to_cstr(path), c::to_cstr(to_libc_mode(mode)));
+    let a = alloc::system();
+    let p = ffi::alloc_cstr(path, a);
+
+    if p == null {
+        return null;
+    }
+
+    let p = p.!;
+    let file = c::fopen(p, ffi::as_cstr(to_libc_mode(mode)));
+
+    a.free(p as *mut u8);
 
     if file == null {
         return null;
@@ -21,31 +34,44 @@ pub fn open(path: []u8, mode: Mode) ?io::Fd {
 }
 
 pub fn mkdir(path: []u8) bool {
-    return posix::mkdir(
-        c::to_cstr(path), posix::S_IRWXU | posix::S_IRWXG | posix::S_IRWXO
+    let a = alloc::system();
+    let p = ffi::alloc_cstr(path, a);
+
+    if p == null {
+        return false;
+    }
+
+    let p = p.!;
+
+    let result = posix::mkdir(
+        p, posix::S_IRWXU | posix::S_IRWXG | posix::S_IRWXO
     ) == 0;
+
+    a.free(p as *mut u8);
+
+    return result;
 }
 
 fn to_libc_mode(mode: Mode) []u8 {
     if (mode & Mode::read) as u8 != 0 && (mode & Mode::write) as u8 == 0 {
-        return "rb";
+        return "rb\0";
     }
 
     if (mode & Mode::read) as u8 == 0 && (mode & Mode::write) as u8 != 0 {
         if (mode & Mode::append) as u8 != 0 {
-            return "ab";
+            return "ab\0";
         }
 
-        return "wb";
+        return "wb\0";
     }
 
     if (mode & Mode::append) as u8 != 0 {
-        return "a+b";
+        return "a+b\0";
     }
 
     if (mode & Mode::trunc) as u8 != 0 {
-        return "w+b";
+        return "w+b\0";
     }
 
-    return "r+b";
+    return "r+b\0";
 }

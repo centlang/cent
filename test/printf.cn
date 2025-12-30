@@ -1,5 +1,6 @@
+with std::ffi;
 with c;
 
 fn main() {
-    c::printf(c::to_cstr("Hello, %s!\n"), c::to_cstr("world\0"));
+    c::printf(ffi::as_cstr("Hello, %s!\n"), ffi::as_cstr("world\0"));
 }

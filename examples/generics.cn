@@ -1,4 +1,6 @@
 with c;
+
+with std::ffi;
 with std::alloc;
 
 type(<T>) Vec2 {
@@ -15,5 +17,5 @@ fn(<T>) add(a: T, b: T) T {
 
 fn main() {
     let v = Vec2(<f32>) { x: 42, y: 4 };
-    c::printf(c::to_cstr("v.x + v.y = %f\n\0"), add(v.x, v.y) as f64);
+    c::printf(ffi::as_cstr("v.x + v.y = %f\n\0"), add(v.x, v.y) as f64);
 }

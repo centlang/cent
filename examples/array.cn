@@ -1,4 +1,5 @@
 with c;
+with std::ffi;
 
 fn main() {
     mut squares: [10]i32 = undefined;
@@ -7,10 +8,10 @@ fn main() {
         squares[i as usize - 1] = i * i;
     }
 
-    c::puts(c::to_cstr("Squares:\0"));
+    c::puts(ffi::as_cstr("Squares:\0"));
 
     for x in squares {
-        c::printf(c::to_cstr("  %u\n\0"), x);
+        c::printf(ffi::as_cstr("  %u\n\0"), x);
     }
 
     c::putchar('\n' as i32);
@@ -19,5 +20,5 @@ fn main() {
         'H' as u8, 'e' as u8, 'l' as u8, 'l' as u8, 'o' as u8, 0
     };
 
-    c::puts(c::to_cstr(hello));
+    c::puts(ffi::as_cstr(hello));
 }

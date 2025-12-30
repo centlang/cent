@@ -1,3 +1,4 @@
+with std::ffi;
 with c;
 
 type Vec2 {
@@ -16,6 +17,6 @@ fn Vec2::length(self: Vec2) f64 {
 fn main() {
     let v = Vec2 { x: 1.0, y: 1.0 };
 
-    c::printf(c::to_cstr("Vec2 { x: %f, y: %f }:\n\0"), v.x, v.y);
-    c::printf(c::to_cstr("  length: %f\n\0"), v.length());
+    c::printf(ffi::as_cstr("Vec2 { x: %f, y: %f }:\n\0"), v.x, v.y);
+    c::printf(ffi::as_cstr("  length: %f\n\0"), v.length());
 }
