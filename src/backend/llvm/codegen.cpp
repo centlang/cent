@@ -681,20 +681,21 @@ Value Codegen::create_call(
 
         if (type->variadic && i >= params_size) {
             static constexpr auto int_bitwidth = 32;
+            auto* base_type = unwrap_type(value.type, true);
 
-            if (auto* optional = dyn_cast<types::Optional>(value.type)) {
+            if (auto* optional = dyn_cast<types::Optional>(base_type)) {
                 if (is<types::Pointer>(optional->type)) {
                     llvm_args.push_back(load_rvalue(value).value);
                     continue;
                 }
             }
 
-            if (is<types::Pointer, types::F64>(value.type)) {
+            if (is<types::Pointer, types::F64>(base_type)) {
                 llvm_args.push_back(load_rvalue(value).value);
                 continue;
             }
 
-            if (is<types::Bool>(value.type)) {
+            if (is<types::Bool>(base_type)) {
                 llvm_args.push_back(
                     primitive_cast(m_primitive_types["i32"].get(), value, false)
                         .value);
@@ -702,7 +703,7 @@ Value Codegen::create_call(
                 continue;
             }
 
-            if (is<types::F32>(value.type)) {
+            if (is<types::F32>(base_type)) {
                 llvm_args.push_back(
                     primitive_cast(m_primitive_types["f64"].get(), value)
                         .value);
@@ -710,7 +711,7 @@ Value Codegen::create_call(
                 continue;
             }
 
-            if (!is_sint(value.type) && !is_uint(value.type)) {
+            if (!is_sint(base_type) && !is_uint(base_type)) {
                 warning(
                     arguments[i]->offset,
                     "passing argument of type {} to a variadic function is "
@@ -721,7 +722,7 @@ Value Codegen::create_call(
                 continue;
             }
 
-            auto bitwidth = value.type->llvm_type->getIntegerBitWidth();
+            auto bitwidth = base_type->llvm_type->getIntegerBitWidth();
 
             if (bitwidth >= int_bitwidth) {
                 llvm_args.push_back(load_rvalue(value).value);
