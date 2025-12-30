@@ -171,7 +171,7 @@ void Codegen::create_panic_fn() {
         llvm::Type::getVoidTy(m_context), ptr_type, false);
 
     m_panic_fn = llvm::Function::Create(
-        panic_type, llvm::Function::PrivateLinkage, "panic", *m_module);
+        panic_type, llvm::Function::PrivateLinkage, "core::__panic", *m_module);
 
     auto* fputs_type = llvm::FunctionType::get(
         llvm::Type::getInt32Ty(m_context), {ptr_type, ptr_type}, false);
