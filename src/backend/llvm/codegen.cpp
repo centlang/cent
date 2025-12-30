@@ -137,20 +137,19 @@ void Codegen::create_intrinsics() {
 
     m_builder.CreateRet(m_builder.CreateLoad(m_slice_type, as_u8_slice_result));
 
-    auto* alloca_u8_type = get_fn_type(mut_u8_ptr, {usize});
+    auto* alloca_type = get_fn_type(mut_u8_ptr, {usize});
 
-    auto* alloca_u8 = llvm::Function::Create(
-        static_cast<llvm::FunctionType*>(alloca_u8_type->llvm_type),
-        llvm::Function::PrivateLinkage, "core::mem::alloca_u8", *m_module);
+    auto* alloca = llvm::Function::Create(
+        static_cast<llvm::FunctionType*>(alloca_type->llvm_type),
+        llvm::Function::PrivateLinkage, "core::mem::alloca", *m_module);
 
-    alloca_u8->addFnAttr(llvm::Attribute::AlwaysInline);
+    alloca->addFnAttr(llvm::Attribute::AlwaysInline);
 
-    auto* alloca_u8_entry = llvm::BasicBlock::Create(m_context, "", alloca_u8);
+    auto* alloca_entry = llvm::BasicBlock::Create(m_context, "", alloca);
 
-    m_builder.SetInsertPoint(alloca_u8_entry);
+    m_builder.SetInsertPoint(alloca_entry);
 
-    m_builder.CreateRet(
-        create_alloca(u8_type->llvm_type, alloca_u8->getArg(0)));
+    m_builder.CreateRet(create_alloca(u8_type->llvm_type, alloca->getArg(0)));
 
     m_core_module.scopes["mem"].names = {
         {"as_mut_u8_slice",
@@ -159,8 +158,8 @@ void Codegen::create_intrinsics() {
         {"as_u8_slice",
          {.element = {.type = as_u8_slice_type, .value = as_u8_slice},
           .is_public = true}},
-        {"alloca_u8",
-         {.element = {.type = alloca_u8_type, .value = alloca_u8},
+        {"alloca",
+         {.element = {.type = alloca_type, .value = alloca},
           .is_public = true}},
     };
 }
