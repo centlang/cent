@@ -184,9 +184,6 @@ private:
     [[nodiscard]] std::unique_ptr<ast::Module>
     parse_submodule(const std::filesystem::path& path, std::string_view name);
 
-    [[nodiscard]] std::unique_ptr<ast::Module> parse_submodule_dir(
-        const std::filesystem::path& path, std::string_view name);
-
     [[nodiscard]] bool parse_with(ast::Module& module);
 
     [[nodiscard]] static std::uint8_t precedence_of(Token::Type type) {

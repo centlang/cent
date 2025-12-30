@@ -1634,44 +1634,6 @@ std::unique_ptr<ast::Module> Parser::parse_submodule(
     return submodule;
 }
 
-std::unique_ptr<ast::Module> Parser::parse_submodule_dir(
-    const std::filesystem::path& path, std::string_view name) {
-    auto result = std::make_unique<ast::Module>(path, std::string{name});
-
-    for (const auto& entry :
-         std::filesystem::recursive_directory_iterator{path}) {
-        auto name = entry.path().stem().string();
-
-        if (entry.is_directory()) {
-            auto submodule = parse_submodule_dir(entry, name);
-
-            if (!submodule) {
-                return nullptr;
-            }
-
-            result->submodules.push_back(std::move(submodule));
-        }
-
-        if (entry.path() == m_filename) {
-            continue;
-        }
-
-        if (entry.path().extension() != ".cn") {
-            continue;
-        }
-
-        auto submodule = parse_submodule(entry, name);
-
-        if (!submodule) {
-            return nullptr;
-        }
-
-        result->submodules.push_back(std::move(submodule));
-    }
-
-    return result;
-}
-
 bool Parser::parse_with(ast::Module& module) {
     auto name = expect("module name", Token::Type::Identifier);
 
@@ -1736,9 +1698,7 @@ bool Parser::parse_with(ast::Module& module) {
             continue;
         }
 
-        auto submodule = std::filesystem::is_directory(module_path)
-                             ? parse_submodule_dir(module_path, module_name)
-                             : parse_submodule(module_path, module_name);
+        auto submodule = parse_submodule(module_path, module_name);
 
         if (!submodule) {
             return false;
