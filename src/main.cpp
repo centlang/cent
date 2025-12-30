@@ -192,6 +192,11 @@ get_emit_type(std::string_view type) {
             continue;
         }
 
+        if (arg == "--emit-checks") {
+            cent::g_options.emit_checks = true;
+            continue;
+        }
+
         if (arg == "--color") {
             cent::g_options.colorize = true;
             continue;

@@ -66,6 +66,10 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
     m_slice_type = llvm::StructType::create(
         {llvm::PointerType::get(m_context, 0), m_size});
 
+    if (g_options.emit_checks) {
+        create_panic_fn();
+    }
+
     create_intrinsics();
     generate(*m_program);
 
@@ -159,6 +163,49 @@ void Codegen::create_intrinsics() {
          {.element = {.type = alloca_u8_type, .value = alloca_u8},
           .is_public = true}},
     };
+}
+
+void Codegen::create_panic_fn() {
+    auto* ptr_type = llvm::PointerType::get(m_context, 0);
+
+    auto* panic_type = llvm::FunctionType::get(
+        llvm::Type::getVoidTy(m_context), ptr_type, false);
+
+    m_panic_fn = llvm::Function::Create(
+        panic_type, llvm::Function::PrivateLinkage, "panic", *m_module);
+
+    auto* fputs_type = llvm::FunctionType::get(
+        llvm::Type::getInt32Ty(m_context), {ptr_type, ptr_type}, false);
+
+    auto* fputs_fn = llvm::Function::Create(
+        fputs_type, llvm::Function::ExternalLinkage, "fputs", *m_module);
+
+    auto* stderr = new llvm::GlobalVariable{
+        *m_module, llvm::PointerType::get(m_context, 0),
+        false,     llvm::GlobalValue::ExternalLinkage,
+        nullptr,   "stderr"};
+
+    auto* exit_type = llvm::FunctionType::get(
+        llvm::Type::getVoidTy(m_context), {llvm::Type::getInt32Ty(m_context)},
+        false);
+
+    auto* exit_fn = llvm::Function::Create(
+        exit_type, llvm::Function::ExternalLinkage, "exit", *m_module);
+
+    auto* entry = llvm::BasicBlock::Create(m_context, "", m_panic_fn);
+
+    m_builder.SetInsertPoint(entry);
+
+    auto* stderr_value =
+        m_builder.CreateLoad(llvm::PointerType::get(m_context, 0), stderr);
+
+    m_builder.CreateCall(fputs_fn, {m_panic_fn->getArg(0), stderr_value});
+
+    m_builder.CreateCall(
+        exit_fn,
+        llvm::ConstantInt::getSigned(llvm::Type::getInt32Ty(m_context), 1));
+
+    m_builder.CreateUnreachable();
 }
 
 void Codegen::create_main() {
@@ -692,6 +739,12 @@ Value Codegen::create_call(
     auto* call = m_builder.CreateCall(
         static_cast<llvm::FunctionType*>(type->llvm_type), function, llvm_args);
 
+    if (g_options.emit_checks) {
+        if (is<types::Never>(type->return_type)) {
+            create_panic("`never` function returned");
+        }
+    }
+
     return {
         .type = type->return_type,
         .value = sret_result ? sret_result : call,
@@ -704,6 +757,7 @@ Value Codegen::load_rvalue(const Value& value) {
     if (result.ptr_depth == 1) {
         result.value =
             m_builder.CreateLoad(value.type->llvm_type, result.value);
+
         --result.ptr_depth;
     }
 
@@ -716,6 +770,7 @@ Value Codegen::load_lvalue(const Value& value) {
     while (result.ptr_depth > 1) {
         result.value = m_builder.CreateLoad(
             llvm::PointerType::get(m_context, 0), result.value);
+
         --result.ptr_depth;
     }
 
@@ -746,6 +801,31 @@ void Codegen::create_store(const Value& src, llvm::Value* dest) {
     }
 
     m_builder.CreateStore(load_rvalue(src).value, dest);
+}
+
+void Codegen::create_out_of_bounds_check(llvm::Value* index, llvm::Value* len) {
+    auto* function = m_builder.GetInsertBlock()->getParent();
+
+    auto* out_of_bounds = llvm::BasicBlock::Create(m_context, "", function);
+
+    auto* end = llvm::BasicBlock::Create(m_context, "", function);
+
+    m_builder.CreateCondBr(
+        m_builder.CreateICmpULT(index, len), end, out_of_bounds);
+
+    m_builder.SetInsertPoint(out_of_bounds);
+
+    create_panic("out of bounds access");
+
+    m_builder.SetInsertPoint(end);
+}
+
+void Codegen::create_panic(std::string_view message) {
+    m_builder.CreateCall(
+        m_panic_fn,
+        {m_builder.CreateGlobalString(fmt::format("panic: {}\n", message))});
+
+    m_builder.CreateUnreachable();
 }
 
 llvm::Value*

@@ -158,6 +158,8 @@ public:
 
 private:
     void create_intrinsics();
+    void create_panic_fn();
+
     void create_main();
 
     void generate(const ast::Module& module);
@@ -189,6 +191,10 @@ private:
 
     [[nodiscard]] llvm::Value*
     create_alloca(llvm::Type* type, llvm::Value* size = nullptr);
+
+    void create_out_of_bounds_check(llvm::Value* index, llvm::Value* len);
+
+    void create_panic(std::string_view message);
 
     void create_store(const Value& src, llvm::Value* dest);
 
@@ -362,6 +368,8 @@ private:
 
     llvm::BasicBlock* m_loop_continue{nullptr};
     llvm::BasicBlock* m_loop_end{nullptr};
+
+    llvm::Function* m_panic_fn{nullptr};
 
     std::string m_current_scope_prefix{"<main>::"};
 

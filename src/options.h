@@ -29,6 +29,7 @@ struct Options {
     bool optimize = false;
     bool verbose = false;
     bool run = false;
+    bool emit_checks = false;
 
     bool colorize = isatty(fileno(stdout));
 };

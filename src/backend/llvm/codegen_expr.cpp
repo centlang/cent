@@ -128,6 +128,25 @@ Value Codegen::generate(const ast::UnwrapExpr& expr) {
         return Value::poisoned();
     }
 
+    if (!g_options.emit_checks) {
+        return Value{
+            .type = optional->type, .value = get_optional_value(value)};
+    }
+
+    auto* function = m_builder.GetInsertBlock()->getParent();
+
+    auto* bool_false = llvm::BasicBlock::Create(m_context, "", function);
+    auto* end = llvm::BasicBlock::Create(m_context, "", function);
+
+    auto* optional_bool = get_optional_bool(value);
+    m_builder.CreateCondBr(optional_bool, end, bool_false);
+
+    m_builder.SetInsertPoint(bool_false);
+
+    create_panic("`.!` used on `null` optional value");
+
+    m_builder.SetInsertPoint(end);
+
     return Value{.type = optional->type, .value = get_optional_value(value)};
 }
 
@@ -648,27 +667,6 @@ Value Codegen::generate(const ast::CallExpr& expr) {
         error(expr.identifier->offset, "not a function");
     };
 
-    auto create_fn_call = [&](const auto& func) {
-        auto* base_type = unwrap_type(func.type);
-
-        if (auto* type = dyn_cast<types::Function>(base_type)) {
-            return create_call(
-                expr.identifier->offset, type, func.value, expr.arguments);
-        }
-
-        if (auto* pointer = dyn_cast<types::Pointer>(base_type)) {
-            base_type = unwrap_type(pointer->type);
-
-            if (auto* type = dyn_cast<types::Function>(base_type)) {
-                return create_call(
-                    expr.identifier->offset, type, func.value, expr.arguments);
-            }
-        }
-
-        not_a_function();
-        return Value::poisoned();
-    };
-
     auto value = expr.identifier->codegen(*this);
 
     if (!value.ok()) {
@@ -677,7 +675,24 @@ Value Codegen::generate(const ast::CallExpr& expr) {
 
     value = load_rvalue(value);
 
-    return create_fn_call(value);
+    auto* base_type = unwrap_type(value.type);
+
+    if (auto* type = dyn_cast<types::Function>(base_type)) {
+        return create_call(
+            expr.identifier->offset, type, value.value, expr.arguments);
+    }
+
+    if (auto* pointer = dyn_cast<types::Pointer>(base_type)) {
+        base_type = unwrap_type(pointer->type);
+
+        if (auto* type = dyn_cast<types::Function>(base_type)) {
+            return create_call(
+                expr.identifier->offset, type, value.value, expr.arguments);
+        }
+    }
+
+    not_a_function();
+    return Value::poisoned();
 }
 
 Value Codegen::generate(const ast::CallExprGeneric& expr) {
@@ -785,6 +800,12 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
     }
 
     auto* call = m_builder.CreateCall(iterator->second.function, arguments);
+
+    if (g_options.emit_checks) {
+        if (is<types::Never>(iterator->second.type->return_type)) {
+            create_panic("`never` method returned");
+        }
+    }
 
     return Value{
         .type = iterator->second.type->return_type,
@@ -946,6 +967,13 @@ Value Codegen::generate(const ast::IndexExpr& expr) {
     }
 
     if (auto* type = dyn_cast<types::Slice>(value.type)) {
+        if (g_options.emit_checks) {
+            auto* len_value =
+                load_struct_member(m_size, value, slice_member_len);
+
+            create_out_of_bounds_check(val.value, len_value);
+        }
+
         auto* ptr_value = load_struct_member(
             llvm::PointerType::get(m_context, 0), value, slice_member_ptr);
 
@@ -962,6 +990,11 @@ Value Codegen::generate(const ast::IndexExpr& expr) {
     if (!type) {
         error(expr.value->offset, "index access of a non-array type");
         return Value::poisoned();
+    }
+
+    if (g_options.emit_checks) {
+        auto* len_value = llvm::ConstantInt::get(m_size, type->size);
+        create_out_of_bounds_check(val.value, len_value);
     }
 
     return Value{
@@ -1024,11 +1057,39 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
         }
     }
 
+    auto high_low_check = [&] {
+        if (g_options.emit_checks) {
+            auto* function = m_builder.GetInsertBlock()->getParent();
+
+            auto* high_is_lower_than_low =
+                llvm::BasicBlock::Create(m_context, "", function);
+
+            auto* end = llvm::BasicBlock::Create(m_context, "", function);
+
+            m_builder.CreateCondBr(
+                m_builder.CreateICmpULE(low.value, high.value), end,
+                high_is_lower_than_low);
+
+            m_builder.SetInsertPoint(high_is_lower_than_low);
+
+            create_panic("high index is smaller than low index");
+
+            m_builder.SetInsertPoint(end);
+        }
+    };
+
     if (auto* type = dyn_cast<types::Array>(value.type)) {
         if (!high.ok()) {
             high = {
                 .type = m_primitive_types["usize"].get(),
                 .value = llvm::ConstantInt::get(m_size, type->size)};
+        }
+
+        high_low_check();
+
+        if (g_options.emit_checks) {
+            auto* len_value = llvm::ConstantInt::get(m_size, type->size);
+            create_out_of_bounds_check(high.value, len_value);
         }
 
         auto* ptr_value =
@@ -1074,6 +1135,13 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
         high = {
             .type = m_primitive_types["usize"].get(),
             .value = m_builder.CreateLoad(m_size, len_member)};
+    }
+
+    high_low_check();
+
+    if (g_options.emit_checks) {
+        auto* len_value = load_struct_member(m_size, value, slice_member_len);
+        create_out_of_bounds_check(high.value, len_value);
     }
 
     auto* ptr_value = load_struct_member(
