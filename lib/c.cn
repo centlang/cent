@@ -1,124 +1,141 @@
-with c::types;
+pub type void {};
+
+pub type char = i8;
+pub type uchar = u8;
+pub type short = i16;
+pub type ushort = u16;
+pub type int = i32;
+pub type uint = u32;
+pub type long = i64;
+pub type ulong = u64;
+pub type longlong = i64;
+pub type ulonglong = u64;
+
+pub type float = f32;
+pub type double = f64;
+
+pub type time_t = i64;
+pub type FILE = void;
 
 pub const EXIT_SUCCESS = 0;
 pub const EXIT_FAILURE = 1;
 
 pub const EOF = -1;
 
-#(extern) pub mut stdout: *mut types::FILE;
-#(extern) pub mut stdin: *mut types::FILE;
-#(extern) pub mut stderr: *mut types::FILE;
+#(extern) pub mut stdout: *mut FILE;
+#(extern) pub mut stdin: *mut FILE;
+#(extern) pub mut stderr: *mut FILE;
 
-#(extern) pub fn exit(status: types::int) never;
-#(extern) pub fn rand() types::int;
-#(extern) pub fn srand(seed: types::uint);
-#(extern) pub fn time(tloc: ?*types::time_t) types::time_t;
-#(extern) pub fn malloc(size: usize) ?*mut types::void;
-#(extern) pub fn calloc(n: usize, size: usize) ?*mut types::void;
-#(extern) pub fn realloc(p: ?*mut types::void, size: usize) ?*mut types::void;
-#(extern) pub fn free(p: ?*mut types::void);
+#(extern) pub fn exit(status: int) never;
+#(extern) pub fn rand() int;
+#(extern) pub fn srand(seed: uint);
+#(extern) pub fn time(tloc: ?*time_t) time_t;
+#(extern) pub fn malloc(size: usize) ?*mut void;
+#(extern) pub fn calloc(n: usize, size: usize) ?*mut void;
+#(extern) pub fn realloc(p: ?*mut void, size: usize) ?*mut void;
+#(extern) pub fn free(p: ?*mut void);
 
 #(extern) pub fn memset(
-    s: *types::void, c: types::int, n: usize
-) *mut types::void;
+    s: *void, c: int, n: usize
+) *mut void;
 
 #(extern) pub fn memcpy(
-    dest: *mut types::void, src: *types::void, n: usize
-) *mut types::void;
+    dest: *mut void, src: *void, n: usize
+) *mut void;
 
 #(extern) pub fn memmove(
-    dest: *mut types::void, src: *types::void, n: usize
-) *mut types::void;
+    dest: *mut void, src: *void, n: usize
+) *mut void;
 
 #(extern) pub fn memcmp(
-    s1: *types::void, s2: *types::void, n: usize
-) types::int;
+    s1: *void, s2: *void, n: usize
+) int;
 
-#(extern) pub fn strlen(s: *types::char) usize;
+#(extern) pub fn strlen(s: *char) usize;
 
 #(extern) pub fn strcpy(
-    dst: *mut types::char, src: *types::char
-) *mut types::char;
+    dst: *mut char, src: *char
+) *mut char;
 
 #(extern) pub fn strcat(
-    dst: *mut types::char, src: *types::char
-) *mut types::char;
+    dst: *mut char, src: *char
+) *mut char;
 
 #(extern) pub fn strncpy(
-    dst: *mut types::char, src: *types::char, dsize: usize
-) *mut types::char;
+    dst: *mut char, src: *char, dsize: usize
+) *mut char;
 
 #(extern) pub fn strncat(
-    dst: *mut types::char, src: *types::char, ssize: usize
-) *mut types::char;
+    dst: *mut char, src: *char, ssize: usize
+) *mut char;
 
-#(extern) pub fn strcmp(s1: *types::char, s2: *types::char) types::int;
+#(extern) pub fn strcmp(s1: *char, s2: *char) int;
 
 #(extern) pub fn strncmp(
-    s1: *types::char, s2: *types::char, n: usize
-) types::int;
+    s1: *char, s2: *char, n: usize
+) int;
 
-#(extern) pub fn strchr(s: *types::char, c: types::int) ?*mut types::char;
+#(extern) pub fn strchr(s: *char, c: int) ?*mut char;
 
 #(extern) pub fn strstr(
-    haystack: *types::char, needle: *types::char
-) ?*mut types::char;
+    haystack: *char, needle: *char
+) ?*mut char;
 
-#(extern) pub fn printf(format: *types::char, ...) types::int;
-#(extern) pub fn putchar(c: types::int) types::int;
-#(extern) pub fn getchar() types::int;
+#(extern) pub fn printf(format: *char, ...) int;
+#(extern) pub fn putchar(c: int) int;
+#(extern) pub fn getchar() int;
 
 #(extern) pub fn sprintf(
-    str: *mut types::char, format: *types::char, ...
-) types::int;
+    str: *mut char, format: *char, ...
+) int;
 
 #(extern) pub fn snprintf(
-    str: *mut types::char, size: usize, format: *types::char, ...
-) types::int;
+    str: *mut char, size: usize, format: *char, ...
+) int;
 
 #(extern) pub fn sscanf(
-    str: *types::char, format: *types::char, ...
-) types::int;
+    str: *char, format: *char, ...
+) int;
 
 #(extern) pub fn fopen(
-    path: *types::char, mode: *types::char
-) ?*mut types::FILE;
+    path: *char, mode: *char
+) ?*mut FILE;
 
-#(extern) pub fn fclose(stream: *mut types::FILE) types::int;
+#(extern) pub fn fclose(stream: *mut FILE) int;
 
 #(extern) pub fn fread(
-    ptr: *mut types::void, size: usize, n: usize, stream: *mut types::FILE
+    ptr: *mut void, size: usize, n: usize, stream: *mut FILE
 ) usize;
 
 #(extern) pub fn fwrite(
-    ptr: *types::void, size: usize, n: usize, stream: *mut types::FILE
+    ptr: *void, size: usize, n: usize, stream: *mut FILE
 ) usize;
 
-#(extern) pub fn scanf(format: *types::char, ...) types::int;
+#(extern) pub fn scanf(format: *char, ...) int;
 
 #(extern) pub fn fscanf(
-    stream: *mut types::FILE, format: *types::char, ...
-) types::int;
+    stream: *mut FILE, format: *char, ...
+) int;
 
 #(extern) pub fn fgets(
-    s: *mut types::char, size: types::int, stream: *mut types::FILE
-) ?*mut types::char;
+    s: *mut char, size: int, stream: *mut FILE
+) ?*mut char;
 
-#(extern) pub fn fgetc(stream: *mut types::FILE) types::int;
-#(extern) pub fn getc(stream: *mut types::FILE) types::int;
+#(extern) pub fn fgetc(stream: *mut FILE) int;
+#(extern) pub fn getc(stream: *mut FILE) int;
 
-#(extern) pub fn fputs(s: *types::char, stream: *mut types::FILE) types::int;
-#(extern) pub fn fputc(c: types::int, stream: *mut types::FILE) types::int;
-#(extern) pub fn puts(s: *types::char) types::int;
-#(extern) pub fn system(command: *types::char) types::int;
-#(extern) pub fn getenv(name: *types::char) ?*mut types::char;
-#(extern) pub fn pow(x: types::double, y: types::double) types::double;
-#(extern) pub fn sqrt(x: types::double) types::double;
-#(extern) pub fn sin(x: types::double) types::double;
-#(extern) pub fn cos(x: types::double) types::double;
-#(extern) pub fn tan(x: types::double) types::double;
-#(extern) pub fn exp(x: types::double) types::double;
-#(extern) pub fn log(x: types::double) types::double;
-#(extern) pub fn floor(x: types::double) types::double;
-#(extern) pub fn ceil(x: types::double) types::double;
-#(extern) pub fn round(x: types::double) types::double;
+#(extern) pub fn fputs(s: *char, stream: *mut FILE) int;
+#(extern) pub fn fputc(c: int, stream: *mut FILE) int;
+#(extern) pub fn puts(s: *char) int;
+#(extern) pub fn system(command: *char) int;
+#(extern) pub fn getenv(name: *char) ?*mut char;
+#(extern) pub fn pow(x: double, y: double) double;
+#(extern) pub fn sqrt(x: double) double;
+#(extern) pub fn sin(x: double) double;
+#(extern) pub fn cos(x: double) double;
+#(extern) pub fn tan(x: double) double;
+#(extern) pub fn exp(x: double) double;
+#(extern) pub fn log(x: double) double;
+#(extern) pub fn floor(x: double) double;
+#(extern) pub fn ceil(x: double) double;
+#(extern) pub fn round(x: double) double;

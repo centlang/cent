@@ -27,7 +27,7 @@ fn handle_event(e: WindowEvent) {
 }
 
 fn main() {
-    c::srand(c::time(null) as c::types::uint);
+    c::srand(c::time(null) as c::uint);
 
     mut e = poll_event();
 

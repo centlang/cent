@@ -1,11 +1,11 @@
 with std::alloc;
 with c;
 
-pub fn as_cstr(s: []u8) *c::types::char {
-    return &s[0] as *c::types::char;
+pub fn as_cstr(s: []u8) *c::char {
+    return &s[0] as *c::char;
 }
 
-pub fn alloc_cstr(s: []u8, a: alloc::Allocator) ?*mut c::types::char {
+pub fn alloc_cstr(s: []u8, a: alloc::Allocator) ?*mut c::char {
     let p = a.alloc(s.len + 1);
 
     if p == null {
@@ -14,8 +14,8 @@ pub fn alloc_cstr(s: []u8, a: alloc::Allocator) ?*mut c::types::char {
 
     let p = p.!;
 
-    c::memcpy(p as *mut c::types::void, &s[0] as *c::types::void, s.len);
+    c::memcpy(p as *mut c::void, &s[0] as *c::void, s.len);
     *((p as usize + s.len) as *mut u8) = '\0' as u8;
 
-    return p as *mut c::types::char;
+    return p as *mut c::char;
 }

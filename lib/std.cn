@@ -2,7 +2,7 @@ with std::io;
 with c;
 
 pub fn exit(code: i32) never {
-    c::exit(code as c::types::int);
+    c::exit(code as c::int);
 }
 
 pub fn panic(message: []u8) never {

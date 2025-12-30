@@ -2,15 +2,15 @@ with c;
 with std::ffi;
 
 pub type Fd {
-    _file: *mut c::types::FILE,
+    _file: *mut c::FILE,
 }
 
 pub fn Fd::write_u8(self: Fd, value: u8) {
-    c::fputc(value as c::types::int, self._file);
+    c::fputc(value as c::int, self._file);
 }
 
 pub fn Fd::write(self: Fd, data: []u8) {
-    c::fwrite(&data[0] as *c::types::void, 1, data.len, self._file);
+    c::fwrite(&data[0] as *c::void, 1, data.len, self._file);
 }
 
 pub fn Fd::read_u8(self: Fd) ?u8 {

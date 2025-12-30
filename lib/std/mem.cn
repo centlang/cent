@@ -3,6 +3,6 @@ with std;
 
 pub fn equal(a: []u8, b: []u8) bool {
     return a.len == b.len && c::memcmp(
-        &a[0] as *c::types::void, &b[0] as *c::types::void, a.len
+        &a[0] as *c::void, &b[0] as *c::void, a.len
     ) == 0;
 }

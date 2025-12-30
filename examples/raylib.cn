@@ -7,7 +7,7 @@ const RAYWHITE: Color = 0xfff5f5f5;
 const LIGHTGRAY: Color = 0xffc8c8c8;
 
 #(extern) fn InitWindow(
-    width: c::types::int, height: c::types::int, title: *c::types::char
+    width: c::int, height: c::int, title: *c::char
 );
 
 #(extern) fn CloseWindow();
@@ -19,8 +19,8 @@ const LIGHTGRAY: Color = 0xffc8c8c8;
 #(extern) fn ClearBackground(color: Color);
 
 #(extern) fn DrawText(
-    text: *c::types::char, pos_x: c::types::int, pos_y: c::types::int,
-    font_size: c::types::int, color: Color
+    text: *c::char, pos_x: c::int, pos_y: c::int,
+    font_size: c::int, color: Color
 );
 
 fn main() {
