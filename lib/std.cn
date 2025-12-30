@@ -13,3 +13,7 @@ pub fn panic(message: []u8) never {
 pub fn assert(cond: bool) {
     if !cond { return panic("Assertion failed"); }
 }
+
+pub fn dbg_assert(cond: bool) {
+    if core::env::DEBUG { assert(cond); }
+}
