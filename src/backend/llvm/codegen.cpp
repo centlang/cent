@@ -485,7 +485,9 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
     auto* base_value_type = unwrap_type(value.type, !implicit);
 
     if (is<types::Never>(base_value_type)) {
-        m_builder.CreateUnreachable();
+        if (!m_builder.GetInsertBlock()->getTerminator()) {
+            m_builder.CreateUnreachable();
+        }
 
         if (is<types::Void, types::Never>(base_type)) {
             return {.type = type, .value = nullptr};
@@ -825,7 +827,9 @@ void Codegen::create_panic(std::string_view message) {
         m_panic_fn,
         {m_builder.CreateGlobalString(fmt::format("panic: {}\n", message))});
 
-    m_builder.CreateUnreachable();
+    if (!m_builder.GetInsertBlock()->getTerminator()) {
+        m_builder.CreateUnreachable();
+    }
 }
 
 llvm::Value*

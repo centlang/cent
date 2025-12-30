@@ -557,18 +557,27 @@ Value Codegen::generate(const ast::VarDecl& decl) {
             }
         }
 
-        auto* global = new llvm::GlobalVariable{
-            *m_module,
-            type->llvm_type,
-            false,
-            (decl.is_public || is_extern) ? llvm::GlobalValue::ExternalLinkage
-                                          : llvm::GlobalValue::PrivateLinkage,
-            constant,
-            is_extern ? decl.name.value
-                      : m_current_scope_prefix + decl.name.value};
+        llvm::GlobalVariable* global = nullptr;
 
-        global->setAlignment(
-            m_module->getDataLayout().getPreferredAlign(global));
+        if (is_extern) {
+            global = m_module->getGlobalVariable(decl.name.value);
+        }
+
+        if (!global) {
+            global = new llvm::GlobalVariable{
+                *m_module,
+                type->llvm_type,
+                false,
+                (decl.is_public || is_extern)
+                    ? llvm::GlobalValue::ExternalLinkage
+                    : llvm::GlobalValue::PrivateLinkage,
+                constant,
+                is_extern ? decl.name.value
+                          : m_current_scope_prefix + decl.name.value};
+
+            global->setAlignment(
+                m_module->getDataLayout().getPreferredAlign(global));
+        }
 
         result = {
             .element =
@@ -658,9 +667,7 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
     llvm::Function* function = nullptr;
 
     if (is_extern) {
-        if (auto* func = m_module->getFunction(decl.name.value)) {
-            function = func;
-        }
+        function = m_module->getFunction(decl.name.value);
     }
 
     if (!function) {

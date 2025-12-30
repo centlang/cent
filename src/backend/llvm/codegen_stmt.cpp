@@ -573,7 +573,9 @@ Value Codegen::generate(const ast::ContinueStmt& stmt) {
 }
 
 Value Codegen::generate([[maybe_unused]] const ast::Unreachable& stmt) {
-    m_builder.CreateUnreachable();
+    if (!m_builder.GetInsertBlock()->getTerminator()) {
+        m_builder.CreateUnreachable();
+    }
 
     return Value::poisoned();
 }
