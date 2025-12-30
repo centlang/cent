@@ -309,7 +309,7 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
             }();
 
             if (non_lossy) {
-                return Value{
+                return {
                     .type = type,
                     .value = llvm::ConstantInt::get(
                         base_type->llvm_type, type_is_sint
@@ -363,7 +363,7 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
             } else if (to_size < from_size) {
                 cast_op = Trunc;
             } else {
-                return Value{.type = type, .value = load_rvalue(value).value};
+                return {.type = type, .value = load_rvalue(value).value};
             }
         } else if (!implicit && type_is_ptr) {
             cast_op = IntToPtr;
@@ -393,8 +393,7 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
                 if (to_size < from_size) {
                     cast_op = Trunc;
                 } else {
-                    return Value{
-                        .type = type, .value = load_rvalue(value).value};
+                    return {.type = type, .value = load_rvalue(value).value};
                 }
             }
         } else if (!implicit && type_is_ptr) {
@@ -405,7 +404,7 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
             cast_op = PtrToInt;
         } else if (type_is_ptr) {
             if (!implicit) {
-                return Value{
+                return {
                     .type = type,
                     .value = value.value,
                     .ptr_depth = value.ptr_depth};
@@ -416,7 +415,7 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
 
             if (value_ptr->type == type_ptr->type &&
                 (value_ptr->is_mutable || !type_ptr->is_mutable)) {
-                return Value{
+                return {
                     .type = type,
                     .value = value.value,
                     .ptr_depth = value.ptr_depth};
@@ -428,7 +427,7 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
         return Value::poisoned();
     }
 
-    return Value{
+    return {
         .type = type,
         .value = m_builder.CreateCast(
             cast_op, load_rvalue(value).value, base_type->llvm_type)};
@@ -440,11 +439,18 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
 
     if (is<types::Never>(base_value_type)) {
         m_builder.CreateUnreachable();
-        return Value{.type = type, .value = value.value};
+
+        if (is<types::Void, types::Never>(base_type)) {
+            return {.type = type, .value = nullptr};
+        }
+
+        return {
+            .type = type,
+            .value = llvm::Constant::getNullValue(type->llvm_type)};
     }
 
     if (base_type == base_value_type) {
-        return Value{
+        return {
             .type = type,
             .value = value.value,
             .ptr_depth = value.ptr_depth,
@@ -459,7 +465,7 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
         auto* base_contained_type = unwrap_type(optional->type);
 
         if (is<types::Null>(base_value_type)) {
-            return Value{
+            return {
                 .type = type,
                 .value = llvm::Constant::getNullValue(base_type->llvm_type)};
         }
@@ -469,7 +475,7 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
         }
 
         if (is<types::Pointer>(base_contained_type)) {
-            return Value{
+            return {
                 .type = type,
                 .value =
                     is<types::Null>(base_value_type)
@@ -480,7 +486,7 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
         }
 
         if (auto* val = llvm::dyn_cast<llvm::Constant>(value.value)) {
-            return Value{
+            return {
                 .type = type,
                 .value = llvm::ConstantStruct::get(
                     static_cast<llvm::StructType*>(base_type->llvm_type),
@@ -506,7 +512,7 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
             llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), true),
             bool_ptr);
 
-        return Value{
+        return {
             .type = type, .value = variable, .ptr_depth = 1, .memcpy = true};
     }
 
@@ -515,7 +521,7 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
 
         if (auto* slice_value = dyn_cast<types::Slice>(base_value_type)) {
             if (!implicit) {
-                return Value{
+                return {
                     .type = type,
                     .value = value.value,
                     .ptr_depth = value.ptr_depth,
@@ -524,7 +530,7 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
 
             if (base_slice_contained_type == unwrap_type(slice_value->type) &&
                 (!slice->is_mutable || slice_value->is_mutable)) {
-                return Value{
+                return {
                     .type = type,
                     .value = value.value,
                     .ptr_depth = value.ptr_depth,
@@ -567,7 +573,7 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
         m_builder.CreateStore(
             llvm::ConstantInt::get(m_size, array_type->size), len_member);
 
-        return Value{
+        return {
             .type = type, .value = variable, .ptr_depth = 1, .memcpy = true};
     }
 
@@ -686,7 +692,7 @@ Value Codegen::create_call(
     auto* call = m_builder.CreateCall(
         static_cast<llvm::FunctionType*>(type->llvm_type), function, llvm_args);
 
-    return Value{
+    return {
         .type = type->return_type,
         .value = sret_result ? sret_result : call,
         .memcpy = type->sret};

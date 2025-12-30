@@ -286,6 +286,11 @@ Value Codegen::generate(const ast::ReturnStmt& stmt) {
         return Value::poisoned();
     }
 
+    if (!val.value) {
+        m_builder.CreateRetVoid();
+        return Value::poisoned();
+    }
+
     if (m_current_function->sret) {
         auto* function = m_builder.GetInsertBlock()->getParent();
 

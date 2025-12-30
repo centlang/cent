@@ -1179,9 +1179,18 @@ Value Codegen::generate_bin_logical_expr(
             return Value::poisoned();
         }
 
-        m_builder.CreateBr(end);
         auto* rhs_pred = m_builder.GetInsertBlock();
 
+        if (rhs_pred->getTerminator()) {
+            m_builder.SetInsertPoint(end);
+
+            return {
+                .type = lhs_value.type,
+                .value = llvm::ConstantInt::get(
+                    lhs_base_type->llvm_type, oper.value == OrOr)};
+        }
+
+        m_builder.CreateBr(end);
         m_builder.SetInsertPoint(end);
 
         auto* phi = m_builder.CreatePHI(lhs_base_type->llvm_type, 2);
