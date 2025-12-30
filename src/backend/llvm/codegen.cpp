@@ -106,6 +106,7 @@ void Codegen::create_intrinsics() {
 
     m_builder.CreateStore(
         as_mut_u8_slice->getArg(0), as_mut_u8_slice_ptr_member);
+
     m_builder.CreateStore(
         as_mut_u8_slice->getArg(1), as_mut_u8_slice_len_member);
 
@@ -681,7 +682,7 @@ Value Codegen::create_call(
         if (type->variadic && i >= params_size) {
             static constexpr auto int_bitwidth = 32;
 
-            if (is<types::Pointer>(value.type)) {
+            if (is<types::Pointer, types::F64>(value.type)) {
                 llvm_args.push_back(load_rvalue(value).value);
                 continue;
             }
@@ -694,7 +695,7 @@ Value Codegen::create_call(
                 continue;
             }
 
-            if (is_float(value.type)) {
+            if (is<types::F32>(value.type)) {
                 llvm_args.push_back(
                     primitive_cast(m_primitive_types["f64"].get(), value)
                         .value);
@@ -715,7 +716,7 @@ Value Codegen::create_call(
 
             auto bitwidth = value.type->llvm_type->getIntegerBitWidth();
 
-            if (bitwidth > int_bitwidth) {
+            if (bitwidth >= int_bitwidth) {
                 llvm_args.push_back(load_rvalue(value).value);
                 continue;
             }
