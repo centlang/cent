@@ -682,6 +682,13 @@ Value Codegen::create_call(
         if (type->variadic && i >= params_size) {
             static constexpr auto int_bitwidth = 32;
 
+            if (auto* optional = dyn_cast<types::Optional>(value.type)) {
+                if (is<types::Pointer>(optional->type)) {
+                    llvm_args.push_back(load_rvalue(value).value);
+                    continue;
+                }
+            }
+
             if (is<types::Pointer, types::F64>(value.type)) {
                 llvm_args.push_back(load_rvalue(value).value);
                 continue;
