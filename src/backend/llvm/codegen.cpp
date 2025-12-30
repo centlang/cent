@@ -66,7 +66,7 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
     m_slice_type = llvm::StructType::create(
         {llvm::PointerType::get(m_context, 0), m_size});
 
-    if (g_options.emit_checks) {
+    if (!g_options.release) {
         create_panic_fn();
     }
 
@@ -162,6 +162,13 @@ void Codegen::create_intrinsics() {
          {.element = {.type = alloca_type, .value = alloca},
           .is_public = true}},
     };
+
+    auto* debug = llvm::ConstantInt::get(
+        llvm::Type::getInt1Ty(m_context), !g_options.release);
+
+    m_core_module.scopes["env"].names["DEBUG"] = {
+        .element = {.type = m_primitive_types["bool"].get(), .value = debug},
+        .is_public = true};
 }
 
 void Codegen::create_panic_fn() {
@@ -740,7 +747,7 @@ Value Codegen::create_call(
     auto* call = m_builder.CreateCall(
         static_cast<llvm::FunctionType*>(type->llvm_type), function, llvm_args);
 
-    if (g_options.emit_checks) {
+    if (!g_options.release) {
         if (is<types::Never>(type->return_type)) {
             create_panic("`never` function returned");
         }

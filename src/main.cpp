@@ -192,8 +192,8 @@ get_emit_type(std::string_view type) {
             continue;
         }
 
-        if (arg == "--emit-checks") {
-            cent::g_options.emit_checks = true;
+        if (arg == "--release") {
+            cent::g_options.release = true;
             continue;
         }
 

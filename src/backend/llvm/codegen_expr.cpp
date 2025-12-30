@@ -128,7 +128,7 @@ Value Codegen::generate(const ast::UnwrapExpr& expr) {
         return Value::poisoned();
     }
 
-    if (!g_options.emit_checks) {
+    if (g_options.release) {
         return Value{
             .type = optional->type, .value = get_optional_value(value)};
     }
@@ -801,7 +801,7 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
 
     auto* call = m_builder.CreateCall(iterator->second.function, arguments);
 
-    if (g_options.emit_checks) {
+    if (!g_options.release) {
         if (is<types::Never>(iterator->second.type->return_type)) {
             create_panic("`never` method returned");
         }
@@ -967,7 +967,7 @@ Value Codegen::generate(const ast::IndexExpr& expr) {
     }
 
     if (auto* type = dyn_cast<types::Slice>(value.type)) {
-        if (g_options.emit_checks) {
+        if (!g_options.release) {
             auto* len_value =
                 load_struct_member(m_size, value, slice_member_len);
 
@@ -992,7 +992,7 @@ Value Codegen::generate(const ast::IndexExpr& expr) {
         return Value::poisoned();
     }
 
-    if (g_options.emit_checks) {
+    if (!g_options.release) {
         auto* len_value = llvm::ConstantInt::get(m_size, type->size);
         create_out_of_bounds_check(val.value, len_value);
     }
@@ -1058,7 +1058,7 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
     }
 
     auto high_low_check = [&] {
-        if (g_options.emit_checks) {
+        if (!g_options.release) {
             auto* function = m_builder.GetInsertBlock()->getParent();
 
             auto* high_is_lower_than_low =
@@ -1087,7 +1087,7 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
 
         high_low_check();
 
-        if (g_options.emit_checks) {
+        if (!g_options.release) {
             auto* len_value = llvm::ConstantInt::get(m_size, type->size);
             create_out_of_bounds_check(high.value, len_value);
         }
@@ -1139,7 +1139,7 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
 
     high_low_check();
 
-    if (g_options.emit_checks) {
+    if (!g_options.release) {
         auto* len_value = load_struct_member(m_size, value, slice_member_len);
         create_out_of_bounds_check(high.value, len_value);
     }
