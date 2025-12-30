@@ -686,6 +686,10 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
         function->addFnAttr(llvm::Attribute::AlwaysInline);
     }
 
+    if (is<types::Never>(fn_type->return_type)) {
+        function->addFnAttr(llvm::Attribute::NoReturn);
+    }
+
     if (fn_type->sret) {
         function->addParamAttr(
             0, llvm::Attribute::getWithStructRetType(
