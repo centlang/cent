@@ -578,15 +578,40 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
             return Value::poisoned();
         }
 
+        if (auto* array = dyn_cast<types::VarLenArray>(base_value_type)) {
+            if (base_slice_contained_type != unwrap_type(array->type)) {
+                return Value::poisoned();
+            }
+
+            auto* variable = create_alloca(base_type);
+
+            if (!variable) {
+                return Value::poisoned();
+            }
+
+            auto* ptr_member = m_builder.CreateStructGEP(
+                base_type->llvm_type, variable, slice_member_ptr);
+
+            auto* len_member = m_builder.CreateStructGEP(
+                base_type->llvm_type, variable, slice_member_len);
+
+            m_builder.CreateStore(load_lvalue(value).value, ptr_member);
+            m_builder.CreateStore(array->size, len_member);
+
+            return {
+                .type = type,
+                .value = variable,
+                .ptr_depth = 1,
+                .memcpy = true};
+        }
+
         const auto* array_type = dyn_cast<types::Array>(base_value_type);
 
         if (!array_type) {
             return Value::poisoned();
         }
 
-        auto* base_array_contained_type = unwrap_type(array_type->type);
-
-        if (base_slice_contained_type != base_array_contained_type) {
+        if (base_slice_contained_type != unwrap_type(array_type->type)) {
             return Value::poisoned();
         }
 
