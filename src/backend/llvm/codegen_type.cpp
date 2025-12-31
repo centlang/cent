@@ -73,7 +73,8 @@ Type* Codegen::generate(const ast::ArrayType& type) {
         return nullptr;
     }
 
-    auto value = cast(m_primitive_types["usize"].get(), size);
+    auto value = cast_or_error(
+        type.size->offset, m_primitive_types["usize"].get(), size);
 
     if (!value.ok()) {
         return nullptr;
@@ -83,9 +84,7 @@ Type* Codegen::generate(const ast::ArrayType& type) {
         return get_array_type(contained, constant->getZExtValue());
     }
 
-    error(type.offset, "not a constant");
-
-    return nullptr;
+    return get_var_len_array_type(contained, load_rvalue(value).value);
 }
 
 Type* Codegen::generate(const ast::ArrayType& type, std::size_t size) {
@@ -315,6 +314,19 @@ types::Range* Codegen::get_range_type(Type* type, bool inclusive) {
                 ? llvm::StructType::create({type->llvm_type, type->llvm_type})
                 : nullptr,
             inclusive, type);
+    }
+
+    return result.get();
+}
+
+types::VarLenArray*
+Codegen::get_var_len_array_type(Type* type, llvm::Value* size) {
+    auto& result = m_var_len_array_types[std::make_pair(type, size)];
+
+    if (!result) {
+        result = std::make_unique<types::VarLenArray>(
+            type->llvm_type ? llvm::PointerType::get(m_context, 0) : nullptr,
+            type, size);
     }
 
     return result.get();

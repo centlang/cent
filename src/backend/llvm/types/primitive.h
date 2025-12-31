@@ -7,6 +7,9 @@
 
 #include <fmt/core.h>
 
+#include <llvm/IR/Type.h>
+#include <llvm/IR/Value.h>
+
 #include "backend/llvm/type.h"
 
 namespace cent::backend::types {
@@ -165,6 +168,19 @@ struct Array : detail::Ty<Array, Type::Kind::Array> {
 
     Type* type;
     std::size_t size;
+};
+
+struct VarLenArray : detail::Ty<VarLenArray, Type::Kind::VarLenArray> {
+    [[nodiscard]] VarLenArray(
+        llvm::Type* llvm_type, Type* type, llvm::Value* size)
+    : Ty{llvm_type}, type{type}, size{size} {}
+
+    [[nodiscard]] std::string to_string() const override {
+        return fmt::format("[<variable>]{}", type->to_string());
+    }
+
+    Type* type;
+    llvm::Value* size;
 };
 
 struct Slice : detail::Ty<Slice, Type::Kind::Slice> {

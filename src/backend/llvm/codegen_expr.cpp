@@ -295,7 +295,7 @@ Value Codegen::generate(const ast::RangeLiteral& expr) {
         }
     }
 
-    auto* variable = create_alloca_or_error(expr.offset, type->llvm_type);
+    auto* variable = create_alloca_or_error(expr.offset, type);
 
     if (!variable) {
         return Value::poisoned();
@@ -353,8 +353,7 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
             return Value::poisoned();
         }
 
-        auto* variable =
-            create_alloca_or_error(expr.offset, union_type->llvm_type);
+        auto* variable = create_alloca_or_error(expr.offset, union_type);
 
         if (!variable) {
             return Value::poisoned();
@@ -461,8 +460,7 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
                 llvm_values)};
     }
 
-    auto* variable =
-        create_alloca_or_error(expr.offset, struct_type->llvm_type);
+    auto* variable = create_alloca_or_error(expr.offset, struct_type);
 
     if (!variable) {
         return Value::poisoned();
@@ -508,8 +506,6 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
         type->size ? type->codegen(*this)
                    : type->codegen(*this, expr.elements.size()));
 
-    auto* llvm_type = static_cast<llvm::ArrayType*>(array_type->llvm_type);
-
     bool is_const = true;
 
     if (expr.elements.size() != array_type->size) {
@@ -545,10 +541,12 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
 
         return Value{
             .type = array_type,
-            .value = llvm::ConstantArray::get(llvm_type, llvm_values)};
+            .value = llvm::ConstantArray::get(
+                static_cast<llvm::ArrayType*>(array_type->llvm_type),
+                llvm_values)};
     }
 
-    auto* variable = create_alloca_or_error(expr.offset, llvm_type);
+    auto* variable = create_alloca_or_error(expr.offset, array_type);
 
     if (!variable) {
         return Value::poisoned();
@@ -558,7 +556,7 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
         auto& value = values[i];
 
         auto* ptr = m_builder.CreateGEP(
-            llvm_type, variable,
+            array_type->llvm_type, variable,
             {llvm::ConstantInt::get(m_size, 0),
              llvm::ConstantInt::get(m_size, i)});
 
@@ -742,8 +740,7 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
     llvm::Value* sret_result = nullptr;
 
     if (iterator->second.type->sret) {
-        sret_result =
-            create_alloca(iterator->second.type->return_type->llvm_type);
+        sret_result = create_alloca(iterator->second.type->return_type);
 
         arguments.reserve(arg_size + 1);
         arguments.push_back(sret_result);
@@ -1126,11 +1123,9 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
         return Value::poisoned();
     }
 
-    auto* llvm_type = type->llvm_type;
-
     if (!high.ok()) {
-        auto* len_member =
-            m_builder.CreateStructGEP(llvm_type, value.value, slice_member_len);
+        auto* len_member = m_builder.CreateStructGEP(
+            type->llvm_type, value.value, slice_member_len);
 
         high = {
             .type = m_primitive_types["usize"].get(),
@@ -1152,17 +1147,17 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
 
     auto* new_len_value = m_builder.CreateSub(high.value, low.value);
 
-    auto* variable = create_alloca_or_error(expr.offset, llvm_type);
+    auto* variable = create_alloca_or_error(expr.offset, type);
 
     if (!variable) {
         return Value::poisoned();
     }
 
     auto* new_ptr_member =
-        m_builder.CreateStructGEP(llvm_type, variable, slice_member_ptr);
+        m_builder.CreateStructGEP(type->llvm_type, variable, slice_member_ptr);
 
     auto* new_len_member =
-        m_builder.CreateStructGEP(llvm_type, variable, slice_member_len);
+        m_builder.CreateStructGEP(type->llvm_type, variable, slice_member_len);
 
     m_builder.CreateStore(new_ptr_value, new_ptr_member);
     m_builder.CreateStore(new_len_value, new_len_member);

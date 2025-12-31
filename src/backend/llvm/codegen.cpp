@@ -550,7 +550,7 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
                               llvm::Type::getInt1Ty(m_context), true)})};
         }
 
-        auto* variable = create_alloca(base_type->llvm_type);
+        auto* variable = create_alloca(base_type);
 
         if (!variable) {
             return Value::poisoned();
@@ -608,7 +608,7 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
             return Value::poisoned();
         }
 
-        auto* variable = create_alloca(base_type->llvm_type);
+        auto* variable = create_alloca(base_type);
 
         if (!variable) {
             return Value::poisoned();
@@ -664,7 +664,7 @@ Value Codegen::create_call(
     llvm::Value* sret_result = nullptr;
 
     if (type->sret) {
-        sret_result = create_alloca(type->return_type->llvm_type);
+        sret_result = create_alloca(type->return_type);
 
         llvm_args.reserve(params_size + 1);
         llvm_args.push_back(sret_result);
@@ -808,6 +808,14 @@ llvm::Value* Codegen::create_alloca(llvm::Type* type, llvm::Value* size) {
     return result;
 }
 
+llvm::Value* Codegen::create_alloca(Type* type) {
+    if (auto* array = dyn_cast<types::VarLenArray>(type)) {
+        return m_builder.CreateAlloca(array->type->llvm_type, array->size);
+    }
+
+    return create_alloca(type->llvm_type);
+}
+
 void Codegen::create_store(const Value& src, llvm::Value* dest) {
     if (src.memcpy) {
         m_builder.CreateMemCpy(
@@ -847,8 +855,17 @@ void Codegen::create_panic(std::string_view message) {
     }
 }
 
-llvm::Value*
-Codegen::create_alloca_or_error(std::size_t offset, llvm::Type* type) {
+llvm::Value* Codegen::create_alloca_or_error(
+    std::size_t offset, llvm::Type* type, llvm::Value* size) {
+    if (auto* result = create_alloca(type, size)) {
+        return result;
+    }
+
+    error(offset, "could not allocate outside of function");
+    return nullptr;
+}
+
+llvm::Value* Codegen::create_alloca_or_error(std::size_t offset, Type* type) {
     if (auto* result = create_alloca(type)) {
         return result;
     }

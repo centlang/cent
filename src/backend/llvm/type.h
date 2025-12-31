@@ -33,6 +33,7 @@ struct Type {
         Optional,
         Range,
         Array,
+        VarLenArray,
         Slice,
         Tuple,
 

@@ -500,7 +500,7 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
         return Value::poisoned();
     }
 
-    auto* variable = create_alloca(llvm_contained_type);
+    auto* variable = create_alloca(type->type);
     m_builder.CreateStore(begin, variable);
 
     auto create_compare = [&](llvm::Value* begin, llvm::Value* end) {

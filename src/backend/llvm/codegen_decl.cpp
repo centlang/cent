@@ -91,7 +91,7 @@ Value Codegen::generate(const ast::FnDecl& decl) {
         const auto& param = decl.proto.params[i];
 
         auto* value = function->getArg(i);
-        auto* variable = create_alloca(value->getType());
+        auto* variable = create_alloca(m_current_function->param_types[i]);
 
         m_builder.CreateStore(value, variable);
 
@@ -591,7 +591,7 @@ Value Codegen::generate(const ast::VarDecl& decl) {
         return Value::poisoned();
     }
 
-    auto* variable = create_alloca(type->llvm_type);
+    auto* variable = create_alloca(type);
 
     result = {
         .element =

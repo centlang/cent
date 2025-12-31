@@ -192,14 +192,19 @@ private:
     [[nodiscard]] llvm::Value*
     create_alloca(llvm::Type* type, llvm::Value* size = nullptr);
 
+    [[nodiscard]] llvm::Value* create_alloca(Type* type);
+
     void create_out_of_bounds_check(llvm::Value* index, llvm::Value* len);
 
     void create_panic(std::string_view message);
 
     void create_store(const Value& src, llvm::Value* dest);
 
+    [[nodiscard]] llvm::Value* create_alloca_or_error(
+        std::size_t offset, llvm::Type* type, llvm::Value* size = nullptr);
+
     [[nodiscard]] llvm::Value*
-    create_alloca_or_error(std::size_t offset, llvm::Type* type);
+    create_alloca_or_error(std::size_t offset, Type* type);
 
     [[nodiscard]] llvm::Value* get_optional_bool(const Value& value);
     [[nodiscard]] llvm::Value* get_optional_value(const Value& value);
@@ -244,6 +249,9 @@ private:
     [[nodiscard]] types::Tuple* get_tuple_type(const std::vector<Type*>& types);
     [[nodiscard]] types::Optional* get_optional_type(Type* type);
     [[nodiscard]] types::Range* get_range_type(Type* type, bool inclusive);
+
+    [[nodiscard]] types::VarLenArray*
+    get_var_len_array_type(Type* type, llvm::Value* size);
 
     [[nodiscard]] Type* unwrap_type(Type* type, bool ignore_distinct = false);
 
@@ -400,6 +408,10 @@ private:
 
     std::map<std::pair<Type*, std::size_t>, std::unique_ptr<types::Array>>
         m_array_types;
+
+    std::map<
+        std::pair<Type*, llvm::Value*>, std::unique_ptr<types::VarLenArray>>
+        m_var_len_array_types;
 
     std::map<std::pair<Type*, bool>, std::unique_ptr<types::Slice>>
         m_slice_types;
