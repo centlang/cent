@@ -5,6 +5,10 @@ pub type Fd {
     _file: *mut c::FILE,
 }
 
+pub fn Fd::close(self: Fd) {
+    c::fclose(self._file);
+}
+
 pub fn Fd::write_u8(self: Fd, value: u8) {
     c::fputc(value as c::int, self._file);
 }
