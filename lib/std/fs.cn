@@ -14,17 +14,10 @@ pub enum Mode u8 {
 }
 
 pub fn open(path: []u8, mode: Mode) ?io::Fd {
-    let a = alloc::system();
-    let p = ffi::alloc_cstr(path, a);
+    mut cstr: [path.len + 1]u8 = undefined;
+    ffi::cstr_to(cstr, path);
 
-    if p == null {
-        return null;
-    }
-
-    let p = p.!;
-    let file = c::fopen(p, ffi::as_cstr(to_libc_mode(mode)));
-
-    a.free(p as *mut u8);
+    let file = c::fopen(ffi::as_cstr(cstr), ffi::as_cstr(to_libc_mode(mode)));
 
     if file == null {
         return null;
@@ -34,22 +27,12 @@ pub fn open(path: []u8, mode: Mode) ?io::Fd {
 }
 
 pub fn mkdir(path: []u8) bool {
-    let a = alloc::system();
-    let p = ffi::alloc_cstr(path, a);
+    mut cstr: [path.len + 1]u8 = undefined;
+    ffi::cstr_to(cstr, path);
 
-    if p == null {
-        return false;
-    }
-
-    let p = p.!;
-
-    let result = posix::mkdir(
-        p, posix::S_IRWXU | posix::S_IRWXG | posix::S_IRWXO
+    return posix::mkdir(
+        ffi::as_cstr(cstr), posix::S_IRWXU | posix::S_IRWXG | posix::S_IRWXO
     ) == 0;
-
-    a.free(p as *mut u8);
-
-    return result;
 }
 
 fn to_libc_mode(mode: Mode) []u8 {

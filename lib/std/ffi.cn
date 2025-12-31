@@ -1,8 +1,14 @@
+with std::mem;
 with std::alloc;
 with c;
 
 pub fn as_cstr(s: []u8) *c::char {
     return &s[0] as *c::char;
+}
+
+pub fn cstr_to(buf: []mut u8, s: []u8) {
+    mem::copy(buf, s);
+    buf[s.len] = '\0' as u8;
 }
 
 pub fn alloc_cstr(s: []u8, a: alloc::Allocator) ?*mut c::char {
@@ -14,7 +20,7 @@ pub fn alloc_cstr(s: []u8, a: alloc::Allocator) ?*mut c::char {
 
     let p = p.!;
 
-    c::memcpy(p as *mut c::void, &s[0] as *c::void, s.len);
+    mem::copy_n(p, &s[0], s.len);
     *((p as usize + s.len) as *mut u8) = '\0' as u8;
 
     return p as *mut c::char;
