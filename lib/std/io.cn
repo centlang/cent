@@ -9,44 +9,6 @@ pub fn Fd::close(self: Fd) {
     c::fclose(self._file);
 }
 
-pub fn Fd::write_u8(self: Fd, value: u8) {
-    c::fputc(value as c::int, self._file);
-}
-
-pub fn Fd::write(self: Fd, data: []u8) {
-    c::fwrite(&data[0] as *c::void, 1, data.len, self._file);
-}
-
-pub fn Fd::read_u8(self: Fd) ?u8 {
-    let c = c::fgetc(self._file);
-
-    if c == c::EOF {
-        return null;
-    }
-
-    return c as u8;
-}
-
-pub fn Fd::read_line_to(self: Fd, data: []mut u8) ?[]mut u8 {
-    for i in 0..data.len {
-        let c = self.read_u8();
-
-        if c == null {
-            return data[:i];
-        }
-
-        let c = c.! as u8;
-
-        if c == '\n' as u8 {
-            return data[:i];
-        }
-
-        data[i] = c;
-    }
-
-    return null;
-}
-
 pub fn print_rune(value: rune) {
     write_rune(stdout(), value);
 }
@@ -72,27 +34,23 @@ pub fn eprint_int(value: i64) {
 }
 
 pub fn print(str: []u8) {
-    stdout().write(str);
+    write(stdout(), str);
 }
 
 pub fn eprint(str: []u8) {
-    stderr().write(str);
+    write(stderr(), str);
 }
 
 pub fn println(str: []u8) {
-    let fd = stdout();
-    fd.write(str);
-    fd.write_u8('\n' as u8);
+    writeln(stdout(), str);
 }
 
 pub fn eprintln(str: []u8) {
-    let fd = stderr();
-    fd.write(str);
-    fd.write_u8('\n' as u8);
+    writeln(stderr(), str);
 }
 
 pub fn input_line_to(buf: []mut u8) ?[]mut u8 {
-    return stdin().read_line_to(buf);
+    return read_line_to(stdin(), buf);
 }
 
 pub fn input_uint() ?u64 {
@@ -103,6 +61,19 @@ pub fn input_int() ?i64 {
     return read_int(stdin());
 }
 
+pub fn write_u8(fd: Fd, byte: u8) {
+    c::fputc(byte as c::int, fd._file);
+}
+
+pub fn write(fd: Fd, data: []u8) {
+    c::fwrite(&data[0] as *c::void, 1, data.len, fd._file);
+}
+
+pub fn writeln(fd: Fd, data: []u8) {
+    write(fd, data);
+    write_u8(fd, '\n' as u8);
+}
+
 pub fn write_rune(fd: Fd, value: rune) {
     let r = value as u32;
 
@@ -111,27 +82,27 @@ pub fn write_rune(fd: Fd, value: rune) {
     }
 
     if r <= 0x7f {
-        fd.write_u8((r) as u8);
+        write_u8(fd, (r) as u8);
         return;
     }
 
     if r <= 0x7ff {
-        fd.write_u8((0xc0 | (r >> 6)) as u8);
-        fd.write_u8((0x80 | (r & 0x3f)) as u8);
+        write_u8(fd, (0xc0 | (r >> 6)) as u8);
+        write_u8(fd, (0x80 | (r & 0x3f)) as u8);
         return;
     }
 
     if r <= 0xffff {
-        fd.write_u8((0xe0 | (r >> 12)) as u8);
-        fd.write_u8((0x80 | ((r >> 6) & 0x3f)) as u8);
-        fd.write_u8((0x80 | (r & 0x3f)) as u8);
+        write_u8(fd, (0xe0 | (r >> 12)) as u8);
+        write_u8(fd, (0x80 | ((r >> 6) & 0x3f)) as u8);
+        write_u8(fd, (0x80 | (r & 0x3f)) as u8);
         return;
     }
 
-    fd.write_u8((0xf0 | (r >> 18)) as u8);
-    fd.write_u8((0x80 | ((r >> 12) & 0x3f)) as u8);
-    fd.write_u8((0x80 | ((r >> 6) & 0x3f)) as u8);
-    fd.write_u8((0x80 | (r & 0x3f)) as u8);
+    write_u8(fd, (0xf0 | (r >> 18)) as u8);
+    write_u8(fd, (0x80 | ((r >> 12) & 0x3f)) as u8);
+    write_u8(fd, (0x80 | ((r >> 6) & 0x3f)) as u8);
+    write_u8(fd, (0x80 | (r & 0x3f)) as u8);
 }
 
 pub fn write_uint(fd: Fd, mut value: u64) {
@@ -139,7 +110,7 @@ pub fn write_uint(fd: Fd, mut value: u64) {
     mut i: usize;
 
     if value == 0 {
-        fd.write_u8('0' as u8);
+        write_u8(fd, '0' as u8);
         return;
     }
 
@@ -151,19 +122,49 @@ pub fn write_uint(fd: Fd, mut value: u64) {
     }
 
     while i > 0 {
-        fd.write_u8(buf[i - 1] as u8);
+        write_u8(fd, buf[i - 1] as u8);
         i -= 1;
     }
 }
 
 pub fn write_int(fd: Fd, value: i64) {
     if value < 0 {
-        fd.write_u8('-' as u8);
+        write_u8(fd, '-' as u8);
         write_uint(fd, (-(value + 1) + 1) as u64);
         return;
     }
 
     write_uint(fd, value as u64);
+}
+
+pub fn read_u8(fd: Fd) ?u8 {
+    let c = c::fgetc(fd._file);
+
+    if c == c::EOF {
+        return null;
+    }
+
+    return c as u8;
+}
+
+pub fn read_line_to(fd: Fd, data: []mut u8) ?[]mut u8 {
+    for i in 0..data.len {
+        let c = read_u8(fd);
+
+        if c == null {
+            return data[:i];
+        }
+
+        let c = c.! as u8;
+
+        if c == '\n' as u8 {
+            return data[:i];
+        }
+
+        data[i] = c;
+    }
+
+    return null;
 }
 
 pub fn read_uint(fd: Fd) ?u64 {
