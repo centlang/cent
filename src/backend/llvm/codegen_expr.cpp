@@ -887,6 +887,16 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
             .value = llvm::ConstantInt::get(usize->llvm_type, array->size)};
     }
 
+    if (auto* array = dyn_cast<types::VarLenArray>(parent.type)) {
+        if (expr.member.value != "len") {
+            not_a_struct();
+            return Value::poisoned();
+        }
+
+        auto* usize = m_primitive_types["usize"].get();
+        return Value{.type = usize, .value = array->size};
+    }
+
     if (auto* union_type = dyn_cast<types::Union>(parent.type)) {
         auto index =
             get_member(static_cast<llvm::StructType*>(union_type->llvm_type));
