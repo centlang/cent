@@ -616,9 +616,7 @@ Value Codegen::generate(const ast::VarDecl& decl) {
         return Value::poisoned();
     }
 
-    m_builder.CreateStore(
-        llvm::Constant::getNullValue(type->llvm_type), variable);
-
+    zero_init(variable, type);
     return Value::poisoned();
 }
 

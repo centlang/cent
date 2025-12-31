@@ -199,6 +199,7 @@ private:
     void create_panic(std::string_view message);
 
     void create_store(const Value& src, llvm::Value* dest);
+    void zero_init(llvm::Value* value, Type* type);
 
     [[nodiscard]] llvm::Value* create_alloca_or_error(
         std::size_t offset, llvm::Type* type, llvm::Value* size = nullptr);

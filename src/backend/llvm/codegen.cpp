@@ -800,14 +800,36 @@ llvm::Value* Codegen::create_alloca(Type* type) {
 
 void Codegen::create_store(const Value& src, llvm::Value* dest) {
     if (src.memcpy) {
+        const auto& layout = m_module->getDataLayout();
+
         m_builder.CreateMemCpy(
-            dest, std::nullopt, src.value, std::nullopt,
-            m_module->getDataLayout().getTypeAllocSize(src.type->llvm_type));
+            dest, std::nullopt, src.value,
+            layout.getPrefTypeAlign(src.type->llvm_type),
+            layout.getTypeAllocSize(src.type->llvm_type));
 
         return;
     }
 
     m_builder.CreateStore(load_rvalue(src).value, dest);
+}
+
+void Codegen::zero_init(llvm::Value* value, Type* type) {
+    if (auto* array = dyn_cast<types::VarLenArray>(type)) {
+        const auto& layout = m_module->getDataLayout();
+
+        auto* bytes = m_builder.CreateMul(
+            array->size,
+            llvm::ConstantInt::get(
+                m_size, layout.getTypeAllocSize(array->type->llvm_type)));
+
+        m_builder.CreateMemSet(
+            value, llvm::ConstantInt::get(llvm::Type::getInt8Ty(m_context), 0),
+            bytes, layout.getPrefTypeAlign(array->type->llvm_type));
+
+        return;
+    }
+
+    m_builder.CreateStore(llvm::Constant::getNullValue(type->llvm_type), value);
 }
 
 void Codegen::create_out_of_bounds_check(llvm::Value* index, llvm::Value* len) {
