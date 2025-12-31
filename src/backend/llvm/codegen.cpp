@@ -138,31 +138,13 @@ void Codegen::create_intrinsics() {
 
     m_builder.CreateRet(m_builder.CreateLoad(m_slice_type, as_u8_slice_result));
 
-    auto* alloca_type = get_fn_type(mut_u8_ptr, {usize});
-
-    auto* alloca = llvm::Function::Create(
-        static_cast<llvm::FunctionType*>(alloca_type->llvm_type),
-        llvm::Function::PrivateLinkage, "core::mem::alloca", *m_module);
-
-    alloca->addFnAttr(llvm::Attribute::AlwaysInline);
-
-    auto* alloca_entry = llvm::BasicBlock::Create(m_context, "", alloca);
-
-    m_builder.SetInsertPoint(alloca_entry);
-
-    m_builder.CreateRet(create_alloca(u8_type->llvm_type, alloca->getArg(0)));
-
     m_core_module.scopes["mem"].names = {
         {"as_mut_u8_slice",
          {.element = {.type = as_mut_u8_slice_type, .value = as_mut_u8_slice},
           .is_public = true}},
         {"as_u8_slice",
          {.element = {.type = as_u8_slice_type, .value = as_u8_slice},
-          .is_public = true}},
-        {"alloca",
-         {.element = {.type = alloca_type, .value = alloca},
-          .is_public = true}},
-    };
+          .is_public = true}}};
 
     auto* debug = llvm::ConstantInt::get(
         llvm::Type::getInt1Ty(m_context), !g_options.release);
