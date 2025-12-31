@@ -616,6 +616,11 @@ Value Codegen::generate(const ast::VarDecl& decl) {
         return Value::poisoned();
     }
 
+    if (is<types::Pointer>(type)) {
+        error(decl.type->offset, "cannot zero-initialize a pointer");
+        return Value::poisoned();
+    }
+
     zero_init(variable, type);
     return Value::poisoned();
 }
