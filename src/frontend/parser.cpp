@@ -205,7 +205,6 @@ void Parser::expect_stmt(ast::BlockStmt& block) {
         expect_semicolon();
         return;
     case Bang:
-    case Fn:
     case Type:
     case Enum:
     case Let:
@@ -238,14 +237,6 @@ void Parser::expect_stmt(ast::BlockStmt& block) {
     auto attrs = parse_attrs();
 
     switch (peek().type) {
-    case Fn:
-        next();
-
-        if (auto decl = parse_fn(std::move(attrs))) {
-            block.body.push_back(std::move(decl));
-        }
-
-        return;
     case Type:
         next();
 
