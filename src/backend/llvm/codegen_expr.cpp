@@ -958,57 +958,71 @@ Value Codegen::generate(const ast::IndexExpr& expr) {
         return Value::poisoned();
     }
 
+    value = load_lvalue(value);
+
     auto index = expr.index->codegen(*this);
 
     if (!index.ok()) {
         return Value::poisoned();
     }
 
-    auto index_val = load_rvalue(index);
+    auto index_val = cast_or_error(
+        expr.index->offset, m_primitive_types["usize"].get(),
+        load_rvalue(index));
 
-    auto val = cast_or_error(
-        expr.index->offset, m_primitive_types["usize"].get(), index_val);
-
-    if (!val.ok()) {
+    if (!index_val.ok()) {
         return Value::poisoned();
     }
 
-    if (auto* type = dyn_cast<types::Slice>(value.type)) {
+    if (auto* slice = dyn_cast<types::Slice>(value.type)) {
         if (!g_options.release) {
             auto* len_value =
                 load_struct_member(m_size, value, slice_member_len);
 
-            create_out_of_bounds_check(val.value, len_value);
+            create_out_of_bounds_check(index_val.value, len_value);
         }
 
         auto* ptr_value = load_struct_member(
             llvm::PointerType::get(m_context, 0), value, slice_member_ptr);
 
         return Value{
-            .type = type->type,
+            .type = slice->type,
             .value = m_builder.CreateGEP(
-                type->type->llvm_type, ptr_value, val.value),
+                slice->type->llvm_type, ptr_value, index_val.value),
             .ptr_depth = 1,
-            .is_mutable = type->is_mutable};
+            .is_mutable = slice->is_mutable};
     }
 
-    auto* type = dyn_cast<types::Array>(value.type);
+    if (auto* array = dyn_cast<types::VarLenArray>(value.type)) {
+        if (!g_options.release) {
+            create_out_of_bounds_check(index_val.value, array->size);
+        }
 
-    if (!type) {
+        return Value{
+            .type = array->type,
+            .value = m_builder.CreateGEP(
+                array->type->llvm_type, value.value, index_val.value),
+            .ptr_depth = 1,
+            .is_mutable = value.is_mutable};
+    }
+
+    auto* array = dyn_cast<types::Array>(value.type);
+
+    if (!array) {
         error(expr.value->offset, "index access of a non-array type");
         return Value::poisoned();
     }
 
     if (!g_options.release) {
-        auto* len_value = llvm::ConstantInt::get(m_size, type->size);
-        create_out_of_bounds_check(val.value, len_value);
+        auto* len_value = llvm::ConstantInt::get(m_size, array->size);
+        create_out_of_bounds_check(index_val.value, len_value);
     }
 
     return Value{
-        .type = type->type,
+        .type = array->type,
         .value = m_builder.CreateGEP(
-            type->llvm_type, value.value,
-            {llvm::ConstantInt::get(m_size, 0), val.value}),
+            array->llvm_type, value.value,
+            {llvm::ConstantInt::get(m_size, 0), index_val.value}),
         .ptr_depth = 1,
         .is_mutable = value.is_mutable};
 }
