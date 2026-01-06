@@ -17,11 +17,11 @@ fn main() i32 {
         return 1;
     }
 
-    if false && std::exit(1) {
+    if false && core::exit(1) {
         return 1;
     }
 
-    if true || std::exit(1) {
+    if true || core::exit(1) {
         return 0;
     }
 

@@ -1,17 +1,8 @@
 with std::io;
 with c;
 
-pub fn exit(code: i32) never {
-    c::exit(code as c::int);
-}
-
-pub fn panic(message: []u8) never {
-    io::eprintln(message);
-    return exit(1);
-}
-
 pub fn assert(cond: bool) {
-    if !cond { return panic("Assertion failed"); }
+    if !cond { return core::panic("Assertion failed"); }
 }
 
 pub fn dbg_assert(cond: bool) {

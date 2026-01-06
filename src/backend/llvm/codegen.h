@@ -8,6 +8,7 @@
 #include <set>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 #include <fmt/core.h>
 
@@ -158,7 +159,6 @@ public:
 
 private:
     void create_intrinsics();
-    void create_panic_fn();
 
     void create_main();
 
@@ -377,8 +377,6 @@ private:
 
     llvm::BasicBlock* m_loop_continue{nullptr};
     llvm::BasicBlock* m_loop_end{nullptr};
-
-    llvm::Function* m_panic_fn{nullptr};
 
     std::string m_current_scope_prefix{"<main>::"};
 

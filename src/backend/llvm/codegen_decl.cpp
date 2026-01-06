@@ -22,10 +22,6 @@
 namespace cent::backend {
 
 Value Codegen::generate(const ast::FnDecl& decl) {
-    if (m_current_function) {
-        generate_fn_proto(decl);
-    }
-
     Type* type = nullptr;
 
     if (decl.type) {

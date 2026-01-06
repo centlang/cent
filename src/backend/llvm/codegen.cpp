@@ -66,11 +66,8 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
     m_slice_type = llvm::StructType::create(
         {llvm::PointerType::get(m_context, 0), m_size});
 
-    if (!g_options.release) {
-        create_panic_fn();
-    }
-
     create_intrinsics();
+
     generate(*m_program);
 
     create_main();
@@ -82,6 +79,9 @@ void Codegen::create_intrinsics() {
     auto* u8_type = m_primitive_types["u8"].get();
     auto* mut_u8_ptr = get_ptr_type(u8_type, true);
     auto* usize = m_primitive_types["usize"].get();
+    auto* u8_slice = get_slice_type(u8_type, false);
+    auto* i32_type = m_primitive_types["i32"].get();
+    auto* never = m_primitive_types["never"].get();
 
     auto* as_mut_u8_slice_type =
         get_fn_type(get_slice_type(u8_type, true), {mut_u8_ptr, usize});
@@ -113,8 +113,8 @@ void Codegen::create_intrinsics() {
     m_builder.CreateRet(
         m_builder.CreateLoad(m_slice_type, as_mut_u8_slice_result));
 
-    auto* as_u8_slice_type = get_fn_type(
-        get_slice_type(u8_type, false), {get_ptr_type(u8_type, false), usize});
+    auto* as_u8_slice_type =
+        get_fn_type(u8_slice, {get_ptr_type(u8_type, false), usize});
 
     auto* as_u8_slice = llvm::Function::Create(
         static_cast<llvm::FunctionType*>(as_u8_slice_type->llvm_type),
@@ -146,55 +146,91 @@ void Codegen::create_intrinsics() {
          {.element = {.type = as_u8_slice_type, .value = as_u8_slice},
           .is_public = true}}};
 
+    auto* panic_type = get_fn_type(never, {u8_slice});
+
+    auto* panic = llvm::Function::Create(
+        static_cast<llvm::FunctionType*>(panic_type->llvm_type),
+        llvm::Function::PrivateLinkage, "core::panic", *m_module);
+
+    auto* ptr_type = llvm::PointerType::get(m_context, 0);
+
+    auto* fputs_type = llvm::FunctionType::get(
+        i32_type->llvm_type, {ptr_type, ptr_type}, false);
+
+    auto* fputs_fn = llvm::Function::Create(
+        fputs_type, llvm::Function::ExternalLinkage, "fputs", *m_module);
+
+    auto* fwrite_type = llvm::FunctionType::get(
+        m_size, {ptr_type, m_size, m_size, ptr_type}, false);
+
+    auto* fwrite_fn = llvm::Function::Create(
+        fwrite_type, llvm::Function::ExternalLinkage, "fwrite", *m_module);
+
+    auto* fputc_type = llvm::FunctionType::get(
+        i32_type->llvm_type, {i32_type->llvm_type, ptr_type}, false);
+
+    auto* fputc_fn = llvm::Function::Create(
+        fwrite_type, llvm::Function::ExternalLinkage, "fputc", *m_module);
+
+    auto* stderr_ = new llvm::GlobalVariable{
+        *m_module, llvm::PointerType::get(m_context, 0),
+        false,     llvm::GlobalValue::ExternalLinkage,
+        nullptr,   "stderr"};
+
+    auto* exit_type = get_fn_type(never, {i32_type});
+
+    auto* exit_fn = llvm::Function::Create(
+        static_cast<llvm::FunctionType*>(exit_type->llvm_type),
+        llvm::Function::ExternalLinkage, "exit", *m_module);
+
+    auto* panic_entry = llvm::BasicBlock::Create(m_context, "", panic);
+
+    m_builder.SetInsertPoint(panic_entry);
+
+    auto* stderr_value =
+        m_builder.CreateLoad(llvm::PointerType::get(m_context, 0), stderr_);
+
+    auto* panic_begin_str =
+        m_builder.CreateGlobalString("panic: ", "", 0, m_module.get());
+
+    m_builder.CreateCall(fputs_fn, {panic_begin_str, stderr_value});
+
+    auto* panic_message = panic->getArg(0);
+    Value panic_message_val{.type = u8_slice, .value = panic_message};
+
+    auto* message_len =
+        load_struct_member(m_size, panic_message_val, slice_member_len);
+
+    auto* message_ptr = load_struct_member(
+        llvm::PointerType::get(m_context, 0), panic_message_val,
+        slice_member_ptr);
+
+    m_builder.CreateCall(
+        fwrite_fn, {message_ptr, message_len, llvm::ConstantInt::get(m_size, 1),
+                    stderr_value});
+
+    m_builder.CreateCall(
+        fputc_fn,
+        {llvm::ConstantInt::get(i32_type->llvm_type, '\n'), stderr_value});
+
+    m_builder.CreateCall(
+        exit_fn, llvm::ConstantInt::getSigned(i32_type->llvm_type, 1));
+
+    m_builder.CreateUnreachable();
+
+    m_core_module.names = {
+        {"panic",
+         {.element = {.type = panic_type, .value = panic}, .is_public = true}},
+        {"exit",
+         {.element = {.type = exit_type, .value = exit_fn},
+          .is_public = true}}};
+
     auto* debug = llvm::ConstantInt::get(
         llvm::Type::getInt1Ty(m_context), !g_options.release);
 
     m_core_module.scopes["env"].names["DEBUG"] = {
         .element = {.type = m_primitive_types["bool"].get(), .value = debug},
         .is_public = true};
-}
-
-void Codegen::create_panic_fn() {
-    auto* ptr_type = llvm::PointerType::get(m_context, 0);
-
-    auto* panic_type = llvm::FunctionType::get(
-        llvm::Type::getVoidTy(m_context), ptr_type, false);
-
-    m_panic_fn = llvm::Function::Create(
-        panic_type, llvm::Function::PrivateLinkage, "core::__panic", *m_module);
-
-    auto* fputs_type = llvm::FunctionType::get(
-        llvm::Type::getInt32Ty(m_context), {ptr_type, ptr_type}, false);
-
-    auto* fputs_fn = llvm::Function::Create(
-        fputs_type, llvm::Function::ExternalLinkage, "fputs", *m_module);
-
-    auto* stderr = new llvm::GlobalVariable{
-        *m_module, llvm::PointerType::get(m_context, 0),
-        false,     llvm::GlobalValue::ExternalLinkage,
-        nullptr,   "stderr"};
-
-    auto* exit_type = llvm::FunctionType::get(
-        llvm::Type::getVoidTy(m_context), {llvm::Type::getInt32Ty(m_context)},
-        false);
-
-    auto* exit_fn = llvm::Function::Create(
-        exit_type, llvm::Function::ExternalLinkage, "exit", *m_module);
-
-    auto* entry = llvm::BasicBlock::Create(m_context, "", m_panic_fn);
-
-    m_builder.SetInsertPoint(entry);
-
-    auto* stderr_value =
-        m_builder.CreateLoad(llvm::PointerType::get(m_context, 0), stderr);
-
-    m_builder.CreateCall(fputs_fn, {m_panic_fn->getArg(0), stderr_value});
-
-    m_builder.CreateCall(
-        exit_fn,
-        llvm::ConstantInt::getSigned(llvm::Type::getInt32Ty(m_context), 1));
-
-    m_builder.CreateUnreachable();
 }
 
 void Codegen::create_main() {
@@ -875,9 +911,15 @@ void Codegen::create_out_of_bounds_check(llvm::Value* index, llvm::Value* len) {
 }
 
 void Codegen::create_panic(std::string_view message) {
+    auto* arg = llvm::ConstantStruct::get(
+        m_slice_type,
+        {m_builder.CreateGlobalString(message, "", 0, m_module.get(), false),
+         llvm::ConstantInt::get(m_size, message.size())});
+
     m_builder.CreateCall(
-        m_panic_fn,
-        {m_builder.CreateGlobalString(fmt::format("panic: {}\n", message))});
+        static_cast<llvm::Function*>(
+            m_core_module.names["panic"].element.value),
+        {arg});
 
     if (!m_builder.GetInsertBlock()->getTerminator()) {
         m_builder.CreateUnreachable();
