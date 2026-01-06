@@ -1,8 +1,6 @@
-with std;
-
 with c;
 with std::ffi;
 
 fn main() {
-    std::assert(c::strlen(ffi::as_cstr("Hello, world!\0")) == 13);
+    core::assert(c::strlen(ffi::as_cstr("Hello, world!\0")) == 13);
 }

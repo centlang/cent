@@ -1,5 +1,3 @@
-with std;
-
 #(untagged)
 union Untagged {
     a: i32,
@@ -13,19 +11,19 @@ union Tagged {
 
 fn main() i32 {
     mut u = Untagged { a: 1 };
-    std::assert(u.a == 1);
+    core::assert(u.a == 1);
 
     u = Untagged { b: 42 };
-    std::assert(u.b == 42);
+    core::assert(u.b == 42);
 
     u = Untagged { a: u.b as i32 };
-    std::assert(u.a == 42);
+    core::assert(u.a == 42);
 
     mut t = Tagged { a: 1 };
-    std::assert(t.a == 1);
+    core::assert(t.a == 1);
 
     t = Tagged { b: 42 };
-    std::assert(t.b == 42);
+    core::assert(t.b == 42);
 
     switch t {
         Tagged::a { return 1; }

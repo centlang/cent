@@ -1,6 +1,4 @@
-with std;
-
 fn main() {
-    std::assert(42.42 as i32 == 42);
-    std::assert(42 == 42.42 as i32);
+    core::assert(42.42 as i32 == 42);
+    core::assert(42 == 42.42 as i32);
 }

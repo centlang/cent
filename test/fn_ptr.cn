@@ -1,5 +1,3 @@
-with std;
-
 fn add(a: i32, b: i32) i32 {
     return a + b;
 }
@@ -23,19 +21,19 @@ fn call(func: *fn(a: i32, b: i32) i32, a: i32, b: i32) i32 {
 fn main() {
     let add_func = &add;
 
-    std::assert(call(&add, 42, 42) == 84);
-    std::assert(call(add_func, 42, 42) == 84);
-    std::assert(add_func(42, 42) == 84);
+    core::assert(call(&add, 42, 42) == 84);
+    core::assert(call(add_func, 42, 42) == 84);
+    core::assert(add_func(42, 42) == 84);
 
     let mul_func = &mul;
 
-    std::assert(call(mul_func, 42, 42) == 1764);
-    std::assert(call(&mul, 42, 42) == 1764);
-    std::assert(mul_func(42, 42) == 1764);
+    core::assert(call(mul_func, 42, 42) == 1764);
+    core::assert(call(&mul, 42, 42) == 1764);
+    core::assert(mul_func(42, 42) == 1764);
 
     let max_func = &max;
 
-    std::assert(call(max_func, -42, 42) == 42);
-    std::assert(call(&max, 42, -42) == 42);
-    std::assert(max_func(-42, 42) == 42);
+    core::assert(call(max_func, -42, 42) == 42);
+    core::assert(call(&max, 42, -42) == 42);
+    core::assert(max_func(-42, 42) == 42);
 }

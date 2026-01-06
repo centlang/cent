@@ -1,18 +1,16 @@
-with std;
-
 fn main() {
     mut a: ?i32 = null;
 
-    std::assert(a == null);
-    std::assert((a ?? 7) == 7);
+    core::assert(a == null);
+    core::assert((a ?? 7) == 7);
 
     a = 3;
 
-    std::assert(a.! == 3);
-    std::assert((a ?? 7) == 3);
-    std::assert(a != null);
+    core::assert(a.! == 3);
+    core::assert((a ?? 7) == 3);
+    core::assert(a != null);
 
     mut a: ? ?i32 = 3 as ?i32;
-    std::assert(a.!.! == 3);
-    std::assert(a != null);
+    core::assert(a.!.! == 3);
+    core::assert(a != null);
 }

@@ -1,18 +1,16 @@
-with std;
-
 fn main() {
     mut var: i32;
-    std::assert(var == 0);
+    core::assert(var == 0);
 
     let var = 3;
-    std::assert(var == 3);
+    core::assert(var == 3);
 
     mut var = var;
-    std::assert(var == 3);
+    core::assert(var == 3);
 
     var = 2;
-    std::assert(var == 2);
+    core::assert(var == 2);
 
     let var: i32 = var + 3;
-    std::assert(var == 5);
+    core::assert(var == 5);
 }

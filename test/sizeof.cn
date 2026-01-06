@@ -1,19 +1,17 @@
-with std;
-
 fn main() {
-    std::assert(sizeof(i32) == 4);
-    std::assert(sizeof(i64) == 8);
-    std::assert(sizeof(i8) == 1);
+    core::assert(sizeof(i32) == 4);
+    core::assert(sizeof(i64) == 8);
+    core::assert(sizeof(i8) == 1);
 
-    std::assert(sizeof(u32) == 4);
-    std::assert(sizeof(u64) == 8);
-    std::assert(sizeof(u8) == 1);
+    core::assert(sizeof(u32) == 4);
+    core::assert(sizeof(u64) == 8);
+    core::assert(sizeof(u8) == 1);
 
-    std::assert(sizeof(f32) == 4);
-    std::assert(sizeof(f64) == 8);
+    core::assert(sizeof(f32) == 4);
+    core::assert(sizeof(f64) == 8);
 
-    std::assert(sizeof(bool) == 1);
+    core::assert(sizeof(bool) == 1);
 
-    std::assert(sizeof(*u8) == sizeof(*mut u8));
-    std::assert(sizeof(*u8) == sizeof(usize));
+    core::assert(sizeof(*u8) == sizeof(*mut u8));
+    core::assert(sizeof(*u8) == sizeof(usize));
 }

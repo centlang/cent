@@ -1,5 +1,3 @@
-with std;
-
 type Id = u16;
 type F32 = f32;
 
@@ -7,14 +5,14 @@ type F32 = f32;
 
 fn main() {
     let a: Id = 42;
-    std::assert(a == 42);
+    core::assert(a == 42);
 
     let b: F32 = 3.5;
-    std::assert(b == 3.5);
+    core::assert(b == 3.5);
 
     let c = 4.5 as F32;
-    std::assert(c == 4.5);
+    core::assert(c == 4.5);
 
     let d = 3 as DistinctId;
-    std::assert(d as u16 == 3);
+    core::assert(d as u16 == 3);
 }

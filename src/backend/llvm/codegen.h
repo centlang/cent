@@ -158,7 +158,8 @@ public:
     Value generate(const ast::VarDecl& decl);
 
 private:
-    void create_intrinsics();
+    void create_core();
+    void create_core_mem();
 
     void create_main();
 

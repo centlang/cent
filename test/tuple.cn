@@ -1,30 +1,28 @@
 with c;
-
-with std;
 with std::mem;
 
 fn main() {
     mut tuple = (1, 3.4, "Hello, world!", false);
 
-    std::assert(tuple.0 == 1);
-    std::assert(tuple.1 == 3.4);
-    std::assert(mem::equal(tuple.2, "Hello, world!"));
-    std::assert(tuple.3 != true);
+    core::assert(tuple.0 == 1);
+    core::assert(tuple.1 == 3.4);
+    core::assert(mem::equal(tuple.2, "Hello, world!"));
+    core::assert(tuple.3 != true);
 
     mut tuple: (i32, f32, []u8, bool) = (1, 3.4, "Hello, world!" as []u8, false);
 
-    std::assert(tuple.0 == 1);
-    std::assert(tuple.1 == 3.4);
-    std::assert(mem::equal(tuple.2, "Hello, world!"));
-    std::assert(tuple.3 != true);
+    core::assert(tuple.0 == 1);
+    core::assert(tuple.1 == 3.4);
+    core::assert(mem::equal(tuple.2, "Hello, world!"));
+    core::assert(tuple.3 != true);
 
     tuple.0 = 6;
     tuple.1 = 3.5;
     tuple.2 = "Hi!";
     tuple.3 = !tuple.3;
 
-    std::assert(tuple.0 == 6);
-    std::assert(tuple.1 == 3.5);
-    std::assert(mem::equal(tuple.2, "Hi!"));
-    std::assert(tuple.3 == true);
+    core::assert(tuple.0 == 6);
+    core::assert(tuple.1 == 3.5);
+    core::assert(mem::equal(tuple.2, "Hi!"));
+    core::assert(tuple.3 == true);
 }
