@@ -3,25 +3,11 @@ with std::alloc;
 with c;
 
 pub fn as_cstr(s: []u8) *c::char {
+    core::dbg_assert(s[s.len - 1] == '\0' as u8);
     return &s[0] as *c::char;
 }
 
 pub fn cstr_to(buf: []mut u8, s: []u8) {
     mem::copy(buf, s);
     buf[s.len] = '\0' as u8;
-}
-
-pub fn alloc_cstr(s: []u8, a: alloc::Allocator) ?*mut c::char {
-    let p = a.alloc(s.len + 1);
-
-    if p == null {
-        return null;
-    }
-
-    let p = p.!;
-
-    mem::copy_n(p, &s[0], s.len);
-    *((p as usize + s.len) as *mut u8) = '\0' as u8;
-
-    return p as *mut c::char;
 }

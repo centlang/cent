@@ -7,9 +7,11 @@ pub fn equal(a: []u8, b: []u8) bool {
 }
 
 pub fn copy(dest: []mut u8, src: []u8) {
+    core::dbg_assert(dest.len >= src.len);
     c::memcpy(&dest[0] as *mut c::void, &src[0] as *c::void, src.len);
 }
 
 pub fn copy_n(dest: *mut u8, src: *u8, len: usize) {
+    core::dbg_assert(src.len >= len && dest.len >= len);
     c::memcpy(dest as *mut c::void, src as *c::void, len);
 }
