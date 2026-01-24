@@ -12,6 +12,5 @@ pub fn copy(dest: []mut u8, src: []u8) {
 }
 
 pub fn copy_n(dest: *mut u8, src: *u8, len: usize) {
-    core::dbg_assert(src.len >= len && dest.len >= len);
     c::memcpy(dest as *mut c::void, src as *c::void, len);
 }
