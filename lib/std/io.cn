@@ -40,6 +40,16 @@ pub fn eprint_int(value: i64) {
 }
 
 #(alwaysinline)
+pub fn print_float(value: i64) {
+    write_float(stdout(), value);
+}
+
+#(alwaysinline)
+pub fn eprint_float(value: i64) {
+    write_float(stderr(), value);
+}
+
+#(alwaysinline)
 pub fn print(str: []u8) {
     write(stdout(), str);
 }
@@ -150,6 +160,55 @@ pub fn write_int(fd: Fd, value: i64) {
     write_uint(fd, value as u64);
 }
 
+pub fn write_float(fd: Fd, mut value: f64, precision: u8 = 6) {
+    if value < 0 {
+        write_u8(fd, '-' as u8);
+        value = -value;
+    }
+
+    mut int = value as u64;
+    mut scale: u64 = 1;
+
+    for _ in 0..precision {
+        scale *= 10;
+    }
+
+    mut fract = ((value - int) * scale + 0.5) as u64;
+
+    if fract >= scale {
+        int += 1;
+        fract = 0;
+    }
+
+    write_uint(fd, int);
+
+    if precision == 0 {
+        return;
+    }
+
+    write_u8(fd, '.' as u8);
+
+    mut n = fract;
+    mut fract_digits: u8 = 0;
+
+    if n == 0 {
+        fract_digits = 1;
+    }
+
+    while n > 0 {
+        n /= 10;
+        fract_digits += 1;
+    }
+
+    let zeros = precision - fract_digits;
+
+    for _ in 0..zeros {
+        write_u8(fd, '0' as u8);
+    }
+
+    write_uint(fd, fract);
+}
+
 pub fn read_u8(fd: Fd) ?u8 {
     let c = c::fgetc(fd._file);
 
@@ -181,8 +240,6 @@ pub fn read_line_to(fd: Fd, data: []mut u8) ?[]mut u8 {
 }
 
 pub fn read_uint(fd: Fd) ?u64 {
-    // TODO: do not rely on fscanf
-
     mut r: u64 = undefined;
 
     if c::fscanf(fd._file, ffi::as_cstr("%llu\0"), &r) != 1 {
@@ -193,8 +250,6 @@ pub fn read_uint(fd: Fd) ?u64 {
 }
 
 pub fn read_int(fd: Fd) ?i64 {
-    // TODO: do not rely on fscanf
-
     mut r: i64 = undefined;
 
     if c::fscanf(fd._file, ffi::as_cstr("%lli\0"), &r) != 1 {
