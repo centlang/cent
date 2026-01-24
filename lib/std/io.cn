@@ -10,6 +10,16 @@ pub fn Fd::close(self: Fd) {
 }
 
 #(alwaysinline)
+pub fn printf(fmt: []u8, args: []WriteArg) {
+    writef(stdout(), fmt, args);
+}
+
+#(alwaysinline)
+pub fn eprintf(fmt: []u8, args: []WriteArg) {
+    writef(stderr(), fmt, args);
+}
+
+#(alwaysinline)
 pub fn print_rune(value: rune) {
     write_rune(stdout(), value);
 }
@@ -40,12 +50,12 @@ pub fn eprint_int(value: i64) {
 }
 
 #(alwaysinline)
-pub fn print_float(value: i64) {
+pub fn print_float(value: f64) {
     write_float(stdout(), value);
 }
 
 #(alwaysinline)
-pub fn eprint_float(value: i64) {
+pub fn eprint_float(value: f64) {
     write_float(stderr(), value);
 }
 
@@ -82,6 +92,64 @@ pub fn input_uint() ?u64 {
 #(alwaysinline)
 pub fn input_int() ?i64 {
     return read_int(stdin());
+}
+
+pub union WriteArg {
+    float: f64,
+    int: i64,
+    uint: u64,
+    bool: bool,
+    str: []u8,
+    rune: rune,
+}
+
+fn write_arg(fd: Fd, arg: WriteArg) {
+    switch arg {
+        WriteArg::float { write_float(fd, arg.float); }
+        WriteArg::int { write_int(fd, arg.int); }
+        WriteArg::uint { write_uint(fd, arg.uint); }
+        WriteArg::str { write(fd, arg.str); }
+        WriteArg::rune { write_rune(fd, arg.rune); }
+        WriteArg::bool {
+            if arg.bool {
+                write(fd, "true");
+            } else {
+                write(fd, "false");
+            };
+        }
+        else { unreachable; }
+    }
+}
+
+pub fn writef(fd: Fd, fmt: []u8, args: []WriteArg) bool {
+    mut p: usize = 0;
+    mut arg: usize = 0;
+
+    while p < fmt.len {
+        if fmt[p] == '{' as u8 {
+            p += 1;
+
+            if p == fmt.len || fmt[p] != '}' as u8 {
+                return false;
+            }
+
+            p += 1;
+
+            if arg == args.len {
+                return false;
+            }
+
+            write_arg(fd, args[arg]);
+            arg += 1;
+
+            continue;
+        }
+
+        write_u8(fd, fmt[p]);
+        p += 1;
+    }
+
+    return true;
 }
 
 pub fn write_u8(fd: Fd, byte: u8) {
