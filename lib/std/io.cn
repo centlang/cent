@@ -9,54 +9,67 @@ pub fn Fd::close(self: Fd) {
     c::fclose(self._file);
 }
 
+#(alwaysinline)
 pub fn print_rune(value: rune) {
     write_rune(stdout(), value);
 }
 
+#(alwaysinline)
 pub fn eprint_rune(value: rune) {
     write_rune(stderr(), value);
 }
 
+#(alwaysinline)
 pub fn print_uint(value: u64) {
     write_uint(stdout(), value);
 }
 
+#(alwaysinline)
 pub fn eprint_uint(value: u64) {
     write_uint(stderr(), value);
 }
 
+#(alwaysinline)
 pub fn print_int(value: i64) {
     write_int(stdout(), value);
 }
 
+#(alwaysinline)
 pub fn eprint_int(value: i64) {
     write_int(stderr(), value);
 }
 
+#(alwaysinline)
 pub fn print(str: []u8) {
     write(stdout(), str);
 }
 
+#(alwaysinline)
 pub fn eprint(str: []u8) {
     write(stderr(), str);
 }
 
+#(alwaysinline)
 pub fn println(str: []u8) {
     writeln(stdout(), str);
 }
 
+#(alwaysinline)
 pub fn eprintln(str: []u8) {
     writeln(stderr(), str);
 }
 
+#(alwaysinline)
 pub fn input_line_to(buf: []mut u8) ?[]mut u8 {
     return read_line_to(stdin(), buf);
 }
 
+#(alwaysinline)
 pub fn input_uint() ?u64 {
     return read_uint(stdin());
 }
 
+#(alwaysinline)
 pub fn input_int() ?i64 {
     return read_int(stdin());
 }
