@@ -129,7 +129,18 @@ pub fn writef(fd: Fd, fmt: []u8, args: []WriteArg) bool {
         if fmt[p] == '{' as u8 {
             p += 1;
 
-            if p == fmt.len || fmt[p] != '}' as u8 {
+            if p == fmt.len {
+                return false;
+            }
+
+            if fmt[p] == '{' as u8 {
+                write_u8(fd, '{' as u8);
+                p += 1;
+
+                continue;
+            }
+
+            if fmt[p] != '}' as u8 {
                 return false;
             }
 
@@ -141,6 +152,19 @@ pub fn writef(fd: Fd, fmt: []u8, args: []WriteArg) bool {
 
             write_arg(fd, args[arg]);
             arg += 1;
+
+            continue;
+        }
+
+        if fmt[p] == '}' as u8 {
+            p += 1;
+
+            if p == fmt.len || fmt[p] != '}' as u8 {
+                return false;
+            }
+
+            write_u8(fd, '}' as u8);
+            p += 1;
 
             continue;
         }
