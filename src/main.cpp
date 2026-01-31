@@ -294,6 +294,39 @@ get_emit_type(std::string_view type) {
         cent::g_options.reloc_model);
 }
 
+[[nodiscard]] bool invoke_linker(
+    const std::filesystem::path& output, const std::filesystem::path& object) {
+#ifdef _WIN32
+    std::vector<std::string> args = {
+        fmt::format("/OUT:{}", output.string()), object.string(), "ucrt.lib"};
+
+    args.insert(
+        args.end(), cent::g_options.linker_options.begin(),
+        cent::g_options.linker_options.end());
+
+    return cent::exec_command("link.exe", args) == 0;
+#else
+    std::vector<std::string> args = {"-o", output.string(), object.string()};
+
+    switch (cent::g_options.reloc_model) {
+    case llvm::Reloc::Static:
+    case llvm::Reloc::ROPI:
+    case llvm::Reloc::RWPI:
+    case llvm::Reloc::ROPI_RWPI:
+        args.emplace_back("-no-pie");
+        break;
+    default:
+        break;
+    }
+
+    args.insert(
+        args.end(), cent::g_options.linker_options.begin(),
+        cent::g_options.linker_options.end());
+
+    return cent::exec_command("gcc", args) == 0;
+#endif
+}
+
 [[nodiscard]] std::optional<std::filesystem::path>
 compile(llvm::TargetMachine* machine) {
     auto code = cent::read_file(cent::g_options.source_file->string());
@@ -387,7 +420,12 @@ compile(llvm::TargetMachine* machine) {
         return output;
     }
     case cent::EmitType::Obj: {
-        auto output = get_output_file(".o");
+        auto output =
+#ifdef _WIN32
+            get_output_file(".obj");
+#else
+            get_output_file(".o");
+#endif
 
         if (!cent::backend::emit_obj(*module, *machine, output)) {
             return std::nullopt;
@@ -415,32 +453,16 @@ compile(llvm::TargetMachine* machine) {
             return std::nullopt;
         }
 
-        auto output = get_output_file("");
-
-        std::vector<std::string> args = {
-            "-o", output.string(), object_file.string()};
-
-        switch (cent::g_options.reloc_model) {
-        case llvm::Reloc::Static:
-        case llvm::Reloc::ROPI:
-        case llvm::Reloc::RWPI:
-        case llvm::Reloc::ROPI_RWPI:
-            args.emplace_back("-no-pie");
-            break;
-        default:
-            break;
-        }
-
-        args.insert(
-            args.end(), cent::g_options.linker_options.begin(),
-            cent::g_options.linker_options.end());
+        auto output =
+#ifdef _WIN32
+            get_output_file(".exe");
+#else
+            get_output_file("");
+#endif
 
         start_step();
-        int exit_code = cent::exec_command("gcc", args);
 
-        std::filesystem::remove(object_file);
-
-        if (exit_code != 0) {
+        if (!invoke_linker(output, object_file)) {
             return std::nullopt;
         }
 
