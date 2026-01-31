@@ -130,6 +130,8 @@ offset_to_loc(std::string_view source, std::size_t offset) {
 [[nodiscard]] int
 exec_command(std::string program, std::vector<std::string> args);
 
+[[nodiscard]] std::filesystem::path get_exe_path();
+
 [[nodiscard]] inline std::vector<std::string>
 split(const std::string& value, char delimiter) {
     std::vector<std::string> result;

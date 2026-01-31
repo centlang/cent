@@ -296,7 +296,7 @@ get_emit_type(std::string_view type) {
 
 [[nodiscard]] std::optional<std::filesystem::path>
 compile(llvm::TargetMachine* machine) {
-    auto code = cent::read_file(*cent::g_options.source_file);
+    auto code = cent::read_file(cent::g_options.source_file->string());
 
     if (!code) {
         return std::nullopt;
@@ -404,8 +404,12 @@ compile(llvm::TargetMachine* machine) {
 
         return output;
     }
-    case cent::EmitType::Exe:
+    case cent::EmitType::Exe: {
         std::filesystem::path object_file = std::tmpnam(nullptr);
+
+#ifdef _WIN32
+        object_file = "C:\\Windows\\Temp" + object_file.string();
+#endif
 
         if (!cent::backend::emit_obj(*module, *machine, object_file)) {
             return std::nullopt;
@@ -413,7 +417,8 @@ compile(llvm::TargetMachine* machine) {
 
         auto output = get_output_file("");
 
-        std::vector<std::string> args = {"-o", output, object_file};
+        std::vector<std::string> args = {
+            "-o", output.string(), object_file.string()};
 
         switch (cent::g_options.reloc_model) {
         case llvm::Reloc::Static:
@@ -441,6 +446,7 @@ compile(llvm::TargetMachine* machine) {
 
         end_step("linking");
         return output;
+    }
     }
 
     return std::nullopt;
@@ -475,5 +481,5 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    return cent::exec_command(std::filesystem::absolute(*output), {});
+    return cent::exec_command(std::filesystem::absolute(*output).string(), {});
 }

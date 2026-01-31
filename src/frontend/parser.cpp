@@ -1604,7 +1604,7 @@ std::unique_ptr<ast::Module> Parser::parse_submodule(
 
     submodule_visiting = true;
 
-    auto code = read_file(path);
+    auto code = read_file(path.string());
 
     if (!code) {
         return nullptr;
@@ -1669,10 +1669,7 @@ bool Parser::parse_with(ast::Module& module) {
         }
     } else {
         search_path.emplace_back(
-            std::filesystem::canonical("/proc/self/exe")
-                .parent_path()
-                .parent_path() /
-            "lib" / "cent");
+            get_exe_path().parent_path().parent_path() / "lib" / "cent");
     }
 
     auto module_paths = find_module(path, search_path);

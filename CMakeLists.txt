@@ -16,11 +16,22 @@ set(
     CACHE STRING "Target architecture"
 )
 
+set(CENTC_SYSTEM "${CMAKE_SYSTEM_NAME}" CACHE STRING "Target system")
+set(CENTC_LLVM_VERSION "20.1.8" CACHE STRING "LLVM version to download")
+
+if(CENTC_SYSTEM STREQUAL "Linux")
+    set(LLVM_URL "https://github.com/centlang/llvm-build/releases/download/20.1.8/llvm-linux-${CENTC_ARCH}.tar.xz")
+elseif(CENTC_SYSTEM STREQUAL "Windows")
+    set(LLVM_URL "https://github.com/centlang/llvm-build/releases/download/20.1.8/llvm-windows-${CENTC_ARCH}.tar.xz")
+else()
+    message(FATAL_ERROR "Unsupported system")
+endif()
+
 message(STATUS "Downloading LLVM...")
 
 FetchContent_Declare(
     llvm
-    URL "https://github.com/centlang/llvm-build/releases/download/20.1.8/llvm-linux-${CENTC_ARCH}.tar.xz"
+    URL "${LLVM_URL}"
 )
 
 FetchContent_MakeAvailable(llvm)
