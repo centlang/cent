@@ -79,16 +79,16 @@ jobs:
 
           cmake -G Ninja .. ^
             -DCMAKE_BUILD_TYPE=Release ^
-            -DCENTC_STATIC=ON ^
             -DCMAKE_INSTALL_PREFIX=../install
 
           cmake --build . --target install
 
       - name: Create archive and upload
+        shell: cmd
         run: |
           tar -cJf cent-windows-x86_64.tar.xz -C install .
 
-          gh release upload ${{ github.event.release.tag_name }} \
-            cent-linux-${{ matrix.arch }}.tar.xz
+          gh release upload ${{ github.event.release.tag_name }} ^
+            cent-windows-x86_64.tar.xz
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
