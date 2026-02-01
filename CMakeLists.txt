@@ -26,9 +26,27 @@ set(CENTC_LLVM_VERSION "20.1.8" CACHE STRING "LLVM version to download")
 
 if(NOT CENTC_USE_SYSTEM_LLVM)
     if(CENTC_SYSTEM STREQUAL "Linux")
-        set(LLVM_URL "https://github.com/centlang/llvm-build/releases/download/20.1.8/llvm-linux-${CENTC_ARCH}.tar.xz")
+        string(
+            CONCAT LLVM_URL
+            "https://github.com/centlang/llvm-build/releases/download/20.1.8/"
+            "llvm-linux-${CENTC_ARCH}.tar.xz"
+        )
     elseif(CENTC_SYSTEM STREQUAL "Windows")
-        set(LLVM_URL "https://github.com/centlang/llvm-build/releases/download/20.1.8/llvm-windows-${CENTC_ARCH}.tar.xz")
+        string(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE)
+
+        if(BUILD_TYPE STREQUAL "debug")
+            string(
+                CONCAT LLVM_URL
+                "https://github.com/centlang/llvm-build/releases/download/"
+                "20.1.8/llvm-windows-${CENTC_ARCH}-debug.tar.xz"
+            )
+        else()
+            string(
+                CONCAT LLVM_URL
+                "https://github.com/centlang/llvm-build/releases/download/"
+                "20.1.8/llvm-windows-${CENTC_ARCH}.tar.xz"
+            )
+        endif()
     else()
         message(FATAL_ERROR "Unsupported system")
     endif()
