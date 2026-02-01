@@ -8,7 +8,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build-linux:
     runs-on: ubuntu-latest
 
     strategy:
@@ -55,6 +55,38 @@ jobs:
         run: |
           tar -cJf cent-linux-${{ matrix.arch }}.tar.xz -C \
             install/${{ matrix.arch }} .
+
+          gh release upload ${{ github.event.release.tag_name }} \
+            cent-linux-${{ matrix.arch }}.tar.xz
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build for Windows
+        shell: cmd
+        run: |
+          mkdir install
+          mkdir build
+          cd build
+
+          cmake -G Ninja .. ^
+            -DCMAKE_BUILD_TYPE=Release ^
+            -DCENTC_STATIC=ON ^
+            -DCMAKE_INSTALL_PREFIX=../install
+
+          cmake --build . --target install
+
+      - name: Create archive and upload
+        run: |
+          tar -cJf cent-windows-x86_64.tar.xz -C install .
 
           gh release upload ${{ github.event.release.tag_name }} \
             cent-linux-${{ matrix.arch }}.tar.xz
