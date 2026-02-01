@@ -2,5 +2,5 @@ with std::ffi;
 with c;
 
 fn main() {
-    c::printf(ffi::as_cstr("Hello, %s!\n"), ffi::as_cstr("world\0"));
+    c::printf(ffi::as_cstr("Hello, %s!\n\0"), ffi::as_cstr("world\0"));
 }
