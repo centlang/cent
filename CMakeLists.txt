@@ -9,6 +9,7 @@ include(FetchContent)
 set(FETCHCONTENT_QUIET OFF)
 
 option(CENTC_STATIC "Build static executable" OFF)
+option(CENTC_USE_SYSTEM_LLVM "Use system-wide LLVM library" OFF)
 
 set(
     CENTC_ARCH
@@ -23,24 +24,26 @@ endif()
 set(CENTC_SYSTEM "${CMAKE_SYSTEM_NAME}" CACHE STRING "Target system")
 set(CENTC_LLVM_VERSION "20.1.8" CACHE STRING "LLVM version to download")
 
-if(CENTC_SYSTEM STREQUAL "Linux")
-    set(LLVM_URL "https://github.com/centlang/llvm-build/releases/download/20.1.8/llvm-linux-${CENTC_ARCH}.tar.xz")
-elseif(CENTC_SYSTEM STREQUAL "Windows")
-    set(LLVM_URL "https://github.com/centlang/llvm-build/releases/download/20.1.8/llvm-windows-${CENTC_ARCH}.tar.xz")
-else()
-    message(FATAL_ERROR "Unsupported system")
+if(NOT CENTC_USE_SYSTEM_LLVM)
+    if(CENTC_SYSTEM STREQUAL "Linux")
+        set(LLVM_URL "https://github.com/centlang/llvm-build/releases/download/20.1.8/llvm-linux-${CENTC_ARCH}.tar.xz")
+    elseif(CENTC_SYSTEM STREQUAL "Windows")
+        set(LLVM_URL "https://github.com/centlang/llvm-build/releases/download/20.1.8/llvm-windows-${CENTC_ARCH}.tar.xz")
+    else()
+        message(FATAL_ERROR "Unsupported system")
+    endif()
+
+    message(STATUS "Downloading LLVM...")
+
+    FetchContent_Declare(
+        llvm
+        URL "${LLVM_URL}"
+    )
+
+    FetchContent_MakeAvailable(llvm)
+    list(APPEND CMAKE_PREFIX_PATH ${llvm_SOURCE_DIR})
 endif()
 
-message(STATUS "Downloading LLVM...")
-
-FetchContent_Declare(
-    llvm
-    URL "${LLVM_URL}"
-)
-
-FetchContent_MakeAvailable(llvm)
-
-list(APPEND CMAKE_PREFIX_PATH ${llvm_SOURCE_DIR})
 find_package(LLVM REQUIRED CONFIG)
 
 llvm_map_components_to_libnames(
