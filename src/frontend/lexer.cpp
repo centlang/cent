@@ -348,7 +348,7 @@ void Lexer::escape_seq() {
         }
 
         ValueType value{};
-        std::from_chars(hex.cbegin().base(), hex.cend().base(), value, 16);
+        std::from_chars(hex.data(), &hex[hex.size()], value, 16);
 
         return value;
     };

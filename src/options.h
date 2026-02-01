@@ -4,7 +4,11 @@
 #include <llvm/Support/CodeGen.h>
 #include <llvm/TargetParser/Host.h>
 
+#ifdef _WIN32
+#include <io.h>
+#else
 #include <unistd.h>
+#endif
 
 #include <filesystem>
 #include <optional>
@@ -31,7 +35,12 @@ struct Options {
     bool run = false;
     bool release = false;
 
-    bool colorize = isatty(fileno(stdout));
+    bool colorize =
+#ifdef _WIN32
+        _isatty(_fileno(stdout));
+#else
+        isatty(fileno(stdout));
+#endif
 };
 
 extern Options g_options;

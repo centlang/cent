@@ -35,10 +35,9 @@ edit_distance(std::string_view first, std::string_view second) {
                 continue;
             }
 
-            distances[i][j] =
-                1 + std::min(
-                        std::min(distances[i][j - 1], distances[i - 1][j]),
-                        distances[i - 1][j - 1]);
+            distances[i][j] = 1 + std::min<std::uint8_t>(
+                                      {distances[i][j - 1], distances[i - 1][j],
+                                       distances[i - 1][j - 1]});
         }
     }
 
@@ -48,11 +47,10 @@ edit_distance(std::string_view first, std::string_view second) {
 template <typename... Maps>
 [[nodiscard]] inline std::optional<std::string_view>
 closest_match(std::string_view name, const Maps&... maps) {
-    static constexpr auto u8_max = std::numeric_limits<std::uint8_t>::max();
+    static constexpr auto u8_max = (std::numeric_limits<std::uint8_t>::max)();
     static constexpr std::uint8_t max_threshold = 5;
 
-    auto threshold =
-        std::min(static_cast<std::uint8_t>(name.size() / 2), max_threshold);
+    auto threshold = std::min<std::uint8_t>(name.size() / 2, max_threshold);
 
     std::string_view result;
     std::uint8_t min_distance = u8_max;

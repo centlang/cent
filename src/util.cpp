@@ -25,23 +25,19 @@ int exec_command(std::string program, std::vector<std::string> args) {
     log::verbose("running {}", log::quoted(command));
 
 #ifdef _WIN32
-    STARTUPINFOA si;
-    PROCESS_INFORMATION pi;
-
-    ZeroMemory(&si, sizeof(si));
-    si.cb = sizeof(si);
-    ZeroMemory(&pi, sizeof(pi));
+    STARTUPINFOA si{.cb = sizeof(STARTUPINFOA)};
+    PROCESS_INFORMATION pi{};
 
     if (!CreateProcessA(
-            NULL, command.data(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
-
+            nullptr, command.data(), nullptr, nullptr, false, 0, nullptr,
+            nullptr, &si, &pi)) {
         LPSTR buffer = nullptr;
 
         size_t size = FormatMessageA(
             FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
                 FORMAT_MESSAGE_IGNORE_INSERTS,
             NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-            (LPSTR)&buffer, 0, NULL);
+            reinterpret_cast<LPSTR>(&buffer), 0, nullptr);
 
         std::string message(buffer, size);
 
@@ -54,7 +50,7 @@ int exec_command(std::string program, std::vector<std::string> args) {
 
     WaitForSingleObject(pi.hProcess, INFINITE);
 
-    DWORD status;
+    DWORD status{};
     GetExitCodeProcess(pi.hProcess, &status);
 
     CloseHandle(pi.hProcess);
@@ -95,7 +91,7 @@ int exec_command(std::string program, std::vector<std::string> args) {
 std::filesystem::path get_exe_path() {
 #ifdef _WIN32
     std::array<char, MAX_PATH> path;
-    GetModuleFileNameA(NULL, path.data(), MAX_PATH);
+    GetModuleFileNameA(nullptr, path.data(), MAX_PATH);
     return path.data();
 #else
     return std::filesystem::canonical("/proc/self/exe");

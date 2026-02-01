@@ -190,7 +190,7 @@ Value Codegen::generate(const ast::Struct& decl) {
         llvm_fields.push_back(field.type->llvm_type);
         type_fields.push_back(field.type);
 
-        max_element = std::max(
+        max_element = std::max<std::size_t>(
             std::min<std::size_t>(
                 field.size, m_module->getDataLayout().getTypeAllocSize(m_size)),
             max_element);

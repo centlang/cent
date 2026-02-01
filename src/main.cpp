@@ -445,10 +445,6 @@ compile(llvm::TargetMachine* machine) {
     case cent::EmitType::Exe: {
         std::filesystem::path object_file = std::tmpnam(nullptr);
 
-#ifdef _WIN32
-        object_file = "C:\\Windows\\Temp" + object_file.string();
-#endif
-
         if (!cent::backend::emit_obj(*module, *machine, object_file)) {
             return std::nullopt;
         }

@@ -16,6 +16,10 @@ set(
     CACHE STRING "Target architecture"
 )
 
+if(CENTC_ARCH STREQUAL "AMD64")
+    set(CENTC_ARCH "x86_64")
+endif()
+
 set(CENTC_SYSTEM "${CMAKE_SYSTEM_NAME}" CACHE STRING "Target system")
 set(CENTC_LLVM_VERSION "20.1.8" CACHE STRING "LLVM version to download")
 
