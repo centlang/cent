@@ -93,7 +93,20 @@ string(REPLACE " " ";" LLVM_LIBS "${LLVM_LIBS}")
 
 if(CENTC_STATIC)
     set(BUILD_SHARED_LIBS OFF)
-    set(CMAKE_EXE_LINKER_FLAGS "-static")
+
+    if(MSVC)
+        set(CMAKE_C_FLAGS_DEBUG "/MTd")
+        set(CMAKE_C_FLAGS_RELEASE "/MT")
+        set(CMAKE_C_FLAGS_RELWITHDEBINFO "/MT")
+        set(CMAKE_C_FLAGS_MINSIZEREL "/MT")
+
+        set(CMAKE_CXX_FLAGS_DEBUG "/MTd")
+        set(CMAKE_CXX_FLAGS_RELEASE "/MT")
+        set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "/MT")
+        set(CMAKE_CXX_FLAGS_MINSIZEREL "/MT")
+    else()
+        set(CMAKE_EXE_LINKER_FLAGS "-static")
+    endif()
 endif()
 
 message(STATUS "Fetching fmt...")
