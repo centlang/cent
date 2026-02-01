@@ -929,18 +929,12 @@ std::unique_ptr<ast::Type> Parser::expect_var_type() {
     return expect_type();
 }
 
-std::unique_ptr<ast::Type> Parser::parse_array_type() {
-    auto offset = get().offset;
-
-    std::unique_ptr<ast::Expression> size = nullptr;
-
-    if (!match(Token::Type::RightBracket)) {
-        size = expect_expr(false);
-
-        if (!size) {
-            return nullptr;
-        }
+std::unique_ptr<ast::Type> Parser::parse_arraylike_type() {
+    if (!match(1, Token::Type::RightBracket)) {
+        return parse_array_type();
     }
+
+    auto offset = get().offset;
 
     if (!expect("`]`", Token::Type::RightBracket)) {
         return nullptr;
@@ -960,25 +954,39 @@ std::unique_ptr<ast::Type> Parser::parse_array_type() {
         return nullptr;
     }
 
-    if (size) {
-        if (is_mutable) {
-            error(is_mutable_offset, "array type cannot be mutable");
-        }
-
-        if (auto* identifier = dynamic_cast<ast::Identifier*>(size.get())) {
-            if (identifier->value.size() == 1 &&
-                identifier->value[0].value == "_") {
-                return std::make_unique<ast::ArrayType>(
-                    offset, std::move(type), nullptr);
-            }
-        }
-
-        return std::make_unique<ast::ArrayType>(
-            offset, std::move(type), std::move(size));
-    }
-
     return std::make_unique<ast::SliceType>(
         offset, std::move(type), is_mutable);
+}
+
+std::unique_ptr<ast::ArrayType> Parser::parse_array_type() {
+    auto offset = get().offset;
+
+    std::unique_ptr<ast::Expression> size = expect_expr(false);
+
+    if (!size) {
+        return nullptr;
+    }
+
+    if (!expect("`]`", Token::Type::RightBracket)) {
+        return nullptr;
+    }
+
+    auto type = expect_type();
+
+    if (!type) {
+        return nullptr;
+    }
+
+    if (auto* identifier = dynamic_cast<ast::Identifier*>(size.get())) {
+        if (identifier->value.size() == 1 &&
+            identifier->value[0].value == "_") {
+            return std::make_unique<ast::ArrayType>(
+                offset, std::move(type), nullptr);
+        }
+    }
+
+    return std::make_unique<ast::ArrayType>(
+        offset, std::move(type), std::move(size));
 }
 
 std::unique_ptr<ast::Type> Parser::expect_type() {
@@ -1056,7 +1064,7 @@ std::unique_ptr<ast::Type> Parser::expect_type() {
     }
 
     if (match(LeftBracket)) {
-        return parse_array_type();
+        return parse_arraylike_type();
     }
 
     std::vector<OffsetValue<std::string>> value;
@@ -1143,9 +1151,8 @@ void Parser::parse_switch(ast::BlockStmt& block) {
         return;
     }
 
-    block.body.push_back(
-        std::make_unique<ast::Switch>(
-            offset, std::move(value), std::move(cases), std::move(else_block)));
+    block.body.push_back(std::make_unique<ast::Switch>(
+        offset, std::move(value), std::move(cases), std::move(else_block)));
 }
 
 void Parser::parse_while(ast::BlockStmt& block) {
@@ -1162,9 +1169,8 @@ void Parser::parse_while(ast::BlockStmt& block) {
         return;
     }
 
-    block.body.push_back(
-        std::make_unique<ast::WhileLoop>(
-            offset, std::move(condition), std::move(body)));
+    block.body.push_back(std::make_unique<ast::WhileLoop>(
+        offset, std::move(condition), std::move(body)));
 }
 
 void Parser::parse_for(ast::BlockStmt& block) {
@@ -1198,12 +1204,10 @@ void Parser::parse_for(ast::BlockStmt& block) {
         return;
     }
 
-    block.body.push_back(
-        std::make_unique<ast::ForLoop>(
-            offset, is_mutable,
-            OffsetValue{
-                .value = std::move(name->value), .offset = name->offset},
-            std::move(value), std::move(body)));
+    block.body.push_back(std::make_unique<ast::ForLoop>(
+        offset, is_mutable,
+        OffsetValue{.value = std::move(name->value), .offset = name->offset},
+        std::move(value), std::move(body)));
 }
 
 void Parser::parse_return(ast::BlockStmt& block) {
@@ -1232,10 +1236,9 @@ void Parser::parse_assignment(
         return;
     }
 
-    block.body.push_back(
-        std::make_unique<ast::Assignment>(
-            variable->offset, std::move(variable), std::move(value),
-            OffsetValue{.value = oper.type, .offset = oper.offset}));
+    block.body.push_back(std::make_unique<ast::Assignment>(
+        variable->offset, std::move(variable), std::move(value),
+        OffsetValue{.value = oper.type, .offset = oper.offset}));
 }
 
 std::vector<ast::Struct::Field> Parser::parse_fields() {

@@ -140,7 +140,9 @@ private:
 
     [[nodiscard]] std::unique_ptr<ast::Type> expect_var_type();
 
-    [[nodiscard]] std::unique_ptr<ast::Type> parse_array_type();
+    [[nodiscard]] std::unique_ptr<ast::Type> parse_arraylike_type();
+
+    [[nodiscard]] std::unique_ptr<ast::ArrayType> parse_array_type();
 
     [[nodiscard]] std::unique_ptr<ast::Type> expect_type();
 
