@@ -86,9 +86,9 @@ jobs:
       - name: Create archive and upload
         shell: cmd
         run: |
-          tar -cJf cent-windows-x86_64.tar.xz -C install .
+          tar -caf cent-windows-x86_64.zip -C install .
 
           gh release upload ${{ github.event.release.tag_name }} ^
-            cent-windows-x86_64.tar.xz
+            cent-windows-x86_64.zip
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
