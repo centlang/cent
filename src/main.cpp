@@ -8,6 +8,11 @@
 #include <string_view>
 #include <vector>
 
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#endif
+
 #include <fmt/core.h>
 
 #include <llvm/MC/TargetRegistry.h>
@@ -471,6 +476,13 @@ compile(llvm::TargetMachine* machine) {
 }
 
 int main(int argc, char** argv) {
+#ifdef _WIN32
+    HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD mode{};
+    GetConsoleMode(handle, &mode);
+    SetConsoleMode(handle, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+#endif
+
     auto start_time = std::chrono::steady_clock::now();
 
     if (!parse_args(std::span<char*>{argv, static_cast<std::size_t>(argc)})) {
