@@ -1166,7 +1166,8 @@ void Codegen::report_invalid_attrs(
     const ast::Declaration& decl,
     std::initializer_list<std::string_view> allowed) {
     for (const auto& attribute : decl.attributes) {
-        if (attr_to_os_type(attribute.name)) {
+        if (attr_to_os_type(attribute.name) ||
+            attr_to_arch_type(attribute.name)) {
             continue;
         }
 
@@ -1188,24 +1189,48 @@ void Codegen::report_invalid_attrs(
 }
 
 bool Codegen::matches_target(const ast::Declaration& decl) {
-    auto [windows, linux] = parse_attrs(decl, "windows", "linux");
-
-    if (!windows && !linux) {
-        return true;
-    }
-
     llvm::Triple triple{cent::g_options.target_triple};
 
-    switch (triple.getOS()) {
-    case llvm::Triple::Linux:
-        return linux;
-    case llvm::Triple::Win32:
-        return windows;
-    default:
-        break;
+    std::optional<bool> os_matches = std::nullopt;
+    std::optional<bool> arch_matches = std::nullopt;
+
+    for (const auto& attr : decl.attributes) {
+        if (auto os_type = attr_to_os_type(attr.name)) {
+            if (!os_matches.has_value()) {
+                os_matches = false;
+            }
+
+            if (os_type == triple.getOS()) {
+                os_matches = true;
+            }
+
+            continue;
+        }
+
+        if (auto arch_type = attr_to_arch_type(attr.name)) {
+            if (!arch_matches.has_value()) {
+                arch_matches = false;
+            }
+
+            if (arch_type == triple.getArch()) {
+                arch_matches = true;
+            }
+        }
     }
 
-    return false;
+    if (os_matches.has_value()) {
+        if (!*os_matches) {
+            return false;
+        }
+    }
+
+    if (arch_matches.has_value()) {
+        if (!*arch_matches) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool Codegen::decl_get_attr(

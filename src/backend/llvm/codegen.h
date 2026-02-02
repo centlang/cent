@@ -380,6 +380,27 @@ private:
         return std::nullopt;
     }
 
+    [[nodiscard]] static std::optional<llvm::Triple::ArchType>
+    attr_to_arch_type(std::string_view attr) {
+        if (attr == "x86_64") {
+            return llvm::Triple::x86_64;
+        }
+
+        if (attr == "x86") {
+            return llvm::Triple::x86;
+        }
+
+        if (attr == "aarch64") {
+            return llvm::Triple::aarch64;
+        }
+
+        if (attr == "riscv64") {
+            return llvm::Triple::riscv64;
+        }
+
+        return std::nullopt;
+    }
+
     [[nodiscard]] static bool is_float(const Type* type);
     [[nodiscard]] static bool is_sint(const Type* type);
     [[nodiscard]] static bool is_uint(const Type* type);
