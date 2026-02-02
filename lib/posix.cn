@@ -1,78 +1,66 @@
-with c;
-
-pub type pid_t = i32;
-pub type uid_t = u32;
-pub type gid_t = u32;
-pub type id_t = u32;
-
-pub type off_t = i64;
-pub type mode_t = u32;
-
 pub const STDIN_FILENO = 0;
 pub const STDOUT_FILENO = 1;
 pub const STDERR_FILENO = 2;
 
-pub const SIGINT = 2;
-pub const SIGKILL = 9;
-pub const SIGTERM = 15;
+#(linux) {
+    with c;
 
-pub const O_RDONLY = 0;
-pub const O_WRONLY = 1;
-pub const O_RDWR = 2;
+    #(x86_64) {
+        pub type pid_t = i32;
+        pub type uid_t = u32;
+        pub type gid_t = u32;
+        pub type id_t = u32;
 
-pub const S_IRWXU = 0o700;
-pub const S_IRUSR = 0o400;
-pub const S_IWUSR = 0o200;
-pub const S_IXUSR = 0o100;
-pub const S_IRWXG = 0o70;
-pub const S_IRGRP = 0o40;
-pub const S_IWGRP = 0o20;
-pub const S_IXGRP = 0o10;
-pub const S_IRWXO = 0o7;
-pub const S_IROTH = 0o4;
-pub const S_IWOTH = 0o2;
-pub const S_IXOTH = 0o1;
-pub const S_ISUID = 0o4000;
-pub const S_ISGID = 0o2000;
-pub const S_ISVTX = 0o1000;
+        pub type off_t = i64;
+        pub type mode_t = u32;
 
-#(extern) pub fn open(
-    path: *c::char, flags: c::int, mode: mode_t
-);
+        pub const SIGINT = 2;
+        pub const SIGKILL = 9;
+        pub const SIGTERM = 15;
 
-#(extern) pub fn close(fd: c::int) c::int;
+        pub const O_RDONLY = 0;
+        pub const O_WRONLY = 1;
+        pub const O_RDWR = 2;
 
-#(extern) pub fn read(
-    fd: c::int, buf: *mut c::void, count: usize
-) isize;
+        pub const S_IRWXU = 0o700;
+        pub const S_IRUSR = 0o400;
+        pub const S_IWUSR = 0o200;
+        pub const S_IXUSR = 0o100;
+        pub const S_IRWXG = 0o70;
+        pub const S_IRGRP = 0o40;
+        pub const S_IWGRP = 0o20;
+        pub const S_IXGRP = 0o10;
+        pub const S_IRWXO = 0o7;
+        pub const S_IROTH = 0o4;
+        pub const S_IWOTH = 0o2;
+        pub const S_IXOTH = 0o1;
+        pub const S_ISUID = 0o4000;
+        pub const S_ISGID = 0o2000;
+        pub const S_ISVTX = 0o1000;
+    }
 
-#(extern) pub fn write(
-    fd: c::int, buf: *c::void, count: usize
-) isize;
+    #(extern) {
+        pub fn open(path: *c::char, flags: c::int, mode: mode_t);
+        pub fn close(fd: c::int) c::int;
+        pub fn read(fd: c::int, buf: *mut c::void, count: usize) isize;
+        pub fn write(fd: c::int, buf: *c::void, count: usize) isize;
 
-#(extern) pub fn fork() pid_t;
+        pub fn fork() pid_t;
+        pub fn waitpid(pid: pid_t, wstatus: ?*c::int, options: c::int) pid_t;
+        pub fn _exit(status: c::int);
+        pub fn kill(pid: pid_t, sig: c::int) c::int;
 
-#(extern) pub fn execve(
-    path: *c::char, argv: *mut ?*c::char,
-    envp: *mut ?*c::char
-) c::int;
+        pub fn execve(
+            path: *c::char, argv: *mut ?*c::char, envp: *mut ?*c::char
+        ) c::int;
 
-#(extern) pub fn waitpid(
-    pid: pid_t, wstatus: ?*c::int, options: c::int
-) pid_t;
+        pub fn mmap(
+            addr: *mut c::void, length: usize, prot: c::int, flags: c::int,
+            fd: c::int, offset: off_t
+        ) *mut c::void;
 
-#(extern) pub fn _exit(status: c::int);
-#(extern) pub fn kill(pid: pid_t, sig: c::int) c::int;
+        pub fn munmap(length: usize, addr: *mut c::void, length: usize) c::int;
 
-#(extern) pub fn mmap(
-    addr: *mut c::void, length: usize, prot: c::int,
-    flags: c::int, fd: c::int, offset: off_t
-) *mut c::void;
-
-#(extern) pub fn munmap(
-    length: usize, addr: *mut c::void, length: usize
-) c::int;
-
-#(extern) pub fn mkdir(
-    path: *c::char, mode: mode_t
-) c::int;
+        pub fn mkdir(path: *c::char, mode: mode_t) c::int;
+    }
+}

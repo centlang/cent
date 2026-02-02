@@ -6,8 +6,17 @@ pub type short = i16;
 pub type ushort = u16;
 pub type int = i32;
 pub type uint = u32;
-pub type long = i64;
-pub type ulong = u64;
+
+#(linux) {
+    pub type long = i64;
+    pub type ulong = u64;
+}
+
+#(windows) {
+    pub type long = i32;
+    pub type ulong = u32;
+}
+
 pub type longlong = i64;
 pub type ulonglong = u64;
 
@@ -22,120 +31,69 @@ pub const EXIT_FAILURE = 1;
 
 pub const EOF = -1;
 
-#(extern) pub mut stdout: *mut FILE;
-#(extern) pub mut stdin: *mut FILE;
-#(extern) pub mut stderr: *mut FILE;
+#(extern) {
+    pub mut stdin: *mut FILE;
+    pub mut stdout: *mut FILE;
+    pub mut stderr: *mut FILE;
 
-#(extern) pub fn exit(status: int) never;
-#(extern) pub fn rand() int;
-#(extern) pub fn srand(seed: uint);
-#(extern) pub fn time(tloc: ?*time_t) time_t;
-#(extern) pub fn malloc(size: usize) ?*mut void;
-#(extern) pub fn calloc(n: usize, size: usize) ?*mut void;
-#(extern) pub fn realloc(p: ?*mut void, size: usize) ?*mut void;
-#(extern) pub fn free(p: ?*mut void);
+    pub fn exit(status: int) never;
+    pub fn rand() int;
+    pub fn srand(seed: uint);
+    pub fn time(tloc: ?*time_t) time_t;
+    pub fn malloc(size: usize) ?*mut void;
+    pub fn calloc(n: usize, size: usize) ?*mut void;
+    pub fn realloc(p: ?*mut void, size: usize) ?*mut void;
+    pub fn free(p: ?*mut void);
 
-#(extern) pub fn memset(
-    s: *void, c: int, n: usize
-) *mut void;
+    pub fn memset(s: *void, c: int, n: usize) *mut void;
+    pub fn memcpy(dest: *mut void, src: *void, n: usize) *mut void;
+    pub fn memmove(dest: *mut void, src: *void, n: usize) *mut void;
+    pub fn memcmp(s1: *void, s2: *void, n: usize) int;
 
-#(extern) pub fn memcpy(
-    dest: *mut void, src: *void, n: usize
-) *mut void;
+    pub fn strlen(s: *char) usize;
+    pub fn strcpy(dst: *mut char, src: *char) *mut char;
+    pub fn strcat(dst: *mut char, src: *char) *mut char;
+    pub fn strncpy(dst: *mut char, src: *char, dsize: usize) *mut char;
+    pub fn strncat(dst: *mut char, src: *char, ssize: usize) *mut char;
+    pub fn strcmp(s1: *char, s2: *char) int;
+    pub fn strncmp(s1: *char, s2: *char, n: usize) int;
+    pub fn strchr(s: *char, c: int) ?*mut char;
+    pub fn strstr(haystack: *char, needle: *char) ?*mut char;
 
-#(extern) pub fn memmove(
-    dest: *mut void, src: *void, n: usize
-) *mut void;
+    pub fn printf(format: *char, ...) int;
+    pub fn sprintf(str: *mut char, format: *char, ...) int;
+    pub fn snprintf(str: *mut char, size: usize, format: *char, ...) int;
+    pub fn sscanf(str: *char, format: *char, ...) int;
+    pub fn fwrite(ptr: *void, size: usize, n: usize, stream: *mut FILE) usize;
+    pub fn scanf(format: *char, ...) int;
+    pub fn fscanf(stream: *mut FILE, format: *char, ...) int;
+    pub fn fgets(s: *mut char, size: int, stream: *mut FILE) ?*mut char;
+    pub fn fgetc(stream: *mut FILE) int;
+    pub fn getc(stream: *mut FILE) int;
+    pub fn fputs(s: *char, stream: *mut FILE) int;
+    pub fn fputc(c: int, stream: *mut FILE) int;
+    pub fn puts(s: *char) int;
+    pub fn putchar(c: int) int;
+    pub fn getchar() int;
 
-#(extern) pub fn memcmp(
-    s1: *void, s2: *void, n: usize
-) int;
+    pub fn fopen(path: *char, mode: *char) ?*mut FILE;
+    pub fn fclose(stream: *mut FILE) int;
 
-#(extern) pub fn strlen(s: *char) usize;
+    pub fn fread(
+        ptr: *mut void, size: usize, n: usize, stream: *mut FILE
+    ) usize;
 
-#(extern) pub fn strcpy(
-    dst: *mut char, src: *char
-) *mut char;
+    pub fn system(command: *char) int;
+    pub fn getenv(name: *char) ?*mut char;
 
-#(extern) pub fn strcat(
-    dst: *mut char, src: *char
-) *mut char;
-
-#(extern) pub fn strncpy(
-    dst: *mut char, src: *char, dsize: usize
-) *mut char;
-
-#(extern) pub fn strncat(
-    dst: *mut char, src: *char, ssize: usize
-) *mut char;
-
-#(extern) pub fn strcmp(s1: *char, s2: *char) int;
-
-#(extern) pub fn strncmp(
-    s1: *char, s2: *char, n: usize
-) int;
-
-#(extern) pub fn strchr(s: *char, c: int) ?*mut char;
-
-#(extern) pub fn strstr(
-    haystack: *char, needle: *char
-) ?*mut char;
-
-#(extern) pub fn printf(format: *char, ...) int;
-#(extern) pub fn putchar(c: int) int;
-#(extern) pub fn getchar() int;
-
-#(extern) pub fn sprintf(
-    str: *mut char, format: *char, ...
-) int;
-
-#(extern) pub fn snprintf(
-    str: *mut char, size: usize, format: *char, ...
-) int;
-
-#(extern) pub fn sscanf(
-    str: *char, format: *char, ...
-) int;
-
-#(extern) pub fn fopen(
-    path: *char, mode: *char
-) ?*mut FILE;
-
-#(extern) pub fn fclose(stream: *mut FILE) int;
-
-#(extern) pub fn fread(
-    ptr: *mut void, size: usize, n: usize, stream: *mut FILE
-) usize;
-
-#(extern) pub fn fwrite(
-    ptr: *void, size: usize, n: usize, stream: *mut FILE
-) usize;
-
-#(extern) pub fn scanf(format: *char, ...) int;
-
-#(extern) pub fn fscanf(
-    stream: *mut FILE, format: *char, ...
-) int;
-
-#(extern) pub fn fgets(
-    s: *mut char, size: int, stream: *mut FILE
-) ?*mut char;
-
-#(extern) pub fn fgetc(stream: *mut FILE) int;
-#(extern) pub fn getc(stream: *mut FILE) int;
-
-#(extern) pub fn fputs(s: *char, stream: *mut FILE) int;
-#(extern) pub fn fputc(c: int, stream: *mut FILE) int;
-#(extern) pub fn puts(s: *char) int;
-#(extern) pub fn system(command: *char) int;
-#(extern) pub fn getenv(name: *char) ?*mut char;
-#(extern) pub fn pow(x: double, y: double) double;
-#(extern) pub fn sqrt(x: double) double;
-#(extern) pub fn sin(x: double) double;
-#(extern) pub fn cos(x: double) double;
-#(extern) pub fn tan(x: double) double;
-#(extern) pub fn exp(x: double) double;
-#(extern) pub fn log(x: double) double;
-#(extern) pub fn floor(x: double) double;
-#(extern) pub fn ceil(x: double) double;
-#(extern) pub fn round(x: double) double;
+    pub fn pow(x: double, y: double) double;
+    pub fn sqrt(x: double) double;
+    pub fn sin(x: double) double;
+    pub fn cos(x: double) double;
+    pub fn tan(x: double) double;
+    pub fn exp(x: double) double;
+    pub fn log(x: double) double;
+    pub fn floor(x: double) double;
+    pub fn ceil(x: double) double;
+    pub fn round(x: double) double;
+}

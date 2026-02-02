@@ -26,6 +26,7 @@ pub fn open(path: []u8, mode: Mode) ?io::Fd {
     return io::Fd { _file: file.! };
 }
 
+#(linux)
 pub fn mkdir(path: []u8) bool {
     mut cstr: [path.len + 1]u8 = undefined;
     ffi::cstr_to(cstr, path);
