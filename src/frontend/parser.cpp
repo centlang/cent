@@ -40,35 +40,9 @@ namespace cent::frontend {
 std::unique_ptr<ast::Module> Parser::parse() {
     using enum Token::Type;
 
-    auto skip_until_decl = [&] {
-        while (!match(Eof, Type, Enum, Fn, Const, Mut, With, Pub, Bang)) {
-            next();
-        }
-    };
-
     auto result = std::make_unique<ast::Module>(m_filename);
 
     m_submodules_visiting[m_filename] = true;
-
-    auto handle_type = [&](std::vector<ast::Attribute> attrs, bool is_public) {
-        if (match(1, Equal)) {
-            auto type = parse_type_alias(std::move(attrs), is_public);
-
-            if (type) {
-                result->types.push_back(std::move(type));
-            } else {
-                skip_until_decl();
-            }
-        } else {
-            auto struct_decl = parse_struct(std::move(attrs), is_public);
-
-            if (struct_decl) {
-                result->types.push_back(std::move(struct_decl));
-            } else {
-                skip_until_decl();
-            }
-        }
-    };
 
     while (true) {
         if (match(Eof)) {
@@ -79,83 +53,7 @@ std::unique_ptr<ast::Module> Parser::parse() {
             continue;
         }
 
-        if (match_next(With)) {
-            if (!parse_with(*result)) {
-                skip_until_decl();
-                continue;
-            }
-
-            expect("`;`", Token::Type::Semicolon);
-
-            continue;
-        }
-
-        auto attrs = parse_attrs();
-        bool is_public = false;
-
-        if (match_next(Pub)) {
-            is_public = true;
-        }
-
-        if (match(Const, Mut)) {
-            auto variable = parse_var(std::move(attrs), is_public);
-
-            if (!variable) {
-                skip_until_decl();
-                continue;
-            }
-
-            expect("`;`", Token::Type::Semicolon);
-
-            result->variables.push_back(std::move(variable));
-
-            continue;
-        }
-
-        if (match_next(Type)) {
-            handle_type(std::move(attrs), is_public);
-
-            continue;
-        }
-
-        if (match_next(Union)) {
-            auto union_decl = parse_union(std::move(attrs), is_public);
-
-            if (union_decl) {
-                result->types.push_back(std::move(union_decl));
-            } else {
-                skip_until_decl();
-            }
-
-            continue;
-        }
-
-        if (match_next(Enum)) {
-            auto enum_decl = parse_enum(std::move(attrs), is_public);
-
-            if (enum_decl) {
-                result->types.push_back(std::move(enum_decl));
-            } else {
-                skip_until_decl();
-            }
-
-            continue;
-        }
-
-        if (match_next(Fn)) {
-            auto function = parse_fn(std::move(attrs), is_public);
-
-            if (function) {
-                result->functions.push_back(std::move(function));
-            } else {
-                skip_until_decl();
-            }
-
-            continue;
-        }
-
-        error("expected declaration");
-        skip_until_decl();
+        parse_toplevel(*result);
     }
 
     return result;
@@ -206,11 +104,13 @@ void Parser::expect_stmt(ast::BlockStmt& block) {
         return;
     case Hash:
     case Type:
+    case Union:
     case Enum:
     case Let:
     case Mut:
     case Const:
-        break;
+        parse_decl(block.body);
+        return;
     default:
         auto value = expect_expr(false);
 
@@ -233,78 +133,32 @@ void Parser::expect_stmt(ast::BlockStmt& block) {
 
         return;
     }
-
-    auto attrs = parse_attrs();
-
-    switch (peek().type) {
-    case Type:
-        next();
-
-        if (match(1, Equal)) {
-            if (auto decl = parse_type_alias(std::move(attrs))) {
-                block.body.push_back(std::move(decl));
-            }
-        } else if (auto decl = parse_struct(std::move(attrs))) {
-            block.body.push_back(std::move(decl));
-        }
-
-        return;
-    case Enum:
-        next();
-
-        if (auto decl = parse_enum(std::move(attrs))) {
-            block.body.push_back(std::move(decl));
-        }
-
-        return;
-    case Let:
-    case Mut:
-    case Const:
-        if (auto decl = parse_var(std::move(attrs))) {
-            block.body.push_back(std::move(decl));
-        }
-
-        expect_semicolon();
-        return;
-    default:
-        return;
-    }
 }
 
-std::vector<ast::Attribute> Parser::parse_attrs() {
-    std::vector<ast::Attribute> result;
-
-    if (!match_next(Token::Type::Hash)) {
-        return {};
-    }
-
+void Parser::parse_attrs(std::vector<ast::Attribute>& attrs) {
     if (!expect("`(`", Token::Type::LeftParen)) {
-        return {};
+        return;
     }
 
     auto attribute = expect("attribute name", Token::Type::Identifier);
 
     if (!attribute) {
-        return {};
+        return;
     }
 
-    result.emplace_back(attribute->offset, attribute->value);
+    attrs.emplace_back(attribute->offset, attribute->value);
 
     while (match_next(Token::Type::Comma)) {
         attribute = expect("attribute name", Token::Type::Identifier);
 
         if (!attribute) {
-            return {};
+            return;
         }
 
-        result.emplace_back(attribute->offset, attribute->value);
+        attrs.emplace_back(attribute->offset, attribute->value);
     }
 
-    if (!expect("`)`", Token::Type::RightParen)) {
-        return {};
-    }
-
-    return result;
+    expect("`)`", Token::Type::RightParen);
 }
 
 std::vector<std::unique_ptr<ast::Expression>> Parser::parse_args() {
@@ -849,6 +703,201 @@ std::unique_ptr<ast::Expression> Parser::expect_range_expr(bool is_condition) {
 
 std::unique_ptr<ast::Expression> Parser::expect_expr(bool is_condition) {
     return expect_range_expr(is_condition);
+}
+
+void Parser::parse_decl(
+    std::vector<std::unique_ptr<ast::Statement>>& stmts,
+    std::vector<ast::Attribute> attributes) {
+    using enum Token::Type;
+
+    auto attrs = std::move(attributes);
+
+    if (match(Hash)) {
+        parse_attrs(attrs);
+
+        if (match_next(LeftBrace)) {
+            while (true) {
+                if (match(Token::Type::Eof)) {
+                    expected("`}`");
+                    return;
+                }
+
+                if (match_next(Token::Type::RightBrace)) {
+                    return;
+                }
+
+                if (match_next(Token::Type::Semicolon)) {
+                    continue;
+                }
+
+                parse_decl(stmts, attrs);
+            }
+
+            return;
+        }
+    }
+
+    switch (peek().type) {
+    case Type:
+        next();
+
+        if (match(1, Equal)) {
+            if (auto decl = parse_type_alias(std::move(attrs))) {
+                stmts.push_back(std::move(decl));
+            }
+        } else if (auto decl = parse_struct(std::move(attrs))) {
+            stmts.push_back(std::move(decl));
+        }
+
+        return;
+    case Union:
+        next();
+
+        if (auto decl = parse_union(std::move(attrs))) {
+            stmts.push_back(std::move(decl));
+        }
+
+        return;
+    case Enum:
+        next();
+
+        if (auto decl = parse_enum(std::move(attrs))) {
+            stmts.push_back(std::move(decl));
+        }
+
+        return;
+    case Let:
+    case Mut:
+    case Const:
+        if (auto decl = parse_var(std::move(attrs))) {
+            stmts.push_back(std::move(decl));
+        }
+
+        expect("`;`", Token::Type::Semicolon);
+        return;
+    default:
+        break;
+    }
+}
+
+void Parser::parse_toplevel(
+    ast::Module& module, std::vector<ast::Attribute> attributes) {
+    using enum Token::Type;
+
+    auto skip_until_decl = [&] {
+        while (!match(
+            Eof, Type, Union, Enum, Fn, Const, Mut, Let, With, Pub, Hash)) {
+            next();
+        }
+    };
+
+    if (match_next(With)) {
+        if (!parse_with(module)) {
+            skip_until_decl();
+            return;
+        }
+
+        expect("`;`", Token::Type::Semicolon);
+        return;
+    }
+
+    std::vector<ast::Attribute> attrs = std::move(attributes);
+
+    if (match_next(Hash)) {
+        parse_attrs(attrs);
+
+        if (match_next(LeftBrace)) {
+            while (true) {
+                if (match(Token::Type::Eof)) {
+                    expected("`}`");
+                    return;
+                }
+
+                if (match_next(Token::Type::RightBrace)) {
+                    return;
+                }
+
+                if (match_next(Token::Type::Semicolon)) {
+                    continue;
+                }
+
+                parse_toplevel(module, attrs);
+            }
+
+            return;
+        }
+    }
+
+    bool is_public = false;
+
+    if (match_next(Pub)) {
+        is_public = true;
+    }
+
+    switch (peek().type) {
+    case Type:
+        next();
+
+        if (match(1, Equal)) {
+            if (auto type = parse_type_alias(std::move(attrs), is_public)) {
+                module.types.push_back(std::move(type));
+            } else {
+                skip_until_decl();
+            }
+        } else {
+            if (auto struct_decl = parse_struct(std::move(attrs), is_public)) {
+                module.types.push_back(std::move(struct_decl));
+            } else {
+                skip_until_decl();
+            }
+        }
+
+        return;
+    case Union:
+        next();
+
+        if (auto union_decl = parse_union(std::move(attrs), is_public)) {
+            module.types.push_back(std::move(union_decl));
+        } else {
+            skip_until_decl();
+        }
+
+        return;
+    case Enum:
+        next();
+
+        if (auto enum_decl = parse_enum(std::move(attrs), is_public)) {
+            module.types.push_back(std::move(enum_decl));
+        } else {
+            skip_until_decl();
+        }
+
+        return;
+    case Let:
+    case Mut:
+    case Const:
+        if (auto decl = parse_var(std::move(attrs), is_public)) {
+            module.variables.push_back(std::move(decl));
+        } else {
+            skip_until_decl();
+        }
+
+        expect("`;`", Token::Type::Semicolon);
+        return;
+    case Fn:
+        next();
+
+        if (auto function = parse_fn(std::move(attrs), is_public)) {
+            module.functions.push_back(std::move(function));
+        } else {
+            skip_until_decl();
+        }
+
+        return;
+    default:
+        error("expected declaration");
+        skip_until_decl();
+    }
 }
 
 std::unique_ptr<ast::BlockStmt> Parser::expect_block() {

@@ -109,7 +109,7 @@ private:
 
     void expect_stmt(ast::BlockStmt& block);
 
-    [[nodiscard]] std::vector<ast::Attribute> parse_attrs();
+    void parse_attrs(std::vector<ast::Attribute>& attrs);
 
     [[nodiscard]] std::vector<std::unique_ptr<ast::Expression>> parse_args();
 
@@ -137,6 +137,13 @@ private:
 
     [[nodiscard]] std::unique_ptr<ast::Expression>
     expect_expr(bool is_condition);
+
+    void parse_decl(
+        std::vector<std::unique_ptr<ast::Statement>>& stmts,
+        std::vector<ast::Attribute> attributes = {});
+
+    void parse_toplevel(
+        ast::Module& module, std::vector<ast::Attribute> attributes = {});
 
     [[nodiscard]] std::unique_ptr<ast::Type> expect_var_type();
 
