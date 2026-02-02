@@ -204,7 +204,7 @@ void Parser::expect_stmt(ast::BlockStmt& block) {
         block.body.push_back(std::make_unique<ast::Unreachable>(get().offset));
         expect_semicolon();
         return;
-    case Bang:
+    case Hash:
     case Type:
     case Enum:
     case Let:
