@@ -128,10 +128,7 @@ Value Codegen::generate(const ast::FnDecl& decl) {
 }
 
 Value Codegen::generate(const ast::Struct& decl) {
-    auto attrs = parse_attrs(decl, {"extern", "packed"});
-
-    bool is_extern = attrs.contains("extern");
-    bool packed = attrs.contains("packed");
+    auto [is_extern, packed] = parse_attrs_validate(decl, "extern", "packed");
 
     if (m_current_scope->types.contains(decl.name.value)) {
         error(
@@ -203,19 +200,17 @@ Value Codegen::generate(const ast::Struct& decl) {
         auto rem = total_size % max_element;
 
         if (rem != 0) {
-            llvm_fields.push_back(
-                llvm::ArrayType::get(
-                    llvm::Type::getInt8Ty(m_context), max_element - rem));
+            llvm_fields.push_back(llvm::ArrayType::get(
+                llvm::Type::getInt8Ty(m_context), max_element - rem));
         }
     }
 
     bool has_tail = llvm_fields.size() != type_fields.size();
     struct_type->setBody(llvm_fields, packed);
 
-    m_named_types.push_back(
-        std::make_unique<types::Struct>(
-            struct_type, m_current_scope_prefix + decl.name.value,
-            std::move(type_fields), has_tail));
+    m_named_types.push_back(std::make_unique<types::Struct>(
+        struct_type, m_current_scope_prefix + decl.name.value,
+        std::move(type_fields), has_tail));
 
     m_current_scope->types[decl.name.value] = {
         .element = m_named_types.back().get(),
@@ -226,8 +221,7 @@ Value Codegen::generate(const ast::Struct& decl) {
 }
 
 Value Codegen::generate(const ast::Union& decl) {
-    auto attrs = parse_attrs(decl, {"untagged"});
-    bool untagged = attrs.contains("untagged");
+    auto [untagged] = parse_attrs_validate(decl, "untagged");
 
     if (m_current_scope->types.contains(decl.name.value)) {
         error(
@@ -278,10 +272,9 @@ Value Codegen::generate(const ast::Union& decl) {
     if (untagged) {
         struct_type->setBody(max_type);
 
-        m_named_types.push_back(
-            std::make_unique<types::Union>(
-                struct_type, m_current_scope_prefix + decl.name.value,
-                std::move(fields)));
+        m_named_types.push_back(std::make_unique<types::Union>(
+            struct_type, m_current_scope_prefix + decl.name.value,
+            std::move(fields)));
 
         m_current_scope->types[decl.name.value] = {
             .element = m_named_types.back().get(),
@@ -293,10 +286,9 @@ Value Codegen::generate(const ast::Union& decl) {
 
     auto* underlying = m_primitive_types["i32"].get();
 
-    m_named_types.push_back(
-        std::make_unique<types::Enum>(
-            underlying->llvm_type,
-            m_current_scope_prefix + decl.name.value + "(tag)", underlying));
+    m_named_types.push_back(std::make_unique<types::Enum>(
+        underlying->llvm_type,
+        m_current_scope_prefix + decl.name.value + "(tag)", underlying));
 
     auto* tag_type = static_cast<types::Enum*>(m_named_types.back().get());
 
@@ -312,10 +304,9 @@ Value Codegen::generate(const ast::Union& decl) {
 
     struct_type->setBody({max_type, underlying->llvm_type});
 
-    m_named_types.push_back(
-        std::make_unique<types::Union>(
-            struct_type, m_current_scope_prefix + decl.name.value,
-            std::move(fields), tag_type));
+    m_named_types.push_back(std::make_unique<types::Union>(
+        struct_type, m_current_scope_prefix + decl.name.value,
+        std::move(fields), tag_type));
 
     m_current_scope->types[decl.name.value] = {
         .element = m_named_types.back().get(),
@@ -351,10 +342,9 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
         underlying = type;
     }
 
-    m_named_types.push_back(
-        std::make_unique<types::Enum>(
-            underlying->llvm_type, m_current_scope_prefix + decl.name.value,
-            underlying));
+    m_named_types.push_back(std::make_unique<types::Enum>(
+        underlying->llvm_type, m_current_scope_prefix + decl.name.value,
+        underlying));
 
     m_current_scope->types[decl.name.value] = {
         .element = m_named_types.back().get(),
@@ -411,19 +401,16 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
 }
 
 Value Codegen::generate(const ast::TypeAlias& decl) {
-    auto attrs = parse_attrs(decl, {"distinct"});
-    bool distinct = attrs.contains("distinct");
-
+    auto [distinct] = parse_attrs_validate(decl, "distinct");
     auto* type = decl.type->codegen(*this);
 
     if (!type) {
         return Value::poisoned();
     }
 
-    m_named_types.push_back(
-        std::make_unique<types::Alias>(
-            type->llvm_type, m_current_scope_prefix + decl.name.value, type,
-            distinct));
+    m_named_types.push_back(std::make_unique<types::Alias>(
+        type->llvm_type, m_current_scope_prefix + decl.name.value, type,
+        distinct));
 
     m_current_scope->types[decl.name.value] = {
         .element = m_named_types.back().get(),
@@ -434,9 +421,7 @@ Value Codegen::generate(const ast::TypeAlias& decl) {
 }
 
 Value Codegen::generate(const ast::VarDecl& decl) {
-    auto attrs = parse_attrs(decl, {"extern"});
-    bool is_extern = attrs.contains("extern");
-
+    auto [is_extern] = parse_attrs_validate(decl, "extern");
     auto& result = m_current_scope->names[decl.name.value];
 
     if (decl.mutability == ast::VarDecl::Mut::Const) {
@@ -622,10 +607,8 @@ Value Codegen::generate(const ast::VarDecl& decl) {
 }
 
 void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
-    auto attrs = parse_attrs(decl, {"extern", "alwaysinline"});
-
-    bool is_extern = attrs.contains("extern");
-    bool alwaysinline = attrs.contains("alwaysinline");
+    auto [is_extern, alwaysinline] =
+        parse_attrs_validate(decl, "extern", "alwaysinline");
 
     if (!is_extern && !decl.block) {
         error(decl.name.offset, "{} has no body", log::quoted(decl.name.value));

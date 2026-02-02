@@ -359,18 +359,34 @@ void Codegen::generate(const ast::Module& module) {
     m_current_unit = unit;
 
     for (const auto& type : module.types) {
+        if (!matches_target(*type)) {
+            continue;
+        }
+
         type->codegen(*this);
     }
 
     for (const auto& variable : module.variables) {
+        if (!matches_target(*variable)) {
+            continue;
+        }
+
         variable->codegen(*this);
     }
 
     for (const auto& function : module.functions) {
+        if (!matches_target(*function)) {
+            continue;
+        }
+
         generate_fn_proto(*function);
     }
 
     for (const auto& function : module.functions) {
+        if (!matches_target(*function)) {
+            continue;
+        }
+
         if (function->block) {
             function->codegen(*this);
         }
@@ -1146,20 +1162,61 @@ void Codegen::type_mismatch(
         log::quoted(got->to_string()));
 }
 
-Attributes Codegen::parse_attrs(
-    const ast::Declaration& decl, const std::set<std::string_view>& allowed) {
-    Attributes result;
-
-    for (const auto& attr : decl.attributes) {
-        if (allowed.contains(attr.name)) {
-            result.insert(attr.name);
+void Codegen::report_invalid_attrs(
+    const ast::Declaration& decl,
+    std::initializer_list<std::string_view> allowed) {
+    for (const auto& attribute : decl.attributes) {
+        if (attr_to_os_type(attribute.name)) {
             continue;
         }
 
-        error(attr.offset, "unexpected attribute {}", log::quoted(attr.name));
+        bool valid = false;
+
+        for (const auto& attr : allowed) {
+            if (attribute.name == attr) {
+                valid = true;
+                break;
+            }
+        }
+
+        if (!valid) {
+            error(
+                attribute.offset, "unexpected attribute {}",
+                log::quoted(attribute.name));
+        }
+    }
+}
+
+bool Codegen::matches_target(const ast::Declaration& decl) {
+    auto [windows, linux] = parse_attrs(decl, "windows", "linux");
+
+    if (!windows && !linux) {
+        return true;
     }
 
-    return result;
+    llvm::Triple triple{cent::g_options.target_triple};
+
+    switch (triple.getOS()) {
+    case llvm::Triple::Linux:
+        return linux;
+    case llvm::Triple::Win32:
+        return windows;
+    default:
+        break;
+    }
+
+    return false;
+}
+
+bool Codegen::decl_get_attr(
+    const ast::Declaration& decl, std::string_view attr) {
+    for (const auto& attribute : decl.attributes) {
+        if (attribute.name == attr) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 bool Codegen::is_float(const Type* type) {

@@ -2,6 +2,7 @@
 #define CENT_BACKEND_CODEGEN_H
 
 #include <filesystem>
+#include <initializer_list>
 #include <map>
 #include <memory>
 #include <optional>
@@ -15,6 +16,7 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+#include <llvm/TargetParser/Triple.h>
 
 #include "frontend/token.h"
 #include "offset_value.h"
@@ -90,8 +92,6 @@ namespace cent::backend {
 
 struct Value;
 struct Type;
-
-using Attributes = std::set<std::string_view>;
 
 class Codegen {
 public:
@@ -342,9 +342,43 @@ private:
             fmt::format(message, std::forward(args)...));
     }
 
-    [[nodiscard]] Attributes parse_attrs(
+    void report_invalid_attrs(
         const ast::Declaration& decl,
-        const std::set<std::string_view>& allowed);
+        std::initializer_list<std::string_view> allowed);
+
+    template <typename... Attrs>
+    [[nodiscard]] std::array<bool, sizeof...(Attrs)>
+    parse_attrs_validate(const ast::Declaration& decl, Attrs... attrs) {
+        report_invalid_attrs(decl, {attrs...});
+        return parse_attrs(decl, attrs...);
+    }
+
+    template <typename... Attrs>
+    [[nodiscard]] std::array<bool, sizeof...(Attrs)>
+    parse_attrs(const ast::Declaration& decl, Attrs... attrs) {
+        std::array<bool, sizeof...(Attrs)> result = {
+            decl_get_attr(decl, attrs)...};
+
+        return result;
+    }
+
+    [[nodiscard]] bool matches_target(const ast::Declaration& decl);
+
+    [[nodiscard]] static bool
+    decl_get_attr(const ast::Declaration& decl, std::string_view attr);
+
+    [[nodiscard]] static std::optional<llvm::Triple::OSType>
+    attr_to_os_type(std::string_view attr) {
+        if (attr == "linux") {
+            return llvm::Triple::Linux;
+        }
+
+        if (attr == "windows") {
+            return llvm::Triple::Win32;
+        }
+
+        return std::nullopt;
+    }
 
     [[nodiscard]] static bool is_float(const Type* type);
     [[nodiscard]] static bool is_sint(const Type* type);
