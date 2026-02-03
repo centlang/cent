@@ -447,10 +447,9 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
         }
 
         if (struct_type->has_tail) {
-            llvm_values.push_back(
-                llvm::UndefValue::get(
-                    static_cast<llvm::StructType*>(struct_type->llvm_type)
-                        ->getElementType(struct_type->fields.size())));
+            llvm_values.push_back(llvm::UndefValue::get(
+                static_cast<llvm::StructType*>(struct_type->llvm_type)
+                    ->getElementType(struct_type->fields.size())));
         }
 
         return Value{
@@ -1111,6 +1110,45 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
         if (!g_options.release) {
             auto* len_value = llvm::ConstantInt::get(m_size, type->size);
             create_out_of_bounds_check(high.value, len_value);
+        }
+
+        auto* ptr_value =
+            m_builder.CreateGEP(type->type->llvm_type, value.value, low.value);
+
+        auto* len_value = m_builder.CreateSub(high.value, low.value);
+
+        auto* variable = create_alloca_or_error(expr.offset, m_slice_type);
+
+        if (!variable) {
+            return Value::poisoned();
+        }
+
+        auto* ptr_member =
+            m_builder.CreateStructGEP(m_slice_type, variable, slice_member_ptr);
+
+        auto* len_member =
+            m_builder.CreateStructGEP(m_slice_type, variable, slice_member_len);
+
+        m_builder.CreateStore(ptr_value, ptr_member);
+        m_builder.CreateStore(len_value, len_member);
+
+        return Value{
+            .type = get_slice_type(type->type, value.is_mutable),
+            .value = variable,
+            .ptr_depth = 1,
+            .memcpy = true};
+    }
+
+    if (auto* type = dyn_cast<types::VarLenArray>(value.type)) {
+        if (!high.ok()) {
+            high = {
+                .type = m_primitive_types["usize"].get(), .value = type->size};
+        }
+
+        high_low_check();
+
+        if (!g_options.release) {
+            create_out_of_bounds_check(high.value, type->size);
         }
 
         auto* ptr_value =
