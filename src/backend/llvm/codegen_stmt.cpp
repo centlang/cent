@@ -362,8 +362,6 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
             return Value::poisoned();
         }
 
-        auto* llvm_contained_type = type->type->llvm_type;
-
         auto* usize_null = llvm::ConstantInt::get(m_size, 0);
 
         auto* index = create_alloca(m_size);
@@ -387,7 +385,7 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
             .element =
                 {.type = type->type,
                  .value = m_builder.CreateGEP(
-                     llvm_contained_type, ptr_value, index_value),
+                     type->type->llvm_type, ptr_value, index_value),
                  .ptr_depth = 1,
                  .is_mutable = stmt.is_mutable},
             .unit = m_current_unit};
@@ -423,8 +421,6 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
             return Value::poisoned();
         }
 
-        auto* llvm_contained_type = type->type->llvm_type;
-
         auto* usize_null = llvm::ConstantInt::get(m_size, 0);
 
         auto* index = create_alloca(m_size);
@@ -445,7 +441,7 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
             .element =
                 {.type = type->type,
                  .value = m_builder.CreateGEP(
-                     llvm_contained_type, value.value, index_value),
+                     type->type->llvm_type, value.value, index_value),
                  .ptr_depth = 1,
                  .is_mutable = stmt.is_mutable},
             .unit = m_current_unit};
@@ -465,6 +461,61 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
         m_builder.CreateCondBr(
             m_builder.CreateICmpULT(incremented, length), loop_body,
+            m_loop_end);
+
+        m_builder.SetInsertPoint(m_loop_end);
+
+        m_loop_continue = loop_continue;
+        m_loop_end = loop_end;
+
+        return Value::poisoned();
+    }
+
+    if (auto* type = dyn_cast<types::VarLenArray>(value.type)) {
+        if (stmt.is_mutable && !value.is_mutable) {
+            error(stmt.value->offset, "array is not mutable");
+            return Value::poisoned();
+        }
+
+        auto* usize_null = llvm::ConstantInt::get(m_size, 0);
+
+        auto* index = create_alloca(m_size);
+        m_builder.CreateStore(usize_null, index);
+
+        m_builder.CreateCondBr(
+            m_builder.CreateICmpULT(usize_null, type->size), loop_body,
+            m_loop_end);
+
+        m_builder.SetInsertPoint(loop_body);
+
+        auto current_scope = *m_current_scope;
+
+        auto* index_value = m_builder.CreateLoad(m_size, index);
+
+        m_current_scope->names[stmt.name.value] = {
+            .element =
+                {.type = type->type,
+                 .value = m_builder.CreateGEP(
+                     type->type->llvm_type, value.value, index_value),
+                 .ptr_depth = 1,
+                 .is_mutable = stmt.is_mutable},
+            .unit = m_current_unit};
+
+        stmt.body->codegen(*this);
+
+        m_builder.CreateBr(m_loop_continue);
+
+        *m_current_scope = current_scope;
+
+        m_builder.SetInsertPoint(m_loop_continue);
+
+        auto* incremented =
+            m_builder.CreateAdd(index_value, llvm::ConstantInt::get(m_size, 1));
+
+        m_builder.CreateStore(incremented, index);
+
+        m_builder.CreateCondBr(
+            m_builder.CreateICmpULT(incremented, type->size), loop_body,
             m_loop_end);
 
         m_builder.SetInsertPoint(m_loop_end);
