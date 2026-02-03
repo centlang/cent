@@ -195,7 +195,8 @@ private:
 
     [[nodiscard]] llvm::Value* create_alloca(Type* type);
 
-    void create_out_of_bounds_check(llvm::Value* index, llvm::Value* len);
+    void create_out_of_bounds_check(
+        llvm::Value* index, llvm::Value* len, bool inclusive = false);
 
     void create_panic(std::string_view message);
 

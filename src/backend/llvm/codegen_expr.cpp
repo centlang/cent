@@ -1108,8 +1108,8 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
         high_low_check();
 
         if (!g_options.release) {
-            auto* len_value = llvm::ConstantInt::get(m_size, type->size);
-            create_out_of_bounds_check(high.value, len_value);
+            create_out_of_bounds_check(
+                high.value, llvm::ConstantInt::get(m_size, type->size), true);
         }
 
         auto* ptr_value =
@@ -1148,7 +1148,7 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
         high_low_check();
 
         if (!g_options.release) {
-            create_out_of_bounds_check(high.value, type->size);
+            create_out_of_bounds_check(high.value, type->size, true);
         }
 
         auto* ptr_value =
@@ -1198,7 +1198,7 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
 
     if (!g_options.release) {
         auto* len_value = load_struct_member(m_size, value, slice_member_len);
-        create_out_of_bounds_check(high.value, len_value);
+        create_out_of_bounds_check(high.value, len_value, true);
     }
 
     auto* ptr_value = load_struct_member(

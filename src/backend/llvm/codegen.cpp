@@ -963,7 +963,8 @@ void Codegen::zero_init(llvm::Value* value, Type* type) {
     m_builder.CreateStore(llvm::Constant::getNullValue(type->llvm_type), value);
 }
 
-void Codegen::create_out_of_bounds_check(llvm::Value* index, llvm::Value* len) {
+void Codegen::create_out_of_bounds_check(
+    llvm::Value* index, llvm::Value* len, bool inclusive) {
     auto* function = m_builder.GetInsertBlock()->getParent();
 
     auto* out_of_bounds = llvm::BasicBlock::Create(m_context, "", function);
@@ -971,7 +972,9 @@ void Codegen::create_out_of_bounds_check(llvm::Value* index, llvm::Value* len) {
     auto* end = llvm::BasicBlock::Create(m_context, "", function);
 
     m_builder.CreateCondBr(
-        m_builder.CreateICmpULT(index, len), end, out_of_bounds);
+        inclusive ? m_builder.CreateICmpULE(index, len)
+                  : m_builder.CreateICmpULT(index, len),
+        end, out_of_bounds);
 
     m_builder.SetInsertPoint(out_of_bounds);
 
