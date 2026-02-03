@@ -296,37 +296,137 @@ void Codegen::create_main() {
         return;
     }
 
-    auto* user_main = m_module->getFunction("<main>::main");
+    const auto& user_main = m_scope.names["main"].element;
 
-    if (!user_main) {
+    if (!user_main.ok()) {
         return;
     }
 
-    auto* user_main_return = user_main->getReturnType();
+    auto* user_main_fn = static_cast<types::Function*>(user_main.type);
+
     auto* int32 = llvm::Type::getInt32Ty(m_context);
+    auto* pointer = llvm::PointerType::get(m_context, 0);
 
-    if (!user_main_return->isVoidTy() && user_main_return != int32) {
-        log::error("invalid `main` signature");
-        return;
-    }
+    auto* real_main = llvm::Function::Create(
+        llvm::FunctionType::get(int32, {int32, pointer}, false),
+        llvm::Function::ExternalLinkage, "main", *m_module);
 
-    auto* main = llvm::Function::Create(
-        llvm::FunctionType::get(int32, false), llvm::Function::ExternalLinkage,
-        "main", *m_module);
-
-    auto* entry = llvm::BasicBlock::Create(m_context, "", main);
+    auto* entry = llvm::BasicBlock::Create(m_context, "", real_main);
 
     m_builder.SetInsertPoint(entry);
 
-    if (user_main_return->isVoidTy()) {
-        m_builder.CreateCall(user_main);
-        m_builder.CreateRet(llvm::ConstantInt::get(int32, 0));
+    auto invalid_signature = [&] {
+        log::error("invalid `main` signature");
+        m_had_error = true;
+    };
 
+    auto create_main_call = [&]() -> llvm::Value* {
+        auto* llvm_fn = static_cast<llvm::Function*>(user_main.value);
+
+        if (user_main_fn->param_types.empty()) {
+            return m_builder.CreateCall(llvm_fn);
+        }
+
+        auto* arg_type = get_slice_type(m_primitive_types["u8"].get(), false);
+        auto* args_type = get_slice_type(arg_type, false);
+
+        if (user_main_fn->param_types.size() != 1 ||
+            user_main_fn->param_types[0] != args_type) {
+            invalid_signature();
+            return nullptr;
+        }
+
+        auto* argc = real_main->getArg(0);
+        auto* argv = real_main->getArg(1);
+
+        auto* result_args = m_builder.CreateAlloca(arg_type->llvm_type, argc);
+        auto* result_slice = m_builder.CreateAlloca(args_type->llvm_type);
+        auto* index = m_builder.CreateAlloca(int32);
+
+        m_builder.CreateStore(llvm::ConstantInt::getSigned(int32, 0), index);
+
+        auto* cond = llvm::BasicBlock::Create(m_context, "", real_main);
+        auto* body = llvm::BasicBlock::Create(m_context, "", real_main);
+        auto* end = llvm::BasicBlock::Create(m_context, "", real_main);
+
+        m_builder.CreateBr(cond);
+        m_builder.SetInsertPoint(cond);
+
+        auto* index_val = m_builder.CreateLoad(int32, index);
+
+        m_builder.CreateCondBr(
+            m_builder.CreateICmpSLT(index_val, argc), body, end);
+
+        m_builder.SetInsertPoint(body);
+
+        auto* result_arg =
+            m_builder.CreateGEP(arg_type->llvm_type, result_args, index_val);
+
+        auto* argv_arg = m_builder.CreateLoad(
+            pointer, m_builder.CreateGEP(argv->getType(), argv, index_val));
+
+        auto* strlen_fn = m_module->getFunction("strlen");
+
+        if (!strlen_fn) {
+            strlen_fn = llvm::Function::Create(
+                llvm::FunctionType::get(m_size, pointer, false),
+                llvm::Function::ExternalLinkage, "strlen", *m_module);
+        }
+
+        auto* result_arg_len = m_builder.CreateCall(strlen_fn, argv_arg);
+
+        m_builder.CreateStore(
+            argv_arg, m_builder.CreateStructGEP(
+                          arg_type->llvm_type, result_arg, slice_member_ptr));
+
+        m_builder.CreateStore(
+            result_arg_len,
+            m_builder.CreateStructGEP(
+                arg_type->llvm_type, result_arg, slice_member_len));
+
+        m_builder.CreateStore(
+            m_builder.CreateAdd(
+                m_builder.CreateLoad(int32, index),
+                llvm::ConstantInt::getSigned(int32, 1)),
+            index);
+
+        m_builder.CreateBr(cond);
+        m_builder.SetInsertPoint(end);
+
+        m_builder.CreateStore(
+            result_args,
+            m_builder.CreateStructGEP(
+                args_type->llvm_type, result_slice, slice_member_ptr));
+
+        m_builder.CreateStore(
+            m_builder.CreateSExt(argc, m_size),
+            m_builder.CreateStructGEP(
+                args_type->llvm_type, result_slice, slice_member_len));
+
+        return m_builder.CreateCall(
+            llvm_fn,
+            {m_builder.CreateLoad(args_type->llvm_type, result_slice)});
+    };
+
+    llvm::Value* result = create_main_call();
+
+    if (!result) {
         return;
     }
 
-    auto* result = m_builder.CreateCall(user_main);
-    m_builder.CreateRet(result);
+    auto* base_return_type = unwrap_type(user_main_fn->return_type);
+
+    if (is<types::Void>(base_return_type)) {
+        m_builder.CreateRet(llvm::ConstantInt::get(int32, 0));
+        return;
+    }
+
+    if (is<types::I32>(base_return_type)) {
+        m_builder.CreateRet(result);
+        return;
+    }
+
+    invalid_signature();
 }
 
 void Codegen::generate(const ast::Module& module) {
