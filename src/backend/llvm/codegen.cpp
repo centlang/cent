@@ -87,11 +87,89 @@ void Codegen::create_core() {
     m_core_module.scopes["env"].names["DEBUG"] = {
         .element = {.type = bool_type, .value = debug}, .is_public = true};
 
+    auto panic_fn = create_core_panic();
+
+    auto* assert_type = get_fn_type(m_void_type.get(), {bool_type});
+
+    auto* assert_fn = llvm::Function::Create(
+        static_cast<llvm::FunctionType*>(assert_type->llvm_type),
+        llvm::Function::PrivateLinkage, "core::assert", *m_module);
+
+    auto* assert_entry = llvm::BasicBlock::Create(m_context, "", assert_fn);
+
+    m_builder.SetInsertPoint(assert_entry);
+
+    auto* assert_fail = llvm::BasicBlock::Create(m_context, "", assert_fn);
+    auto* assert_ok = llvm::BasicBlock::Create(m_context, "", assert_fn);
+
+    m_builder.CreateCondBr(assert_fn->getArg(0), assert_ok, assert_fail);
+
+    m_builder.SetInsertPoint(assert_fail);
+
+    std::string_view assert_message = "assertion failed";
+
+    auto* assert_arg = llvm::ConstantStruct::get(
+        m_slice_type, {m_builder.CreateGlobalString(
+                           assert_message, "", 0, m_module.get(), false),
+                       llvm::ConstantInt::get(m_size, assert_message.size())});
+
+    m_builder.CreateCall(
+        static_cast<llvm::Function*>(panic_fn.value), assert_arg);
+
+    m_builder.CreateUnreachable();
+
+    m_builder.SetInsertPoint(assert_ok);
+
+    m_builder.CreateRetVoid();
+
+    llvm::Function* dbg_assert = nullptr;
+
+    if (g_options.release) {
+        dbg_assert = llvm::Function::Create(
+            static_cast<llvm::FunctionType*>(assert_type->llvm_type),
+            llvm::Function::PrivateLinkage, "core::__nop", *m_module);
+
+        auto* entry = llvm::BasicBlock::Create(m_context, "", dbg_assert);
+
+        m_builder.SetInsertPoint(entry);
+        m_builder.CreateRetVoid();
+    } else {
+        dbg_assert = assert_fn;
+    }
+
+    m_core_module.names = {
+        {"panic", {.element = panic_fn, .is_public = true}},
+        {"assert",
+         {.element = {.type = assert_type, .value = assert_fn},
+          .is_public = true}},
+        {"dbg_assert",
+         {.element = {.type = assert_type, .value = dbg_assert},
+          .is_public = true}}};
+
+    create_core_mem();
+}
+
+Value Codegen::create_core_panic() {
+    llvm::Triple triple{cent::g_options.target_triple};
+
+    auto* never = m_primitive_types["never"].get();
+    auto* i32_type = m_primitive_types["i32"].get();
+    auto* u8_slice = get_slice_type(m_primitive_types["u8"].get(), false);
+
     auto* panic_type = get_fn_type(never, {u8_slice});
 
     auto* panic = llvm::Function::Create(
         static_cast<llvm::FunctionType*>(panic_type->llvm_type),
         llvm::Function::PrivateLinkage, "core::panic", *m_module);
+
+    auto* panic_entry = llvm::BasicBlock::Create(m_context, "", panic);
+
+    m_builder.SetInsertPoint(panic_entry);
+
+    if (triple.getOS() != llvm::Triple::Linux) {
+        m_builder.CreateUnreachable();
+        return {.type = panic_type, .value = panic};
+    }
 
     auto* ptr_type = llvm::PointerType::get(m_context, 0);
 
@@ -123,10 +201,6 @@ void Codegen::create_core() {
         static_cast<llvm::FunctionType*>(exit_type->llvm_type),
         llvm::Function::ExternalLinkage, "exit", *m_module);
 
-    auto* panic_entry = llvm::BasicBlock::Create(m_context, "", panic);
-
-    m_builder.SetInsertPoint(panic_entry);
-
     auto* stderr_value = m_builder.CreateLoad(ptr_type, stderr_);
 
     auto* panic_begin_str =
@@ -156,66 +230,7 @@ void Codegen::create_core() {
 
     m_builder.CreateUnreachable();
 
-    auto* assert_type = get_fn_type(m_void_type.get(), {bool_type});
-
-    auto* assert_fn = llvm::Function::Create(
-        static_cast<llvm::FunctionType*>(assert_type->llvm_type),
-        llvm::Function::PrivateLinkage, "core::assert", *m_module);
-
-    auto* assert_entry = llvm::BasicBlock::Create(m_context, "", assert_fn);
-
-    m_builder.SetInsertPoint(assert_entry);
-
-    auto* assert_fail = llvm::BasicBlock::Create(m_context, "", assert_fn);
-    auto* assert_ok = llvm::BasicBlock::Create(m_context, "", assert_fn);
-
-    m_builder.CreateCondBr(assert_fn->getArg(0), assert_ok, assert_fail);
-
-    m_builder.SetInsertPoint(assert_fail);
-
-    std::string_view assert_message = "assertion failed";
-
-    auto* assert_arg = llvm::ConstantStruct::get(
-        m_slice_type, {m_builder.CreateGlobalString(
-                           assert_message, "", 0, m_module.get(), false),
-                       llvm::ConstantInt::get(m_size, assert_message.size())});
-
-    m_builder.CreateCall(panic, assert_arg);
-
-    m_builder.CreateUnreachable();
-
-    m_builder.SetInsertPoint(assert_ok);
-
-    m_builder.CreateRetVoid();
-
-    llvm::Function* dbg_assert = nullptr;
-
-    if (g_options.release) {
-        dbg_assert = llvm::Function::Create(
-            static_cast<llvm::FunctionType*>(assert_type->llvm_type),
-            llvm::Function::PrivateLinkage, "core::__nop", *m_module);
-
-        auto* entry = llvm::BasicBlock::Create(m_context, "", dbg_assert);
-
-        m_builder.SetInsertPoint(entry);
-        m_builder.CreateRetVoid();
-    } else {
-        dbg_assert = assert_fn;
-    }
-
-    m_core_module.names = {
-        {"panic",
-         {.element = {.type = panic_type, .value = panic}, .is_public = true}},
-        {"exit",
-         {.element = {.type = exit_type, .value = exit_fn}, .is_public = true}},
-        {"assert",
-         {.element = {.type = assert_type, .value = assert_fn},
-          .is_public = true}},
-        {"dbg_assert",
-         {.element = {.type = assert_type, .value = dbg_assert},
-          .is_public = true}}};
-
-    create_core_mem();
+    return {.type = panic_type, .value = panic};
 }
 
 void Codegen::create_core_mem() {

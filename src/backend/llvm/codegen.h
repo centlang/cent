@@ -158,6 +158,8 @@ public:
     Value generate(const ast::VarDecl& decl);
 
 private:
+    [[nodiscard]] Value create_core_panic();
+
     void create_core();
     void create_core_mem();
 
@@ -363,7 +365,7 @@ private:
         return result;
     }
 
-    [[nodiscard]] bool matches_target(const ast::Declaration& decl);
+    [[nodiscard]] static bool matches_target(const ast::Declaration& decl);
 
     [[nodiscard]] static bool
     decl_get_attr(const ast::Declaration& decl, std::string_view attr);
