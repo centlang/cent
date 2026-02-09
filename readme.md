@@ -2,7 +2,7 @@
 
 A simple systems programming language.
 
-https://centlang.github.io
+https://centlang.org
 
 ## Building from Source
 
