@@ -47,13 +47,13 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
 
     switch (expr.oper.value) {
     case Minus:
-        if (is_float(base_type)) {
+        if (base_type->is_float()) {
             return Value{
                 .type = value.type,
                 .value = m_builder.CreateFNeg(load_rvalue(value).value)};
         }
 
-        if (!is_sint(base_type) && !is_uint(base_type)) {
+        if (!base_type->is_sint() && !base_type->is_uint()) {
             error(expr.offset, "cannot apply `-` to a non-number type");
             return Value::poisoned();
         }
@@ -101,7 +101,7 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
             .value = value.value,
             .ptr_depth = static_cast<std::uint8_t>(value.ptr_depth - 1)};
     case Not:
-        if (!is_sint(base_type) && !is_uint(base_type)) {
+        if (!base_type->is_sint() && !base_type->is_uint()) {
             error(expr.offset, "cannot apply `~` to a non-integer type");
             return Value::poisoned();
         }
@@ -674,9 +674,17 @@ Value Codegen::generate(const ast::CallExpr& expr) {
 
     auto* base_type = unwrap_type(value.type);
 
+    std::vector<OffsetValue<Value>> arguments;
+    arguments.reserve(expr.arguments.size());
+
+    for (const auto& argument : expr.arguments) {
+        auto value = argument->codegen(*this);
+        arguments.push_back({.value = value, .offset = argument->offset});
+    }
+
     if (auto* type = dyn_cast<types::Function>(base_type)) {
         return create_call(
-            expr.identifier->offset, type, value.value, expr.arguments);
+            expr.identifier->offset, type, value.value, arguments);
     }
 
     if (auto* pointer = dyn_cast<types::Pointer>(base_type)) {
@@ -684,7 +692,7 @@ Value Codegen::generate(const ast::CallExpr& expr) {
 
         if (auto* type = dyn_cast<types::Function>(base_type)) {
             return create_call(
-                expr.identifier->offset, type, value.value, expr.arguments);
+                expr.identifier->offset, type, value.value, arguments);
         }
     }
 
@@ -728,24 +736,8 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
         }
     }
 
-    auto arg_size = iterator->second.type->param_types.size();
-
-    if (arg_size - 1 != expr.arguments.size()) {
-        error(expr.name.offset, "incorrect number of arguments passed");
-        return Value::poisoned();
-    }
-
-    std::vector<llvm::Value*> arguments;
-    llvm::Value* sret_result = nullptr;
-
-    if (iterator->second.type->sret) {
-        sret_result = create_alloca(iterator->second.type->return_type);
-
-        arguments.reserve(arg_size + 1);
-        arguments.push_back(sret_result);
-    } else {
-        arguments.reserve(arg_size);
-    }
+    std::vector<OffsetValue<Value>> arguments;
+    arguments.reserve(expr.arguments.size() + 1);
 
     if (auto* type =
             dyn_cast<types::Pointer>(iterator->second.type->param_types[0])) {
@@ -758,55 +750,40 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
         }
 
         if (is<types::Pointer>(value.type)) {
-            arguments.push_back(load_rvalue(value).value);
+            arguments.push_back({.value = value, .offset = expr.value->offset});
         } else {
-            if (!value.value->getType()->isPointerTy()) {
+            if (value.ptr_depth < 1) {
                 error(expr.value->offset, "type mismatch");
                 return Value::poisoned();
             }
 
-            arguments.push_back(value.value);
+            arguments.push_back(
+                {.value =
+                     {.type = get_ptr_type(value.type, value.is_mutable),
+                      .value = load_lvalue(value).value},
+                 .offset = expr.value->offset});
         }
     } else {
-        auto val = load_rvalue(value);
-
         if (auto* pointer = dyn_cast<types::Pointer>(value.type)) {
             arguments.push_back(
-                m_builder.CreateLoad(pointer->type->llvm_type, val.value));
+                {.value =
+                     {.type = pointer->type,
+                      .value = m_builder.CreateLoad(
+                          pointer->type->llvm_type, load_rvalue(value).value)},
+                 .offset = expr.value->offset});
         } else {
-            arguments.push_back(val.value);
+            arguments.push_back({.value = value, .offset = expr.value->offset});
         }
     }
 
-    for (std::size_t i = 0; i < expr.arguments.size(); ++i) {
-        auto value = expr.arguments[i]->codegen(*this);
-
-        if (!value.ok()) {
-            return Value::poisoned();
-        }
-
-        if (auto val = cast_or_error(
-                expr.arguments[i]->offset,
-                iterator->second.type->param_types[i + 1], value);
-            val.ok()) {
-            arguments.push_back(load_rvalue(val).value);
-        } else {
-            return Value::poisoned();
-        }
+    for (const auto& argument : expr.arguments) {
+        auto value = argument->codegen(*this);
+        arguments.push_back({.value = value, .offset = argument->offset});
     }
 
-    auto* call = m_builder.CreateCall(iterator->second.function, arguments);
-
-    if (!g_options.release) {
-        if (is<types::Never>(iterator->second.type->return_type)) {
-            create_panic("`never` method returned");
-        }
-    }
-
-    return Value{
-        .type = iterator->second.type->return_type,
-        .value = sret_result ? sret_result : call,
-        .memcpy = iterator->second.type->sret};
+    return create_call(
+        expr.name.offset, iterator->second.type, iterator->second.function,
+        arguments);
 }
 
 Value Codegen::generate(const ast::MemberExpr& expr) {
@@ -1458,8 +1435,8 @@ Value Codegen::generate_bin_expr(
     case Greater:
     case GreaterEqual:
     case LessEqual: {
-        if (!is_sint(value_base_type) && !is_uint(value_base_type) &&
-            !is_float(value_base_type)) {
+        if (!value_base_type->is_sint() && !value_base_type->is_uint() &&
+            !value_base_type->is_float()) {
             error(lhs.offset, "type mismatch");
             return Value::poisoned();
         }
@@ -1469,7 +1446,7 @@ Value Codegen::generate_bin_expr(
     case Percent:
     case LessLess:
     case GreaterGreater:
-        if (!is_sint(value_base_type) && !is_uint(value_base_type)) {
+        if (!value_base_type->is_sint() && !value_base_type->is_uint()) {
             error(lhs.offset, "type mismatch");
             return Value::poisoned();
         }
@@ -1478,7 +1455,7 @@ Value Codegen::generate_bin_expr(
     case And:
     case Or:
     case Xor:
-        if (!is_sint(value_base_type) && !is_uint(value_base_type) &&
+        if (!value_base_type->is_sint() && !value_base_type->is_uint() &&
             !is<types::Enum>(value_base_type)) {
             error(lhs.offset, "type mismatch");
             return Value::poisoned();
@@ -1493,23 +1470,23 @@ Value Codegen::generate_bin_expr(
     case Plus:
         return Value{
             .type = value_type,
-            .value = is_float(value_base_type)
+            .value = value_base_type->is_float()
                          ? m_builder.CreateFAdd(value_x.value, value_y.value)
                          : m_builder.CreateAdd(value_x.value, value_y.value)};
     case Minus:
         return Value{
             .type = value_type,
-            .value = is_float(value_base_type)
+            .value = value_base_type->is_float()
                          ? m_builder.CreateFSub(value_x.value, value_y.value)
                          : m_builder.CreateSub(value_x.value, value_y.value)};
     case Star:
         return Value{
             .type = value_type,
-            .value = is_float(value_base_type)
+            .value = value_base_type->is_float()
                          ? m_builder.CreateFMul(value_x.value, value_y.value)
                          : m_builder.CreateMul(value_x.value, value_y.value)};
     case Slash:
-        if (is_float(value_base_type)) {
+        if (value_base_type->is_float()) {
             return Value{
                 .type = value_type,
                 .value = m_builder.CreateFDiv(value_x.value, value_y.value)};
@@ -1517,13 +1494,13 @@ Value Codegen::generate_bin_expr(
 
         return Value{
             .type = value_type,
-            .value = is_sint(value_base_type)
+            .value = value_base_type->is_sint()
                          ? m_builder.CreateSDiv(value_x.value, value_y.value)
                          : m_builder.CreateUDiv(value_x.value, value_y.value)};
     case Percent:
         return Value{
             .type = value_type,
-            .value = is_sint(value_base_type)
+            .value = value_base_type->is_sint()
                          ? m_builder.CreateSRem(value_x.value, value_y.value)
                          : m_builder.CreateURem(value_x.value, value_y.value)};
     case And:
@@ -1545,11 +1522,11 @@ Value Codegen::generate_bin_expr(
     case GreaterGreater:
         return Value{
             .type = value_type,
-            .value = is_sint(value_base_type)
+            .value = value_base_type->is_sint()
                          ? m_builder.CreateAShr(value_x.value, value_y.value)
                          : m_builder.CreateLShr(value_x.value, value_y.value)};
     case Less:
-        if (is_float(value_base_type)) {
+        if (value_base_type->is_float()) {
             return Value{
                 .type = m_primitive_types["bool"].get(),
                 .value = m_builder.CreateFCmpULT(value_x.value, value_y.value)};
@@ -1558,11 +1535,11 @@ Value Codegen::generate_bin_expr(
         return Value{
             .type = m_primitive_types["bool"].get(),
             .value =
-                is_sint(value_base_type)
+                value_base_type->is_sint()
                     ? m_builder.CreateICmpSLT(value_x.value, value_y.value)
                     : m_builder.CreateICmpULT(value_x.value, value_y.value)};
     case Greater:
-        if (is_float(value_base_type)) {
+        if (value_base_type->is_float()) {
             return Value{
                 .type = m_primitive_types["bool"].get(),
                 .value = m_builder.CreateFCmpUGT(value_x.value, value_y.value)};
@@ -1571,25 +1548,25 @@ Value Codegen::generate_bin_expr(
         return Value{
             .type = m_primitive_types["bool"].get(),
             .value =
-                is_sint(value_base_type)
+                value_base_type->is_sint()
                     ? m_builder.CreateICmpSGT(value_x.value, value_y.value)
                     : m_builder.CreateICmpUGT(value_x.value, value_y.value)};
     case EqualEqual:
         return Value{
             .type = m_primitive_types["bool"].get(),
             .value =
-                is_float(value_base_type)
+                value_base_type->is_float()
                     ? m_builder.CreateFCmpUEQ(value_x.value, value_y.value)
                     : m_builder.CreateICmpEQ(value_x.value, value_y.value)};
     case BangEqual:
         return Value{
             .type = m_primitive_types["bool"].get(),
             .value =
-                is_float(value_base_type)
+                value_base_type->is_float()
                     ? m_builder.CreateFCmpUNE(value_x.value, value_y.value)
                     : m_builder.CreateICmpNE(value_x.value, value_y.value)};
     case GreaterEqual:
-        if (is_float(value_base_type)) {
+        if (value_base_type->is_float()) {
             return Value{
                 .type = m_primitive_types["bool"].get(),
                 .value = m_builder.CreateFCmpUGE(value_x.value, value_y.value)};
@@ -1598,11 +1575,11 @@ Value Codegen::generate_bin_expr(
         return Value{
             .type = m_primitive_types["bool"].get(),
             .value =
-                is_sint(value_base_type)
+                value_base_type->is_sint()
                     ? m_builder.CreateICmpSGE(value_x.value, value_y.value)
                     : m_builder.CreateICmpUGE(value_x.value, value_y.value)};
     case LessEqual:
-        if (is_float(value_base_type)) {
+        if (value_base_type->is_float()) {
             return Value{
                 .type = m_primitive_types["bool"].get(),
                 .value = m_builder.CreateFCmpULE(value_x.value, value_y.value)};
@@ -1611,7 +1588,7 @@ Value Codegen::generate_bin_expr(
         return Value{
             .type = m_primitive_types["bool"].get(),
             .value =
-                is_sint(value_base_type)
+                value_base_type->is_sint()
                     ? m_builder.CreateICmpSLE(value_x.value, value_y.value)
                     : m_builder.CreateICmpULE(value_x.value, value_y.value)};
     default:

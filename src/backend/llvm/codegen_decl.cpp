@@ -17,6 +17,7 @@
 #include "backend/llvm/types/struct.h"
 #include "backend/llvm/types/union.h"
 
+#include "backend/llvm/abi.h"
 #include "backend/llvm/codegen.h"
 
 namespace cent::backend {
@@ -65,7 +66,7 @@ Value Codegen::generate(const ast::FnDecl& decl) {
                 .element.value);
     };
 
-    auto* function_type = get_fn_type();
+    auto* function_type = static_cast<types::Function*>(get_fn_type());
 
     if (!function_type) {
         return Value::poisoned();
@@ -79,21 +80,19 @@ Value Codegen::generate(const ast::FnDecl& decl) {
     m_builder.SetInsertPoint(entry);
 
     auto* current_function = m_current_function;
-    m_current_function = static_cast<types::Function*>(function_type);
+    m_current_function = function_type;
 
     auto current_scope_names = m_current_scope->names;
 
     for (std::size_t i = 0; i < decl.proto.params.size(); ++i) {
         const auto& param = decl.proto.params[i];
+        const auto& type = m_current_function->param_types[i];
 
-        auto* value = function->getArg(i);
-        auto* variable = create_alloca(m_current_function->param_types[i]);
-
-        m_builder.CreateStore(value, variable);
+        auto* variable = alloca_arg(function_type->sret ? i + 1 : i, type);
 
         m_current_scope->names[param.name.value] = {
             .element =
-                {.type = m_current_function->param_types[i],
+                {.type = type,
                  .value = variable,
                  .ptr_depth = 1,
                  .is_mutable = param.is_mutable},
@@ -334,7 +333,7 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
             return Value::poisoned();
         }
 
-        if (!is_sint(type) && !is_uint(type) && !is<types::Bool>(type)) {
+        if (!type->is_sint() && !type->is_uint() && !is<types::Bool>(type)) {
             error(decl.type->offset, "type mismatch");
             return Value::poisoned();
         }
@@ -363,7 +362,8 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
                 .element =
                     {.type = type,
                      .value = llvm::ConstantInt::get(
-                         underlying->llvm_type, number++, is_sint(underlying))},
+                         underlying->llvm_type, number++,
+                         underlying->is_sint())},
                 .is_public = decl.is_public,
                 .unit = m_current_unit};
 
@@ -384,8 +384,8 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
                 .unit = m_current_unit};
 
             if (auto* constant = llvm::dyn_cast<llvm::ConstantInt>(val.value)) {
-                number = is_sint(type) ? constant->getSExtValue()
-                                       : constant->getZExtValue();
+                number = type->is_sint() ? constant->getSExtValue()
+                                         : constant->getZExtValue();
             } else {
                 error(field.value->offset, "not a constant");
                 return Value::poisoned();

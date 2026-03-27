@@ -14,6 +14,7 @@
 
 #include "backend/llvm/types/alias.h"
 
+#include "backend/llvm/abi.h"
 #include "backend/llvm/codegen.h"
 
 namespace cent::backend {
@@ -197,25 +198,41 @@ types::Function* Codegen::get_fn_type(
 
     const auto& layout = m_module->getDataLayout();
 
-    if (!is<types::Void, types::Never>(return_type) &&
-        layout.getTypeAllocSize(return_type->llvm_type) >
-            layout.getTypeAllocSize(m_size) * 2) {
-        sret = true;
-        llvm_param_types.reserve(param_types.size() + 1);
+    if (get_abi(m_triple) == Abi::SysV) {
+        sret = sysv::should_sret(return_type->llvm_type, layout);
+    }
 
+    llvm_param_types.reserve(
+        sret ? param_types.size() + 1 : param_types.size());
+
+    if (sret) {
         llvm_param_types.push_back(
             llvm::PointerType::get(return_type->llvm_type, 0));
-    } else {
-        llvm_param_types.reserve(param_types.size());
     }
 
     for (const auto& parameter : param_types) {
-        llvm_param_types.push_back(parameter->llvm_type);
+        if (get_abi(m_triple) != Abi::SysV) {
+            llvm_param_types.push_back(parameter->llvm_type);
+            continue;
+        }
+
+        auto classification = sysv::classify(parameter->llvm_type, layout);
+
+        llvm_param_types.push_back(
+            sysv::lower(parameter, classification, layout, m_context));
     }
 
-    auto* llvm_type = llvm::FunctionType::get(
-        sret ? m_void_type->llvm_type : return_type->llvm_type,
-        llvm_param_types, variadic);
+    auto* llvm_return = m_void_type->llvm_type;
+
+    if (!sret && !is<types::Void, types::Never>(return_type)) {
+        auto classification = sysv::classify(return_type->llvm_type, layout);
+
+        llvm_return =
+            sysv::lower(return_type, classification, layout, m_context);
+    }
+
+    auto* llvm_type =
+        llvm::FunctionType::get(llvm_return, llvm_param_types, variadic);
 
     result = std::make_unique<types::Function>(
         llvm_type, return_type, std::move(param_types), std::move(default_args),

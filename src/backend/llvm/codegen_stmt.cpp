@@ -15,6 +15,7 @@
 
 #include "backend/llvm/types/union.h"
 
+#include "backend/llvm/abi.h"
 #include "backend/llvm/codegen.h"
 
 namespace cent::backend {
@@ -300,7 +301,20 @@ Value Codegen::generate(const ast::ReturnStmt& stmt) {
         return Value::poisoned();
     }
 
-    m_builder.CreateRet(load_rvalue(val).value);
+    val = load_lvalue(val);
+
+    auto* return_type = function->getReturnType();
+
+    if (val.ptr_depth == 1) {
+        m_builder.CreateRet(m_builder.CreateLoad(return_type, val.value));
+        return Value::poisoned();
+    }
+
+    auto* result = create_alloca(function->getReturnType());
+
+    m_builder.CreateStore(val.value, result);
+    m_builder.CreateRet(m_builder.CreateLoad(return_type, result));
+
     return Value::poisoned();
 }
 
@@ -546,7 +560,7 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
     llvm::Value* end =
         load_struct_member(llvm_contained_type, value, range_member_end);
 
-    if (!is_sint(type->type) && !is_uint(type->type)) {
+    if (!type->type->is_sint() && !type->type->is_uint()) {
         error(stmt.value->offset, "type mismatch");
         return Value::poisoned();
     }
@@ -556,12 +570,12 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
     auto create_compare = [&](llvm::Value* begin, llvm::Value* end) {
         if (type->inclusive) {
-            return is_sint(type->type) ? m_builder.CreateICmpSLE(begin, end)
-                                       : m_builder.CreateICmpULE(begin, end);
+            return type->type->is_sint() ? m_builder.CreateICmpSLE(begin, end)
+                                         : m_builder.CreateICmpULE(begin, end);
         }
 
-        return is_sint(type->type) ? m_builder.CreateICmpSLT(begin, end)
-                                   : m_builder.CreateICmpULT(begin, end);
+        return type->type->is_sint() ? m_builder.CreateICmpSLT(begin, end)
+                                     : m_builder.CreateICmpULT(begin, end);
     };
 
     m_builder.CreateCondBr(create_compare(begin, end), loop_body, m_loop_end);

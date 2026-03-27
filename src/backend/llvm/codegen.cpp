@@ -9,6 +9,7 @@
 
 #include "backend/llvm/types/enum.h"
 
+#include "backend/llvm/abi.h"
 #include "backend/llvm/codegen.h"
 
 #include "options.h"
@@ -150,8 +151,6 @@ void Codegen::create_core() {
 }
 
 Value Codegen::create_core_panic() {
-    llvm::Triple triple{cent::g_options.target_triple};
-
     auto* never = m_primitive_types["never"].get();
     auto* i32_type = m_primitive_types["i32"].get();
     auto* u8_slice = get_slice_type(m_primitive_types["u8"].get(), false);
@@ -166,7 +165,7 @@ Value Codegen::create_core_panic() {
 
     m_builder.SetInsertPoint(panic_entry);
 
-    if (triple.getOS() != llvm::Triple::Linux) {
+    if (m_triple.getOS() != llvm::Triple::Linux) {
         m_builder.CreateUnreachable();
         return {.type = panic_type, .value = panic};
     }
@@ -208,8 +207,8 @@ Value Codegen::create_core_panic() {
 
     m_builder.CreateCall(fputs_fn, {panic_begin_str, stderr_value});
 
-    auto* panic_message = panic->getArg(0);
-    Value panic_message_val{.type = u8_slice, .value = panic_message};
+    Value panic_message_val{
+        .type = u8_slice, .value = alloca_arg(0, u8_slice), .ptr_depth = 1};
 
     auto* message_len =
         load_struct_member(m_size, panic_message_val, slice_member_len);
@@ -265,8 +264,10 @@ void Codegen::create_core_mem() {
     m_builder.CreateStore(
         as_mut_u8_slice->getArg(1), as_mut_u8_slice_len_member);
 
-    m_builder.CreateRet(
-        m_builder.CreateLoad(m_slice_type, as_mut_u8_slice_result));
+    m_builder.CreateRet(m_builder.CreateLoad(
+        static_cast<llvm::FunctionType*>(as_mut_u8_slice_type->llvm_type)
+            ->getReturnType(),
+        as_mut_u8_slice_result));
 
     auto* as_u8_slice_type = get_fn_type(
         get_slice_type(u8_type, false), {get_ptr_type(u8_type, false), usize});
@@ -291,7 +292,10 @@ void Codegen::create_core_mem() {
     m_builder.CreateStore(as_u8_slice->getArg(0), as_u8_slice_ptr_member);
     m_builder.CreateStore(as_u8_slice->getArg(1), as_u8_slice_len_member);
 
-    m_builder.CreateRet(m_builder.CreateLoad(m_slice_type, as_u8_slice_result));
+    m_builder.CreateRet(m_builder.CreateLoad(
+        static_cast<llvm::FunctionType*>(as_u8_slice_type->llvm_type)
+            ->getReturnType(),
+        as_u8_slice_result));
 
     m_core_module.scopes["mem"].names = {
         {"as_mut_u8_slice",
@@ -523,9 +527,9 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
         return Value::poisoned();
     }
 
-    bool value_is_float = is_float(base_value_type);
-    bool value_is_sint = is_sint(base_value_type);
-    bool value_is_uint = is_uint(base_value_type) || value_is_rune;
+    bool value_is_float = base_value_type->is_float();
+    bool value_is_sint = base_value_type->is_sint();
+    bool value_is_uint = base_value_type->is_uint() || value_is_rune;
     bool value_is_ptr = is<types::Pointer>(base_value_type);
     bool value_is_enum = is<types::Enum>(base_value_type);
 
@@ -534,9 +538,9 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
         return Value::poisoned();
     }
 
-    bool type_is_float = is_float(base_type);
-    bool type_is_sint = is_sint(base_type);
-    bool type_is_uint = is_uint(base_type) || type_is_rune;
+    bool type_is_float = base_type->is_float();
+    bool type_is_sint = base_type->is_sint();
+    bool type_is_uint = base_type->is_uint() || type_is_rune;
     bool type_is_ptr = is<types::Pointer>(base_type);
     bool type_is_enum = is<types::Enum>(base_type);
 
@@ -598,13 +602,13 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
     } else if (
         value_is_sint ||
         (!implicit && value_is_enum &&
-         is_sint(static_cast<types::Enum*>(base_value_type)->type))) {
+         static_cast<types::Enum*>(base_value_type)->type->is_sint())) {
         if (type_is_float) {
             cast_op = SIToFP;
         } else if (
             type_is_sint ||
             (!implicit && type_is_enum &&
-             is_sint(static_cast<types::Enum*>(base_type)->type))) {
+             static_cast<types::Enum*>(base_type)->type->is_sint())) {
             if (to_size > from_size) {
                 cast_op = SExt;
             } else if (!implicit) {
@@ -614,7 +618,7 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
             !implicit &&
             (type_is_uint ||
              (type_is_enum &&
-              is_uint(static_cast<types::Enum*>(base_type)->type)))) {
+              static_cast<types::Enum*>(base_type)->type->is_uint()))) {
             if (to_size > from_size) {
                 cast_op = SExt;
             } else if (to_size < from_size) {
@@ -628,13 +632,13 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
     } else if (
         value_is_uint ||
         (!implicit && value_is_enum &&
-         is_uint(static_cast<types::Enum*>(base_value_type)->type))) {
+         static_cast<types::Enum*>(base_value_type)->type->is_uint())) {
         if (type_is_float) {
             cast_op = UIToFP;
         } else if (
             type_is_uint ||
             (!implicit && type_is_enum &&
-             is_uint(static_cast<types::Enum*>(base_type)->type))) {
+             static_cast<types::Enum*>(base_type)->type->is_uint())) {
             if (to_size > from_size) {
                 cast_op = ZExt;
             } else if (!implicit) {
@@ -643,7 +647,7 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
         } else if (
             type_is_sint ||
             (type_is_enum &&
-             is_sint(static_cast<types::Enum*>(base_type)->type))) {
+             static_cast<types::Enum*>(base_type)->type->is_sint())) {
             if (to_size > from_size) {
                 cast_op = ZExt;
             } else if (!implicit) {
@@ -877,7 +881,7 @@ Value Codegen::cast_or_error(
 
 Value Codegen::create_call(
     std::size_t offset, types::Function* type, llvm::Value* function,
-    const std::vector<std::unique_ptr<ast::Expression>>& arguments) {
+    const std::vector<OffsetValue<Value>>& arguments) {
     auto params_size = type->param_types.size();
     auto args_size = arguments.size();
     auto default_args_size = type->default_args.size();
@@ -900,8 +904,10 @@ Value Codegen::create_call(
         llvm_args.reserve(params_size);
     }
 
+    auto layout = m_module->getDataLayout();
+
     for (std::size_t i = 0; i < args_size; ++i) {
-        auto value = arguments[i]->codegen(*this);
+        auto value = arguments[i].value;
 
         if (!value.ok()) {
             return Value::poisoned();
@@ -939,9 +945,9 @@ Value Codegen::create_call(
                 continue;
             }
 
-            if (!is_sint(base_type) && !is_uint(base_type)) {
+            if (!base_type->is_sint() && !base_type->is_uint()) {
                 warning(
-                    arguments[i]->offset,
+                    arguments[i].offset,
                     "passing argument of type {} to a variadic function is "
                     "undefined behavior",
                     log::quoted(value.type->to_string()));
@@ -967,18 +973,63 @@ Value Codegen::create_call(
             continue;
         }
 
-        if (auto val = cast_or_error(
-                arguments[i]->offset, type->param_types[i], value);
-            val.ok()) {
-            llvm_args.push_back(load_rvalue(val).value);
-        } else {
+        auto val =
+            cast_or_error(arguments[i].offset, type->param_types[i], value);
+
+        if (!val.ok()) {
             return Value::poisoned();
         }
+
+        val = load_rvalue(val);
+
+        if (get_abi(m_triple) != Abi::SysV) {
+            llvm_args.push_back(val.value);
+            continue;
+        }
+
+        auto classification = sysv::classify(val.type->llvm_type, layout);
+
+        if (classification.first == sysv::RegClass::Memory) {
+            auto* variable = create_alloca(val.type->llvm_type);
+            m_builder.CreateStore(val.value, variable);
+            llvm_args.push_back(variable);
+
+            continue;
+        }
+
+        auto* lowered =
+            sysv::lower(val.type, classification, layout, m_context);
+
+        auto* variable = create_alloca(lowered);
+        m_builder.CreateStore(val.value, variable);
+
+        llvm_args.push_back(m_builder.CreateLoad(lowered, variable));
     }
 
     for (std::size_t i = default_args_size - (params_size - args_size);
          i < default_args_size; ++i) {
-        llvm_args.push_back(type->default_args[i]);
+        auto* arg = type->default_args[i];
+
+        auto* arg_type =
+            type->param_types[(params_size - default_args_size) + i];
+
+        auto classification = sysv::classify(arg_type->llvm_type, layout);
+
+        if (classification.first == sysv::RegClass::Memory) {
+            auto* variable = create_alloca(arg_type->llvm_type);
+            m_builder.CreateStore(arg, variable);
+            llvm_args.push_back(variable);
+
+            continue;
+        }
+
+        auto* lowered =
+            sysv::lower(arg_type, classification, layout, m_context);
+
+        auto* variable = create_alloca(lowered);
+        m_builder.CreateStore(arg, variable);
+
+        llvm_args.push_back(m_builder.CreateLoad(lowered, variable));
     }
 
     auto* call = m_builder.CreateCall(
@@ -990,10 +1041,21 @@ Value Codegen::create_call(
         }
     }
 
-    return {
-        .type = type->return_type,
-        .value = sret_result ? sret_result : call,
-        .memcpy = type->sret};
+    if (sret_result) {
+        return {
+            .type = type->return_type,
+            .value = sret_result,
+            .memcpy = type->sret};
+    }
+
+    if (is<types::Void, types::Never>(type->return_type)) {
+        return {.type = type->return_type};
+    }
+
+    auto* variable = create_alloca(type->return_type->llvm_type);
+    m_builder.CreateStore(call, variable);
+
+    return {.type = type->return_type, .value = variable, .ptr_depth = 1};
 }
 
 Value Codegen::load_rvalue(const Value& value) {
@@ -1273,6 +1335,32 @@ Codegen::resolve_scope(const std::vector<OffsetValue<std::string>>& value) {
     return scope;
 }
 
+llvm::Value* Codegen::alloca_arg(std::size_t index, Type* type) {
+    auto layout = m_module->getDataLayout();
+    auto* function = m_builder.GetInsertBlock()->getParent();
+
+    auto* value = function->getArg(index);
+    auto* variable = create_alloca(type);
+
+    if (get_abi(m_triple) != Abi::SysV) {
+        m_builder.CreateStore(value, variable);
+        return variable;
+    }
+
+    auto classification = sysv::classify(type->llvm_type, layout);
+
+    if (classification.first == sysv::RegClass::Memory) {
+        m_builder.CreateMemCpy(
+            variable, std::nullopt, value,
+            layout.getPrefTypeAlign(type->llvm_type),
+            layout.getTypeAllocSize(type->llvm_type));
+    } else {
+        m_builder.CreateStore(value, variable);
+    }
+
+    return variable;
+}
+
 void Codegen::type_mismatch(
     std::size_t offset, const Type* expected, const Type* got) {
     error(
@@ -1307,8 +1395,6 @@ void Codegen::report_invalid_attrs(
 }
 
 bool Codegen::matches_target(const ast::Declaration& decl) {
-    llvm::Triple triple{cent::g_options.target_triple};
-
     std::optional<bool> os_matches = std::nullopt;
     std::optional<bool> arch_matches = std::nullopt;
 
@@ -1318,7 +1404,7 @@ bool Codegen::matches_target(const ast::Declaration& decl) {
                 os_matches = false;
             }
 
-            if (os_type == triple.getOS()) {
+            if (os_type == m_triple.getOS()) {
                 os_matches = true;
             }
 
@@ -1330,7 +1416,7 @@ bool Codegen::matches_target(const ast::Declaration& decl) {
                 arch_matches = false;
             }
 
-            if (arch_type == triple.getArch()) {
+            if (arch_type == m_triple.getArch()) {
                 arch_matches = true;
             }
         }
@@ -1361,19 +1447,5 @@ bool Codegen::decl_get_attr(
 
     return false;
 }
-
-bool Codegen::is_float(const Type* type) {
-    return is<types::F32, types::F64>(type);
-};
-
-bool Codegen::is_sint(const Type* type) {
-    return is<types::I8, types::I16, types::I32, types::I64, types::ISize>(
-        type);
-};
-
-bool Codegen::is_uint(const Type* type) {
-    return is<types::U8, types::U16, types::U32, types::U64, types::USize>(
-        type);
-};
 
 } // namespace cent::backend

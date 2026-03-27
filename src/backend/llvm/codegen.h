@@ -6,7 +6,6 @@
 #include <map>
 #include <memory>
 #include <optional>
-#include <set>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -26,6 +25,8 @@
 #include "backend/llvm/types/primitive.h"
 
 #include "backend/llvm/scope.h"
+#include "backend/llvm/type.h"
+#include "backend/llvm/value.h"
 
 namespace cent::ast {
 
@@ -89,9 +90,6 @@ struct Declaration;
 } // namespace cent::ast
 
 namespace cent::backend {
-
-struct Value;
-struct Type;
 
 class Codegen {
 public:
@@ -187,7 +185,7 @@ private:
 
     [[nodiscard]] Value create_call(
         std::size_t offset, types::Function* type, llvm::Value* function,
-        const std::vector<std::unique_ptr<ast::Expression>>& arguments);
+        const std::vector<OffsetValue<Value>>& arguments);
 
     [[nodiscard]] Value load_rvalue(const Value& value);
     [[nodiscard]] Value load_lvalue(const Value& value);
@@ -285,6 +283,8 @@ private:
 
     void generate_fn_proto(const ast::FnDecl& decl);
 
+    [[nodiscard]] llvm::Value* alloca_arg(std::size_t index, Type* type);
+
     void
     type_mismatch(std::size_t offset, const Type* expected, const Type* got);
 
@@ -365,7 +365,7 @@ private:
         return result;
     }
 
-    [[nodiscard]] static bool matches_target(const ast::Declaration& decl);
+    [[nodiscard]] bool matches_target(const ast::Declaration& decl);
 
     [[nodiscard]] static bool
     decl_get_attr(const ast::Declaration& decl, std::string_view attr);
@@ -403,10 +403,6 @@ private:
 
         return std::nullopt;
     }
-
-    [[nodiscard]] static bool is_float(const Type* type);
-    [[nodiscard]] static bool is_sint(const Type* type);
-    [[nodiscard]] static bool is_uint(const Type* type);
 
     static constexpr auto optional_member_value = 0;
     static constexpr auto optional_member_bool = 1;
@@ -489,6 +485,8 @@ private:
     std::vector<std::unique_ptr<Type>> m_named_types;
 
     std::vector<std::filesystem::path> m_units;
+
+    llvm::Triple m_triple{g_options.target_triple};
 
     bool m_had_error{false};
 };

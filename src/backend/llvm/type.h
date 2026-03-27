@@ -57,6 +57,39 @@ struct Type {
 
     [[nodiscard]] virtual std::string to_string() const = 0;
 
+    [[nodiscard]] bool is_sint() const {
+        using enum Kind;
+        switch (kind) {
+        case I8:
+        case I16:
+        case I32:
+        case I64:
+        case ISize:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    [[nodiscard]] bool is_uint() const {
+        using enum Kind;
+
+        switch (kind) {
+        case U8:
+        case U16:
+        case U32:
+        case U64:
+        case USize:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    [[nodiscard]] bool is_float() const {
+        return kind == Kind::F32 || kind == Kind::F64;
+    }
+
     const Kind kind;
     llvm::Type* const llvm_type;
 };
