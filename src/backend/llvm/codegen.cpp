@@ -980,16 +980,21 @@ Value Codegen::create_call(
             return Value::poisoned();
         }
 
-        val = load_rvalue(val);
+        val = load_lvalue(val);
 
         if (get_abi(m_triple) != Abi::SysV) {
-            llvm_args.push_back(val.value);
+            llvm_args.push_back(load_rvalue(val).value);
             continue;
         }
 
         auto classification = sysv::classify(val.type->llvm_type, layout);
 
         if (classification.first == sysv::RegClass::Memory) {
+            if (val.ptr_depth == 1) {
+                llvm_args.push_back(val.value);
+                continue;
+            }
+
             auto* variable = create_alloca(val.type->llvm_type);
             m_builder.CreateStore(val.value, variable);
             llvm_args.push_back(variable);
@@ -997,8 +1002,15 @@ Value Codegen::create_call(
             continue;
         }
 
+        val = load_rvalue(val);
+
         auto* lowered =
             sysv::lower(val.type, classification, layout, m_context);
+
+        if (val.type->llvm_type == lowered) {
+            llvm_args.push_back(val.value);
+            continue;
+        }
 
         auto* variable = create_alloca(lowered);
         m_builder.CreateStore(val.value, variable);
@@ -1026,6 +1038,11 @@ Value Codegen::create_call(
         auto* lowered =
             sysv::lower(arg_type, classification, layout, m_context);
 
+        if (arg->getType() == lowered) {
+            llvm_args.push_back(arg);
+            continue;
+        }
+
         auto* variable = create_alloca(lowered);
         m_builder.CreateStore(arg, variable);
 
@@ -1050,6 +1067,10 @@ Value Codegen::create_call(
 
     if (is<types::Void, types::Never>(type->return_type)) {
         return {.type = type->return_type};
+    }
+
+    if (call->getType() == type->return_type->llvm_type) {
+        return {.type = type->return_type, .value = call};
     }
 
     auto* variable = create_alloca(type->return_type->llvm_type);

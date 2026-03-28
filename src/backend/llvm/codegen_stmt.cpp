@@ -310,7 +310,12 @@ Value Codegen::generate(const ast::ReturnStmt& stmt) {
         return Value::poisoned();
     }
 
-    auto* result = create_alloca(function->getReturnType());
+    if (return_type == val.type->llvm_type) {
+        m_builder.CreateRet(val.value);
+        return Value::poisoned();
+    }
+
+    auto* result = create_alloca(return_type);
 
     m_builder.CreateStore(val.value, result);
     m_builder.CreateRet(m_builder.CreateLoad(return_type, result));
