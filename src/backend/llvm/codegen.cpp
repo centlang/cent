@@ -531,10 +531,17 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
     bool value_is_sint = base_value_type->is_sint();
     bool value_is_uint = base_value_type->is_uint() || value_is_rune;
     bool value_is_ptr = is<types::Pointer>(base_value_type);
-    bool value_is_enum = is<types::Enum>(base_value_type);
 
-    if (!value_is_float && !value_is_sint && !value_is_uint && !value_is_ptr &&
-        !value_is_enum) {
+    if (!implicit) {
+        if (auto* type = dyn_cast<types::Enum>(base_value_type)) {
+            auto* base_underlying = unwrap_type(type->type);
+
+            value_is_sint = base_underlying->is_sint();
+            value_is_uint = base_underlying->is_uint();
+        }
+    }
+
+    if (!value_is_float && !value_is_sint && !value_is_uint && !value_is_ptr) {
         return Value::poisoned();
     }
 
@@ -542,7 +549,13 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
     bool type_is_sint = base_type->is_sint();
     bool type_is_uint = base_type->is_uint() || type_is_rune;
     bool type_is_ptr = is<types::Pointer>(base_type);
-    bool type_is_enum = is<types::Enum>(base_type);
+
+    if (!implicit) {
+        if (auto* type = dyn_cast<types::Enum>(base_type)) {
+            type_is_sint = type->type->is_sint();
+            type_is_uint = type->type->is_uint();
+        }
+    }
 
     if (auto* constant = llvm::dyn_cast<llvm::ConstantInt>(value.value)) {
         if (type_is_sint || type_is_uint) {
@@ -599,26 +612,16 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
         } else if (!implicit && type_is_uint) {
             cast_op = FPToUI;
         }
-    } else if (
-        value_is_sint ||
-        (!implicit && value_is_enum &&
-         static_cast<types::Enum*>(base_value_type)->type->is_sint())) {
+    } else if (value_is_sint) {
         if (type_is_float) {
             cast_op = SIToFP;
-        } else if (
-            type_is_sint ||
-            (!implicit && type_is_enum &&
-             static_cast<types::Enum*>(base_type)->type->is_sint())) {
+        } else if (type_is_sint) {
             if (to_size > from_size) {
                 cast_op = SExt;
             } else if (!implicit) {
                 cast_op = Trunc;
             }
-        } else if (
-            !implicit &&
-            (type_is_uint ||
-             (type_is_enum &&
-              static_cast<types::Enum*>(base_type)->type->is_uint()))) {
+        } else if (!implicit && type_is_uint) {
             if (to_size > from_size) {
                 cast_op = SExt;
             } else if (to_size < from_size) {
@@ -629,25 +632,16 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
         } else if (!implicit && type_is_ptr) {
             cast_op = IntToPtr;
         }
-    } else if (
-        value_is_uint ||
-        (!implicit && value_is_enum &&
-         static_cast<types::Enum*>(base_value_type)->type->is_uint())) {
+    } else if (value_is_uint) {
         if (type_is_float) {
             cast_op = UIToFP;
-        } else if (
-            type_is_uint ||
-            (!implicit && type_is_enum &&
-             static_cast<types::Enum*>(base_type)->type->is_uint())) {
+        } else if (type_is_uint) {
             if (to_size > from_size) {
                 cast_op = ZExt;
             } else if (!implicit) {
                 cast_op = Trunc;
             }
-        } else if (
-            type_is_sint ||
-            (type_is_enum &&
-             static_cast<types::Enum*>(base_type)->type->is_sint())) {
+        } else if (type_is_sint) {
             if (to_size > from_size) {
                 cast_op = ZExt;
             } else if (!implicit) {
