@@ -333,7 +333,10 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
             return Value::poisoned();
         }
 
-        if (!type->is_sint() && !type->is_uint() && !is<types::Bool>(type)) {
+        auto* base_type = unwrap_type(type);
+
+        if (!base_type->is_sint() && !base_type->is_uint() &&
+            !is<types::Bool>(base_type)) {
             error(decl.type->offset, "type mismatch");
             return Value::poisoned();
         }
