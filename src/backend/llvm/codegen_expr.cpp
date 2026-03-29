@@ -85,13 +85,13 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
             .is_mutable = pointer->is_mutable};
     }
     case And:
-        if (llvm::isa<llvm::Function>(value.value)) {
+        if (llvm::isa_and_nonnull<llvm::Function>(value.value)) {
             return Value{
                 .type = get_ptr_type(value.type, false), .value = value.value};
         }
 
-        if (!llvm::isa<llvm::AllocaInst>(value.value) &&
-            !llvm::isa<llvm::GetElementPtrInst>(value.value)) {
+        if (!llvm::isa_and_nonnull<llvm::AllocaInst>(value.value) &&
+            !llvm::isa_and_nonnull<llvm::GetElementPtrInst>(value.value)) {
             error(expr.offset, "taking the reference of a non-variable value");
             return Value::poisoned();
         }
@@ -419,8 +419,8 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
         value = load_rvalue(value);
         values.push_back(value);
 
-        if (!llvm::isa<llvm::Constant>(value.value) || value.ptr_depth > 0 ||
-            value.memcpy) {
+        if (!llvm::isa_and_nonnull<llvm::Constant>(value.value) ||
+            value.ptr_depth > 0 || value.memcpy) {
             is_const = false;
             continue;
         }
@@ -522,7 +522,7 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
             return Value::poisoned();
         }
 
-        if (!llvm::isa<llvm::Constant>(value.value) ||
+        if (!llvm::isa_and_nonnull<llvm::Constant>(value.value) ||
             array_type != value.type || value.ptr_depth > 0 || value.memcpy) {
             is_const = false;
         }
@@ -586,8 +586,8 @@ Value Codegen::generate(const ast::TupleLiteral& expr) {
             return Value::poisoned();
         }
 
-        if (!llvm::isa<llvm::Constant>(value.value) || value.ptr_depth > 0 ||
-            value.memcpy) {
+        if (!llvm::isa_and_nonnull<llvm::Constant>(value.value) ||
+            value.ptr_depth > 0 || value.memcpy) {
             is_const = false;
         }
 

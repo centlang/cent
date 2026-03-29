@@ -142,8 +142,19 @@ Value Codegen::generate(const ast::Struct& decl) {
         return Value::poisoned();
     }
 
-    auto* struct_type = llvm::StructType::create(
+    auto* llvm_struct_type = llvm::StructType::create(
         m_context, m_current_scope_prefix + decl.name.value);
+
+    m_named_types.push_back(std::make_unique<types::Struct>(
+        llvm_struct_type, m_current_scope_prefix + decl.name.value,
+        std::vector<Type*>{}, false));
+
+    auto* struct_type = static_cast<types::Struct*>(m_named_types.back().get());
+
+    m_current_scope->types[decl.name.value] = {
+        .element = struct_type,
+        .is_public = decl.is_public,
+        .unit = m_current_unit};
 
     struct Field {
         Type* type;
@@ -192,7 +203,7 @@ Value Codegen::generate(const ast::Struct& decl) {
             max_element);
 
         total_size += field.size;
-        m_members[struct_type][field.name] = i;
+        m_members[llvm_struct_type][field.name] = i;
     }
 
     if (!is_extern && !packed && max_element > 0) {
@@ -204,17 +215,10 @@ Value Codegen::generate(const ast::Struct& decl) {
         }
     }
 
-    bool has_tail = llvm_fields.size() != type_fields.size();
-    struct_type->setBody(llvm_fields, packed);
+    llvm_struct_type->setBody(llvm_fields, packed);
 
-    m_named_types.push_back(std::make_unique<types::Struct>(
-        struct_type, m_current_scope_prefix + decl.name.value,
-        std::move(type_fields), has_tail));
-
-    m_current_scope->types[decl.name.value] = {
-        .element = m_named_types.back().get(),
-        .is_public = decl.is_public,
-        .unit = m_current_unit};
+    struct_type->fields = type_fields;
+    struct_type->has_tail = llvm_fields.size() != type_fields.size();
 
     return Value::poisoned();
 }
@@ -453,7 +457,7 @@ Value Codegen::generate(const ast::VarDecl& decl) {
             }
         }
 
-        if (!llvm::isa<llvm::Constant>(value.value)) {
+        if (!llvm::isa_and_nonnull<llvm::Constant>(value.value)) {
             error(decl.value->offset, "not a constant");
             return Value::poisoned();
         }
