@@ -4,7 +4,7 @@ with c;
 
 pub fn as_cstr(s: []u8) *c::char {
     core::dbg_assert(s[s.len - 1] == '\0' as u8);
-    return &s[0] as *c::char;
+    return s.ptr as *c::char;
 }
 
 pub fn cstr_to(buf: []mut u8, s: []u8) {

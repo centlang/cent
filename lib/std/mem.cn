@@ -2,13 +2,13 @@ with c;
 
 pub fn equal(a: []u8, b: []u8) bool {
     return a.len == b.len && c::memcmp(
-        &a[0] as *c::void, &b[0] as *c::void, a.len
+        a.ptr as *c::void, b.ptr as *c::void, a.len
     ) == 0;
 }
 
 pub fn copy(dest: []mut u8, src: []u8) {
     core::dbg_assert(dest.len >= src.len);
-    c::memcpy(&dest[0] as *mut c::void, &src[0] as *c::void, src.len);
+    c::memcpy(dest.ptr as *mut c::void, src.ptr as *c::void, src.len);
 }
 
 pub fn copy_n(dest: *mut u8, src: *u8, len: usize) {

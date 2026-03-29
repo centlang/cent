@@ -181,7 +181,7 @@ pub fn write_u8(fd: Fd, byte: u8) {
 }
 
 pub fn write(fd: Fd, data: []u8) {
-    c::fwrite(&data[0] as *c::void, 1, data.len, fd._file);
+    c::fwrite(data.ptr as *c::void, 1, data.len, fd._file);
 }
 
 pub fn writeln(fd: Fd, data: []u8) {

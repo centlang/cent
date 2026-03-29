@@ -834,23 +834,41 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
         error(expr.member.offset, "member access of a non-structure type");
     };
 
+    parent = load_lvalue(parent);
+
     if (auto* slice = dyn_cast<types::Slice>(parent.type)) {
+        if (expr.member.value == "ptr") {
+            return get_struct_member(
+                get_ptr_type(slice->type, slice->is_mutable), parent,
+                slice_member_ptr);
+        }
+
         if (expr.member.value != "len") {
             not_a_struct();
             return Value::poisoned();
         }
 
-        auto* usize = m_primitive_types["usize"].get();
-
-        return Value{
-            .type = usize,
-            .value = m_builder.CreateLoad(
-                usize->llvm_type,
-                m_builder.CreateStructGEP(
-                    m_slice_type, parent.value, slice_member_len))};
+        return get_struct_member(
+            m_primitive_types["usize"].get(), parent, slice_member_len);
     }
 
     if (auto* array = dyn_cast<types::Array>(parent.type)) {
+        if (expr.member.value == "ptr") {
+            if (parent.ptr_depth == 0) {
+                error(
+                    expr.member.offset, "cannot get pointer to constant data");
+
+                return Value::poisoned();
+            }
+
+            return Value{
+                .type = get_ptr_type(array->type, parent.is_mutable),
+                .value = m_builder.CreateGEP(
+                    array->llvm_type, parent.value,
+                    {llvm::ConstantInt::get(m_size, 0),
+                     llvm::ConstantInt::get(m_size, 0)})};
+        }
+
         if (expr.member.value != "len") {
             not_a_struct();
             return Value::poisoned();
@@ -864,6 +882,14 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
     }
 
     if (auto* array = dyn_cast<types::VarLenArray>(parent.type)) {
+        if (expr.member.value == "ptr") {
+            return Value{
+                .type = get_ptr_type(array->type, parent.is_mutable),
+                .value = m_builder.CreateGEP(
+                    array->type->llvm_type, parent.value,
+                    llvm::ConstantInt::get(m_size, 0))};
+        }
+
         if (expr.member.value != "len") {
             not_a_struct();
             return Value::poisoned();
