@@ -545,6 +545,10 @@ Value Codegen::generate(const ast::VarDecl& decl) {
             }
         }
 
+        if (!is_extern && !constant) {
+            constant = llvm::Constant::getNullValue(type->llvm_type);
+        }
+
         llvm::GlobalVariable* global = nullptr;
 
         if (is_extern) {
