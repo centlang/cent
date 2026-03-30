@@ -54,6 +54,7 @@ pub const STDERR_FILENO = 2;
         pub fn waitpid(pid: pid_t, wstatus: ?*c::int, options: c::int) pid_t;
         pub fn _exit(status: c::int);
         pub fn kill(pid: pid_t, sig: c::int) c::int;
+        pub fn getpid() pid_t;
 
         pub fn execve(
             path: *c::char, argv: *mut ?*c::char, envp: *mut ?*c::char
@@ -83,7 +84,6 @@ pub const STDERR_FILENO = 2;
         pub fn mkdir(path: *c::char, mode: mode_t) c::int;
 
         pub fn signal(signum: c::int, handler: sighandler_t) sighandler_t;
-
         pub fn pause() c::int;
     }
 }
