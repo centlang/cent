@@ -17,6 +17,7 @@ pub const STDERR_FILENO = 2;
         pub const SIGINT = 2;
         pub const SIGKILL = 9;
         pub const SIGTERM = 15;
+        pub const SIGCHLD = 17;
 
         pub const O_RDONLY = 0;
         pub const O_WRONLY = 1;
@@ -37,7 +38,11 @@ pub const STDERR_FILENO = 2;
         pub const S_ISUID = 0o4000;
         pub const S_ISGID = 0o2000;
         pub const S_ISVTX = 0o1000;
+
+        pub const WNOHANG = 1;
     }
+
+    pub type sighandler_t = *fn(signal: c::int);
 
     #(extern) {
         pub fn open(path: *c::char, flags: c::int, mode: mode_t);
@@ -76,5 +81,9 @@ pub const STDERR_FILENO = 2;
         pub fn munmap(length: usize, addr: *mut c::void, length: usize) c::int;
 
         pub fn mkdir(path: *c::char, mode: mode_t) c::int;
+
+        pub fn signal(signum: c::int, handler: sighandler_t) sighandler_t;
+
+        pub fn pause() c::int;
     }
 }
