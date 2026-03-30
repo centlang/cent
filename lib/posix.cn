@@ -54,6 +54,20 @@ pub const STDERR_FILENO = 2;
             path: *c::char, argv: *mut ?*c::char, envp: *mut ?*c::char
         ) c::int;
 
+        pub fn execl(path: *c::char, arg: ?*c::char, ...) c::int;
+        pub fn execlp(file: *c::char, arg: ?*c::char, ...) c::int;
+
+        pub fn execle(
+            path: *c::char, arg: ?*c::char, envp: *mut ?*c::char
+        ) c::int;
+
+        pub fn execv(path: *c::char, argv: *mut ?*c::char) c::int;
+        pub fn execvp(file: *c::char, argv: *mut ?*c::char) c::int;
+
+        pub fn execvpe(
+            file: *c::char, argv: *mut ?*c::char, envp: *mut ?*c::char
+        ) c::int;
+
         pub fn mmap(
             addr: *mut c::void, length: usize, prot: c::int, flags: c::int,
             fd: c::int, offset: off_t
