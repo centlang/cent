@@ -9,7 +9,9 @@ include(FetchContent)
 set(FETCHCONTENT_QUIET OFF)
 
 option(CENTC_STATIC "Build static executable" OFF)
+
 option(CENTC_USE_SYSTEM_LLVM "Use system-wide LLVM" OFF)
+option(CENTC_USE_SYSTEM_FMT "Use system-wide fmt" OFF)
 
 set(
     CENTC_ARCH
@@ -120,17 +122,21 @@ if(CENTC_STATIC)
     endif()
 endif()
 
-message(STATUS "Fetching fmt...")
+if(CENTC_USE_SYSTEM_FMT)
+    find_package(fmt REQUIRED CONFIG)
+else()
+    message(STATUS "Fetching fmt...")
 
-FetchContent_Declare(
-    fmt
-    GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-    GIT_TAG 11.1.4
-    GIT_PROGRESS ON
-    EXCLUDE_FROM_ALL
-)
+    FetchContent_Declare(
+        fmt
+        GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+        GIT_TAG 11.1.4
+        GIT_PROGRESS ON
+        EXCLUDE_FROM_ALL
+    )
 
-FetchContent_MakeAvailable(fmt)
+    FetchContent_MakeAvailable(fmt)
+endif()
 
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
 add_executable(centc ${SOURCES})
