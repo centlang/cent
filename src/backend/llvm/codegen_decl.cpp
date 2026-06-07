@@ -17,7 +17,6 @@
 #include "backend/llvm/types/struct.h"
 #include "backend/llvm/types/union.h"
 
-#include "backend/llvm/abi.h"
 #include "backend/llvm/codegen.h"
 
 namespace cent::backend {
