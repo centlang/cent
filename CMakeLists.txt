@@ -9,7 +9,7 @@ include(FetchContent)
 set(FETCHCONTENT_QUIET OFF)
 
 option(CENTC_STATIC "Build static executable" OFF)
-option(CENTC_USE_SYSTEM_LLVM "Use system-wide LLVM library" OFF)
+option(CENTC_USE_SYSTEM_LLVM "Use system-wide LLVM" OFF)
 
 set(
     CENTC_ARCH
@@ -24,7 +24,18 @@ endif()
 set(CENTC_SYSTEM "${CMAKE_SYSTEM_NAME}" CACHE STRING "Target system")
 set(CENTC_LLVM_VERSION "20.1.8" CACHE STRING "LLVM version to download")
 
-if(NOT CENTC_USE_SYSTEM_LLVM)
+if(CENTC_USE_SYSTEM_LLVM)
+    find_program(LLVM_CONFIG_EXE llvm-config)
+
+    if(LLVM_CONFIG_EXE)
+        execute_process(
+            COMMAND "${LLVM_CONFIG_EXE}" --cmakedir
+            OUTPUT_VARIABLE LLVM_CMAKE_DIR OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+
+        list(APPEND CMAKE_PREFIX_PATH "${LLVM_CMAKE_DIR}")
+    endif()
+else()
     if(CENTC_SYSTEM STREQUAL "Linux")
         string(
             CONCAT LLVM_URL
@@ -59,7 +70,7 @@ if(NOT CENTC_USE_SYSTEM_LLVM)
     )
 
     FetchContent_MakeAvailable(llvm)
-    list(APPEND CMAKE_PREFIX_PATH ${llvm_SOURCE_DIR})
+    list(APPEND CMAKE_PREFIX_PATH "${llvm_SOURCE_DIR}")
 endif()
 
 find_package(LLVM REQUIRED CONFIG)
