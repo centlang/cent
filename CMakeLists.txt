@@ -11,6 +11,8 @@ set(FETCHCONTENT_QUIET OFF)
 option(CENTC_STATIC "Build static executable" OFF)
 
 option(CENTC_USE_SYSTEM_LLVM "Use system-wide LLVM" OFF)
+option(CENTC_USE_SHARED_LLVM "Link with shared LLVM library" OFF)
+
 option(CENTC_USE_SYSTEM_FMT "Use system-wide fmt" OFF)
 
 set(
@@ -142,7 +144,14 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
 add_executable(centc ${SOURCES})
 
 target_include_directories(centc PRIVATE src ${LLVM_INCLUDE_DIRS})
-target_link_libraries(centc PRIVATE ${LLVM_LIBS} fmt::fmt)
+
+if(CENTC_USE_SHARED_LLVM)
+    llvm_config(centc USE_SHARED all)
+else()
+    target_link_libraries(centc PRIVATE ${LLVM_LIBS})
+endif()
+
+target_link_libraries(centc PRIVATE fmt::fmt)
 
 install(TARGETS centc)
 install(DIRECTORY lib/ DESTINATION lib/cent)
