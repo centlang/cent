@@ -266,21 +266,17 @@ std::optional<ast::FnProto> Parser::parse_fn_proto() {
             std::move(type), std::move(value), is_mutable);
     };
 
-    auto parse_params = [&] {
-        if (match(Mut, Identifier, Ellipsis)) {
-            parse_param();
-
-            while (!variadic && match_next(Comma)) {
-                parse_param();
-            }
-        }
-    };
-
     if (!expect("`(`", LeftParen)) {
         return std::nullopt;
     }
 
-    parse_params();
+    if (match(Mut, Identifier, Ellipsis)) {
+        parse_param();
+
+        while (!variadic && match_next(Comma)) {
+            parse_param();
+        }
+    }
 
     if (!expect("`)`", RightParen)) {
         return std::nullopt;
