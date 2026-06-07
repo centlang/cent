@@ -23,7 +23,12 @@ Codegen::Codegen(
   m_program{std::move(program)}, m_filename{filename},
   m_units{std::filesystem::absolute(filename).parent_path()} {
     m_module->setDataLayout(layout);
+
+#if LLVM_VERSION_MAJOR >= 21
+    m_module->setTargetTriple(llvm::Triple{g_options.target_triple});
+#else
     m_module->setTargetTriple(g_options.target_triple);
+#endif
 }
 
 std::unique_ptr<llvm::Module> Codegen::generate() {
