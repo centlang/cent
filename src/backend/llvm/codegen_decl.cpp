@@ -144,9 +144,10 @@ Value Codegen::generate(const ast::Struct& decl) {
     auto* llvm_struct_type = llvm::StructType::create(
         m_context, m_current_scope_prefix + decl.name.value);
 
-    m_named_types.push_back(std::make_unique<types::Struct>(
-        llvm_struct_type, m_current_scope_prefix + decl.name.value,
-        std::vector<Type*>{}, false));
+    m_named_types.push_back(
+        std::make_unique<types::Struct>(
+            llvm_struct_type, m_current_scope_prefix + decl.name.value,
+            std::vector<Type*>{}, false));
 
     auto* struct_type = static_cast<types::Struct*>(m_named_types.back().get());
 
@@ -209,8 +210,9 @@ Value Codegen::generate(const ast::Struct& decl) {
         auto rem = total_size % max_element;
 
         if (rem != 0) {
-            llvm_fields.push_back(llvm::ArrayType::get(
-                llvm::Type::getInt8Ty(m_context), max_element - rem));
+            llvm_fields.push_back(
+                llvm::ArrayType::get(
+                    llvm::Type::getInt8Ty(m_context), max_element - rem));
         }
     }
 
@@ -274,9 +276,10 @@ Value Codegen::generate(const ast::Union& decl) {
     if (untagged) {
         struct_type->setBody(max_type);
 
-        m_named_types.push_back(std::make_unique<types::Union>(
-            struct_type, m_current_scope_prefix + decl.name.value,
-            std::move(fields)));
+        m_named_types.push_back(
+            std::make_unique<types::Union>(
+                struct_type, m_current_scope_prefix + decl.name.value,
+                std::move(fields)));
 
         m_current_scope->types[decl.name.value] = {
             .element = m_named_types.back().get(),
@@ -288,9 +291,10 @@ Value Codegen::generate(const ast::Union& decl) {
 
     auto* underlying = m_primitive_types["i32"].get();
 
-    m_named_types.push_back(std::make_unique<types::Enum>(
-        underlying->llvm_type,
-        m_current_scope_prefix + decl.name.value + "(tag)", underlying));
+    m_named_types.push_back(
+        std::make_unique<types::Enum>(
+            underlying->llvm_type,
+            m_current_scope_prefix + decl.name.value + "(tag)", underlying));
 
     auto* tag_type = static_cast<types::Enum*>(m_named_types.back().get());
 
@@ -306,9 +310,10 @@ Value Codegen::generate(const ast::Union& decl) {
 
     struct_type->setBody({max_type, underlying->llvm_type});
 
-    m_named_types.push_back(std::make_unique<types::Union>(
-        struct_type, m_current_scope_prefix + decl.name.value,
-        std::move(fields), tag_type));
+    m_named_types.push_back(
+        std::make_unique<types::Union>(
+            struct_type, m_current_scope_prefix + decl.name.value,
+            std::move(fields), tag_type));
 
     m_current_scope->types[decl.name.value] = {
         .element = m_named_types.back().get(),
@@ -347,9 +352,10 @@ Value Codegen::generate(const ast::EnumDecl& decl) {
         underlying = type;
     }
 
-    m_named_types.push_back(std::make_unique<types::Enum>(
-        underlying->llvm_type, m_current_scope_prefix + decl.name.value,
-        underlying));
+    m_named_types.push_back(
+        std::make_unique<types::Enum>(
+            underlying->llvm_type, m_current_scope_prefix + decl.name.value,
+            underlying));
 
     m_current_scope->types[decl.name.value] = {
         .element = m_named_types.back().get(),
@@ -414,9 +420,10 @@ Value Codegen::generate(const ast::TypeAlias& decl) {
         return Value::poisoned();
     }
 
-    m_named_types.push_back(std::make_unique<types::Alias>(
-        type->llvm_type, m_current_scope_prefix + decl.name.value, type,
-        distinct));
+    m_named_types.push_back(
+        std::make_unique<types::Alias>(
+            type->llvm_type, m_current_scope_prefix + decl.name.value, type,
+            distinct));
 
     m_current_scope->types[decl.name.value] = {
         .element = m_named_types.back().get(),

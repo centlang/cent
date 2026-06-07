@@ -447,9 +447,10 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
         }
 
         if (struct_type->has_tail) {
-            llvm_values.push_back(llvm::UndefValue::get(
-                static_cast<llvm::StructType*>(struct_type->llvm_type)
-                    ->getElementType(struct_type->fields.size())));
+            llvm_values.push_back(
+                llvm::UndefValue::get(
+                    static_cast<llvm::StructType*>(struct_type->llvm_type)
+                        ->getElementType(struct_type->fields.size())));
         }
 
         return Value{

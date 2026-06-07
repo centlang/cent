@@ -1200,8 +1200,9 @@ void Parser::parse_switch(ast::BlockStmt& block) {
         return;
     }
 
-    block.body.push_back(std::make_unique<ast::Switch>(
-        offset, std::move(value), std::move(cases), std::move(else_block)));
+    block.body.push_back(
+        std::make_unique<ast::Switch>(
+            offset, std::move(value), std::move(cases), std::move(else_block)));
 }
 
 void Parser::parse_while(ast::BlockStmt& block) {
@@ -1218,8 +1219,9 @@ void Parser::parse_while(ast::BlockStmt& block) {
         return;
     }
 
-    block.body.push_back(std::make_unique<ast::WhileLoop>(
-        offset, std::move(condition), std::move(body)));
+    block.body.push_back(
+        std::make_unique<ast::WhileLoop>(
+            offset, std::move(condition), std::move(body)));
 }
 
 void Parser::parse_for(ast::BlockStmt& block) {
@@ -1253,10 +1255,12 @@ void Parser::parse_for(ast::BlockStmt& block) {
         return;
     }
 
-    block.body.push_back(std::make_unique<ast::ForLoop>(
-        offset, is_mutable,
-        OffsetValue{.value = std::move(name->value), .offset = name->offset},
-        std::move(value), std::move(body)));
+    block.body.push_back(
+        std::make_unique<ast::ForLoop>(
+            offset, is_mutable,
+            OffsetValue{
+                .value = std::move(name->value), .offset = name->offset},
+            std::move(value), std::move(body)));
 }
 
 void Parser::parse_return(ast::BlockStmt& block) {
@@ -1285,9 +1289,10 @@ void Parser::parse_assignment(
         return;
     }
 
-    block.body.push_back(std::make_unique<ast::Assignment>(
-        variable->offset, std::move(variable), std::move(value),
-        OffsetValue{.value = oper.type, .offset = oper.offset}));
+    block.body.push_back(
+        std::make_unique<ast::Assignment>(
+            variable->offset, std::move(variable), std::move(value),
+            OffsetValue{.value = oper.type, .offset = oper.offset}));
 }
 
 std::vector<ast::Struct::Field> Parser::parse_fields() {
