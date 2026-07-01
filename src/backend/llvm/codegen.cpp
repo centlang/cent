@@ -1061,6 +1061,7 @@ Value Codegen::create_call(
         return {
             .type = type->return_type,
             .value = sret_result,
+            .ptr_depth = 1,
             .memcpy = type->sret};
     }
 
