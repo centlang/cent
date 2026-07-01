@@ -37,9 +37,9 @@ struct Options {
 
     bool colorize =
 #ifdef _WIN32
-        _isatty(_fileno(stdout));
+        _isatty(_fileno(stderr));
 #else
-        isatty(fileno(stdout));
+        isatty(fileno(stderr));
 #endif
 };
 
