@@ -79,7 +79,7 @@ pub const STDERR_FILENO = 2;
             fd: c::int, offset: off_t
         ) *mut c::void;
 
-        pub fn munmap(length: usize, addr: *mut c::void, length: usize) c::int;
+        pub fn munmap(addr: *mut c::void, length: usize) c::int;
 
         pub fn mkdir(path: *c::char, mode: mode_t) c::int;
 
