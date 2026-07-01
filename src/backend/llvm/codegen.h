@@ -49,6 +49,7 @@ struct WhileLoop;
 struct ForLoop;
 struct BreakStmt;
 struct ContinueStmt;
+struct DeferStmt;
 struct Unreachable;
 
 struct BinaryExpr;
@@ -84,6 +85,7 @@ struct TypeAlias;
 
 struct VarDecl;
 
+struct Statement;
 struct Expression;
 struct Declaration;
 
@@ -119,6 +121,7 @@ public:
     Value generate(const ast::ForLoop& stmt);
     Value generate(const ast::BreakStmt& stmt);
     Value generate(const ast::ContinueStmt& stmt);
+    Value generate(const ast::DeferStmt& stmt);
     Value generate(const ast::Unreachable& stmt);
 
     [[nodiscard]] Value generate(const ast::BinaryExpr& expr);
@@ -432,6 +435,14 @@ private:
 
     llvm::BasicBlock* m_loop_continue{nullptr};
     llvm::BasicBlock* m_loop_end{nullptr};
+    std::size_t m_loop_defer_depth{0};
+
+    std::vector<std::vector<const ast::Statement*>> m_defer_scopes;
+
+    void push_defer_scope();
+    void pop_defer_scope();
+
+    void consume_deferred(std::size_t depth = 0);
 
     std::string m_current_scope_prefix{"<main>::"};
 

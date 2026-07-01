@@ -339,8 +339,7 @@ void Lexer::escape_seq() {
         hex.reserve(count);
 
         for (std::uint8_t i = 0; i < count; ++i) {
-            if (eof() ||
-                !std::isxdigit(static_cast<unsigned char>(peek()))) {
+            if (eof() || !std::isxdigit(static_cast<unsigned char>(peek()))) {
                 invalid_unicode();
                 return std::nullopt;
             }
@@ -643,6 +642,11 @@ void Lexer::ident() {
 
     if (m_token.value == "return") {
         keyword(Return);
+        return;
+    }
+
+    if (m_token.value == "defer") {
+        keyword(Defer);
         return;
     }
 

@@ -6,6 +6,7 @@
 #include "ast/stmt/block_stmt.h"
 #include "ast/stmt/break_stmt.h"
 #include "ast/stmt/continue_stmt.h"
+#include "ast/stmt/defer_stmt.h"
 #include "ast/stmt/for_loop.h"
 #include "ast/stmt/if_else.h"
 #include "ast/stmt/return_stmt.h"
@@ -93,12 +94,42 @@ Value Codegen::generate([[maybe_unused]] const ast::Assignment& stmt) {
     return Value::poisoned();
 }
 
+void Codegen::push_defer_scope() { m_defer_scopes.emplace_back(); }
+
+void Codegen::pop_defer_scope() {
+    auto scope = std::move(m_defer_scopes.back());
+    m_defer_scopes.pop_back();
+
+    for (std::size_t i = scope.size(); i > 0; --i) {
+        scope[i - 1]->codegen(*this);
+    }
+}
+
+void Codegen::consume_deferred(std::size_t depth) {
+    for (std::size_t i = m_defer_scopes.size(); i-- > depth;) {
+        auto scope = std::move(m_defer_scopes[i]);
+
+        for (std::size_t j = scope.size(); j > 0; --j) {
+            scope[j - 1]->codegen(*this);
+        }
+    }
+}
+
+Value Codegen::generate([[maybe_unused]] const ast::DeferStmt& stmt) {
+    m_defer_scopes.back().push_back(stmt.stmt.get());
+    return Value::poisoned();
+}
+
 Value Codegen::generate(const ast::BlockStmt& stmt) {
+    push_defer_scope();
+
     auto current_scope = *m_current_scope;
 
     for (const auto& statement : stmt.body) {
         statement->codegen(*this);
     }
+
+    pop_defer_scope();
 
     *m_current_scope = std::move(current_scope);
 
@@ -262,6 +293,8 @@ Value Codegen::generate(const ast::ReturnStmt& stmt) {
             return Value::poisoned();
         }
 
+        consume_deferred();
+
         if (!m_builder.GetInsertBlock()->getTerminator()) {
             m_builder.CreateRetVoid();
         }
@@ -282,6 +315,8 @@ Value Codegen::generate(const ast::ReturnStmt& stmt) {
         return Value::poisoned();
     }
 
+    consume_deferred();
+
     if (m_builder.GetInsertBlock()->getTerminator()) {
         return Value::poisoned();
     }
@@ -292,8 +327,6 @@ Value Codegen::generate(const ast::ReturnStmt& stmt) {
     }
 
     if (m_current_function->sret) {
-        auto* function = m_builder.GetInsertBlock()->getParent();
-
         m_builder.CreateStore(load_rvalue(val).value, function->getArg(0));
         m_builder.CreateRetVoid();
 
@@ -327,7 +360,9 @@ Value Codegen::generate(const ast::WhileLoop& stmt) {
 
     auto* loop_continue = m_loop_continue;
     auto* loop_end = m_loop_end;
+    auto loop_defer_depth = m_loop_defer_depth;
 
+    m_loop_defer_depth = m_defer_scopes.size();
     m_loop_continue = llvm::BasicBlock::Create(m_context, "", function);
     m_loop_end = llvm::BasicBlock::Create(m_context, "", function);
 
@@ -347,10 +382,14 @@ Value Codegen::generate(const ast::WhileLoop& stmt) {
     m_builder.SetInsertPoint(loop_body);
 
     stmt.body->codegen(*this);
-    m_builder.CreateBr(m_loop_continue);
+
+    if (!m_builder.GetInsertBlock()->getTerminator()) {
+        m_builder.CreateBr(m_loop_continue);
+    }
 
     m_builder.SetInsertPoint(m_loop_end);
 
+    m_loop_defer_depth = loop_defer_depth;
     m_loop_continue = loop_continue;
     m_loop_end = loop_end;
 
@@ -368,9 +407,11 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
     auto* loop_continue = m_loop_continue;
     auto* loop_end = m_loop_end;
+    auto loop_defer_depth = m_loop_defer_depth;
 
     auto* loop_body = llvm::BasicBlock::Create(m_context, "", function);
 
+    m_loop_defer_depth = m_defer_scopes.size();
     m_loop_continue = llvm::BasicBlock::Create(m_context, "", function);
     m_loop_end = llvm::BasicBlock::Create(m_context, "", function);
 
@@ -410,7 +451,9 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
         stmt.body->codegen(*this);
 
-        m_builder.CreateBr(m_loop_continue);
+        if (!m_builder.GetInsertBlock()->getTerminator()) {
+            m_builder.CreateBr(m_loop_continue);
+        }
 
         *m_current_scope = current_scope;
 
@@ -427,6 +470,7 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
         m_builder.SetInsertPoint(m_loop_end);
 
+        m_loop_defer_depth = loop_defer_depth;
         m_loop_continue = loop_continue;
         m_loop_end = loop_end;
 
@@ -466,7 +510,9 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
         stmt.body->codegen(*this);
 
-        m_builder.CreateBr(m_loop_continue);
+        if (!m_builder.GetInsertBlock()->getTerminator()) {
+            m_builder.CreateBr(m_loop_continue);
+        }
 
         *m_current_scope = current_scope;
 
@@ -483,6 +529,7 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
         m_builder.SetInsertPoint(m_loop_end);
 
+        m_loop_defer_depth = loop_defer_depth;
         m_loop_continue = loop_continue;
         m_loop_end = loop_end;
 
@@ -521,7 +568,9 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
         stmt.body->codegen(*this);
 
-        m_builder.CreateBr(m_loop_continue);
+        if (!m_builder.GetInsertBlock()->getTerminator()) {
+            m_builder.CreateBr(m_loop_continue);
+        }
 
         *m_current_scope = current_scope;
 
@@ -538,6 +587,7 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
         m_builder.SetInsertPoint(m_loop_end);
 
+        m_loop_defer_depth = loop_defer_depth;
         m_loop_continue = loop_continue;
         m_loop_end = loop_end;
 
@@ -594,7 +644,9 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
     stmt.body->codegen(*this);
 
-    m_builder.CreateBr(m_loop_continue);
+    if (!m_builder.GetInsertBlock()->getTerminator()) {
+        m_builder.CreateBr(m_loop_continue);
+    }
 
     *m_current_scope = current_scope;
 
@@ -611,6 +663,7 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
     m_builder.SetInsertPoint(m_loop_end);
 
+    m_loop_defer_depth = loop_defer_depth;
     m_loop_continue = loop_continue;
     m_loop_end = loop_end;
 
@@ -624,6 +677,7 @@ Value Codegen::generate(const ast::BreakStmt& stmt) {
         return Value::poisoned();
     }
 
+    consume_deferred(m_loop_defer_depth);
     m_builder.CreateBr(m_loop_end);
 
     return Value::poisoned();
@@ -636,6 +690,7 @@ Value Codegen::generate(const ast::ContinueStmt& stmt) {
         return Value::poisoned();
     }
 
+    consume_deferred(m_loop_defer_depth);
     m_builder.CreateBr(m_loop_continue);
 
     return Value::poisoned();

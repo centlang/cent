@@ -104,6 +104,7 @@ struct Token {
         Const,
 
         Return,
+        Defer,
 
         Break,
         Continue,

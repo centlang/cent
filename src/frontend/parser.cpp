@@ -15,6 +15,7 @@
 #include "ast/stmt/assignment.h"
 #include "ast/stmt/break_stmt.h"
 #include "ast/stmt/continue_stmt.h"
+#include "ast/stmt/defer_stmt.h"
 #include "ast/stmt/for_loop.h"
 #include "ast/stmt/return_stmt.h"
 #include "ast/stmt/switch.h"
@@ -59,79 +60,71 @@ std::unique_ptr<ast::Module> Parser::parse() {
     return result;
 }
 
-void Parser::expect_stmt(ast::BlockStmt& block) {
+std::unique_ptr<ast::Statement> Parser::expect_stmt() {
     using enum Token::Type;
 
     auto expect_semicolon = [&] { expect("`;`", Token::Type::Semicolon); };
 
     switch (peek().type) {
     case LeftBrace:
-        if (auto stmt = expect_block()) {
-            block.body.push_back(std::move(stmt));
-        }
-
-        return;
+        return expect_block();
     case If:
-        if (auto stmt = parse_if_else()) {
-            block.body.push_back(std::move(stmt));
+        return parse_if_else();
+    case Switch:
+        return parse_switch();
+    case While:
+        return parse_while();
+    case For:
+        return parse_for();
+    case Return: {
+        auto stmt = parse_return();
+        expect_semicolon();
+        return stmt;
+    }
+    case Break: {
+        auto stmt = std::make_unique<ast::BreakStmt>(get().offset);
+        expect_semicolon();
+        return stmt;
+    }
+    case Continue: {
+        auto stmt = std::make_unique<ast::ContinueStmt>(get().offset);
+        expect_semicolon();
+        return stmt;
+    }
+    case Defer: {
+        auto offset = get().offset;
+
+        if (auto stmt = expect_stmt()) {
+            return std::make_unique<ast::DeferStmt>(offset, std::move(stmt));
         }
 
-        return;
-    case Switch:
-        parse_switch(block);
-        return;
-    case While:
-        parse_while(block);
-        return;
-    case For:
-        parse_for(block);
-        return;
-    case Return:
-        parse_return(block);
+        return nullptr;
+    }
+    case Unreachable: {
+        auto stmt = std::make_unique<ast::Unreachable>(get().offset);
         expect_semicolon();
-        return;
-    case Break:
-        block.body.push_back(std::make_unique<ast::BreakStmt>(get().offset));
-        expect_semicolon();
-        return;
-    case Continue:
-        block.body.push_back(std::make_unique<ast::ContinueStmt>(get().offset));
-        expect_semicolon();
-        return;
-    case Unreachable:
-        block.body.push_back(std::make_unique<ast::Unreachable>(get().offset));
-        expect_semicolon();
-        return;
-    case Hash:
-    case Type:
-    case Union:
-    case Enum:
-    case Let:
-    case Mut:
-    case Const:
-        parse_decl(block.body);
-        return;
-    default:
+        return stmt;
+    }
+    default: {
         auto value = expect_expr(false);
 
         if (!value) {
             next();
-            return;
+            return nullptr;
         }
 
         if (!match(
                 Equal, PlusEqual, MinusEqual, StarEqual, SlashEqual,
                 PercentEqual, AndEqual, OrEqual, XorEqual)) {
-            block.body.push_back(std::move(value));
             expect_semicolon();
-
-            return;
+            return value;
         }
 
-        parse_assignment(block, std::move(value));
+        auto stmt = parse_assignment(std::move(value));
         expect_semicolon();
 
-        return;
+        return stmt;
+    }
     }
 }
 
@@ -897,6 +890,7 @@ void Parser::parse_toplevel(
 }
 
 std::unique_ptr<ast::BlockStmt> Parser::expect_block() {
+    using enum Token::Type;
     auto result = std::make_unique<ast::BlockStmt>(peek().offset);
 
     if (!expect("`{`", Token::Type::LeftBrace)) {
@@ -917,7 +911,14 @@ std::unique_ptr<ast::BlockStmt> Parser::expect_block() {
             continue;
         }
 
-        expect_stmt(*result);
+        if (match(Type, Union, Enum, Let, Mut, Const, Hash)) {
+            parse_decl(result->body);
+            continue;
+        }
+
+        if (auto stmt = expect_stmt()) {
+            result->body.push_back(std::move(stmt));
+        }
     }
 
     return result;
@@ -1139,16 +1140,16 @@ std::unique_ptr<ast::Type> Parser::expect_type() {
         offset, std::move(value), std::move(template_args));
 }
 
-void Parser::parse_switch(ast::BlockStmt& block) {
+std::unique_ptr<ast::Statement> Parser::parse_switch() {
     auto offset = get().offset;
     auto value = expect_expr(true);
 
     if (!value) {
-        return;
+        return nullptr;
     }
 
     if (!expect("`{`", Token::Type::LeftBrace)) {
-        return;
+        return nullptr;
     }
 
     std::vector<ast::Switch::Case> cases;
@@ -1160,7 +1161,7 @@ void Parser::parse_switch(ast::BlockStmt& block) {
         auto value = expect_expr(true);
 
         if (!value) {
-            return;
+            return nullptr;
         }
 
         values.push_back(std::move(value));
@@ -1169,7 +1170,7 @@ void Parser::parse_switch(ast::BlockStmt& block) {
             auto value = expect_expr(true);
 
             if (!value) {
-                return;
+                return nullptr;
             }
 
             values.push_back(std::move(value));
@@ -1178,7 +1179,7 @@ void Parser::parse_switch(ast::BlockStmt& block) {
         auto body = expect_block();
 
         if (!body) {
-            return;
+            return nullptr;
         }
 
         cases.emplace_back(std::move(values), std::move(body));
@@ -1188,39 +1189,37 @@ void Parser::parse_switch(ast::BlockStmt& block) {
         else_block = expect_block();
 
         if (!else_block) {
-            return;
+            return nullptr;
         }
     }
 
     if (!expect("`}`", Token::Type::RightBrace)) {
-        return;
+        return nullptr;
     }
 
-    block.body.push_back(
-        std::make_unique<ast::Switch>(
-            offset, std::move(value), std::move(cases), std::move(else_block)));
+    return std::make_unique<ast::Switch>(
+        offset, std::move(value), std::move(cases), std::move(else_block));
 }
 
-void Parser::parse_while(ast::BlockStmt& block) {
+std::unique_ptr<ast::Statement> Parser::parse_while() {
     auto offset = get().offset;
     auto condition = expect_expr(true);
 
     if (!condition) {
-        return;
+        return nullptr;
     }
 
     auto body = expect_block();
 
     if (!body) {
-        return;
+        return nullptr;
     }
 
-    block.body.push_back(
-        std::make_unique<ast::WhileLoop>(
-            offset, std::move(condition), std::move(body)));
+    return std::make_unique<ast::WhileLoop>(
+        offset, std::move(condition), std::move(body));
 }
 
-void Parser::parse_for(ast::BlockStmt& block) {
+std::unique_ptr<ast::Statement> Parser::parse_for() {
     auto offset = get().offset;
 
     bool is_mutable = false;
@@ -1232,34 +1231,32 @@ void Parser::parse_for(ast::BlockStmt& block) {
     auto name = expect("variable name", Token::Type::Identifier);
 
     if (!name) {
-        return;
+        return nullptr;
     }
 
     if (!expect("`in`", Token::Type::In)) {
-        return;
+        return nullptr;
     }
 
     auto value = expect_expr(true);
 
     if (!value) {
-        return;
+        return nullptr;
     }
 
     auto body = expect_block();
 
     if (!body) {
-        return;
+        return nullptr;
     }
 
-    block.body.push_back(
-        std::make_unique<ast::ForLoop>(
-            offset, is_mutable,
-            OffsetValue{
-                .value = std::move(name->value), .offset = name->offset},
-            std::move(value), std::move(body)));
+    return std::make_unique<ast::ForLoop>(
+        offset, is_mutable,
+        OffsetValue{.value = std::move(name->value), .offset = name->offset},
+        std::move(value), std::move(body));
 }
 
-void Parser::parse_return(ast::BlockStmt& block) {
+std::unique_ptr<ast::Statement> Parser::parse_return() {
     auto offset = get().offset;
 
     std::unique_ptr<ast::Expression> value = nullptr;
@@ -1268,27 +1265,25 @@ void Parser::parse_return(ast::BlockStmt& block) {
         value = expect_expr(false);
 
         if (!value) {
-            return;
+            return nullptr;
         }
     }
 
-    block.body.push_back(
-        std::make_unique<ast::ReturnStmt>(offset, std::move(value)));
+    return std::make_unique<ast::ReturnStmt>(offset, std::move(value));
 }
 
-void Parser::parse_assignment(
-    ast::BlockStmt& block, std::unique_ptr<ast::Expression> variable) {
+std::unique_ptr<ast::Statement>
+Parser::parse_assignment(std::unique_ptr<ast::Expression> variable) {
     auto oper = get();
     auto value = expect_expr(false);
 
     if (!value) {
-        return;
+        return nullptr;
     }
 
-    block.body.push_back(
-        std::make_unique<ast::Assignment>(
-            variable->offset, std::move(variable), std::move(value),
-            OffsetValue{.value = oper.type, .offset = oper.offset}));
+    return std::make_unique<ast::Assignment>(
+        variable->offset, std::move(variable), std::move(value),
+        OffsetValue{.value = oper.type, .offset = oper.offset});
 }
 
 std::vector<ast::Struct::Field> Parser::parse_fields() {

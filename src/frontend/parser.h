@@ -107,7 +107,7 @@ private:
 
     [[nodiscard]] std::unique_ptr<ast::IfElse> parse_if_else();
 
-    void expect_stmt(ast::BlockStmt& block);
+    [[nodiscard]] std::unique_ptr<ast::Statement> expect_stmt();
 
     void parse_attrs(std::vector<ast::Attribute>& attrs);
 
@@ -153,16 +153,16 @@ private:
 
     [[nodiscard]] std::unique_ptr<ast::Type> expect_type();
 
-    void parse_switch(ast::BlockStmt& block);
+    [[nodiscard]] std::unique_ptr<ast::Statement> parse_switch();
 
-    void parse_while(ast::BlockStmt& block);
+    [[nodiscard]] std::unique_ptr<ast::Statement> parse_while();
 
-    void parse_for(ast::BlockStmt& block);
+    [[nodiscard]] std::unique_ptr<ast::Statement> parse_for();
 
-    void parse_return(ast::BlockStmt& block);
+    [[nodiscard]] std::unique_ptr<ast::Statement> parse_return();
 
-    void parse_assignment(
-        ast::BlockStmt& block, std::unique_ptr<ast::Expression> variable);
+    [[nodiscard]] std::unique_ptr<ast::Statement>
+    parse_assignment(std::unique_ptr<ast::Expression> variable);
 
     [[nodiscard]] std::vector<ast::Struct::Field> parse_fields();
 
