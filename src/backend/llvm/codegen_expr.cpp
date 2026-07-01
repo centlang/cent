@@ -232,6 +232,7 @@ Value Codegen::generate(const ast::StrLiteral& expr) {
             get_array_type(m_primitive_types["u8"].get(), expr.value.size()),
         .value = m_builder.CreateGlobalString(
             expr.value, "", 0, m_module.get(), false),
+        .ptr_depth = 1,
         .memcpy = true};
 }
 
