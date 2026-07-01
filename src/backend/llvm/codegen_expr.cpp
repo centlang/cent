@@ -715,7 +715,9 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
         return Value::poisoned();
     }
 
-    auto iterator = m_methods[value.type].find(expr.name.value);
+    auto& type_methods = m_methods[value.type];
+
+    auto iterator = type_methods.find(expr.name.value);
 
     auto no_such_method = [&] {
         error(
@@ -723,7 +725,7 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
             log::quoted(expr.name.value));
     };
 
-    if (iterator == m_methods[value.type].end()) {
+    if (iterator == type_methods.end()) {
         auto* type = dyn_cast<types::Pointer>(value.type);
 
         if (!type) {
@@ -731,9 +733,11 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
             return Value::poisoned();
         }
 
-        iterator = m_methods[type->type].find(expr.name.value);
+        auto& type_methods = m_methods[type->type];
 
-        if (iterator == m_methods[type->type].end()) {
+        iterator = type_methods.find(expr.name.value);
+
+        if (iterator == type_methods.end()) {
             no_such_method();
             return Value::poisoned();
         }
