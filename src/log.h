@@ -146,7 +146,7 @@ template <typename ValueType> inline auto underline(const ValueType& value) {
 
 template <typename ValueType>
 inline auto strikethrough(const ValueType& value) {
-    return Styled{.value = value, .mode = Underline};
+    return Styled{.value = value, .mode = Strikethrough};
 }
 
 template <typename ValueType>
