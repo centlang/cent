@@ -1501,16 +1501,6 @@ Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
         return nullptr;
     }
 
-    std::unique_ptr<ast::Type> return_type = nullptr;
-
-    if (!match(Token::Type::LeftBrace, Token::Type::Semicolon)) {
-        return_type = expect_type();
-
-        if (!return_type) {
-            return nullptr;
-        }
-    }
-
     std::unique_ptr<ast::BlockStmt> body = nullptr;
 
     if (match(Token::Type::LeftBrace)) {
