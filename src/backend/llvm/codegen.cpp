@@ -1086,6 +1086,7 @@ Value Codegen::load_rvalue(const Value& value) {
             m_builder.CreateLoad(value.type->llvm_type, result.value);
 
         --result.ptr_depth;
+        result.memcpy = false;
     }
 
     return result;
