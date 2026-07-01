@@ -34,7 +34,7 @@ private:
     [[nodiscard]] bool eof() const { return m_offset == m_source.size(); }
 
     void skip_whitespaces() {
-        while (!eof() && std::isspace(peek())) {
+        while (!eof() && std::isspace(static_cast<unsigned char>(peek()))) {
             get();
         }
     }
@@ -77,7 +77,8 @@ private:
     }
 
     [[nodiscard]] static bool is_ident(char character) {
-        return std::isalnum(character) || character == '_';
+        return std::isalnum(static_cast<unsigned char>(character)) ||
+               character == '_';
     }
 
     std::string_view m_source;

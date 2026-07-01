@@ -23,7 +23,7 @@ void Lexer::next_token() {
         return;
     }
 
-    if (std::isdigit(peek())) {
+    if (std::isdigit(static_cast<unsigned char>(peek()))) {
         number();
         return;
     }
@@ -339,7 +339,8 @@ void Lexer::escape_seq() {
         hex.reserve(count);
 
         for (std::uint8_t i = 0; i < count; ++i) {
-            if (eof() || !std::isxdigit(peek())) {
+            if (eof() ||
+                !std::isxdigit(static_cast<unsigned char>(peek()))) {
                 invalid_unicode();
                 return std::nullopt;
             }
@@ -433,13 +434,13 @@ void Lexer::number() {
     auto is_digit = [&](char character) -> bool {
         switch (base) {
         case hex:
-            return std::isxdigit(character);
+            return std::isxdigit(static_cast<unsigned char>(character));
         case oct:
             return character >= '0' && character < '8';
         case bin:
             return character == '0' || character == '1';
         case dec:
-            return std::isdigit(character);
+            return std::isdigit(static_cast<unsigned char>(character));
         default:
             return false;
         }
