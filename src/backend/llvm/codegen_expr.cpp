@@ -91,7 +91,8 @@ Value Codegen::generate(const ast::UnaryExpr& expr) {
         }
 
         if (!llvm::isa_and_nonnull<llvm::AllocaInst>(value.value) &&
-            !llvm::isa_and_nonnull<llvm::GetElementPtrInst>(value.value)) {
+            !llvm::isa_and_nonnull<llvm::GetElementPtrInst>(value.value) &&
+            !llvm::isa_and_nonnull<llvm::GlobalVariable>(value.value)) {
             error(expr.offset, "taking the reference of a non-variable value");
             return Value::poisoned();
         }
