@@ -986,11 +986,9 @@ std::unique_ptr<ast::Type> Parser::parse_arraylike_type() {
         return nullptr;
     }
 
-    std::size_t is_mutable_offset = 0;
     bool is_mutable = false;
 
     if (match(Token::Type::Mut)) {
-        is_mutable_offset = get().offset;
         is_mutable = true;
     }
 
