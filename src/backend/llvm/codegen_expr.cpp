@@ -180,8 +180,8 @@ Value Codegen::generate(const ast::IntLiteral& expr) {
 
     std::uint64_t value{};
 
-    auto [pointer, result] =
-        std::from_chars(literal.data(), literal.data() + literal.size(), value, base);
+    auto [pointer, result] = std::from_chars(
+        literal.data(), literal.data() + literal.size(), value, base);
 
     if (result == std::errc::result_out_of_range) {
         error(expr.offset, "integer out of range");
@@ -1558,7 +1558,7 @@ Value Codegen::generate_bin_expr(
         if (value_base_type->is_float()) {
             return Value{
                 .type = m_primitive_types["bool"].get(),
-                .value = m_builder.CreateFCmpULT(value_x.value, value_y.value)};
+                .value = m_builder.CreateFCmpOLT(value_x.value, value_y.value)};
         }
 
         return Value{
@@ -1571,7 +1571,7 @@ Value Codegen::generate_bin_expr(
         if (value_base_type->is_float()) {
             return Value{
                 .type = m_primitive_types["bool"].get(),
-                .value = m_builder.CreateFCmpUGT(value_x.value, value_y.value)};
+                .value = m_builder.CreateFCmpOGT(value_x.value, value_y.value)};
         }
 
         return Value{
@@ -1585,7 +1585,7 @@ Value Codegen::generate_bin_expr(
             .type = m_primitive_types["bool"].get(),
             .value =
                 value_base_type->is_float()
-                    ? m_builder.CreateFCmpUEQ(value_x.value, value_y.value)
+                    ? m_builder.CreateFCmpOEQ(value_x.value, value_y.value)
                     : m_builder.CreateICmpEQ(value_x.value, value_y.value)};
     case BangEqual:
         return Value{
@@ -1598,7 +1598,7 @@ Value Codegen::generate_bin_expr(
         if (value_base_type->is_float()) {
             return Value{
                 .type = m_primitive_types["bool"].get(),
-                .value = m_builder.CreateFCmpUGE(value_x.value, value_y.value)};
+                .value = m_builder.CreateFCmpOGE(value_x.value, value_y.value)};
         }
 
         return Value{
@@ -1611,7 +1611,7 @@ Value Codegen::generate_bin_expr(
         if (value_base_type->is_float()) {
             return Value{
                 .type = m_primitive_types["bool"].get(),
-                .value = m_builder.CreateFCmpULE(value_x.value, value_y.value)};
+                .value = m_builder.CreateFCmpOLE(value_x.value, value_y.value)};
         }
 
         return Value{
