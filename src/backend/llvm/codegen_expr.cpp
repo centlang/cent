@@ -526,7 +526,8 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
         }
 
         if (!llvm::isa_and_nonnull<llvm::Constant>(value.value) ||
-            array_type != value.type || value.ptr_depth > 0 || value.memcpy) {
+            array_type->type != value.type || value.ptr_depth > 0 ||
+            value.memcpy) {
             is_const = false;
         }
 
