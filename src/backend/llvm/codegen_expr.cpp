@@ -180,7 +180,7 @@ Value Codegen::generate(const ast::IntLiteral& expr) {
     std::uint64_t value{};
 
     auto [pointer, result] =
-        std::from_chars(literal.data(), &literal[literal.size()], value, base);
+        std::from_chars(literal.data(), literal.data() + literal.size(), value, base);
 
     if (result == std::errc::result_out_of_range) {
         error(expr.offset, "integer out of range");
@@ -213,7 +213,7 @@ Value Codegen::generate(const ast::FloatLiteral& expr) {
     float value{};
 
     auto [pointer, result] = std::from_chars(
-        expr.value.data(), &expr.value[expr.value.size()], value);
+        expr.value.data(), expr.value.data() + expr.value.size(), value);
 
     if (result == std::errc::result_out_of_range) {
         error(expr.offset, "float out of range");
@@ -821,7 +821,7 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
         std::size_t value{};
         std::string_view literal = expr.member.value;
 
-        std::from_chars(literal.data(), &literal[literal.size()], value);
+        std::from_chars(literal.data(), literal.data() + literal.size(), value);
 
         if (value >= tuple->types.size()) {
             no_such_member();
