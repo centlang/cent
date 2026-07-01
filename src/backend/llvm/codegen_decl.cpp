@@ -78,14 +78,11 @@ Value Codegen::generate(const ast::FnDecl& decl) {
     auto* insert_point = m_builder.GetInsertBlock();
     m_builder.SetInsertPoint(entry);
 
-    auto* current_function = m_current_function;
-    m_current_function = function_type;
-
     auto current_scope_names = m_current_scope->names;
 
     for (std::size_t i = 0; i < decl.proto.params.size(); ++i) {
         const auto& param = decl.proto.params[i];
-        const auto& type = m_current_function->param_types[i];
+        const auto& type = function_type->param_types[i];
 
         auto* variable = alloca_arg(function_type->sret ? i + 1 : i, type);
 
@@ -101,6 +98,9 @@ Value Codegen::generate(const ast::FnDecl& decl) {
     auto scope_prefix = m_current_scope_prefix;
     m_current_scope_prefix += decl.name.value + "::__";
 
+    auto* current_function = m_current_function;
+    m_current_function = function_type;
+
     decl.block->codegen(*this);
 
     m_current_scope_prefix = scope_prefix;
@@ -112,14 +112,20 @@ Value Codegen::generate(const ast::FnDecl& decl) {
         return Value::poisoned();
     }
 
-    if (!m_current_fn_had_error && !function->getReturnType()->isVoidTy()) {
+    if (!m_current_fn_had_error &&
+        !is<types::Void, types::Never>(function_type->return_type)) {
         error(decl.name.offset, "non-void function does not return a value");
         m_builder.SetInsertPoint(insert_point);
 
         return Value::poisoned();
     }
 
-    m_builder.CreateRetVoid();
+    if (is<types::Never>(function_type->return_type)) {
+        m_builder.CreateUnreachable();
+    } else {
+        m_builder.CreateRetVoid();
+    }
+
     m_builder.SetInsertPoint(insert_point);
 
     return Value::poisoned();
