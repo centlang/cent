@@ -45,7 +45,7 @@ pub const STDERR_FILENO = 2;
     pub type sighandler_t = *fn(signal: c::int);
 
     #(extern) {
-        pub fn open(path: *c::char, flags: c::int, mode: mode_t);
+        pub fn open(path: *c::char, flags: c::int, ...) c::int;
         pub fn close(fd: c::int) c::int;
         pub fn read(fd: c::int, buf: *mut c::void, count: usize) isize;
         pub fn write(fd: c::int, buf: *c::void, count: usize) isize;
