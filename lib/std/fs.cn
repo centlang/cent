@@ -38,6 +38,10 @@ pub fn mkdir(path: []u8) bool {
 
 fn to_libc_mode(mode: Mode) []u8 {
     if (mode & Mode::read) as u8 != 0 && (mode & Mode::write) as u8 == 0 {
+        if (mode & Mode::append) as u8 != 0 {
+            return "a+b\0";
+        }
+
         return "rb\0";
     }
 
