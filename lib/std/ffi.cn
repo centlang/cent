@@ -3,7 +3,7 @@ with std::alloc;
 with c;
 
 pub fn as_cstr(s: []u8) *c::char {
-    core::dbg_assert(s[s.len - 1] == '\0' as u8);
+    core::dbg_assert(s.len > 0 && s[s.len - 1] == '\0' as u8);
     return s.ptr as *c::char;
 }
 
