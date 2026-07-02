@@ -8,6 +8,7 @@ pub fn as_cstr(s: []u8) *c::char {
 }
 
 pub fn cstr_to(buf: []mut u8, s: []u8) {
+    core::dbg_assert(buf.len > s.len);
     mem::copy(buf, s);
     buf[s.len] = '\0' as u8;
 }
