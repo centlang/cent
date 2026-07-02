@@ -222,7 +222,7 @@ Value Codegen::generate(const ast::Struct& decl) {
         }
     }
 
-    llvm_struct_type->setBody(llvm_fields, packed);
+    llvm_struct_type->setBody(llvm_fields, packed.has_value());
 
     struct_type->fields = type_fields;
     struct_type->has_tail = llvm_fields.size() != type_fields.size();
@@ -429,7 +429,7 @@ Value Codegen::generate(const ast::TypeAlias& decl) {
     m_named_types.push_back(
         std::make_unique<types::Alias>(
             type->llvm_type, m_current_scope_prefix + decl.name.value, type,
-            distinct));
+            distinct.has_value()));
 
     m_current_scope->types[decl.name.value] = {
         .element = m_named_types.back().get(),
@@ -630,8 +630,8 @@ Value Codegen::generate(const ast::VarDecl& decl) {
 }
 
 void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
-    auto [is_extern, alwaysinline] =
-        parse_attrs_validate(decl, "extern", "alwaysinline");
+    auto [is_extern, alwaysinline, symbol] =
+        parse_attrs_validate(decl, "extern", "alwaysinline", "symbol");
 
     if (!is_extern && !decl.block) {
         error(decl.name.offset, "{} has no body", log::quoted(decl.name.value));
@@ -643,6 +643,11 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
             decl.name.offset, "extern function {} cannot be `alwaysinline`",
             log::quoted(decl.name.value));
 
+        return;
+    }
+
+    if (symbol && !symbol->value) {
+        error(symbol->offset, "`symbol` requires a string value");
         return;
     }
 
@@ -669,10 +674,27 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
     }
 
     auto* llvm_fn_type = static_cast<llvm::FunctionType*>(fn_type->llvm_type);
+
+    std::string llvm_name;
+
+    if (symbol) {
+        llvm_name = *symbol->value;
+    } else if (is_extern) {
+        llvm_name = decl.name.value;
+    } else {
+        llvm_name = m_current_scope_prefix;
+
+        if (decl.type) {
+            llvm_name += decl.type->value + "::";
+        }
+
+        llvm_name += decl.name.value;
+    }
+
     llvm::Function* function = nullptr;
 
     if (is_extern) {
-        function = m_module->getFunction(decl.name.value);
+        function = m_module->getFunction(llvm_name);
     }
 
     if (!function) {
@@ -680,11 +702,7 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
             llvm_fn_type,
             (decl.is_public || is_extern) ? llvm::Function::ExternalLinkage
                                           : llvm::Function::PrivateLinkage,
-            is_extern ? decl.name.value
-                      : m_current_scope_prefix +
-                            (decl.type ? decl.type->value + "::" : "") +
-                            decl.name.value,
-            *m_module);
+            llvm_name, *m_module);
     }
 
     if (alwaysinline) {

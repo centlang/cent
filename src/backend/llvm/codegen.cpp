@@ -1381,15 +1381,15 @@ void Codegen::report_invalid_attrs(
     const ast::Declaration& decl,
     std::initializer_list<std::string_view> allowed) {
     for (const auto& attribute : decl.attributes) {
-        if (attr_to_os_type(attribute.name) ||
-            attr_to_arch_type(attribute.name)) {
+        if (attr_to_os_type(attribute.name.value) ||
+            attr_to_arch_type(attribute.name.value)) {
             continue;
         }
 
         bool valid = false;
 
         for (const auto& attr : allowed) {
-            if (attribute.name == attr) {
+            if (attribute.name.value == attr) {
                 valid = true;
                 break;
             }
@@ -1397,8 +1397,8 @@ void Codegen::report_invalid_attrs(
 
         if (!valid) {
             error(
-                attribute.offset, "unexpected attribute {}",
-                log::quoted(attribute.name));
+                attribute.name.offset, "unexpected attribute {}",
+                log::quoted(attribute.name.value));
         }
     }
 }
@@ -1408,7 +1408,7 @@ bool Codegen::matches_target(const ast::Declaration& decl) {
     std::optional<bool> arch_matches = std::nullopt;
 
     for (const auto& attr : decl.attributes) {
-        if (auto os_type = attr_to_os_type(attr.name)) {
+        if (auto os_type = attr_to_os_type(attr.name.value)) {
             if (!os_matches.has_value()) {
                 os_matches = false;
             }
@@ -1420,7 +1420,7 @@ bool Codegen::matches_target(const ast::Declaration& decl) {
             continue;
         }
 
-        if (auto arch_type = attr_to_arch_type(attr.name)) {
+        if (auto arch_type = attr_to_arch_type(attr.name.value)) {
             if (!arch_matches.has_value()) {
                 arch_matches = false;
             }
@@ -1446,15 +1446,22 @@ bool Codegen::matches_target(const ast::Declaration& decl) {
     return true;
 }
 
-bool Codegen::decl_get_attr(
-    const ast::Declaration& decl, std::string_view attr) {
+std::optional<OffsetValue<std::optional<std::string>>>
+Codegen::decl_get_attr(const ast::Declaration& decl, std::string_view attr) {
     for (const auto& attribute : decl.attributes) {
-        if (attribute.name == attr) {
-            return true;
+        if (attribute.name.value == attr) {
+            if (attribute.value) {
+                return OffsetValue{
+                    .value = std::optional{attribute.value},
+                    .offset = attribute.name.offset};
+            }
+
+            return OffsetValue<std::optional<std::string>>{
+                .value = std::nullopt, .offset = attribute.name.offset};
         }
     }
 
-    return false;
+    return std::nullopt;
 }
 
 } // namespace cent::backend

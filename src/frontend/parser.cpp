@@ -133,22 +133,30 @@ void Parser::parse_attrs(std::vector<ast::Attribute>& attrs) {
         return;
     }
 
-    auto attribute = expect("attribute name", Token::Type::Identifier);
-
-    if (!attribute) {
-        return;
-    }
-
-    attrs.emplace_back(attribute->offset, attribute->value);
-
-    while (match_next(Token::Type::Comma)) {
-        attribute = expect("attribute name", Token::Type::Identifier);
+    while (true) {
+        auto attribute = expect("attribute name", Token::Type::Identifier);
 
         if (!attribute) {
             return;
         }
 
-        attrs.emplace_back(attribute->offset, attribute->value);
+        std::optional<std::string> value = std::nullopt;
+
+        if (match(Token::Type::StrLiteral)) {
+            value = get().value;
+        }
+
+        attrs.emplace_back(
+            OffsetValue{
+                .value = std::move(attribute->value),
+                .offset = attribute->offset},
+            std::move(value));
+
+        if (match_next(Token::Type::Comma)) {
+            continue;
+        }
+
+        break;
     }
 
     expect("`)`", Token::Type::RightParen);

@@ -353,24 +353,30 @@ private:
         std::initializer_list<std::string_view> allowed);
 
     template <typename... Attrs>
-    [[nodiscard]] std::array<bool, sizeof...(Attrs)>
+    [[nodiscard]] std::array<
+        std::optional<OffsetValue<std::optional<std::string>>>,
+        sizeof...(Attrs)>
     parse_attrs_validate(const ast::Declaration& decl, Attrs... attrs) {
         report_invalid_attrs(decl, {attrs...});
         return parse_attrs(decl, attrs...);
     }
 
     template <typename... Attrs>
-    [[nodiscard]] std::array<bool, sizeof...(Attrs)>
+    [[nodiscard]] std::array<
+        std::optional<OffsetValue<std::optional<std::string>>>,
+        sizeof...(Attrs)>
     parse_attrs(const ast::Declaration& decl, Attrs... attrs) {
-        std::array<bool, sizeof...(Attrs)> result = {
-            decl_get_attr(decl, attrs)...};
+        std::array<
+            std::optional<OffsetValue<std::optional<std::string>>>,
+            sizeof...(Attrs)>
+            result = {decl_get_attr(decl, attrs)...};
 
         return result;
     }
 
     [[nodiscard]] bool matches_target(const ast::Declaration& decl);
 
-    [[nodiscard]] static bool
+    [[nodiscard]] static std::optional<OffsetValue<std::optional<std::string>>>
     decl_get_attr(const ast::Declaration& decl, std::string_view attr);
 
     [[nodiscard]] static std::optional<llvm::Triple::OSType>
