@@ -45,7 +45,7 @@ pub const EOF = -1;
     pub fn realloc(p: ?*mut void, size: usize) ?*mut void;
     pub fn free(p: ?*mut void);
 
-    pub fn memset(s: *void, c: int, n: usize) *mut void;
+    pub fn memset(s: *mut void, c: int, n: usize) *mut void;
     pub fn memcpy(dest: *mut void, src: *void, n: usize) *mut void;
     pub fn memmove(dest: *mut void, src: *void, n: usize) *mut void;
     pub fn memcmp(s1: *void, s2: *void, n: usize) int;
