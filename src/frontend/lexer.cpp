@@ -674,6 +674,11 @@ void Lexer::ident() {
         keyword(Sizeof);
         return;
     }
+
+    if (m_token.value == "nan" || m_token.value == "inf") {
+        m_token.type = FloatLiteral;
+        return;
+    }
 }
 
 void Lexer::utf8_char() {
