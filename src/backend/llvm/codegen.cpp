@@ -128,20 +128,7 @@ void Codegen::create_core() {
 
     m_builder.CreateRetVoid();
 
-    llvm::Function* dbg_assert = nullptr;
-
-    if (g_options.release) {
-        dbg_assert = llvm::Function::Create(
-            static_cast<llvm::FunctionType*>(assert_type->llvm_type),
-            llvm::Function::PrivateLinkage, "core::__nop", *m_module);
-
-        auto* entry = llvm::BasicBlock::Create(m_context, "", dbg_assert);
-
-        m_builder.SetInsertPoint(entry);
-        m_builder.CreateRetVoid();
-    } else {
-        dbg_assert = assert_fn;
-    }
+    auto* dbg_assert = g_options.release ? nullptr : assert_fn;
 
     m_core_module.names = {
         {"panic", {.element = panic_fn, .is_public = true}},

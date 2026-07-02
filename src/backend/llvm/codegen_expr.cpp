@@ -676,6 +676,10 @@ Value Codegen::generate(const ast::CallExpr& expr) {
 
     value = load_rvalue(value);
 
+    if (!value.value) {
+        return Value{.type = m_void_type.get(), .value = {}};
+    }
+
     auto* base_type = unwrap_type(value.type);
 
     std::vector<OffsetValue<Value>> arguments;
