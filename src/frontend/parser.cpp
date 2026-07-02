@@ -988,7 +988,7 @@ std::unique_ptr<ast::Type> Parser::parse_arraylike_type() {
 
     bool is_mutable = false;
 
-    if (match(Token::Type::Mut)) {
+    if (match_next(Token::Type::Mut)) {
         is_mutable = true;
     }
 
