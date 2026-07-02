@@ -211,7 +211,7 @@ Value Codegen::generate(const ast::IntLiteral& expr) {
 }
 
 Value Codegen::generate(const ast::FloatLiteral& expr) {
-    float value{};
+    double value{};
 
     auto [pointer, result] = std::from_chars(
         expr.value.data(), expr.value.data() + expr.value.size(), value);
@@ -222,9 +222,9 @@ Value Codegen::generate(const ast::FloatLiteral& expr) {
     }
 
     return Value{
-        .type = m_primitive_types["f32"].get(),
+        .type = m_primitive_types["f64"].get(),
         .value =
-            llvm::ConstantFP::get(llvm::Type::getFloatTy(m_context), value)};
+            llvm::ConstantFP::get(llvm::Type::getDoubleTy(m_context), value)};
 }
 
 Value Codegen::generate(const ast::StrLiteral& expr) {

@@ -25,11 +25,11 @@ fn BinExpr::add(x: i32, y: i32) BinExpr {
     return BinExpr { x: x, y: y, kind: OperKind::add };
 }
 
-fn sum(x: i32, y: f32, z: i32, w: f32) f32 {
+fn sum(x: i32, y: f64, z: i32, w: f64) f64 {
     return x + y + z + w;
 }
 
-fn default_args(x: i32, mut y: f32 = 3.5, mut z: i32 = 3) f32 {
+fn default_args(x: i32, mut y: f64 = 3.5, mut z: i32 = 3) f64 {
     z += 1;
 
     for _ in 0..x {

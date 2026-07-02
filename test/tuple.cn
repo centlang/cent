@@ -9,7 +9,7 @@ fn main() {
     core::assert(mem::equal(tuple.2, "Hello, world!"));
     core::assert(tuple.3 != true);
 
-    mut tuple: (i32, f32, []u8, bool) = (1, 3.4, "Hello, world!" as []u8, false);
+    mut tuple: (i32, f64, []u8, bool) = (1, 3.4, "Hello, world!" as []u8, false);
 
     core::assert(tuple.0 == 1);
     core::assert(tuple.1 == 3.4);
