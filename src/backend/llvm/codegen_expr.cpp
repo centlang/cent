@@ -753,7 +753,14 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
 
     if (auto* type =
             dyn_cast<types::Pointer>(iterator->second.type->param_types[0])) {
-        if (!value.is_mutable && type->is_mutable) {
+        bool value_is_mutable = value.is_mutable;
+        auto* pointer = dyn_cast<types::Pointer>(value.type);
+
+        if (pointer) {
+            value_is_mutable = pointer->is_mutable;
+        }
+
+        if (!value_is_mutable && type->is_mutable) {
             error(
                 expr.name.offset, "cannot call method {} on an immutable value",
                 log::quoted(expr.name.value));
@@ -761,7 +768,7 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
             return Value::poisoned();
         }
 
-        if (is<types::Pointer>(value.type)) {
+        if (pointer) {
             arguments.push_back({.value = value, .offset = expr.value->offset});
         } else {
             if (value.ptr_depth < 1) {
@@ -771,7 +778,7 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
 
             arguments.push_back(
                 {.value =
-                     {.type = get_ptr_type(value.type, value.is_mutable),
+                     {.type = get_ptr_type(value.type, value_is_mutable),
                       .value = load_lvalue(value).value},
                  .offset = expr.value->offset});
         }
