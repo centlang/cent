@@ -123,7 +123,8 @@ Value Codegen::generate([[maybe_unused]] const ast::DeferStmt& stmt) {
 Value Codegen::generate(const ast::BlockStmt& stmt) {
     push_defer_scope();
 
-    auto current_scope = *m_current_scope;
+    auto current_names = m_current_scope->names;
+    auto current_types = m_current_scope->types;
 
     for (const auto& statement : stmt.body) {
         statement->codegen(*this);
@@ -131,7 +132,8 @@ Value Codegen::generate(const ast::BlockStmt& stmt) {
 
     pop_defer_scope();
 
-    *m_current_scope = std::move(current_scope);
+    m_current_scope->names = std::move(current_names);
+    m_current_scope->types = std::move(current_types);
 
     return Value::poisoned();
 }
@@ -433,7 +435,8 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
         m_builder.SetInsertPoint(loop_body);
 
-        auto current_scope = *m_current_scope;
+        auto current_names = m_current_scope->names;
+        auto current_types = m_current_scope->types;
 
         auto* ptr_value = load_struct_member(
             llvm::PointerType::get(m_context, 0), value, slice_member_ptr);
@@ -455,7 +458,8 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
             m_builder.CreateBr(m_loop_continue);
         }
 
-        *m_current_scope = current_scope;
+        m_current_scope->names = std::move(current_names);
+        m_current_scope->types = std::move(current_types);
 
         m_builder.SetInsertPoint(m_loop_continue);
 
@@ -495,7 +499,8 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
         m_builder.SetInsertPoint(loop_body);
 
-        auto current_scope = *m_current_scope;
+        auto current_names = m_current_scope->names;
+        auto current_types = m_current_scope->types;
 
         auto* index_value = m_builder.CreateLoad(m_size, index);
 
@@ -514,7 +519,8 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
             m_builder.CreateBr(m_loop_continue);
         }
 
-        *m_current_scope = current_scope;
+        m_current_scope->names = std::move(current_names);
+        m_current_scope->types = std::move(current_types);
 
         m_builder.SetInsertPoint(m_loop_continue);
 
@@ -553,7 +559,8 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
         m_builder.SetInsertPoint(loop_body);
 
-        auto current_scope = *m_current_scope;
+        auto current_names = m_current_scope->names;
+        auto current_types = m_current_scope->types;
 
         auto* index_value = m_builder.CreateLoad(m_size, index);
 
@@ -572,7 +579,8 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
             m_builder.CreateBr(m_loop_continue);
         }
 
-        *m_current_scope = current_scope;
+        m_current_scope->names = std::move(current_names);
+        m_current_scope->types = std::move(current_types);
 
         m_builder.SetInsertPoint(m_loop_continue);
 
@@ -636,7 +644,8 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
 
     m_builder.SetInsertPoint(loop_body);
 
-    auto current_scope = *m_current_scope;
+    auto current_names = m_current_scope->names;
+    auto current_types = m_current_scope->types;
 
     m_current_scope->names[stmt.name.value] = {
         .element = {.type = type->type, .value = variable, .ptr_depth = 1},
@@ -648,7 +657,8 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
         m_builder.CreateBr(m_loop_continue);
     }
 
-    *m_current_scope = current_scope;
+    m_current_scope->names = std::move(current_names);
+    m_current_scope->types = std::move(current_types);
 
     m_builder.SetInsertPoint(m_loop_continue);
 

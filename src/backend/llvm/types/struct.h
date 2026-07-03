@@ -5,6 +5,7 @@
 
 #include <llvm/IR/DerivedTypes.h>
 
+#include "backend/llvm/generics.h"
 #include "backend/llvm/type.h"
 
 namespace cent::backend::types {
@@ -12,9 +13,9 @@ namespace cent::backend::types {
 struct Struct : detail::Ty<Struct, Type::Kind::Struct> {
     [[nodiscard]] Struct(
         llvm::Type* llvm_type, std::string name, std::vector<Type*> fields,
-        bool has_tail)
+        bool has_tail, GenericStruct* origin = nullptr)
     : Ty{llvm_type}, name{std::move(name)}, fields{std::move(fields)},
-      has_tail{has_tail} {}
+      has_tail{has_tail}, origin{origin} {}
 
     [[nodiscard]] std::string to_string() const override { return name; }
 
@@ -22,6 +23,7 @@ struct Struct : detail::Ty<Struct, Type::Kind::Struct> {
     std::vector<Type*> fields;
 
     bool has_tail;
+    GenericStruct* origin;
 };
 
 } // namespace cent::backend::types

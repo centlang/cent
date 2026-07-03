@@ -5,6 +5,7 @@
 
 #include <llvm/IR/DerivedTypes.h>
 
+#include "backend/llvm/generics.h"
 #include "backend/llvm/type.h"
 #include "backend/llvm/types/enum.h"
 
@@ -13,9 +14,9 @@ namespace cent::backend::types {
 struct Union : detail::Ty<Union, Type::Kind::Union> {
     [[nodiscard]] Union(
         llvm::Type* llvm_type, std::string name, std::vector<Type*> fields,
-        Enum* tag_type = nullptr)
+        Enum* tag_type = nullptr, GenericUnion* origin = nullptr)
     : Ty{llvm_type}, name{std::move(name)}, fields{std::move(fields)},
-      tag_type{tag_type} {}
+      tag_type{tag_type}, origin{origin} {}
 
     [[nodiscard]] std::string to_string() const override { return name; }
 
@@ -23,6 +24,7 @@ struct Union : detail::Ty<Union, Type::Kind::Union> {
     std::vector<Type*> fields;
 
     Enum* tag_type;
+    GenericUnion* origin;
 };
 
 } // namespace cent::backend::types

@@ -13,6 +13,7 @@
 #include "ast/type/tuple_type.h"
 
 #include "backend/llvm/types/alias.h"
+#include "backend/llvm/types/generic.h"
 
 #include "backend/llvm/abi.h"
 #include "backend/llvm/codegen.h"
@@ -29,7 +30,76 @@ Type* Codegen::generate(const ast::NamedType& type) {
     auto [name, offset] = type.value.back();
 
     if (!type.template_args.empty()) {
-        not_implemented(type.template_args[0]->offset, "generic structs");
+        std::vector<Type*> args;
+        args.reserve(type.template_args.size());
+
+        bool has_generic_arg = false;
+
+        for (const auto& arg : type.template_args) {
+            auto* type = arg->codegen(*this);
+
+            if (!type) {
+                return nullptr;
+            }
+
+            type = unwrap_type(type);
+
+            if (!type->llvm_type) {
+                has_generic_arg = true;
+            }
+
+            args.push_back(type);
+        }
+
+        auto struct_it = scope->generic_structs.find(name);
+
+        if (struct_it != scope->generic_structs.end()) {
+            if (struct_it->second.template_params.size() !=
+                type.template_args.size()) {
+                error(offset, "incorrect number of template arguments passed");
+                return nullptr;
+            }
+
+            if (has_generic_arg) {
+                m_named_types.push_back(
+                    std::make_unique<types::TemplateStructInst>(
+                        &struct_it->second, std::move(args)));
+
+                return m_named_types.back().get();
+            }
+
+            return inst_generic_struct(&struct_it->second, args);
+        }
+
+        auto union_it = scope->generic_unions.find(name);
+
+        if (union_it != scope->generic_unions.end()) {
+            if (union_it->second.template_params.size() !=
+                type.template_args.size()) {
+                error(offset, "incorrect number of template arguments passed");
+                return nullptr;
+            }
+
+            if (has_generic_arg) {
+                m_named_types.push_back(
+                    std::make_unique<types::TemplateUnionInst>(
+                        &union_it->second, std::move(args)));
+
+                return m_named_types.back().get();
+            }
+
+            return inst_generic_union(&union_it->second, args);
+        }
+
+        if (auto hint = did_you_mean_hint(
+                name, scope->generic_unions, scope->generic_structs)) {
+            error_hint(
+                offset, *hint, "undeclared generic type: {}",
+                log::quoted(name));
+        } else {
+            error(offset, "undeclared generic type: {}", log::quoted(name));
+        }
+
         return nullptr;
     }
 
@@ -350,6 +420,10 @@ Codegen::get_var_len_array_type(Type* type, llvm::Value* size) {
 }
 
 Type* Codegen::unwrap_type(Type* type, bool ignore_distinct) {
+    if (!type) {
+        return nullptr;
+    }
+
     if (auto* alias = dyn_cast<types::Alias>(type)) {
         if (alias->distinct && !ignore_distinct) {
             return type;

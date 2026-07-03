@@ -15,6 +15,7 @@
 
 #include "backend/llvm/types/alias.h"
 #include "backend/llvm/types/struct.h"
+#include "backend/llvm/types/type_param.h"
 #include "backend/llvm/types/union.h"
 
 #include "backend/llvm/codegen.h"
@@ -134,7 +135,9 @@ Value Codegen::generate(const ast::FnDecl& decl) {
 Value Codegen::generate(const ast::Struct& decl) {
     auto [is_extern, packed] = parse_attrs_validate(decl, "extern", "packed");
 
-    if (m_current_scope->types.contains(decl.name.value)) {
+    if (m_current_scope->types.contains(decl.name.value) ||
+        m_current_scope->generic_structs.contains(decl.name.value) ||
+        m_current_scope->generic_unions.contains(decl.name.value)) {
         error(
             decl.name.offset, "{} is already defined",
             log::quoted(decl.name.value));
@@ -143,7 +146,40 @@ Value Codegen::generate(const ast::Struct& decl) {
     }
 
     if (!decl.template_params.empty()) {
-        not_implemented(decl.template_params[0].offset, "generic structs");
+        auto& generic_struct =
+            m_current_scope->generic_structs[decl.name.value];
+
+        auto current_scope_types = m_current_scope->types;
+
+        for (const auto& param : decl.template_params) {
+            m_named_types.push_back(
+                std::make_unique<types::TypeParam>(param.value));
+
+            generic_struct.template_params.push_back(
+                static_cast<types::TypeParam*>(m_named_types.back().get()));
+
+            m_current_scope->types[param.value] = {
+                .element = generic_struct.template_params.back()};
+        }
+
+        std::vector<GenericStruct::Field> fields;
+        fields.reserve(decl.fields.size());
+
+        for (const auto& field : decl.fields) {
+            auto* type = field.type->codegen(*this);
+
+            if (!type) {
+                return Value::poisoned();
+            }
+
+            fields.emplace_back(field.name.value, type);
+        }
+
+        m_current_scope->types = current_scope_types;
+
+        generic_struct.name = decl.name.value;
+        generic_struct.fields = std::move(fields);
+
         return Value::poisoned();
     }
 
@@ -233,7 +269,9 @@ Value Codegen::generate(const ast::Struct& decl) {
 Value Codegen::generate(const ast::Union& decl) {
     auto [untagged] = parse_attrs_validate(decl, "untagged");
 
-    if (m_current_scope->types.contains(decl.name.value)) {
+    if (m_current_scope->types.contains(decl.name.value) ||
+        m_current_scope->generic_structs.contains(decl.name.value) ||
+        m_current_scope->generic_unions.contains(decl.name.value)) {
         error(
             decl.name.offset, "{} is already defined",
             log::quoted(decl.name.value));
@@ -242,7 +280,67 @@ Value Codegen::generate(const ast::Union& decl) {
     }
 
     if (!decl.template_params.empty()) {
-        not_implemented(decl.template_params[0].offset, "generic unions");
+        auto& generic_union = m_current_scope->generic_unions[decl.name.value];
+
+        auto current_scope_types = m_current_scope->types;
+
+        for (const auto& param : decl.template_params) {
+            m_named_types.push_back(
+                std::make_unique<types::TypeParam>(param.value));
+
+            generic_union.template_params.push_back(
+                static_cast<types::TypeParam*>(m_named_types.back().get()));
+
+            m_current_scope->types[param.value] = {
+                .element = generic_union.template_params.back()};
+        }
+
+        std::vector<GenericUnion::Field> fields;
+        fields.reserve(decl.fields.size());
+
+        for (const auto& field : decl.fields) {
+            auto* type = field.type->codegen(*this);
+
+            if (!type) {
+                return Value::poisoned();
+            }
+
+            fields.emplace_back(field.name.value, type);
+        }
+
+        m_current_scope->types = current_scope_types;
+
+        generic_union.name = decl.name.value;
+        generic_union.fields = std::move(fields);
+
+        if (untagged) {
+            generic_union.tag_type = nullptr;
+        } else {
+            auto* underlying = m_primitive_types["i32"].get();
+
+            m_named_types.push_back(
+                std::make_unique<types::Enum>(
+                    underlying->llvm_type,
+                    m_current_scope_prefix + decl.name.value + "(tag)",
+                    underlying));
+
+            auto* tag_type =
+                static_cast<types::Enum*>(m_named_types.back().get());
+
+            for (std::size_t i = 0; i < decl.fields.size(); ++i) {
+                m_current_scope->scopes[decl.name.value]
+                    .names[decl.fields[i].name.value] = {
+                    .element =
+                        {.type = tag_type,
+                         .value =
+                             llvm::ConstantInt::get(underlying->llvm_type, i)},
+                    .is_public = decl.is_public,
+                    .unit = m_current_unit};
+            }
+
+            generic_union.tag_type = tag_type;
+        }
+
         return Value::poisoned();
     }
 
@@ -441,7 +539,6 @@ Value Codegen::generate(const ast::TypeAlias& decl) {
 
 Value Codegen::generate(const ast::VarDecl& decl) {
     auto [is_extern] = parse_attrs_validate(decl, "extern");
-    auto& result = m_current_scope->names[decl.name.value];
 
     if (decl.mutability == ast::VarDecl::Mut::Const) {
         if (!decl.value) {
@@ -474,7 +571,7 @@ Value Codegen::generate(const ast::VarDecl& decl) {
             return Value::poisoned();
         }
 
-        result = {
+        m_current_scope->names[decl.name.value] = {
             .element = value,
             .is_public = decl.is_public,
             .unit = m_current_unit};
@@ -583,7 +680,7 @@ Value Codegen::generate(const ast::VarDecl& decl) {
                 m_module->getDataLayout().getPreferredAlign(global));
         }
 
-        result = {
+        m_current_scope->names[decl.name.value] = {
             .element =
                 {.type = type,
                  .value = global,
@@ -597,7 +694,7 @@ Value Codegen::generate(const ast::VarDecl& decl) {
 
     auto* variable = create_alloca(type);
 
-    result = {
+    m_current_scope->names[decl.name.value] = {
         .element =
             {.type = type,
              .value = variable,
@@ -654,7 +751,8 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
     auto& scope = decl.type ? m_current_scope->scopes[decl.type->value]
                             : *m_current_scope;
 
-    if (scope.names.contains(decl.name.value)) {
+    if (scope.names.contains(decl.name.value) ||
+        scope.generic_fns.contains(decl.name.value)) {
         error(
             decl.name.offset, "{} is already defined",
             log::quoted(decl.name.value));
@@ -663,7 +761,56 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
     }
 
     if (!decl.template_params.empty()) {
-        not_implemented(decl.template_params[0].offset, "generic functions");
+        auto& generic_fn = scope.generic_fns[decl.name.value];
+
+        auto current_scope_types = m_current_scope->types;
+
+        for (const auto& param : decl.template_params) {
+            m_named_types.push_back(
+                std::make_unique<types::TypeParam>(param.value));
+
+            generic_fn.template_params.emplace_back(
+                static_cast<types::TypeParam*>(m_named_types.back().get()));
+
+            m_current_scope->types[param.value] = {
+                .element = generic_fn.template_params.back()};
+        }
+
+        Type* return_type = m_void_type.get();
+
+        if (decl.proto.return_type) {
+            return_type = decl.proto.return_type->codegen(*this);
+
+            if (!return_type) {
+                return;
+            }
+        }
+
+        generic_fn.params.reserve(decl.proto.params.size());
+
+        for (const auto& parameter : decl.proto.params) {
+            auto* type = parameter.type->codegen(*this);
+
+            if (!type) {
+                return;
+            }
+
+            generic_fn.params.emplace_back(
+                parameter.name.value, type, parameter.is_mutable);
+
+            if (!parameter.value) {
+                continue;
+            }
+
+            generic_fn.default_args.push_back(parameter.value.get());
+        }
+
+        m_current_scope->types = current_scope_types;
+
+        generic_fn.name = decl.name;
+        generic_fn.return_type = return_type;
+        generic_fn.block = decl.block.get();
+
         return;
     }
 

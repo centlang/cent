@@ -20,10 +20,14 @@
 #include "ast/expr/unary_expr.h"
 #include "ast/expr/unwrap_expr.h"
 
+#include "ast/decl/fn_decl.h"
+
 #include "ast/type/array_type.h"
 #include "ast/type/named_type.h"
 
+#include "backend/llvm/types/generic.h"
 #include "backend/llvm/types/struct.h"
+#include "backend/llvm/types/type_param.h"
 #include "backend/llvm/types/union.h"
 
 #include "backend/llvm/codegen.h"
@@ -317,7 +321,7 @@ Value Codegen::generate(const ast::RangeLiteral& expr) {
 }
 
 Value Codegen::generate(const ast::StructLiteral& expr) {
-    auto* type = expr.type->codegen(*this);
+    auto* type = unwrap_type(expr.type->codegen(*this));
 
     if (!type) {
         return Value::poisoned();
@@ -668,6 +672,80 @@ Value Codegen::generate(const ast::CallExpr& expr) {
         error(expr.identifier->offset, "not a function");
     };
 
+    if (const auto* identifier =
+            dynamic_cast<const ast::Identifier*>(expr.identifier.get())) {
+        auto [name, offset] = identifier->value.back();
+        auto* scope = resolve_scope(identifier->value);
+
+        if (scope) {
+            auto generic_fn = scope->generic_fns.find(name);
+
+            if (generic_fn != scope->generic_fns.end()) {
+                auto* gen = &generic_fn->second;
+
+                std::vector<OffsetValue<Value>> arguments;
+                arguments.reserve(expr.arguments.size());
+
+                for (const auto& argument : expr.arguments) {
+                    auto arg_value = argument->codegen(*this);
+
+                    arguments.push_back(
+                        {.value = arg_value, .offset = argument->offset});
+                }
+
+                std::vector<Type*> template_args;
+                template_args.resize(gen->template_params.size(), nullptr);
+
+                for (std::size_t i = 0;
+                     i < gen->params.size() && i < arguments.size(); ++i) {
+                    auto* param_type = gen->params[i].type;
+                    auto* arg_type = arguments[i].value.type;
+
+                    if (!deduce_template_arg(
+                            param_type, arg_type, gen->template_params,
+                            template_args)) {
+                        error(
+                            offset, "could not deduce type for parameter {}",
+                            log::quoted(gen->params[i].name));
+
+                        return Value::poisoned();
+                    }
+                }
+
+                bool all_deduced = true;
+
+                for (auto* arg : template_args) {
+                    if (!arg) {
+                        all_deduced = false;
+                        break;
+                    }
+                }
+
+                if (!all_deduced) {
+                    error(
+                        offset,
+                        "could not deduce type arguments for generic function "
+                        "{}",
+                        log::quoted(name));
+
+                    return Value::poisoned();
+                }
+
+                auto result = inst_generic_fn(gen, template_args);
+
+                if (!result.ok()) {
+                    return Value::poisoned();
+                }
+
+                auto* fn_type = static_cast<types::Function*>(result.type);
+
+                return create_call(
+                    offset, fn_type, static_cast<llvm::Function*>(result.value),
+                    arguments);
+            }
+        }
+    }
+
     auto value = expr.identifier->codegen(*this);
 
     if (!value.ok()) {
@@ -709,8 +787,58 @@ Value Codegen::generate(const ast::CallExpr& expr) {
 }
 
 Value Codegen::generate(const ast::CallExprGeneric& expr) {
-    not_implemented(expr.identifier->offset, "generic function calls");
-    return Value::poisoned();
+    auto [name, offset] = expr.identifier->value.back();
+    auto* scope = resolve_scope(expr.identifier->value);
+
+    if (!scope) {
+        return Value::poisoned();
+    }
+
+    auto generic_fn = scope->generic_fns.find(name);
+
+    if (generic_fn == scope->generic_fns.end()) {
+        if (auto hint = did_you_mean_hint(name, scope->generic_fns)) {
+            error_hint(
+                offset, *hint, "no such generic function: {}",
+                log::quoted(name));
+        } else {
+            error(offset, "no such generic function: {}", log::quoted(name));
+        }
+
+        return Value::poisoned();
+    }
+
+    std::vector<Type*> template_args;
+    template_args.reserve(expr.template_args.size());
+
+    for (const auto& arg : expr.template_args) {
+        auto* type = arg->codegen(*this);
+
+        if (!type) {
+            return Value::poisoned();
+        }
+
+        template_args.push_back(type);
+    }
+
+    std::vector<OffsetValue<Value>> arguments;
+    arguments.reserve(expr.arguments.size());
+
+    for (const auto& argument : expr.arguments) {
+        auto arg_value = argument->codegen(*this);
+        arguments.push_back({.value = arg_value, .offset = argument->offset});
+    }
+
+    auto result = inst_generic_fn(&generic_fn->second, template_args);
+
+    if (!result.ok()) {
+        return Value::poisoned();
+    }
+
+    auto* fn_type = static_cast<types::Function*>(result.type);
+
+    return create_call(
+        offset, fn_type, static_cast<llvm::Function*>(result.value), arguments);
 }
 
 Value Codegen::generate(const ast::MethodExpr& expr) {

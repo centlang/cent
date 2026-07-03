@@ -37,6 +37,10 @@ struct Type {
         Slice,
         Tuple,
 
+        TypeParam,
+        TemplateStructInst,
+        TemplateUnionInst,
+
         Enum,
         Struct,
         Union,

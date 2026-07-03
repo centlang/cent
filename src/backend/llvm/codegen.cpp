@@ -7,7 +7,10 @@
 #include "ast/decl/fn_decl.h"
 #include "ast/decl/var_decl.h"
 
+#include "backend/llvm/types/alias.h"
 #include "backend/llvm/types/enum.h"
+#include "backend/llvm/types/generic.h"
+#include "backend/llvm/types/type_param.h"
 
 #include "backend/llvm/abi.h"
 #include "backend/llvm/codegen.h"
@@ -498,12 +501,638 @@ void Codegen::generate(const ast::Module& module) {
             continue;
         }
 
-        if (function->block) {
+        if (function->block && function->template_params.empty()) {
             function->codegen(*this);
         }
     }
 
     m_generated_modules[module.path] = *m_current_scope;
+}
+
+bool Codegen::deduce_template_arg(
+    Type* param, Type* arg,
+    const std::vector<types::TypeParam*>& template_params,
+    std::vector<Type*>& deduced_args) {
+    param = unwrap_type(param);
+    arg = unwrap_type(arg);
+
+    if (auto* t_param = dyn_cast<types::TypeParam>(param)) {
+        for (std::size_t i = 0; i < template_params.size(); ++i) {
+            if (template_params[i] == t_param) {
+                if (deduced_args[i] && deduced_args[i] != arg) {
+                    return false;
+                }
+
+                deduced_args[i] = arg;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    if (auto* param_struct = dyn_cast<types::TemplateStructInst>(param)) {
+        auto* arg_struct = dyn_cast<types::Struct>(arg);
+
+        if (!arg_struct || param_struct->type != arg_struct->origin) {
+            return false;
+        }
+
+        for (std::size_t i = 0; i < param_struct->type->fields.size(); ++i) {
+            auto& param_field = param_struct->type->fields[i];
+
+            auto* resolved_field_type = inst_template_param(
+                param_struct->type->template_params, param_struct->args,
+                param_field.type);
+
+            for (auto& [name, index] : m_members[static_cast<llvm::StructType*>(
+                     arg_struct->llvm_type)]) {
+                if (name == param_field.name) {
+                    if (!deduce_template_arg(
+                            resolved_field_type, arg_struct->fields[index],
+                            template_params, deduced_args)) {
+                        return false;
+                    }
+
+                    break;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    if (auto* param_union = dyn_cast<types::TemplateUnionInst>(param)) {
+        auto* arg_union = dyn_cast<types::Union>(arg);
+
+        if (!arg_union || param_union->type != arg_union->origin) {
+            return false;
+        }
+
+        for (std::size_t i = 0; i < param_union->type->fields.size(); ++i) {
+            auto& param_field = param_union->type->fields[i];
+
+            auto* resolved_field_type = inst_template_param(
+                param_union->type->template_params, param_union->args,
+                param_field.type);
+
+            auto* llvm_struct_type = arg_union->llvm_type;
+
+            for (auto& [name, index] :
+                 m_members[static_cast<llvm::StructType*>(llvm_struct_type)]) {
+                if (name == param_field.name) {
+                    if (!deduce_template_arg(
+                            resolved_field_type, arg_union->fields[index],
+                            template_params, deduced_args)) {
+                        return false;
+                    }
+
+                    break;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    if (auto* param_ptr = dyn_cast<types::Pointer>(param)) {
+        if (auto* arg_ptr = dyn_cast<types::Pointer>(arg)) {
+            return deduce_template_arg(
+                param_ptr->type, arg_ptr->type, template_params, deduced_args);
+        }
+
+        return false;
+    }
+
+    if (auto* param_opt = dyn_cast<types::Optional>(param)) {
+        if (auto* arg_opt = dyn_cast<types::Optional>(arg)) {
+            return deduce_template_arg(
+                param_opt->type, arg_opt->type, template_params, deduced_args);
+        }
+
+        return false;
+    }
+
+    if (auto* param_slice = dyn_cast<types::Slice>(param)) {
+        if (auto* arg_slice = dyn_cast<types::Slice>(arg)) {
+            return deduce_template_arg(
+                param_slice->type, arg_slice->type, template_params,
+                deduced_args);
+        }
+
+        return false;
+    }
+
+    if (auto* param_array = dyn_cast<types::Array>(param)) {
+        if (auto* arg_array = dyn_cast<types::Array>(arg)) {
+            if (param_array->size != arg_array->size) {
+                return false;
+            }
+
+            return deduce_template_arg(
+                param_array->type, arg_array->type, template_params,
+                deduced_args);
+        }
+
+        return false;
+    }
+
+    if (auto* param_range = dyn_cast<types::Range>(param)) {
+        if (auto* arg_range = dyn_cast<types::Range>(arg)) {
+            return deduce_template_arg(
+                param_range->type, arg_range->type, template_params,
+                deduced_args);
+        }
+
+        return false;
+    }
+
+    if (auto* param_tuple = dyn_cast<types::Tuple>(param)) {
+        auto* arg_tuple = dyn_cast<types::Tuple>(arg);
+
+        if (!arg_tuple ||
+            param_tuple->types.size() != arg_tuple->types.size()) {
+            return false;
+        }
+
+        for (std::size_t i = 0; i < param_tuple->types.size(); ++i) {
+            if (!deduce_template_arg(
+                    param_tuple->types[i], arg_tuple->types[i], template_params,
+                    deduced_args)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    if (auto* param_fn = dyn_cast<types::Function>(param)) {
+        auto* arg_fn = dyn_cast<types::Function>(arg);
+
+        if (!arg_fn ||
+            param_fn->param_types.size() != arg_fn->param_types.size()) {
+            return false;
+        }
+
+        if (!deduce_template_arg(
+                param_fn->return_type, arg_fn->return_type, template_params,
+                deduced_args)) {
+            return false;
+        }
+
+        for (std::size_t i = 0; i < param_fn->param_types.size(); ++i) {
+            if (!deduce_template_arg(
+                    param_fn->param_types[i], arg_fn->param_types[i],
+                    template_params, deduced_args)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    return param == arg;
+}
+
+Type* Codegen::inst_template_param(
+    const std::vector<types::TypeParam*>& params,
+    const std::vector<Type*>& args, Type* type) {
+    auto* base_type = unwrap_type(type);
+
+    if (auto* t_param = dyn_cast<types::TypeParam>(base_type)) {
+        for (std::size_t i = 0; i < params.size(); ++i) {
+            if (params[i] == t_param) {
+                return args[i];
+            }
+        }
+
+        return nullptr;
+    }
+
+    if (auto* t_struct = dyn_cast<types::TemplateStructInst>(base_type)) {
+        std::vector<Type*> new_args;
+        new_args.reserve(t_struct->args.size());
+
+        bool all_resolved = true;
+
+        for (auto* arg : t_struct->args) {
+            auto* resolved = inst_template_param(params, args, arg);
+
+            if (!resolved) {
+                return nullptr;
+            }
+
+            if (!resolved->llvm_type) {
+                all_resolved = false;
+            }
+
+            new_args.push_back(resolved);
+        }
+
+        if (all_resolved) {
+            return inst_generic_struct(t_struct->type, new_args);
+        }
+
+        m_named_types.push_back(
+            std::make_unique<types::TemplateStructInst>(
+                t_struct->type, new_args));
+
+        return m_named_types.back().get();
+    }
+
+    if (auto* t_union = dyn_cast<types::TemplateUnionInst>(base_type)) {
+        std::vector<Type*> new_args;
+        new_args.reserve(t_union->args.size());
+
+        bool all_resolved = true;
+
+        for (auto* arg : t_union->args) {
+            auto* resolved = inst_template_param(params, args, arg);
+
+            if (!resolved) {
+                return nullptr;
+            }
+
+            if (!resolved->llvm_type) {
+                all_resolved = false;
+            }
+
+            new_args.push_back(resolved);
+        }
+
+        if (all_resolved) {
+            return inst_generic_union(t_union->type, new_args);
+        }
+
+        m_named_types.push_back(
+            std::make_unique<types::TemplateUnionInst>(
+                t_union->type, new_args));
+
+        return m_named_types.back().get();
+    }
+
+    if (auto* ptr = dyn_cast<types::Pointer>(base_type)) {
+        return get_ptr_type(
+            inst_template_param(params, args, ptr->type), ptr->is_mutable);
+    }
+
+    if (auto* optional = dyn_cast<types::Optional>(base_type)) {
+        return get_optional_type(
+            inst_template_param(params, args, optional->type));
+    }
+
+    if (auto* range = dyn_cast<types::Range>(base_type)) {
+        return get_range_type(
+            inst_template_param(params, args, range->type), range->inclusive);
+    }
+
+    if (auto* array = dyn_cast<types::Array>(base_type)) {
+        return get_array_type(
+            inst_template_param(params, args, array->type), array->size);
+    }
+
+    if (auto* slice = dyn_cast<types::Slice>(base_type)) {
+        return get_slice_type(
+            inst_template_param(params, args, slice->type), slice->is_mutable);
+    }
+
+    if (auto* tuple = dyn_cast<types::Tuple>(base_type)) {
+        std::vector<Type*> types;
+        types.reserve(tuple->types.size());
+
+        for (auto& element : tuple->types) {
+            types.push_back(inst_template_param(params, args, element));
+        }
+
+        return get_tuple_type(types);
+    }
+
+    if (auto* func = dyn_cast<types::Function>(base_type)) {
+        Type* return_type =
+            inst_template_param(params, args, func->return_type);
+
+        std::vector<Type*> param_types;
+
+        param_types.reserve(func->param_types.size());
+
+        for (auto& param_type : func->param_types) {
+            param_types.push_back(
+                inst_template_param(params, args, param_type));
+        }
+
+        return get_fn_type(
+            return_type, param_types, func->default_args, func->variadic);
+    }
+
+    return type;
+}
+
+types::Struct* Codegen::inst_generic_struct(
+    GenericStruct* type, const std::vector<Type*>& types) {
+    auto& result = m_generic_struct_inst[type][types];
+
+    if (result) {
+        return result.get();
+    }
+
+    std::string name = m_current_scope_prefix + type->name + "(<";
+
+    for (std::size_t i = 0; i < types.size(); ++i) {
+        if (i > 0) {
+            name += ",";
+        }
+
+        name += types[i]->to_string();
+    }
+
+    name += ">)";
+
+    auto* llvm_struct_type = llvm::StructType::create(m_context, name);
+
+    result = std::make_unique<types::Struct>(
+        llvm_struct_type, name, std::vector<Type*>{}, false, type);
+
+    struct Field {
+        Type* type;
+        std::string_view name;
+        std::size_t size;
+    };
+
+    std::vector<Field> fields;
+    fields.reserve(type->fields.size());
+
+    for (const auto& field : type->fields) {
+        auto* field_type =
+            inst_template_param(type->template_params, types, field.type);
+
+        auto size =
+            m_module->getDataLayout().getTypeAllocSize(field_type->llvm_type);
+
+        fields.emplace_back(field_type, field.name, size);
+    }
+
+    std::ranges::sort(fields, [](const auto& left, const auto& right) {
+        return left.size > right.size;
+    });
+
+    std::vector<llvm::Type*> llvm_fields;
+    std::vector<Type*> type_fields;
+    llvm_fields.reserve(fields.size());
+    type_fields.reserve(fields.size());
+
+    std::size_t max_element = 0;
+    std::size_t total_size = 0;
+
+    for (std::size_t i = 0; i < fields.size(); ++i) {
+        const auto& field = fields[i];
+
+        llvm_fields.push_back(field.type->llvm_type);
+        type_fields.push_back(field.type);
+
+        max_element = std::max<std::size_t>(
+            std::min<std::size_t>(
+                field.size, m_module->getDataLayout().getTypeAllocSize(m_size)),
+            max_element);
+
+        total_size += field.size;
+        m_members[llvm_struct_type][field.name] = i;
+    }
+
+    if (max_element > 0) {
+        auto rem = total_size % max_element;
+
+        if (rem != 0) {
+            llvm_fields.push_back(
+                llvm::ArrayType::get(
+                    llvm::Type::getInt8Ty(m_context), max_element - rem));
+        }
+    }
+
+    llvm_struct_type->setBody(llvm_fields, false);
+
+    result->fields = type_fields;
+    result->has_tail = llvm_fields.size() != type_fields.size();
+
+    return result.get();
+}
+
+types::Union* Codegen::inst_generic_union(
+    GenericUnion* type, const std::vector<Type*>& types) {
+    auto& result = m_generic_union_inst[type][types];
+
+    if (result) {
+        return result.get();
+    }
+
+    std::string name = m_current_scope_prefix + type->name + "(<";
+
+    for (std::size_t i = 0; i < types.size(); ++i) {
+        if (i > 0) {
+            name += ",";
+        }
+
+        name += types[i]->to_string();
+    }
+
+    name += ">)";
+
+    auto* llvm_struct_type = llvm::StructType::create(m_context, name);
+
+    std::vector<Type*> fields;
+    fields.reserve(type->fields.size());
+
+    for (std::size_t i = 0; i < type->fields.size(); ++i) {
+        const auto& field = type->fields[i];
+
+        auto* field_type =
+            inst_template_param(type->template_params, types, field.type);
+
+        fields.push_back(field_type);
+        m_members[llvm_struct_type][field.name] = i;
+    }
+
+    std::size_t max = 0;
+    llvm::Type* max_type = nullptr;
+
+    auto layout = m_module->getDataLayout();
+
+    for (const auto& field : fields) {
+        auto size = layout.getTypeAllocSize(field->llvm_type);
+
+        if (size > max) {
+            max = size;
+            max_type = field->llvm_type;
+        }
+    }
+
+    if (!type->tag_type) {
+        llvm_struct_type->setBody(max_type);
+
+        result = std::make_unique<types::Union>(
+            llvm_struct_type, name, std::move(fields), nullptr, type);
+
+        return result.get();
+    }
+
+    llvm_struct_type->setBody({max_type, type->tag_type->llvm_type});
+
+    result = std::make_unique<types::Union>(
+        llvm_struct_type, name, std::move(fields), type->tag_type, type);
+
+    return result.get();
+}
+
+Value Codegen::inst_generic_fn(
+    GenericFunction* function, const std::vector<Type*>& types) {
+    auto& generic_fn_inst = m_generic_fns_inst[function];
+
+    auto result = generic_fn_inst.find(types);
+
+    if (result != generic_fn_inst.end()) {
+        return result->second;
+    }
+
+    std::vector<Type*> param_types;
+    param_types.reserve(function->params.size());
+
+    for (const auto& param : function->params) {
+        param_types.push_back(
+            inst_template_param(function->template_params, types, param.type));
+    }
+
+    std::vector<llvm::Constant*> default_args;
+    default_args.reserve(function->default_args.size());
+
+    for (std::size_t i = 0; i < function->default_args.size(); ++i) {
+        const auto* arg = function->default_args[i];
+        auto value = arg->codegen(*this);
+
+        if (!value.ok()) {
+            return Value::poisoned();
+        }
+
+        auto* type =
+            param_types[i + param_types.size() - function->default_args.size()];
+
+        auto val = cast_or_error(arg->offset, type, value);
+
+        if (!val.ok()) {
+            return Value::poisoned();
+        }
+
+        if (!llvm::isa<llvm::Constant>(val.value)) {
+            error(arg->offset, "not a constant");
+            return Value::poisoned();
+        }
+
+        default_args.push_back(static_cast<llvm::Constant*>(val.value));
+    }
+
+    std::string name = m_current_scope_prefix + function->name.value + "(<";
+
+    for (std::size_t i = 0; i < types.size(); ++i) {
+        if (i > 0) {
+            name += ",";
+        }
+
+        name += types[i]->to_string();
+    }
+
+    name += ">)";
+
+    auto* fn_type = get_fn_type(
+        inst_template_param(
+            function->template_params, types, function->return_type),
+        std::move(param_types), std::move(default_args), false);
+
+    auto* llvm_fn_type = static_cast<llvm::FunctionType*>(fn_type->llvm_type);
+
+    auto* llvm_function = llvm::Function::Create(
+        llvm_fn_type, llvm::Function::PrivateLinkage, name, *m_module);
+
+    if (is<types::Never>(fn_type->return_type)) {
+        llvm_function->addFnAttr(llvm::Attribute::NoReturn);
+    }
+
+    if (fn_type->sret) {
+        llvm_function->addParamAttr(
+            0, llvm::Attribute::getWithStructRetType(
+                   m_context, fn_type->return_type->llvm_type));
+    }
+
+    auto* entry = llvm::BasicBlock::Create(m_context, "", llvm_function);
+
+    auto* insert_point = m_builder.GetInsertBlock();
+    m_builder.SetInsertPoint(entry);
+
+    auto* current_function = m_current_function;
+    m_current_function = fn_type;
+
+    auto current_scope_names = m_current_scope->names;
+    auto current_scope_types = m_current_scope->types;
+
+    for (std::size_t i = 0; i < function->params.size(); ++i) {
+        const auto& param = function->params[i];
+
+        auto* variable =
+            alloca_arg(fn_type->sret ? i + 1 : i, fn_type->param_types[i]);
+
+        m_current_scope->names[param.name] = {
+            .element =
+                {.type = fn_type->param_types[i],
+                 .value = variable,
+                 .ptr_depth = 1,
+                 .is_mutable = param.is_mutable},
+            .unit = m_current_unit};
+    }
+
+    for (std::size_t i = 0; i < function->template_params.size(); ++i) {
+        m_named_types.push_back(
+            std::make_unique<types::Alias>(
+                types[i]->llvm_type, function->template_params[i]->name,
+                types[i], false));
+
+        m_current_scope->types[function->template_params[i]->name] = {
+            .element = m_named_types.back().get()};
+    }
+
+    auto scope_prefix = m_current_scope_prefix;
+    m_current_scope_prefix = name + "::";
+
+    function->block->codegen(*this);
+
+    m_current_scope_prefix = scope_prefix;
+    m_current_scope->names = current_scope_names;
+    m_current_scope->types = current_scope_types;
+    m_current_function = current_function;
+
+    if (m_builder.GetInsertBlock()->getTerminator()) {
+        m_builder.SetInsertPoint(insert_point);
+        generic_fn_inst[types] = Value{.type = fn_type, .value = llvm_function};
+
+        return generic_fn_inst[types];
+    }
+
+    if (!m_current_fn_had_error &&
+        !is<types::Void, types::Never>(fn_type->return_type)) {
+        error(
+            function->name.offset, "non-void function does not return a value");
+
+        m_builder.SetInsertPoint(insert_point);
+
+        return Value::poisoned();
+    }
+
+    if (is<types::Never>(fn_type->return_type)) {
+        m_builder.CreateUnreachable();
+    } else {
+        m_builder.CreateRetVoid();
+    }
+
+    m_builder.SetInsertPoint(insert_point);
+
+    generic_fn_inst[types] = Value{.type = fn_type, .value = llvm_function};
+    return generic_fn_inst[types];
 }
 
 Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {

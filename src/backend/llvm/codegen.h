@@ -23,6 +23,8 @@
 
 #include "backend/llvm/types/function.h"
 #include "backend/llvm/types/primitive.h"
+#include "backend/llvm/types/struct.h"
+#include "backend/llvm/types/union.h"
 
 #include "backend/llvm/scope.h"
 #include "backend/llvm/type.h"
@@ -167,6 +169,24 @@ private:
     void create_main();
 
     void generate(const ast::Module& module);
+
+    [[nodiscard]] Type* inst_template_param(
+        const std::vector<types::TypeParam*>& params,
+        const std::vector<Type*>& args, Type* type);
+
+    bool deduce_template_arg(
+        Type* param, Type* arg,
+        const std::vector<types::TypeParam*>& template_params,
+        std::vector<Type*>& deduced_args);
+
+    [[nodiscard]] types::Struct*
+    inst_generic_struct(GenericStruct* type, const std::vector<Type*>& types);
+
+    [[nodiscard]] types::Union*
+    inst_generic_union(GenericUnion* type, const std::vector<Type*>& types);
+
+    [[nodiscard]] Value
+    inst_generic_fn(GenericFunction* function, const std::vector<Type*>& types);
 
     [[nodiscard]] Value
     primitive_cast(Type* type, const Value& value, bool implicit = true);
@@ -500,6 +520,19 @@ private:
     std::map<FnTypeKey, std::unique_ptr<types::Function>> m_fn_types;
 
     std::vector<std::unique_ptr<Type>> m_named_types;
+
+    std::map<
+        GenericStruct*,
+        std::map<std::vector<Type*>, std::unique_ptr<types::Struct>>>
+        m_generic_struct_inst;
+
+    std::map<
+        GenericUnion*,
+        std::map<std::vector<Type*>, std::unique_ptr<types::Union>>>
+        m_generic_union_inst;
+
+    std::map<GenericFunction*, std::map<std::vector<Type*>, Value>>
+        m_generic_fns_inst;
 
     std::vector<std::filesystem::path> m_units;
 
