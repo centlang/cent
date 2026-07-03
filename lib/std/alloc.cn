@@ -8,11 +8,11 @@ pub type Allocator {
     _free: *FreeFn,
 }
 
-pub fn Allocator::alloc(self: Allocator, size: usize) ?*mut u8 {
+pub fn Allocator::alloc(self: *mut Allocator, size: usize) ?*mut u8 {
     return (self._alloc)(size);
 }
 
-pub fn Allocator::free(self: Allocator, ptr: *mut u8) {
+pub fn Allocator::free(self: *mut Allocator, ptr: *mut u8) {
     (self._free)(ptr);
 }
 
