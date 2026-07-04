@@ -8,12 +8,26 @@ pub type Allocator {
     _free: *FreeFn,
 }
 
-pub fn Allocator::alloc(self: *mut Allocator, size: usize) ?*mut u8 {
-    return (self._alloc)(size);
+pub fn(<T>) Allocator::alloc(self: *mut Allocator) ?*mut T {
+    return (self._alloc)(sizeof(T)) as ?*mut T;
 }
 
-pub fn Allocator::free(self: *mut Allocator, ptr: *mut u8) {
-    (self._free)(ptr);
+pub fn(<T>) Allocator::alloc_n(self: *mut Allocator, size: usize) ?[]mut T {
+    let data = (self._alloc)(size * sizeof(T));
+
+    if data == null {
+        return null;
+    }
+
+    return core::mem::as_mut_slice(data.! as *mut T, size);
+}
+
+pub fn(<T>) Allocator::free(self: *mut Allocator, ptr: *mut T) {
+    (self._free)(ptr as *mut u8);
+}
+
+pub fn(<T>) Allocator::free_n(self: *mut Allocator, slice: []mut T) {
+    (self._free)(slice.ptr as *mut u8);
 }
 
 pub fn system() Allocator {
