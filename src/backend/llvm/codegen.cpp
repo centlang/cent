@@ -1316,7 +1316,22 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
         }
 
         if (base_contained_type != base_value_type) {
-            return Value::poisoned();
+            if (implicit) {
+                return Value::poisoned();
+            }
+
+            auto* value_optional = dyn_cast<types::Optional>(base_value_type);
+
+            if (!value_optional) {
+                return Value::poisoned();
+            }
+
+            if (!is<types::Pointer>(base_contained_type) ||
+                !is<types::Pointer>(unwrap_type(value_optional->type))) {
+                return Value::poisoned();
+            }
+
+            return {.type = type, .value = load_rvalue(value).value};
         }
 
         if (is<types::Pointer>(base_contained_type)) {

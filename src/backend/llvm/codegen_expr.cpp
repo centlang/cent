@@ -20,14 +20,10 @@
 #include "ast/expr/unary_expr.h"
 #include "ast/expr/unwrap_expr.h"
 
-#include "ast/decl/fn_decl.h"
-
 #include "ast/type/array_type.h"
 #include "ast/type/named_type.h"
 
-#include "backend/llvm/types/generic.h"
 #include "backend/llvm/types/struct.h"
-#include "backend/llvm/types/type_param.h"
 #include "backend/llvm/types/union.h"
 
 #include "backend/llvm/codegen.h"
