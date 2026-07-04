@@ -1055,10 +1055,18 @@ Value Codegen::inst_generic_fn(
             .element = m_named_types.back().get()};
     }
 
+    auto filename = m_filename;
+
+    if (!function->source_file.empty()) {
+        m_filename = function->source_file;
+    }
+
     auto scope_prefix = m_current_scope_prefix;
     m_current_scope_prefix = name + "::";
 
     function->block->codegen(*this);
+
+    m_filename = filename;
 
     m_current_scope_prefix = scope_prefix;
     m_current_scope->names = current_scope_names;

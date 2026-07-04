@@ -813,6 +813,7 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
         generic_fn.name = decl.name;
         generic_fn.return_type = return_type;
         generic_fn.block = decl.block.get();
+        generic_fn.source_file = m_filename;
 
         return;
     }

@@ -64,6 +64,8 @@ struct GenericFunction {
 
     std::vector<types::TypeParam*> template_params;
     FnKind kind{FnKind::Normal};
+
+    std::string source_file;
 };
 
 } // namespace cent::backend
