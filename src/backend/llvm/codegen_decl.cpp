@@ -159,7 +159,8 @@ Value Codegen::generate(const ast::Struct& decl) {
                 static_cast<types::TypeParam*>(m_named_types.back().get()));
 
             m_current_scope->types[param.value] = {
-                .element = generic_struct.template_params.back()};
+                .element = generic_struct.template_params.back(),
+                .is_public = true};
         }
 
         std::vector<GenericStruct::Field> fields;
@@ -292,7 +293,8 @@ Value Codegen::generate(const ast::Union& decl) {
                 static_cast<types::TypeParam*>(m_named_types.back().get()));
 
             m_current_scope->types[param.value] = {
-                .element = generic_union.template_params.back()};
+                .element = generic_union.template_params.back(),
+                .is_public = true};
         }
 
         std::vector<GenericUnion::Field> fields;
@@ -773,7 +775,8 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
                 static_cast<types::TypeParam*>(m_named_types.back().get()));
 
             m_current_scope->types[param.value] = {
-                .element = generic_fn.template_params.back()};
+                .element = generic_fn.template_params.back(),
+                .is_public = true};
         }
 
         Type* return_type = m_void_type.get();
