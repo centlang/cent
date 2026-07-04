@@ -228,77 +228,36 @@ Value Codegen::create_core_panic() {
 }
 
 void Codegen::create_core_mem() {
-    auto* u8_type = m_primitive_types["u8"].get();
-    auto* mut_u8_ptr = get_ptr_type(u8_type, true);
-    auto* usize = m_primitive_types["usize"].get();
+    auto* t_param = new types::TypeParam("T");
+    auto* usize_type = m_primitive_types["usize"].get();
 
-    auto* as_mut_u8_slice_type =
-        get_fn_type(get_slice_type(u8_type, true), {mut_u8_ptr, usize});
-
-    auto* as_mut_u8_slice = llvm::Function::Create(
-        static_cast<llvm::FunctionType*>(as_mut_u8_slice_type->llvm_type),
-        llvm::Function::PrivateLinkage, "core::mem::as_mut_u8_slice",
-        *m_module);
-
-    auto* as_mut_u8_slice_entry =
-        llvm::BasicBlock::Create(m_context, "", as_mut_u8_slice);
-
-    m_builder.SetInsertPoint(as_mut_u8_slice_entry);
-
-    auto* as_mut_u8_slice_result = create_alloca(m_slice_type);
-
-    auto* as_mut_u8_slice_ptr_member = m_builder.CreateStructGEP(
-        m_slice_type, as_mut_u8_slice_result, slice_member_ptr);
-
-    auto* as_mut_u8_slice_len_member = m_builder.CreateStructGEP(
-        m_slice_type, as_mut_u8_slice_result, slice_member_len);
-
-    m_builder.CreateStore(
-        as_mut_u8_slice->getArg(0), as_mut_u8_slice_ptr_member);
-
-    m_builder.CreateStore(
-        as_mut_u8_slice->getArg(1), as_mut_u8_slice_len_member);
-
-    m_builder.CreateRet(m_builder.CreateLoad(
-        static_cast<llvm::FunctionType*>(as_mut_u8_slice_type->llvm_type)
-            ->getReturnType(),
-        as_mut_u8_slice_result));
-
-    auto* as_u8_slice_type = get_fn_type(
-        get_slice_type(u8_type, false), {get_ptr_type(u8_type, false), usize});
-
-    auto* as_u8_slice = llvm::Function::Create(
-        static_cast<llvm::FunctionType*>(as_u8_slice_type->llvm_type),
-        llvm::Function::PrivateLinkage, "core::mem::as_u8_slice", *m_module);
-
-    auto* as_u8_slice_entry =
-        llvm::BasicBlock::Create(m_context, "", as_u8_slice);
-
-    m_builder.SetInsertPoint(as_u8_slice_entry);
-
-    auto* as_u8_slice_result = create_alloca(m_slice_type);
-
-    auto* as_u8_slice_ptr_member = m_builder.CreateStructGEP(
-        m_slice_type, as_u8_slice_result, slice_member_ptr);
-
-    auto* as_u8_slice_len_member = m_builder.CreateStructGEP(
-        m_slice_type, as_u8_slice_result, slice_member_len);
-
-    m_builder.CreateStore(as_u8_slice->getArg(0), as_u8_slice_ptr_member);
-    m_builder.CreateStore(as_u8_slice->getArg(1), as_u8_slice_len_member);
-
-    m_builder.CreateRet(m_builder.CreateLoad(
-        static_cast<llvm::FunctionType*>(as_u8_slice_type->llvm_type)
-            ->getReturnType(),
-        as_u8_slice_result));
-
-    m_core_module.scopes["mem"].names = {
-        {"as_mut_u8_slice",
-         {.element = {.type = as_mut_u8_slice_type, .value = as_mut_u8_slice},
-          .is_public = true}},
-        {"as_u8_slice",
-         {.element = {.type = as_u8_slice_type, .value = as_u8_slice},
-          .is_public = true}}};
+    m_core_module.scopes["mem"].generic_fns = {
+        {"as_mut_slice",
+         GenericFunction{
+             .name = {.value = "as_mut_slice", .offset = 0},
+             .return_type = get_slice_type(t_param, true),
+             .params =
+                 {
+                     {.name = "ptr",
+                      .type = get_ptr_type(t_param, true),
+                      .is_mutable = false},
+                     {.name = "len", .type = usize_type, .is_mutable = false},
+                 },
+             .template_params = {t_param},
+             .kind = GenericFunction::FnKind::AsMutSlice}},
+        {"as_slice",
+         GenericFunction{
+             .name = {.value = "as_slice", .offset = 0},
+             .return_type = get_slice_type(t_param, false),
+             .params =
+                 {
+                     {.name = "ptr",
+                      .type = get_ptr_type(t_param, false),
+                      .is_mutable = false},
+                     {.name = "len", .type = usize_type, .is_mutable = false},
+                 },
+             .template_params = {t_param},
+             .kind = GenericFunction::FnKind::AsSlice}}};
 }
 
 void Codegen::create_main() {
@@ -691,7 +650,7 @@ bool Codegen::deduce_template_arg(
         return true;
     }
 
-    return param == arg;
+    return true;
 }
 
 Type* Codegen::inst_template_param(
@@ -1693,6 +1652,50 @@ Value Codegen::create_call(
     m_builder.CreateStore(call, variable);
 
     return {.type = type->return_type, .value = variable, .ptr_depth = 1};
+}
+
+Value Codegen::create_intrinsic_call(
+    std::size_t offset, GenericFunction* function,
+    const std::vector<Type*>& types,
+    const std::vector<OffsetValue<Value>>& arguments) {
+    std::vector<Type*> param_types;
+    param_types.reserve(function->params.size());
+
+    for (const auto& param : function->params) {
+        param_types.push_back(
+            inst_template_param(function->template_params, types, param.type));
+    }
+
+    std::vector<Value> args;
+    args.reserve(arguments.size());
+
+    for (std::size_t i = 0; i < arguments.size(); ++i) {
+        auto val = cast_or_error(
+            arguments[i].offset, param_types[i], arguments[i].value);
+
+        if (!val.ok()) {
+            return Value::poisoned();
+        }
+
+        args.push_back(val);
+    }
+
+    auto* slice_type = get_slice_type(
+        types[0], function->kind == GenericFunction::FnKind::AsMutSlice);
+
+    auto* variable = create_alloca(slice_type);
+
+    auto* ptr_field =
+        m_builder.CreateStructGEP(m_slice_type, variable, slice_member_ptr);
+
+    auto* len_field =
+        m_builder.CreateStructGEP(m_slice_type, variable, slice_member_len);
+
+    m_builder.CreateStore(load_rvalue(args[0]).value, ptr_field);
+    m_builder.CreateStore(load_rvalue(args[1]).value, len_field);
+
+    return {
+        .type = slice_type, .value = variable, .ptr_depth = 1, .memcpy = true};
 }
 
 Value Codegen::load_rvalue(const Value& value) {

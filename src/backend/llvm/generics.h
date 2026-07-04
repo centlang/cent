@@ -51,6 +51,8 @@ struct GenericFunction {
         bool is_mutable;
     };
 
+    enum struct FnKind : std::uint8_t { Normal, AsSlice, AsMutSlice };
+
     OffsetValue<std::string> name;
 
     Type* return_type;
@@ -61,6 +63,7 @@ struct GenericFunction {
     const ast::BlockStmt* block{nullptr};
 
     std::vector<types::TypeParam*> template_params;
+    FnKind kind{FnKind::Normal};
 };
 
 } // namespace cent::backend

@@ -210,6 +210,11 @@ private:
         std::size_t offset, types::Function* type, llvm::Value* function,
         const std::vector<OffsetValue<Value>>& arguments);
 
+    [[nodiscard]] Value create_intrinsic_call(
+        std::size_t offset, GenericFunction* function,
+        const std::vector<Type*>& types,
+        const std::vector<OffsetValue<Value>>& arguments);
+
     [[nodiscard]] Value load_rvalue(const Value& value);
     [[nodiscard]] Value load_lvalue(const Value& value);
 

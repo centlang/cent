@@ -739,6 +739,11 @@ Value Codegen::generate(const ast::CallExpr& expr) {
                     return Value::poisoned();
                 }
 
+                if (gen->kind != GenericFunction::FnKind::Normal) {
+                    return create_intrinsic_call(
+                        offset, gen, template_args, arguments);
+                }
+
                 auto result = inst_generic_fn(gen, template_args);
 
                 if (!result.ok()) {
@@ -837,7 +842,13 @@ Value Codegen::generate(const ast::CallExprGeneric& expr) {
         arguments.push_back({.value = arg_value, .offset = argument->offset});
     }
 
-    auto result = inst_generic_fn(&generic_fn->second, template_args);
+    auto* gen = &generic_fn->second;
+
+    if (gen->kind != GenericFunction::FnKind::Normal) {
+        return create_intrinsic_call(offset, gen, template_args, arguments);
+    }
+
+    auto result = inst_generic_fn(gen, template_args);
 
     if (!result.ok()) {
         return Value::poisoned();
