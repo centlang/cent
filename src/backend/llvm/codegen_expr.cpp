@@ -445,11 +445,19 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
     }
 
     if (is_const) {
-        std::vector<llvm::Constant*> llvm_values;
-        llvm_values.reserve(expr.fields.size());
+        std::vector<llvm::Constant*> llvm_values(struct_type->fields.size());
 
-        for (auto& value : values) {
-            llvm_values.push_back(static_cast<llvm::Constant*>(value.value));
+        for (std::size_t i = 0; i < expr.fields.size(); ++i) {
+            auto index = get_index(
+                m_members[static_cast<llvm::StructType*>(
+                    struct_type->llvm_type)],
+                expr.fields[i]);
+
+            if (!index) {
+                return Value::poisoned();
+            }
+
+            llvm_values[*index] = static_cast<llvm::Constant*>(values[i].value);
         }
 
         if (struct_type->has_tail) {
