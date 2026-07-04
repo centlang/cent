@@ -1365,14 +1365,6 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
         auto* base_slice_contained_type = unwrap_type(slice->type);
 
         if (auto* slice_value = dyn_cast<types::Slice>(base_value_type)) {
-            if (!implicit) {
-                return {
-                    .type = type,
-                    .value = value.value,
-                    .ptr_depth = value.ptr_depth,
-                    .memcpy = value.memcpy};
-            }
-
             if (base_slice_contained_type == unwrap_type(slice_value->type) &&
                 (!slice->is_mutable || slice_value->is_mutable)) {
                 return {
