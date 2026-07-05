@@ -1578,13 +1578,13 @@ Parser::parse_struct(std::vector<ast::Attribute> attrs, bool is_public) {
 
 std::unique_ptr<ast::Union>
 Parser::parse_union(std::vector<ast::Attribute> attrs, bool is_public) {
+    auto template_params = parse_template_params();
+
     auto name = expect("union name", Token::Type::Identifier);
 
     if (!name) {
         return nullptr;
     }
-
-    auto template_params = parse_template_params();
 
     if (!expect("`{`", Token::Type::LeftBrace)) {
         return nullptr;
