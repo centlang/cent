@@ -1331,7 +1331,11 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
                 return Value::poisoned();
             }
 
-            return {.type = type, .value = load_rvalue(value).value};
+            return {
+                .type = type,
+                .value = value.value,
+                .ptr_depth = value.ptr_depth,
+                .memcpy = value.memcpy};
         }
 
         if (is<types::Pointer>(base_contained_type)) {

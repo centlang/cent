@@ -419,13 +419,6 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
         }
 
         value = load_rvalue(value);
-        values.push_back(value);
-
-        if (!llvm::isa_and_nonnull<llvm::Constant>(value.value) ||
-            value.ptr_depth > 0 || value.memcpy) {
-            is_const = false;
-            continue;
-        }
 
         auto index = get_index(
             m_members[static_cast<llvm::StructType*>(struct_type->llvm_type)],
@@ -435,9 +428,18 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
             return Value::poisoned();
         }
 
-        if (struct_type->fields[*index] != value.type) {
+        auto val = cast_or_error(
+            field.value->offset, struct_type->fields[*index], value);
+
+        if (!val.ok()) {
+            return Value::poisoned();
+        }
+
+        if (!llvm::isa<llvm::Constant>(val.value)) {
             is_const = false;
         }
+
+        values.push_back(val);
     }
 
     if (is_const) {
@@ -477,12 +479,9 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
     }
 
     for (std::size_t i = 0; i < expr.fields.size(); ++i) {
-        const auto& field = expr.fields[i];
-        auto& value = values[i];
-
         auto index = get_index(
             m_members[static_cast<llvm::StructType*>(struct_type->llvm_type)],
-            field);
+            expr.fields[i]);
 
         if (!index) {
             return Value::poisoned();
@@ -491,14 +490,7 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
         auto* member =
             m_builder.CreateStructGEP(struct_type->llvm_type, variable, *index);
 
-        auto val = cast_or_error(
-            field.value->offset, struct_type->fields[*index], value);
-
-        if (!val.ok()) {
-            return Value::poisoned();
-        }
-
-        create_store(val, member);
+        create_store(values[i], member);
     }
 
     return Value{
@@ -533,13 +525,19 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
             return Value::poisoned();
         }
 
-        if (!llvm::isa_and_nonnull<llvm::Constant>(value.value) ||
-            array_type->type != value.type || value.ptr_depth > 0 ||
-            value.memcpy) {
+        value = load_rvalue(value);
+
+        auto val = cast_or_error(element->offset, array_type->type, value);
+
+        if (!val.ok()) {
+            return Value::poisoned();
+        }
+
+        if (!llvm::isa<llvm::Constant>(val.value)) {
             is_const = false;
         }
 
-        values.push_back(value);
+        values.push_back(val);
     }
 
     if (is_const) {
@@ -564,21 +562,12 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
     }
 
     for (std::size_t i = 0; i < expr.elements.size(); ++i) {
-        auto& value = values[i];
-
         auto* ptr = m_builder.CreateGEP(
             array_type->llvm_type, variable,
             {llvm::ConstantInt::get(m_size, 0),
              llvm::ConstantInt::get(m_size, i)});
 
-        auto val =
-            cast_or_error(expr.elements[i]->offset, array_type->type, value);
-
-        if (!val.ok()) {
-            return Value::poisoned();
-        }
-
-        create_store(val, ptr);
+        create_store(values[i], ptr);
     }
 
     return Value{
@@ -598,8 +587,7 @@ Value Codegen::generate(const ast::TupleLiteral& expr) {
             return Value::poisoned();
         }
 
-        if (!llvm::isa_and_nonnull<llvm::Constant>(value.value) ||
-            value.ptr_depth > 0 || value.memcpy) {
+        if (llvm::isa_and_nonnull<llvm::Constant>(value.value)) {
             is_const = false;
         }
 
