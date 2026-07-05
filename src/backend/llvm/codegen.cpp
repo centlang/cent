@@ -1052,7 +1052,7 @@ Value Codegen::inst_generic_fn(
                 types[i], false));
 
         m_current_scope->types[function->template_params[i]->name] = {
-            .element = m_named_types.back().get()};
+            .element = m_named_types.back().get(), .is_public = true};
     }
 
     auto filename = m_filename;
