@@ -56,7 +56,7 @@ Type* Codegen::generate(const ast::NamedType& type) {
         if (struct_it != scope->generic_structs.end()) {
             if (struct_it->second.template_params.size() !=
                 type.template_args.size()) {
-                error(offset, "incorrect number of template arguments passed");
+                error(offset, "incorrect number of type arguments passed");
                 return nullptr;
             }
 
@@ -76,7 +76,7 @@ Type* Codegen::generate(const ast::NamedType& type) {
         if (union_it != scope->generic_unions.end()) {
             if (union_it->second.template_params.size() !=
                 type.template_args.size()) {
-                error(offset, "incorrect number of template arguments passed");
+                error(offset, "incorrect number of type arguments passed");
                 return nullptr;
             }
 

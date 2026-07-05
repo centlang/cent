@@ -600,6 +600,27 @@ Parser::expect_access_or_call_expr(bool is_condition) {
             return nullptr;
         }
 
+        if (!is_condition && match(LeftParen) && match(1, Less)) {
+            auto template_args = parse_template_args();
+
+            if (!expect("`(`", LeftParen)) {
+                return nullptr;
+            }
+
+            auto args = parse_args();
+
+            if (!expect("`)`", RightParen)) {
+                return nullptr;
+            }
+
+            expression = std::make_unique<ast::MethodExprGeneric>(
+                expression->offset, std::move(expression),
+                OffsetValue{.value = member->value, .offset = member->offset},
+                std::move(template_args), std::move(args));
+
+            continue;
+        }
+
         if (match_next(LeftParen)) {
             auto args = parse_args();
 

@@ -716,23 +716,17 @@ Value Codegen::generate(const ast::CallExpr& expr) {
                     }
                 }
 
-                bool all_deduced = true;
-
                 for (auto* arg : template_args) {
                     if (!arg) {
-                        all_deduced = false;
-                        break;
+                        error(
+                            offset,
+                            "could not deduce type arguments for generic "
+                            "function "
+                            "{}",
+                            log::quoted(name));
+
+                        return Value::poisoned();
                     }
-                }
-
-                if (!all_deduced) {
-                    error(
-                        offset,
-                        "could not deduce type arguments for generic function "
-                        "{}",
-                        log::quoted(name));
-
-                    return Value::poisoned();
                 }
 
                 if (gen->kind != GenericFunction::FnKind::Normal) {
@@ -856,6 +850,81 @@ Value Codegen::generate(const ast::CallExprGeneric& expr) {
         offset, fn_type, static_cast<llvm::Function*>(result.value), arguments);
 }
 
+Value Codegen::generate_self(
+    const Value& value, Type* first_param_type, std::size_t offset,
+    std::string_view name) {
+    if (auto* type = dyn_cast<types::Pointer>(first_param_type)) {
+        bool value_is_mutable = value.is_mutable;
+        auto* pointer = dyn_cast<types::Pointer>(value.type);
+
+        if (pointer) {
+            value_is_mutable = pointer->is_mutable;
+        }
+
+        if (!value_is_mutable && type->is_mutable) {
+            error(
+                offset, "cannot call method {} on an immutable value",
+                log::quoted(name));
+
+            return Value::poisoned();
+        }
+
+        if (pointer) {
+            return value;
+        }
+
+        if (value.ptr_depth < 1) {
+            error(offset, "type mismatch");
+            return Value::poisoned();
+        }
+
+        return {
+            .type = get_ptr_type(value.type, value_is_mutable),
+            .value = load_lvalue(value).value};
+    }
+
+    if (auto* pointer = dyn_cast<types::Pointer>(value.type)) {
+        return {
+            .type = pointer->type,
+            .value = m_builder.CreateLoad(
+                pointer->type->llvm_type, load_rvalue(value).value)};
+    }
+
+    return value;
+}
+
+Value Codegen::call_generic_fn_with_self(
+    const std::vector<OffsetValue<Value>>& args, GenericFunction* func,
+    const std::vector<Type*>& template_args, std::size_t offset,
+    std::string_view name) {
+    auto fn_inst = inst_generic_fn(func, template_args);
+
+    if (!fn_inst.ok()) {
+        return Value::poisoned();
+    }
+
+    auto* fn_type = static_cast<types::Function*>(fn_inst.type);
+
+    std::vector<OffsetValue<Value>> arguments;
+    arguments.reserve(args.size());
+
+    auto self =
+        generate_self(args[0].value, fn_type->param_types[0], offset, name);
+
+    if (!self.ok()) {
+        return Value::poisoned();
+    }
+
+    arguments.push_back({.value = self, .offset = args[0].offset});
+
+    for (std::size_t i = 1; i < args.size(); ++i) {
+        arguments.push_back(args[i]);
+    }
+
+    return create_call(
+        offset, fn_type, static_cast<llvm::Function*>(fn_inst.value),
+        arguments);
+}
 Value Codegen::generate(const ast::MethodExpr& expr) {
     auto value = expr.value->codegen(*this);
 
@@ -867,85 +936,190 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
 
     auto iterator = type_methods.find(expr.name.value);
 
-    auto no_such_method = [&] {
-        error(
-            expr.name.offset, "no such method: {}",
-            log::quoted(expr.name.value));
-    };
+    Type* type = value.type;
 
     if (iterator == type_methods.end()) {
-        auto* type = dyn_cast<types::Pointer>(value.type);
-
-        if (!type) {
-            no_such_method();
-            return Value::poisoned();
-        }
-
-        auto& type_methods = m_methods[type->type];
-
-        iterator = type_methods.find(expr.name.value);
-
-        if (iterator == type_methods.end()) {
-            no_such_method();
-            return Value::poisoned();
-        }
-    }
-
-    std::vector<OffsetValue<Value>> arguments;
-    arguments.reserve(expr.arguments.size() + 1);
-
-    if (auto* type =
-            dyn_cast<types::Pointer>(iterator->second.type->param_types[0])) {
-        bool value_is_mutable = value.is_mutable;
         auto* pointer = dyn_cast<types::Pointer>(value.type);
 
         if (pointer) {
-            value_is_mutable = pointer->is_mutable;
+            type = pointer->type;
         }
 
-        if (!value_is_mutable && type->is_mutable) {
-            error(
-                expr.name.offset, "cannot call method {} on an immutable value",
-                log::quoted(expr.name.value));
+        auto& type_methods = m_methods[type];
 
+        iterator = type_methods.find(expr.name.value);
+    }
+
+    if (iterator != type_methods.end()) {
+        std::vector<OffsetValue<Value>> arguments;
+        arguments.reserve(expr.arguments.size() + 1);
+
+        auto self = generate_self(
+            value, iterator->second.type->param_types[0], expr.name.offset,
+            expr.name.value);
+
+        if (!self.ok()) {
             return Value::poisoned();
         }
 
-        if (pointer) {
-            arguments.push_back({.value = value, .offset = expr.value->offset});
-        } else {
-            if (value.ptr_depth < 1) {
-                error(expr.value->offset, "type mismatch");
-                return Value::poisoned();
-            }
+        arguments.push_back({.value = self, .offset = expr.value->offset});
 
-            arguments.push_back(
-                {.value =
-                     {.type = get_ptr_type(value.type, value_is_mutable),
-                      .value = load_lvalue(value).value},
-                 .offset = expr.value->offset});
+        for (const auto& argument : expr.arguments) {
+            auto value = argument->codegen(*this);
+            arguments.push_back({.value = value, .offset = argument->offset});
         }
-    } else {
-        if (auto* pointer = dyn_cast<types::Pointer>(value.type)) {
-            arguments.push_back(
-                {.value =
-                     {.type = pointer->type,
-                      .value = m_builder.CreateLoad(
-                          pointer->type->llvm_type, load_rvalue(value).value)},
-                 .offset = expr.value->offset});
-        } else {
-            arguments.push_back({.value = value, .offset = expr.value->offset});
-        }
+
+        return create_call(
+            expr.name.offset, iterator->second.type, iterator->second.function,
+            arguments);
     }
+
+    auto gen_methods = m_generic_methods.find(type);
+
+    if (gen_methods == m_generic_methods.end()) {
+        error(
+            expr.name.offset, "no such method: {}",
+            log::quoted(expr.name.value));
+
+        return Value::poisoned();
+    }
+
+    auto gen_method_it = gen_methods->second.find(expr.name.value);
+
+    if (gen_method_it == gen_methods->second.end()) {
+        error(
+            expr.name.offset, "no such method: {}",
+            log::quoted(expr.name.value));
+
+        return Value::poisoned();
+    }
+
+    auto* gen_method = gen_method_it->second;
+
+    std::vector<OffsetValue<Value>> args;
+    args.reserve(expr.arguments.size() + 1);
+
+    args.push_back({.value = value, .offset = expr.value->offset});
 
     for (const auto& argument : expr.arguments) {
-        auto value = argument->codegen(*this);
-        arguments.push_back({.value = value, .offset = argument->offset});
+        auto arg = argument->codegen(*this);
+
+        if (!arg.ok()) {
+            return Value::poisoned();
+        }
+
+        args.push_back({.value = arg, .offset = argument->offset});
     }
 
-    return create_call(
-        expr.name.offset, iterator->second.type, iterator->second.function,
-        arguments);
+    std::vector<Type*> template_args(
+        gen_method->template_params.size(), nullptr);
+
+    Type* self_type = value.type;
+
+    if (!is<types::Pointer>(value.type) &&
+        is<types::Pointer>(gen_method->params[0].type)) {
+        self_type = get_ptr_type(value.type, value.is_mutable);
+    }
+
+    auto could_not_deduce = [&] {
+        error(
+            expr.name.offset, "could not deduce type arguments for method {}",
+            log::quoted(expr.name.value));
+    };
+
+    if (!deduce_template_arg(
+            gen_method->params[0].type, self_type, gen_method->template_params,
+            template_args)) {
+        could_not_deduce();
+        return Value::poisoned();
+    }
+
+    for (std::size_t i = 1; i < args.size() && i < gen_method->params.size();
+         ++i) {
+        if (!deduce_template_arg(
+                gen_method->params[i].type, args[i].value.type,
+                gen_method->template_params, template_args)) {
+            could_not_deduce();
+            return Value::poisoned();
+        }
+    }
+
+    for (auto* arg : template_args) {
+        if (!arg) {
+            could_not_deduce();
+            return Value::poisoned();
+        }
+    }
+
+    return call_generic_fn_with_self(
+        args, gen_method, template_args, expr.name.offset, expr.name.value);
+}
+
+Value Codegen::generate(const ast::MethodExprGeneric& expr) {
+    auto value = expr.value->codegen(*this);
+
+    if (!value.ok()) {
+        return Value::poisoned();
+    }
+
+    Type* type = value.type;
+
+    if (auto* pointer = dyn_cast<types::Pointer>(value.type)) {
+        type = pointer->type;
+    }
+
+    auto gen_methods = m_generic_methods.find(type);
+
+    if (gen_methods == m_generic_methods.end()) {
+        error(
+            expr.name.offset, "no such method: {}",
+            log::quoted(expr.name.value));
+
+        return Value::poisoned();
+    }
+
+    auto gen_method_it = gen_methods->second.find(expr.name.value);
+
+    if (gen_method_it == gen_methods->second.end()) {
+        error(
+            expr.name.offset, "no such method: {}",
+            log::quoted(expr.name.value));
+
+        return Value::poisoned();
+    }
+
+    auto* gen_method = gen_method_it->second;
+
+    std::vector<Type*> template_args;
+    template_args.reserve(expr.template_args.size());
+
+    for (const auto& arg : expr.template_args) {
+        auto* type = arg->codegen(*this);
+
+        if (!type) {
+            return Value::poisoned();
+        }
+
+        template_args.push_back(type);
+    }
+
+    std::vector<OffsetValue<Value>> args;
+
+    args.reserve(expr.arguments.size() + 1);
+    args.push_back({.value = value, .offset = expr.value->offset});
+
+    for (const auto& argument : expr.arguments) {
+        auto arg = argument->codegen(*this);
+
+        if (!arg.ok()) {
+            return Value::poisoned();
+        }
+
+        args.push_back({.value = arg, .offset = argument->offset});
+    }
+
+    return call_generic_fn_with_self(
+        args, gen_method, template_args, expr.name.offset, expr.name.value);
 }
 
 Value Codegen::generate(const ast::MemberExpr& expr) {

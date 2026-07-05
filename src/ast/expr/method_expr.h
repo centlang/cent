@@ -23,6 +23,23 @@ struct MethodExpr : detail::Expr<MethodExpr> {
     std::vector<std::unique_ptr<Expression>> arguments;
 };
 
+struct MethodExprGeneric : detail::Expr<MethodExprGeneric> {
+    [[nodiscard]] MethodExprGeneric(
+        std::size_t offset, std::unique_ptr<Expression> value,
+        OffsetValue<std::string> name,
+        std::vector<std::unique_ptr<ast::Type>> template_args,
+        std::vector<std::unique_ptr<Expression>> arguments)
+    : Expr{offset}, value{std::move(value)}, name{std::move(name)},
+      template_args{std::move(template_args)}, arguments{std::move(arguments)} {
+    }
+
+    std::unique_ptr<Expression> value;
+    OffsetValue<std::string> name;
+
+    std::vector<std::unique_ptr<ast::Type>> template_args;
+    std::vector<std::unique_ptr<Expression>> arguments;
+};
+
 } // namespace cent::ast
 
 #endif

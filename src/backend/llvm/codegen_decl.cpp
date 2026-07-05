@@ -815,6 +815,15 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
         generic_fn.block = decl.block.get();
         generic_fn.source_file = m_filename;
 
+        if (decl.type) {
+            auto* type =
+                get_type(decl.type->offset, decl.type->value, *m_current_scope);
+
+            if (type) {
+                m_generic_methods[type][decl.name.value] = &generic_fn;
+            }
+        }
+
         return;
     }
 

@@ -72,6 +72,7 @@ struct Identifier;
 struct CallExpr;
 struct CallExprGeneric;
 struct MethodExpr;
+struct MethodExprGeneric;
 struct MemberExpr;
 struct IndexExpr;
 struct SliceExpr;
@@ -146,6 +147,7 @@ public:
     [[nodiscard]] Value generate(const ast::CallExprGeneric& expr);
 
     [[nodiscard]] Value generate(const ast::MethodExpr& expr);
+    [[nodiscard]] Value generate(const ast::MethodExprGeneric& expr);
     [[nodiscard]] Value generate(const ast::MemberExpr& expr);
     [[nodiscard]] Value generate(const ast::IndexExpr& expr);
     [[nodiscard]] Value generate(const ast::SliceExpr& expr);
@@ -187,6 +189,15 @@ private:
 
     [[nodiscard]] Value
     inst_generic_fn(GenericFunction* function, const std::vector<Type*>& types);
+
+    [[nodiscard]] Value generate_self(
+        const Value& value, Type* first_param_type, std::size_t offset,
+        std::string_view name);
+
+    [[nodiscard]] Value call_generic_fn_with_self(
+        const std::vector<OffsetValue<Value>>& args, GenericFunction* func,
+        const std::vector<Type*>& template_args, std::size_t offset,
+        std::string_view name);
 
     [[nodiscard]] Value
     primitive_cast(Type* type, const Value& value, bool implicit = true);
@@ -486,6 +497,9 @@ private:
     };
 
     std::map<Type*, std::map<std::string_view, Method>> m_methods;
+
+    std::map<Type*, std::map<std::string_view, GenericFunction*>>
+        m_generic_methods;
 
     std::map<std::filesystem::path, Scope> m_generated_modules;
 
