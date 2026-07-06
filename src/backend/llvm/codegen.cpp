@@ -1302,7 +1302,7 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
             .memcpy = value.memcpy};
     }
 
-    if (is<types::Void>(base_type)) {
+    if (is<types::Void, types::Null, types::Never>(base_type)) {
         return Value::poisoned();
     }
 
