@@ -800,6 +800,11 @@ Value Codegen::generate(const ast::CallExprGeneric& expr) {
         return Value::poisoned();
     }
 
+    if (expr.template_args.size() > generic_fn->second.template_params.size()) {
+        error(offset, "too many type arguments passed");
+        return Value::poisoned();
+    }
+
     std::vector<Type*> template_args;
     template_args.reserve(expr.template_args.size());
 
@@ -1040,6 +1045,11 @@ Value Codegen::generate(const ast::MethodExprGeneric& expr) {
             expr.name.offset, "no such method: {}",
             log::quoted(expr.name.value));
 
+        return Value::poisoned();
+    }
+
+    if (expr.template_args.size() > method.function->template_params.size()) {
+        error(expr.offset, "too many type arguments passed");
         return Value::poisoned();
     }
 
