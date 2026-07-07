@@ -414,7 +414,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
         }
 
         if (!is_condition && match(LeftParen) && match(1, Less)) {
-            auto template_args = parse_template_args();
+            auto type_args = parse_type_args();
 
             if (match_next(LeftParen)) {
                 auto args = parse_args();
@@ -427,7 +427,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
                     token->offset,
                     std::make_unique<ast::Identifier>(
                         token->offset, std::move(value)),
-                    std::move(template_args), std::move(args));
+                    std::move(type_args), std::move(args));
             }
 
             if (!expect("`{` or `(`", LeftBrace)) {
@@ -443,7 +443,7 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
             return std::make_unique<ast::StructLiteral>(
                 token->offset,
                 std::make_unique<ast::NamedType>(
-                    token->offset, std::move(value), std::move(template_args)),
+                    token->offset, std::move(value), std::move(type_args)),
                 std::move(fields));
         }
 
@@ -601,7 +601,7 @@ Parser::expect_access_or_call_expr(bool is_condition) {
         }
 
         if (!is_condition && match(LeftParen) && match(1, Less)) {
-            auto template_args = parse_template_args();
+            auto type_args = parse_type_args();
 
             if (!expect("`(`", LeftParen)) {
                 return nullptr;
@@ -616,7 +616,7 @@ Parser::expect_access_or_call_expr(bool is_condition) {
             expression = std::make_unique<ast::MethodExprGeneric>(
                 expression->offset, std::move(expression),
                 OffsetValue{.value = member->value, .offset = member->offset},
-                std::move(template_args), std::move(args));
+                std::move(type_args), std::move(args));
 
             continue;
         }
@@ -1172,10 +1172,10 @@ std::unique_ptr<ast::Type> Parser::expect_type() {
             OffsetValue{.value = name->value, .offset = name->offset});
     }
 
-    auto template_args = parse_template_args();
+    auto type_args = parse_type_args();
 
     return std::make_unique<ast::NamedType>(
-        offset, std::move(value), std::move(template_args));
+        offset, std::move(value), std::move(type_args));
 }
 
 std::unique_ptr<ast::Statement> Parser::parse_switch() {
@@ -1350,7 +1350,7 @@ std::vector<ast::Struct::Field> Parser::parse_fields() {
     return result;
 }
 
-std::vector<std::unique_ptr<ast::Type>> Parser::parse_template_args() {
+std::vector<std::unique_ptr<ast::Type>> Parser::parse_type_args() {
     std::vector<std::unique_ptr<ast::Type>> result;
 
     if (!match(Token::Type::LeftParen) || !match(1, Token::Type::Less)) {
@@ -1392,7 +1392,7 @@ std::vector<std::unique_ptr<ast::Type>> Parser::parse_template_args() {
     return result;
 }
 
-std::vector<OffsetValue<std::string>> Parser::parse_template_params() {
+std::vector<OffsetValue<std::string>> Parser::parse_type_params() {
     auto offset = peek().offset;
 
     std::vector<OffsetValue<std::string>> result;
@@ -1517,7 +1517,7 @@ Parser::parse_var(std::vector<ast::Attribute> attrs, bool is_public) {
 
 std::unique_ptr<ast::FnDecl>
 Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
-    auto template_params = parse_template_params();
+    auto type_params = parse_type_params();
     auto name = expect("function name", Token::Type::Identifier);
 
     if (!name) {
@@ -1546,15 +1546,13 @@ Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
 
     return std::make_unique<ast::FnDecl>(
         name->offset, OffsetValue{.value = name->value, .offset = name->offset},
-        std::move(*proto), std::move(body), std::move(template_params),
+        std::move(*proto), std::move(body), std::move(type_params),
         std::move(attrs), is_public);
 }
 
 std::unique_ptr<ast::ForBlock>
 Parser::parse_for_block(std::vector<ast::Attribute> attrs, bool is_public) {
-    auto offset = peek().offset;
-
-    auto template_params = parse_template_params();
+    auto type_params = parse_type_params();
     auto type = expect("type name", Token::Type::Identifier);
 
     if (!type) {
@@ -1601,14 +1599,14 @@ Parser::parse_for_block(std::vector<ast::Attribute> attrs, bool is_public) {
     }
 
     return std::make_unique<ast::ForBlock>(
-        offset, std::move(template_params),
+        type->offset, std::move(type_params),
         OffsetValue{.value = type->value, .offset = type->offset},
         std::move(methods), std::move(attrs), is_public);
 }
 
 std::unique_ptr<ast::Struct>
 Parser::parse_struct(std::vector<ast::Attribute> attrs, bool is_public) {
-    auto template_params = parse_template_params();
+    auto type_params = parse_type_params();
     auto name = expect("struct name", Token::Type::Identifier);
 
     if (!name) {
@@ -1627,14 +1625,12 @@ Parser::parse_struct(std::vector<ast::Attribute> attrs, bool is_public) {
 
     return std::make_unique<ast::Struct>(
         name->offset, OffsetValue{.value = name->value, .offset = name->offset},
-        std::move(fields), std::move(template_params), std::move(attrs),
-        is_public);
+        std::move(fields), std::move(type_params), std::move(attrs), is_public);
 }
 
 std::unique_ptr<ast::Union>
 Parser::parse_union(std::vector<ast::Attribute> attrs, bool is_public) {
-    auto template_params = parse_template_params();
-
+    auto type_params = parse_type_params();
     auto name = expect("union name", Token::Type::Identifier);
 
     if (!name) {
@@ -1653,8 +1649,7 @@ Parser::parse_union(std::vector<ast::Attribute> attrs, bool is_public) {
 
     return std::make_unique<ast::Union>(
         name->offset, OffsetValue{.value = name->value, .offset = name->offset},
-        std::move(fields), std::move(template_params), std::move(attrs),
-        is_public);
+        std::move(fields), std::move(type_params), std::move(attrs), is_public);
 }
 
 std::unique_ptr<ast::TypeAlias>

@@ -23,7 +23,6 @@
 #include "ast/type/array_type.h"
 #include "ast/type/named_type.h"
 
-#include "backend/llvm/types/generic.h"
 #include "backend/llvm/types/struct.h"
 #include "backend/llvm/types/union.h"
 
@@ -686,17 +685,17 @@ Value Codegen::generate(const ast::CallExpr& expr) {
                         {.value = arg_value, .offset = argument->offset});
                 }
 
-                std::vector<Type*> template_args;
-                template_args.resize(gen->template_params.size(), nullptr);
+                std::vector<Type*> type_args;
+                type_args.resize(gen->type_params.size(), nullptr);
 
                 for (std::size_t i = 0;
                      i < gen->params.size() && i < arguments.size(); ++i) {
                     auto* param_type = gen->params[i].type;
                     auto* arg_type = arguments[i].value.type;
 
-                    if (!deduce_template_arg(
-                            param_type, arg_type, gen->template_params,
-                            template_args)) {
+                    if (!deduce_type_arg(
+                            param_type, arg_type, gen->type_params,
+                            type_args)) {
                         error(
                             offset, "could not deduce type for parameter {}",
                             log::quoted(gen->params[i].name));
@@ -705,7 +704,7 @@ Value Codegen::generate(const ast::CallExpr& expr) {
                     }
                 }
 
-                for (auto* arg : template_args) {
+                for (auto* arg : type_args) {
                     if (!arg) {
                         error(
                             offset,
@@ -720,10 +719,10 @@ Value Codegen::generate(const ast::CallExpr& expr) {
 
                 if (gen->kind != GenericFunction::FnKind::Normal) {
                     return create_intrinsic_call(
-                        offset, gen, template_args, arguments);
+                        offset, gen, type_args, arguments);
                 }
 
-                auto result = inst_generic_fn(gen, template_args);
+                auto result = inst_generic_fn(gen, type_args);
 
                 if (!result.ok()) {
                     return Value::poisoned();
@@ -800,22 +799,22 @@ Value Codegen::generate(const ast::CallExprGeneric& expr) {
         return Value::poisoned();
     }
 
-    if (expr.template_args.size() > generic_fn->second.template_params.size()) {
+    if (expr.type_args.size() > generic_fn->second.type_params.size()) {
         error(offset, "too many type arguments passed");
         return Value::poisoned();
     }
 
-    std::vector<Type*> template_args;
-    template_args.reserve(expr.template_args.size());
+    std::vector<Type*> type_args;
+    type_args.reserve(expr.type_args.size());
 
-    for (const auto& arg : expr.template_args) {
+    for (const auto& arg : expr.type_args) {
         auto* type = arg->codegen(*this);
 
         if (!type) {
             return Value::poisoned();
         }
 
-        template_args.push_back(type);
+        type_args.push_back(type);
     }
 
     std::vector<OffsetValue<Value>> arguments;
@@ -829,10 +828,10 @@ Value Codegen::generate(const ast::CallExprGeneric& expr) {
     auto* gen = &generic_fn->second;
 
     if (gen->kind != GenericFunction::FnKind::Normal) {
-        return create_intrinsic_call(offset, gen, template_args, arguments);
+        return create_intrinsic_call(offset, gen, type_args, arguments);
     }
 
-    auto result = inst_generic_fn(gen, template_args);
+    auto result = inst_generic_fn(gen, type_args);
 
     if (!result.ok()) {
         return Value::poisoned();
@@ -889,9 +888,9 @@ Value Codegen::generate_self(
 
 Value Codegen::call_generic_fn_with_self(
     const std::vector<OffsetValue<Value>>& args, GenericFunction* func,
-    const std::vector<Type*>& template_args, std::size_t offset,
+    const std::vector<Type*>& type_args, std::size_t offset,
     std::string_view name, const std::vector<Type*>& parent_types) {
-    auto fn_inst = inst_generic_fn(func, template_args, parent_types);
+    auto fn_inst = inst_generic_fn(func, type_args, parent_types);
 
     if (!fn_inst.ok()) {
         return Value::poisoned();
@@ -987,7 +986,7 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
         args.push_back({.value = arg_value, .offset = arg->offset});
     }
 
-    std::vector<Type*> deduced(func->template_params.size(), nullptr);
+    std::vector<Type*> deduced(func->type_params.size(), nullptr);
 
     auto could_not_deduce = [&] {
         error(
@@ -999,9 +998,8 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
         auto* param_type = func->params[i].type;
 
         if (!gen_method.parent_args.empty()) {
-            param_type = inst_template_param(
-                func->parent_template_params, gen_method.parent_args,
-                param_type);
+            param_type = inst_type_param(
+                func->parent_type_params, gen_method.parent_args, param_type);
 
             if (!param_type) {
                 could_not_deduce();
@@ -1009,9 +1007,8 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
             }
         }
 
-        if (!deduce_template_arg(
-                param_type, args[i].value.type, func->template_params,
-                deduced)) {
+        if (!deduce_type_arg(
+                param_type, args[i].value.type, func->type_params, deduced)) {
             error(
                 expr.name.offset, "could not deduce type for parameter {}",
                 log::quoted(func->params[i].name));
@@ -1048,15 +1045,15 @@ Value Codegen::generate(const ast::MethodExprGeneric& expr) {
         return Value::poisoned();
     }
 
-    if (expr.template_args.size() > method.function->template_params.size()) {
+    if (expr.type_args.size() > method.function->type_params.size()) {
         error(expr.offset, "too many type arguments passed");
         return Value::poisoned();
     }
 
     std::vector<Type*> type_args;
-    type_args.reserve(expr.template_args.size());
+    type_args.reserve(expr.type_args.size());
 
-    for (const auto& arg : expr.template_args) {
+    for (const auto& arg : expr.type_args) {
         auto* type = arg->codegen(*this);
 
         if (!type) {

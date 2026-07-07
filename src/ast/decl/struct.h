@@ -19,15 +19,15 @@ struct Struct : detail::Decl<Struct> {
     [[nodiscard]] Struct(
         std::size_t offset, OffsetValue<std::string> name,
         std::vector<Field> fields,
-        std::vector<OffsetValue<std::string>> template_params,
+        std::vector<OffsetValue<std::string>> type_params,
         std::vector<Attribute> attributes, bool is_public = false)
     : Decl{offset, std::move(attributes), is_public}, name{std::move(name)},
-      fields{std::move(fields)}, template_params{std::move(template_params)} {}
+      fields{std::move(fields)}, type_params{std::move(type_params)} {}
 
     OffsetValue<std::string> name;
     std::vector<Field> fields;
 
-    std::vector<OffsetValue<std::string>> template_params;
+    std::vector<OffsetValue<std::string>> type_params;
 };
 
 } // namespace cent::ast

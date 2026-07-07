@@ -167,9 +167,9 @@ private:
 
     [[nodiscard]] std::vector<ast::Struct::Field> parse_fields();
 
-    [[nodiscard]] std::vector<std::unique_ptr<ast::Type>> parse_template_args();
+    [[nodiscard]] std::vector<std::unique_ptr<ast::Type>> parse_type_args();
 
-    [[nodiscard]] std::vector<OffsetValue<std::string>> parse_template_params();
+    [[nodiscard]] std::vector<OffsetValue<std::string>> parse_type_params();
 
     [[nodiscard]] std::vector<ast::EnumDecl::Field> parse_enum_fields();
 

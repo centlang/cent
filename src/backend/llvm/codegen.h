@@ -178,13 +178,13 @@ private:
 
     void generate(const ast::Module& module);
 
-    [[nodiscard]] Type* inst_template_param(
+    [[nodiscard]] Type* inst_type_param(
         const std::vector<types::TypeParam*>& params,
         const std::vector<Type*>& args, Type* type);
 
-    bool deduce_template_arg(
+    bool deduce_type_arg(
         Type* param, Type* arg,
-        const std::vector<types::TypeParam*>& template_params,
+        const std::vector<types::TypeParam*>& type_params,
         std::vector<Type*>& deduced_args);
 
     [[nodiscard]] types::Struct*
@@ -203,7 +203,7 @@ private:
 
     [[nodiscard]] Value call_generic_fn_with_self(
         const std::vector<OffsetValue<Value>>& args, GenericFunction* func,
-        const std::vector<Type*>& template_args, std::size_t offset,
+        const std::vector<Type*>& type_args, std::size_t offset,
         std::string_view name, const std::vector<Type*>& parent_types = {});
 
     [[nodiscard]] Value

@@ -9,9 +9,9 @@
 
 namespace cent::backend::types {
 
-struct TemplateStructInst
-: detail::Ty<TemplateStructInst, Type::Kind::TemplateStructInst> {
-    [[nodiscard]] TemplateStructInst(
+struct GenericStructInst
+: detail::Ty<GenericStructInst, Type::Kind::GenericStructInst> {
+    [[nodiscard]] GenericStructInst(
         GenericStruct* type, std::vector<Type*> args)
     : Ty{nullptr}, type{type}, args{std::move(args)} {}
 
@@ -33,9 +33,9 @@ struct TemplateStructInst
     std::vector<Type*> args;
 };
 
-struct TemplateUnionInst
-: detail::Ty<TemplateUnionInst, Type::Kind::TemplateUnionInst> {
-    [[nodiscard]] TemplateUnionInst(GenericUnion* type, std::vector<Type*> args)
+struct GenericUnionInst
+: detail::Ty<GenericUnionInst, Type::Kind::GenericUnionInst> {
+    [[nodiscard]] GenericUnionInst(GenericUnion* type, std::vector<Type*> args)
     : Ty{nullptr}, type{type}, args{std::move(args)} {}
 
     [[nodiscard]] std::string to_string() const override {

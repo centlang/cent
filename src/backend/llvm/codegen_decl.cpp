@@ -110,21 +110,21 @@ Value Codegen::generate(const ast::Struct& decl) {
         return Value::poisoned();
     }
 
-    if (!decl.template_params.empty()) {
+    if (!decl.type_params.empty()) {
         auto& generic_struct =
             m_current_scope->generic_structs[decl.name.value];
 
         auto current_scope_types = m_current_scope->types;
 
-        for (const auto& param : decl.template_params) {
+        for (const auto& param : decl.type_params) {
             m_named_types.push_back(
                 std::make_unique<types::TypeParam>(param.value));
 
-            generic_struct.template_params.push_back(
+            generic_struct.type_params.push_back(
                 static_cast<types::TypeParam*>(m_named_types.back().get()));
 
             m_current_scope->types[param.value] = {
-                .element = generic_struct.template_params.back(),
+                .element = generic_struct.type_params.back(),
                 .is_public = true};
         }
 
@@ -245,21 +245,20 @@ Value Codegen::generate(const ast::Union& decl) {
         return Value::poisoned();
     }
 
-    if (!decl.template_params.empty()) {
+    if (!decl.type_params.empty()) {
         auto& generic_union = m_current_scope->generic_unions[decl.name.value];
 
         auto current_scope_types = m_current_scope->types;
 
-        for (const auto& param : decl.template_params) {
+        for (const auto& param : decl.type_params) {
             m_named_types.push_back(
                 std::make_unique<types::TypeParam>(param.value));
 
-            generic_union.template_params.push_back(
+            generic_union.type_params.push_back(
                 static_cast<types::TypeParam*>(m_named_types.back().get()));
 
             m_current_scope->types[param.value] = {
-                .element = generic_union.template_params.back(),
-                .is_public = true};
+                .element = generic_union.type_params.back(), .is_public = true};
         }
 
         std::vector<GenericUnion::Field> fields;
@@ -717,7 +716,7 @@ void Codegen::generate_method_proto(
     auto scope_types = scope.types;
     std::vector<types::TypeParam*> type_args;
 
-    for (const auto& param : method.template_params) {
+    for (const auto& param : method.type_params) {
         m_named_types.push_back(
             std::make_unique<types::TypeParam>(param.value));
 
@@ -754,7 +753,7 @@ void Codegen::generate_method_proto(
 
     scope.types = scope_types;
 
-    if (!for_block.template_params.empty() || !method.template_params.empty()) {
+    if (!for_block.type_params.empty() || !method.type_params.empty()) {
         auto& gen = type_scope.generic_fns[method.name.value];
 
         gen = GenericFunction{
@@ -762,8 +761,8 @@ void Codegen::generate_method_proto(
             .return_type = return_type,
             .params = std::move(params),
             .block = method.block.get(),
-            .template_params = std::move(type_args),
-            .parent_template_params = parent_params,
+            .type_params = std::move(type_args),
+            .parent_type_params = parent_params,
             .source_file = m_filename};
 
         methods[method.name.value] = &gen;
@@ -826,7 +825,7 @@ void Codegen::generate_for_block_protos(const ast::ForBlock& decl) {
     auto scope_types = m_current_scope->types;
     std::vector<types::TypeParam*> type_params;
 
-    for (const auto& param : decl.template_params) {
+    for (const auto& param : decl.type_params) {
         m_named_types.push_back(
             std::make_unique<types::TypeParam>(param.value));
 
@@ -842,13 +841,13 @@ void Codegen::generate_for_block_protos(const ast::ForBlock& decl) {
     if (struct_it != m_current_scope->generic_structs.end()) {
         auto& gen = struct_it->second;
 
-        if (decl.template_params.size() != gen.template_params.size()) {
+        if (decl.type_params.size() != gen.type_params.size()) {
             num_of_args();
             return;
         }
 
         m_named_types.push_back(
-            std::make_unique<types::TemplateStructInst>(
+            std::make_unique<types::GenericStructInst>(
                 &gen,
                 std::vector<Type*>(type_params.begin(), type_params.end())));
 
@@ -870,13 +869,13 @@ void Codegen::generate_for_block_protos(const ast::ForBlock& decl) {
     if (union_it != m_current_scope->generic_unions.end()) {
         auto& gen = union_it->second;
 
-        if (decl.template_params.size() != gen.template_params.size()) {
+        if (decl.type_params.size() != gen.type_params.size()) {
             num_of_args();
             return;
         }
 
         m_named_types.push_back(
-            std::make_unique<types::TemplateUnionInst>(
+            std::make_unique<types::GenericUnionInst>(
                 &gen,
                 std::vector<Type*>(type_params.begin(), type_params.end())));
 
@@ -899,7 +898,7 @@ void Codegen::generate_for_block_protos(const ast::ForBlock& decl) {
         return;
     }
 
-    if (!decl.template_params.empty()) {
+    if (!decl.type_params.empty()) {
         error(
             decl.type.offset, "{} is not a generic type",
             log::quoted(decl.type.value));
@@ -932,8 +931,8 @@ Value Codegen::generate(const ast::ForBlock& decl) {
         .element = scope.types[decl.type.value].element, .is_public = true};
 
     for (const auto& method : decl.methods) {
-        if (!method->block || !method->template_params.empty() ||
-            !decl.template_params.empty()) {
+        if (!method->block || !method->type_params.empty() ||
+            !decl.type_params.empty()) {
             continue;
         }
 
@@ -984,21 +983,20 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
         return;
     }
 
-    if (!decl.template_params.empty()) {
+    if (!decl.type_params.empty()) {
         auto& generic_fn = scope.generic_fns[decl.name.value];
 
         auto current_scope_types = m_current_scope->types;
 
-        for (const auto& param : decl.template_params) {
+        for (const auto& param : decl.type_params) {
             m_named_types.push_back(
                 std::make_unique<types::TypeParam>(param.value));
 
-            generic_fn.template_params.emplace_back(
+            generic_fn.type_params.emplace_back(
                 static_cast<types::TypeParam*>(m_named_types.back().get()));
 
             m_current_scope->types[param.value] = {
-                .element = generic_fn.template_params.back(),
-                .is_public = true};
+                .element = generic_fn.type_params.back(), .is_public = true};
         }
 
         Type* return_type = m_void_type.get();

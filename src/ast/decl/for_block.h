@@ -14,16 +14,15 @@ namespace cent::ast {
 
 struct ForBlock : detail::Decl<ForBlock> {
     [[nodiscard]] ForBlock(
-        std::size_t offset,
-        std::vector<OffsetValue<std::string>> template_params,
+        std::size_t offset, std::vector<OffsetValue<std::string>> type_params,
         OffsetValue<std::string> type_name,
         std::vector<std::unique_ptr<FnDecl>> methods,
         std::vector<Attribute> attributes, bool is_public = false)
     : Decl{offset, std::move(attributes), is_public},
-      template_params{std::move(template_params)}, type{std::move(type_name)},
+      type_params{std::move(type_params)}, type{std::move(type_name)},
       methods{std::move(methods)} {}
 
-    std::vector<OffsetValue<std::string>> template_params;
+    std::vector<OffsetValue<std::string>> type_params;
     OffsetValue<std::string> type;
 
     std::vector<std::unique_ptr<FnDecl>> methods;

@@ -29,13 +29,13 @@ Type* Codegen::generate(const ast::NamedType& type) {
 
     auto [name, offset] = type.value.back();
 
-    if (!type.template_args.empty()) {
+    if (!type.type_params.empty()) {
         std::vector<Type*> args;
-        args.reserve(type.template_args.size());
+        args.reserve(type.type_params.size());
 
         bool has_generic_arg = false;
 
-        for (const auto& arg : type.template_args) {
+        for (const auto& arg : type.type_params) {
             auto* type = arg->codegen(*this);
 
             if (!type) {
@@ -54,15 +54,15 @@ Type* Codegen::generate(const ast::NamedType& type) {
         auto struct_it = scope->generic_structs.find(name);
 
         if (struct_it != scope->generic_structs.end()) {
-            if (struct_it->second.template_params.size() !=
-                type.template_args.size()) {
+            if (struct_it->second.type_params.size() !=
+                type.type_params.size()) {
                 error(offset, "incorrect number of type arguments passed");
                 return nullptr;
             }
 
             if (has_generic_arg) {
                 m_named_types.push_back(
-                    std::make_unique<types::TemplateStructInst>(
+                    std::make_unique<types::GenericStructInst>(
                         &struct_it->second, std::move(args)));
 
                 return m_named_types.back().get();
@@ -74,15 +74,15 @@ Type* Codegen::generate(const ast::NamedType& type) {
         auto union_it = scope->generic_unions.find(name);
 
         if (union_it != scope->generic_unions.end()) {
-            if (union_it->second.template_params.size() !=
-                type.template_args.size()) {
+            if (union_it->second.type_params.size() !=
+                type.type_params.size()) {
                 error(offset, "incorrect number of type arguments passed");
                 return nullptr;
             }
 
             if (has_generic_arg) {
                 m_named_types.push_back(
-                    std::make_unique<types::TemplateUnionInst>(
+                    std::make_unique<types::GenericUnionInst>(
                         &union_it->second, std::move(args)));
 
                 return m_named_types.back().get();

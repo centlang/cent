@@ -54,8 +54,8 @@ struct Type {
         Tuple,
 
         TypeParam,
-        TemplateStructInst,
-        TemplateUnionInst,
+        GenericStructInst,
+        GenericUnionInst,
 
         Enum,
         Struct,

@@ -38,8 +38,8 @@ struct GenericFunction {
 
     const ast::BlockStmt* block{nullptr};
 
-    std::vector<types::TypeParam*> template_params;
-    std::vector<types::TypeParam*> parent_template_params;
+    std::vector<types::TypeParam*> type_params;
+    std::vector<types::TypeParam*> parent_type_params;
 
     FnKind kind{FnKind::Normal};
 
@@ -55,7 +55,7 @@ struct GenericStruct {
     std::string name;
     std::vector<Field> fields;
 
-    std::vector<types::TypeParam*> template_params;
+    std::vector<types::TypeParam*> type_params;
 
     std::map<std::string_view, GenericFunction*> methods;
 };
@@ -69,7 +69,7 @@ struct GenericUnion {
     std::string name;
     std::vector<Field> fields;
 
-    std::vector<types::TypeParam*> template_params;
+    std::vector<types::TypeParam*> type_params;
     types::Enum* tag_type{nullptr};
 
     std::map<std::string_view, GenericFunction*> methods;
