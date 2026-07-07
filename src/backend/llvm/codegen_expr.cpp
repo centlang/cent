@@ -990,8 +990,7 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
             log::quoted(expr.name.value));
     };
 
-    for (std::size_t i = gen_method.parent_args.empty() ? 0 : 1;
-         i < args.size(); ++i) {
+    for (std::size_t i = 1; i < args.size(); ++i) {
         auto* param_type = func->params[i].type;
 
         if (!gen_method.parent_args.empty()) {
