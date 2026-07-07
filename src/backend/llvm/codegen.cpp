@@ -455,6 +455,14 @@ void Codegen::generate(const ast::Module& module) {
         generate_fn_proto(*function);
     }
 
+    for (const auto& for_block : module.for_blocks) {
+        if (!matches_target(*for_block)) {
+            continue;
+        }
+
+        generate_for_block_protos(*for_block);
+    }
+
     for (const auto& function : module.functions) {
         if (!matches_target(*function)) {
             continue;
@@ -463,6 +471,14 @@ void Codegen::generate(const ast::Module& module) {
         if (function->block && function->template_params.empty()) {
             function->codegen(*this);
         }
+    }
+
+    for (const auto& for_block : module.for_blocks) {
+        if (!matches_target(*for_block)) {
+            continue;
+        }
+
+        for_block->codegen(*this);
     }
 
     m_generated_modules[module.path] = *m_current_scope;
@@ -809,7 +825,7 @@ types::Struct* Codegen::inst_generic_struct(
     auto* llvm_struct_type = llvm::StructType::create(m_context, name);
 
     result = std::make_unique<types::Struct>(
-        llvm_struct_type, name, std::vector<Type*>{}, false, type);
+        llvm_struct_type, name, std::vector<Type*>{}, false, type, types);
 
     struct Field {
         Type* type;
@@ -928,7 +944,7 @@ types::Union* Codegen::inst_generic_union(
         llvm_struct_type->setBody(max_type);
 
         result = std::make_unique<types::Union>(
-            llvm_struct_type, name, std::move(fields), nullptr, type);
+            llvm_struct_type, name, std::move(fields), nullptr, type, types);
 
         return result.get();
     }
@@ -936,27 +952,49 @@ types::Union* Codegen::inst_generic_union(
     llvm_struct_type->setBody({max_type, type->tag_type->llvm_type});
 
     result = std::make_unique<types::Union>(
-        llvm_struct_type, name, std::move(fields), type->tag_type, type);
+        llvm_struct_type, name, std::move(fields), type->tag_type, type, types);
 
     return result.get();
 }
 
 Value Codegen::inst_generic_fn(
-    GenericFunction* function, const std::vector<Type*>& types) {
+    GenericFunction* function, const std::vector<Type*>& types,
+    const std::vector<Type*>& parent_types) {
+    std::vector<Type*> type_args;
+
+    type_args.reserve(parent_types.size() + types.size());
+
+    type_args.insert(type_args.end(), parent_types.begin(), parent_types.end());
+    type_args.insert(type_args.end(), types.begin(), types.end());
+
     auto& generic_fn_inst = m_generic_fns_inst[function];
 
-    auto result = generic_fn_inst.find(types);
+    auto result = generic_fn_inst.find(type_args);
 
     if (result != generic_fn_inst.end()) {
         return result->second;
     }
+
+    std::vector<types::TypeParam*> type_params;
+
+    type_params.reserve(
+        function->parent_template_params.size() +
+        function->template_params.size());
+
+    type_params.insert(
+        type_params.end(), function->parent_template_params.begin(),
+        function->parent_template_params.end());
+
+    type_params.insert(
+        type_params.end(), function->template_params.begin(),
+        function->template_params.end());
 
     std::vector<Type*> param_types;
     param_types.reserve(function->params.size());
 
     for (const auto& param : function->params) {
         param_types.push_back(
-            inst_template_param(function->template_params, types, param.type));
+            inst_template_param(type_params, type_args, param.type));
     }
 
     std::vector<llvm::Constant*> default_args;
@@ -989,19 +1027,18 @@ Value Codegen::inst_generic_fn(
 
     std::string name = m_current_scope_prefix + function->name.value + "(<";
 
-    for (std::size_t i = 0; i < types.size(); ++i) {
+    for (std::size_t i = 0; i < type_args.size(); ++i) {
         if (i > 0) {
             name += ",";
         }
 
-        name += types[i]->to_string();
+        name += type_args[i]->to_string();
     }
 
     name += ">)";
 
     auto* fn_type = get_fn_type(
-        inst_template_param(
-            function->template_params, types, function->return_type),
+        inst_template_param(type_params, type_args, function->return_type),
         std::move(param_types), std::move(default_args), false);
 
     auto* llvm_fn_type = static_cast<llvm::FunctionType*>(fn_type->llvm_type);
@@ -1045,11 +1082,24 @@ Value Codegen::inst_generic_fn(
             .unit = m_current_unit};
     }
 
-    for (std::size_t i = 0; i < function->template_params.size(); ++i) {
+    for (std::size_t i = 0; i < function->parent_template_params.size(); ++i) {
         m_named_types.push_back(
             std::make_unique<types::Alias>(
-                types[i]->llvm_type, function->template_params[i]->name,
-                types[i], false));
+                type_args[i]->llvm_type,
+                function->parent_template_params[i]->name, type_args[i],
+                false));
+
+        m_current_scope->types[function->parent_template_params[i]->name] = {
+            .element = m_named_types.back().get(), .is_public = true};
+    }
+
+    for (std::size_t i = 0; i < function->template_params.size(); ++i) {
+        auto index = function->parent_template_params.size() + i;
+
+        m_named_types.push_back(
+            std::make_unique<types::Alias>(
+                type_args[index]->llvm_type, function->template_params[i]->name,
+                type_args[index], false));
 
         m_current_scope->types[function->template_params[i]->name] = {
             .element = m_named_types.back().get(), .is_public = true};
@@ -1075,9 +1125,10 @@ Value Codegen::inst_generic_fn(
 
     if (m_builder.GetInsertBlock()->getTerminator()) {
         m_builder.SetInsertPoint(insert_point);
-        generic_fn_inst[types] = Value{.type = fn_type, .value = llvm_function};
+        generic_fn_inst[type_args] =
+            Value{.type = fn_type, .value = llvm_function};
 
-        return generic_fn_inst[types];
+        return generic_fn_inst[type_args];
     }
 
     if (!m_current_fn_had_error &&
@@ -1978,6 +2029,53 @@ Codegen::get_scope(std::size_t offset, std::string_view name, Scope& parent) {
     }
 
     return &iterator->second;
+}
+
+Codegen::GenericMethod
+Codegen::get_generic_method(Type* type, std::string_view name) {
+    if (auto* ptr = dyn_cast<types::Pointer>(type)) {
+        type = ptr->type;
+    } else if (auto* struct_type = dyn_cast<types::Struct>(type)) {
+        if (struct_type->origin) {
+            auto method = struct_type->origin->methods.find(name);
+
+            if (method != struct_type->origin->methods.end()) {
+                return {
+                    .function = method->second,
+                    .parent_args = struct_type->origin_args};
+            }
+        }
+    } else if (auto* union_type = dyn_cast<types::Union>(type)) {
+        if (union_type->origin) {
+            auto method = union_type->origin->methods.find(name);
+
+            if (method != union_type->origin->methods.end()) {
+                return {
+                    .function = method->second,
+                    .parent_args = union_type->origin_args};
+            }
+        }
+    } else if (auto* t_struct = dyn_cast<types::TemplateStructInst>(type)) {
+        auto method = t_struct->type->methods.find(name);
+
+        if (method != t_struct->type->methods.end()) {
+            return {.function = method->second, .parent_args = t_struct->args};
+        }
+    } else if (auto* t_union = dyn_cast<types::TemplateUnionInst>(type)) {
+        auto method = t_union->type->methods.find(name);
+
+        if (method != t_union->type->methods.end()) {
+            return {.function = method->second, .parent_args = t_union->args};
+        }
+    }
+
+    auto method = type->generic_methods.find(name);
+
+    if (method != type->generic_methods.end()) {
+        return {.function = method->second};
+    }
+
+    return {.function = nullptr};
 }
 
 Scope*

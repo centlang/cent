@@ -29,6 +29,7 @@
 
 #include "ast/decl/enum_decl.h"
 #include "ast/decl/fn_decl.h"
+#include "ast/decl/for_block.h"
 #include "ast/decl/struct.h"
 #include "ast/decl/type_alias.h"
 #include "ast/decl/union.h"
@@ -177,6 +178,9 @@ private:
 
     [[nodiscard]] std::unique_ptr<ast::FnDecl>
     parse_fn(std::vector<ast::Attribute> attrs, bool is_public = false);
+
+    [[nodiscard]] std::unique_ptr<ast::ForBlock>
+    parse_for_block(std::vector<ast::Attribute> attrs, bool is_public = false);
 
     [[nodiscard]] std::unique_ptr<ast::Struct>
     parse_struct(std::vector<ast::Attribute> attrs, bool is_public = false);

@@ -81,6 +81,7 @@ struct SizeofExpr;
 
 struct FnProto;
 struct FnDecl;
+struct ForBlock;
 struct Struct;
 struct Union;
 struct EnumDecl;
@@ -155,14 +156,19 @@ public:
     [[nodiscard]] Value generate(const ast::SizeofExpr& expr);
 
     Value generate(const ast::FnDecl& decl);
+    Value generate(const ast::ForBlock& decl);
     Value generate(const ast::Struct& decl);
     Value generate(const ast::Union& decl);
     Value generate(const ast::EnumDecl& decl);
     Value generate(const ast::TypeAlias& decl);
-
     Value generate(const ast::VarDecl& decl);
 
 private:
+    struct GenericMethod {
+        GenericFunction* function;
+        std::vector<Type*> parent_args;
+    };
+
     [[nodiscard]] Value create_core_panic();
 
     void create_core();
@@ -187,8 +193,9 @@ private:
     [[nodiscard]] types::Union*
     inst_generic_union(GenericUnion* type, const std::vector<Type*>& types);
 
-    [[nodiscard]] Value
-    inst_generic_fn(GenericFunction* function, const std::vector<Type*>& types);
+    [[nodiscard]] Value inst_generic_fn(
+        GenericFunction* function, const std::vector<Type*>& types,
+        const std::vector<Type*>& parent_types = {});
 
     [[nodiscard]] Value generate_self(
         const Value& value, Type* first_param_type, std::size_t offset,
@@ -197,7 +204,7 @@ private:
     [[nodiscard]] Value call_generic_fn_with_self(
         const std::vector<OffsetValue<Value>>& args, GenericFunction* func,
         const std::vector<Type*>& template_args, std::size_t offset,
-        std::string_view name);
+        std::string_view name, const std::vector<Type*>& parent_types = {});
 
     [[nodiscard]] Value
     primitive_cast(Type* type, const Value& value, bool implicit = true);
@@ -276,6 +283,9 @@ private:
     [[nodiscard]] Scope*
     get_scope(std::size_t offset, std::string_view name, Scope& parent);
 
+    [[nodiscard]] GenericMethod
+    get_generic_method(Type* type, std::string_view name);
+
     [[nodiscard]] Scope*
     resolve_scope(const std::vector<OffsetValue<std::string>>& value);
 
@@ -320,7 +330,17 @@ private:
         return element.is_public || element.unit == unit;
     }
 
+    void generate_fn_body(
+        const ast::FnDecl& decl, Type* fn_type, llvm::Value* fn_value);
+
     void generate_fn_proto(const ast::FnDecl& decl);
+    void generate_for_block_protos(const ast::ForBlock& decl);
+
+    void generate_method_proto(
+        const ast::FnDecl& method,
+        std::map<std::string_view, GenericFunction*>& methods, Type* self_type,
+        const std::vector<types::TypeParam*>& parent_params,
+        const ast::ForBlock& for_block);
 
     [[nodiscard]] llvm::Value* alloca_arg(std::size_t index, Type* type);
 
@@ -490,16 +510,6 @@ private:
 
     std::map<llvm::StructType*, std::map<std::string_view, std::size_t>>
         m_members;
-
-    struct Method {
-        types::Function* type;
-        llvm::Function* function;
-    };
-
-    std::map<Type*, std::map<std::string_view, Method>> m_methods;
-
-    std::map<Type*, std::map<std::string_view, GenericFunction*>>
-        m_generic_methods;
 
     std::map<std::filesystem::path, Scope> m_generated_modules;
 

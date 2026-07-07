@@ -23,6 +23,7 @@
 #include "ast/type/array_type.h"
 #include "ast/type/named_type.h"
 
+#include "backend/llvm/types/generic.h"
 #include "backend/llvm/types/struct.h"
 #include "backend/llvm/types/union.h"
 
@@ -884,8 +885,8 @@ Value Codegen::generate_self(
 Value Codegen::call_generic_fn_with_self(
     const std::vector<OffsetValue<Value>>& args, GenericFunction* func,
     const std::vector<Type*>& template_args, std::size_t offset,
-    std::string_view name) {
-    auto fn_inst = inst_generic_fn(func, template_args);
+    std::string_view name, const std::vector<Type*>& parent_types) {
+    auto fn_inst = inst_generic_fn(func, template_args, parent_types);
 
     if (!fn_inst.ok()) {
         return Value::poisoned();
@@ -913,6 +914,7 @@ Value Codegen::call_generic_fn_with_self(
         offset, fn_type, static_cast<llvm::Function*>(fn_inst.value),
         arguments);
 }
+
 Value Codegen::generate(const ast::MethodExpr& expr) {
     auto value = expr.value->codegen(*this);
 
@@ -920,94 +922,67 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
         return Value::poisoned();
     }
 
-    auto& type_methods = m_methods[value.type];
-
-    auto iterator = type_methods.find(expr.name.value);
-
     Type* type = value.type;
+    auto method = type->methods.find(expr.name.value);
 
-    if (iterator == type_methods.end()) {
-        auto* pointer = dyn_cast<types::Pointer>(value.type);
-
-        if (pointer) {
-            type = pointer->type;
+    if (method == type->methods.end()) {
+        if (auto* ptr = dyn_cast<types::Pointer>(type)) {
+            type = ptr->type;
+            method = type->methods.find(expr.name.value);
         }
-
-        auto& type_methods = m_methods[type];
-
-        iterator = type_methods.find(expr.name.value);
     }
 
-    if (iterator != type_methods.end()) {
-        std::vector<OffsetValue<Value>> arguments;
-        arguments.reserve(expr.arguments.size() + 1);
-
+    if (method != type->methods.end()) {
         auto self = generate_self(
-            value, iterator->second.type->param_types[0], expr.name.offset,
+            value, method->second.type->param_types[0], expr.name.offset,
             expr.name.value);
 
         if (!self.ok()) {
             return Value::poisoned();
         }
 
+        std::vector<OffsetValue<Value>> arguments;
+        arguments.reserve(expr.arguments.size() + 1);
+
         arguments.push_back({.value = self, .offset = expr.value->offset});
 
-        for (const auto& argument : expr.arguments) {
-            auto value = argument->codegen(*this);
-            arguments.push_back({.value = value, .offset = argument->offset});
+        for (const auto& arg : expr.arguments) {
+            auto arg_value = arg->codegen(*this);
+            arguments.push_back({.value = arg_value, .offset = arg->offset});
         }
 
         return create_call(
-            expr.name.offset, iterator->second.type, iterator->second.function,
+            expr.name.offset, method->second.type, method->second.function,
             arguments);
     }
 
-    auto gen_methods = m_generic_methods.find(type);
+    auto gen_method = get_generic_method(value.type, expr.name.value);
 
-    if (gen_methods == m_generic_methods.end()) {
+    if (!gen_method.function) {
         error(
             expr.name.offset, "no such method: {}",
             log::quoted(expr.name.value));
-
         return Value::poisoned();
     }
 
-    auto gen_method_it = gen_methods->second.find(expr.name.value);
-
-    if (gen_method_it == gen_methods->second.end()) {
-        error(
-            expr.name.offset, "no such method: {}",
-            log::quoted(expr.name.value));
-
-        return Value::poisoned();
-    }
-
-    auto* gen_method = gen_method_it->second;
+    auto* func = gen_method.function;
 
     std::vector<OffsetValue<Value>> args;
-    args.reserve(expr.arguments.size() + 1);
 
+    args.reserve(expr.arguments.size() + 1);
     args.push_back({.value = value, .offset = expr.value->offset});
 
-    for (const auto& argument : expr.arguments) {
-        auto arg = argument->codegen(*this);
+    for (const auto& arg : expr.arguments) {
+        auto arg_value = arg->codegen(*this);
 
-        if (!arg.ok()) {
+        if (!arg_value.ok()) {
             return Value::poisoned();
         }
 
-        args.push_back({.value = arg, .offset = argument->offset});
+        args.push_back({.value = arg_value, .offset = arg->offset});
     }
 
-    std::vector<Type*> template_args(
-        gen_method->template_params.size(), nullptr);
-
-    Type* self_type = value.type;
-
-    if (!is<types::Pointer>(value.type) &&
-        is<types::Pointer>(gen_method->params[0].type)) {
-        self_type = get_ptr_type(value.type, value.is_mutable);
-    }
+    std::vector<Type*> deduced(func->template_params.size(), nullptr);
 
     auto could_not_deduce = [&] {
         error(
@@ -1015,32 +990,41 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
             log::quoted(expr.name.value));
     };
 
-    if (!deduce_template_arg(
-            gen_method->params[0].type, self_type, gen_method->template_params,
-            template_args)) {
-        could_not_deduce();
-        return Value::poisoned();
-    }
+    for (std::size_t i = gen_method.parent_args.empty() ? 0 : 1;
+         i < args.size(); ++i) {
+        auto* param_type = func->params[i].type;
 
-    for (std::size_t i = 1; i < args.size() && i < gen_method->params.size();
-         ++i) {
+        if (!gen_method.parent_args.empty()) {
+            param_type = inst_template_param(
+                func->parent_template_params, gen_method.parent_args,
+                param_type);
+
+            if (!param_type) {
+                could_not_deduce();
+                return Value::poisoned();
+            }
+        }
+
         if (!deduce_template_arg(
-                gen_method->params[i].type, args[i].value.type,
-                gen_method->template_params, template_args)) {
-            could_not_deduce();
+                param_type, args[i].value.type, func->template_params,
+                deduced)) {
+            error(
+                expr.name.offset, "could not deduce type for parameter {}",
+                log::quoted(func->params[i].name));
+
             return Value::poisoned();
         }
     }
 
-    for (auto* arg : template_args) {
+    for (auto* arg : deduced) {
         if (!arg) {
             could_not_deduce();
-            return Value::poisoned();
         }
     }
 
     return call_generic_fn_with_self(
-        args, gen_method, template_args, expr.name.offset, expr.name.value);
+        args, func, deduced, expr.name.offset, expr.name.value,
+        gen_method.parent_args);
 }
 
 Value Codegen::generate(const ast::MethodExprGeneric& expr) {
@@ -1050,15 +1034,9 @@ Value Codegen::generate(const ast::MethodExprGeneric& expr) {
         return Value::poisoned();
     }
 
-    Type* type = value.type;
+    auto method = get_generic_method(value.type, expr.name.value);
 
-    if (auto* pointer = dyn_cast<types::Pointer>(value.type)) {
-        type = pointer->type;
-    }
-
-    auto gen_methods = m_generic_methods.find(type);
-
-    if (gen_methods == m_generic_methods.end()) {
+    if (!method.function) {
         error(
             expr.name.offset, "no such method: {}",
             log::quoted(expr.name.value));
@@ -1066,20 +1044,8 @@ Value Codegen::generate(const ast::MethodExprGeneric& expr) {
         return Value::poisoned();
     }
 
-    auto gen_method_it = gen_methods->second.find(expr.name.value);
-
-    if (gen_method_it == gen_methods->second.end()) {
-        error(
-            expr.name.offset, "no such method: {}",
-            log::quoted(expr.name.value));
-
-        return Value::poisoned();
-    }
-
-    auto* gen_method = gen_method_it->second;
-
-    std::vector<Type*> template_args;
-    template_args.reserve(expr.template_args.size());
+    std::vector<Type*> type_args;
+    type_args.reserve(expr.template_args.size());
 
     for (const auto& arg : expr.template_args) {
         auto* type = arg->codegen(*this);
@@ -1088,7 +1054,7 @@ Value Codegen::generate(const ast::MethodExprGeneric& expr) {
             return Value::poisoned();
         }
 
-        template_args.push_back(type);
+        type_args.push_back(type);
     }
 
     std::vector<OffsetValue<Value>> args;
@@ -1096,18 +1062,19 @@ Value Codegen::generate(const ast::MethodExprGeneric& expr) {
     args.reserve(expr.arguments.size() + 1);
     args.push_back({.value = value, .offset = expr.value->offset});
 
-    for (const auto& argument : expr.arguments) {
-        auto arg = argument->codegen(*this);
+    for (const auto& arg : expr.arguments) {
+        auto arg_value = arg->codegen(*this);
 
-        if (!arg.ok()) {
+        if (!arg_value.ok()) {
             return Value::poisoned();
         }
 
-        args.push_back({.value = arg, .offset = argument->offset});
+        args.push_back({.value = arg_value, .offset = arg->offset});
     }
 
     return call_generic_fn_with_self(
-        args, gen_method, template_args, expr.name.offset, expr.name.value);
+        args, method.function, type_args, expr.name.offset, expr.name.value,
+        method.parent_args);
 }
 
 Value Codegen::generate(const ast::MemberExpr& expr) {

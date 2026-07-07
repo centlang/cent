@@ -13,9 +13,10 @@ namespace cent::backend::types {
 struct Struct : detail::Ty<Struct, Type::Kind::Struct> {
     [[nodiscard]] Struct(
         llvm::Type* llvm_type, std::string name, std::vector<Type*> fields,
-        bool has_tail, GenericStruct* origin = nullptr)
+        bool has_tail, GenericStruct* origin = nullptr,
+        std::vector<Type*> origin_args = {})
     : Ty{llvm_type}, name{std::move(name)}, fields{std::move(fields)},
-      has_tail{has_tail}, origin{origin} {}
+      has_tail{has_tail}, origin{origin}, origin_args{std::move(origin_args)} {}
 
     [[nodiscard]] std::string to_string() const override { return name; }
 
@@ -23,7 +24,9 @@ struct Struct : detail::Ty<Struct, Type::Kind::Struct> {
     std::vector<Type*> fields;
 
     bool has_tail;
+
     GenericStruct* origin;
+    std::vector<Type*> origin_args;
 };
 
 } // namespace cent::backend::types

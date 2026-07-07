@@ -1,6 +1,7 @@
 #ifndef CENT_BACKEND_GENERICS_H
 #define CENT_BACKEND_GENERICS_H
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -18,31 +19,6 @@ struct Expression;
 } // namespace cent::ast
 
 namespace cent::backend {
-
-struct GenericStruct {
-    struct Field {
-        std::string name;
-        Type* type;
-    };
-
-    std::string name;
-    std::vector<Field> fields;
-
-    std::vector<types::TypeParam*> template_params;
-};
-
-struct GenericUnion {
-    struct Field {
-        std::string name;
-        Type* type;
-    };
-
-    std::string name;
-    std::vector<Field> fields;
-
-    std::vector<types::TypeParam*> template_params;
-    types::Enum* tag_type{nullptr};
-};
 
 struct GenericFunction {
     struct Param {
@@ -63,9 +39,40 @@ struct GenericFunction {
     const ast::BlockStmt* block{nullptr};
 
     std::vector<types::TypeParam*> template_params;
+    std::vector<types::TypeParam*> parent_template_params;
+
     FnKind kind{FnKind::Normal};
 
     std::string source_file;
+};
+
+struct GenericStruct {
+    struct Field {
+        std::string name;
+        Type* type;
+    };
+
+    std::string name;
+    std::vector<Field> fields;
+
+    std::vector<types::TypeParam*> template_params;
+
+    std::map<std::string_view, GenericFunction*> methods;
+};
+
+struct GenericUnion {
+    struct Field {
+        std::string name;
+        Type* type;
+    };
+
+    std::string name;
+    std::vector<Field> fields;
+
+    std::vector<types::TypeParam*> template_params;
+    types::Enum* tag_type{nullptr};
+
+    std::map<std::string_view, GenericFunction*> methods;
 };
 
 } // namespace cent::backend

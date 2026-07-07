@@ -2,11 +2,27 @@
 #define CENT_BACKEND_TYPE_H
 
 #include <cstdint>
+#include <map>
 #include <string>
+#include <string_view>
 
+#include <llvm/IR/Function.h>
 #include <llvm/IR/Type.h>
 
 namespace cent::backend {
+
+struct GenericFunction;
+
+namespace types {
+
+struct Function;
+
+} // namespace types
+
+struct Method {
+    types::Function* type;
+    llvm::Function* function;
+};
 
 struct Type {
     enum struct Kind : std::uint8_t {
@@ -96,6 +112,9 @@ struct Type {
 
     const Kind kind;
     llvm::Type* const llvm_type;
+
+    std::map<std::string_view, Method> methods;
+    std::map<std::string_view, GenericFunction*> generic_methods;
 };
 
 template <typename Derived> [[nodiscard]] inline bool is(const Type* value) {

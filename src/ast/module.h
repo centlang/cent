@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "ast/decl/fn_decl.h"
+#include "ast/decl/for_block.h"
 #include "ast/decl/var_decl.h"
 #include "ast/node.h"
 
@@ -23,6 +24,7 @@ struct Module : Node {
     std::vector<std::unique_ptr<Declaration>> types;
     std::vector<std::unique_ptr<FnDecl>> functions;
     std::vector<std::unique_ptr<VarDecl>> variables;
+    std::vector<std::unique_ptr<ForBlock>> for_blocks;
 
     std::vector<std::unique_ptr<Module>> submodules;
 

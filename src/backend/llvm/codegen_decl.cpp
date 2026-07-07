@@ -8,12 +8,14 @@
 
 #include "ast/decl/enum_decl.h"
 #include "ast/decl/fn_decl.h"
+#include "ast/decl/for_block.h"
 #include "ast/decl/struct.h"
 #include "ast/decl/type_alias.h"
 #include "ast/decl/union.h"
 #include "ast/decl/var_decl.h"
 
 #include "backend/llvm/types/alias.h"
+#include "backend/llvm/types/generic.h"
 #include "backend/llvm/types/struct.h"
 #include "backend/llvm/types/type_param.h"
 #include "backend/llvm/types/union.h"
@@ -22,57 +24,10 @@
 
 namespace cent::backend {
 
-Value Codegen::generate(const ast::FnDecl& decl) {
-    Type* type = nullptr;
-
-    if (decl.type) {
-        type = get_type(decl.type->offset, decl.type->value, *m_current_scope);
-
-        if (!type) {
-            return Value::poisoned();
-        }
-    }
-
-    auto get_fn_type = [&]() -> Type* {
-        if (!decl.type) {
-            auto iterator = m_current_scope->names.find(decl.name.value);
-
-            if (iterator != m_current_scope->names.end()) {
-                return iterator->second.element.type;
-            }
-
-            return nullptr;
-        }
-
-        auto iterator = m_current_scope->scopes[decl.type->value].names.find(
-            decl.name.value);
-
-        if (iterator != m_current_scope->scopes[decl.type->value].names.end()) {
-            return iterator->second.element.type;
-        }
-
-        return nullptr;
-    };
-
-    auto get_llvm_fn = [&]() {
-        if (!decl.type) {
-            return static_cast<llvm::Function*>(
-                m_current_scope->names[decl.name.value].element.value);
-        }
-
-        return static_cast<llvm::Function*>(
-            m_current_scope->scopes[decl.type->value]
-                .names[decl.name.value]
-                .element.value);
-    };
-
-    auto* function_type = static_cast<types::Function*>(get_fn_type());
-
-    if (!function_type) {
-        return Value::poisoned();
-    }
-
-    auto* function = get_llvm_fn();
+void Codegen::generate_fn_body(
+    const ast::FnDecl& decl, Type* fn_type, llvm::Value* fn_value) {
+    auto* function_type = static_cast<types::Function*>(fn_type);
+    auto* function = static_cast<llvm::Function*>(fn_value);
 
     auto* entry = llvm::BasicBlock::Create(m_context, "", function);
 
@@ -110,15 +65,14 @@ Value Codegen::generate(const ast::FnDecl& decl) {
 
     if (m_builder.GetInsertBlock()->getTerminator()) {
         m_builder.SetInsertPoint(insert_point);
-        return Value::poisoned();
+        return;
     }
 
     if (!m_current_fn_had_error &&
         !is<types::Void, types::Never>(function_type->return_type)) {
         error(decl.name.offset, "non-void function does not return a value");
         m_builder.SetInsertPoint(insert_point);
-
-        return Value::poisoned();
+        return;
     }
 
     if (is<types::Never>(function_type->return_type)) {
@@ -128,6 +82,17 @@ Value Codegen::generate(const ast::FnDecl& decl) {
     }
 
     m_builder.SetInsertPoint(insert_point);
+}
+
+Value Codegen::generate(const ast::FnDecl& decl) {
+    auto iterator = m_current_scope->names.find(decl.name.value);
+
+    if (iterator == m_current_scope->names.end()) {
+        return Value::poisoned();
+    }
+
+    generate_fn_body(
+        decl, iterator->second.element.type, iterator->second.element.value);
 
     return Value::poisoned();
 }
@@ -728,6 +693,264 @@ Value Codegen::generate(const ast::VarDecl& decl) {
     return Value::poisoned();
 }
 
+void Codegen::generate_method_proto(
+    const ast::FnDecl& method,
+    std::map<std::string_view, GenericFunction*>& methods, Type* self_type,
+    const std::vector<types::TypeParam*>& parent_params,
+    const ast::ForBlock& for_block) {
+    if (!matches_target(method)) {
+        return;
+    }
+
+    auto& scope = *m_current_scope;
+    auto& type_scope = scope.scopes[for_block.type.value];
+
+    if (type_scope.names.contains(method.name.value) ||
+        type_scope.generic_fns.contains(method.name.value)) {
+        error(
+            method.name.offset, "{} is already defined",
+            log::quoted(method.name.value));
+
+        return;
+    }
+
+    auto scope_types = scope.types;
+    std::vector<types::TypeParam*> type_args;
+
+    for (const auto& param : method.template_params) {
+        m_named_types.push_back(
+            std::make_unique<types::TypeParam>(param.value));
+
+        type_args.push_back(
+            static_cast<types::TypeParam*>(m_named_types.back().get()));
+
+        scope.types[param.value] = {
+            .element = type_args.back(), .is_public = true};
+    }
+
+    Type* return_type = m_void_type.get();
+
+    if (method.proto.return_type) {
+        return_type = method.proto.return_type->codegen(*this);
+
+        if (!return_type) {
+            scope.types = scope_types;
+            return;
+        }
+    }
+
+    std::vector<GenericFunction::Param> params;
+
+    for (const auto& param : method.proto.params) {
+        auto* type = param.type->codegen(*this);
+
+        if (!type) {
+            scope.types = scope_types;
+            return;
+        }
+
+        params.emplace_back(param.name.value, type, param.is_mutable);
+    }
+
+    scope.types = scope_types;
+
+    if (!for_block.template_params.empty() || !method.template_params.empty()) {
+        auto& gen = type_scope.generic_fns[method.name.value];
+
+        gen = GenericFunction{
+            .name = method.name,
+            .return_type = return_type,
+            .params = std::move(params),
+            .block = method.block.get(),
+            .template_params = std::move(type_args),
+            .parent_template_params = parent_params,
+            .source_file = m_filename};
+
+        methods[method.name.value] = &gen;
+        return;
+    }
+
+    auto* fn_type = generate_fn_type(method.proto);
+
+    if (!fn_type) {
+        return;
+    }
+
+    auto llvm_name = m_current_scope_prefix + for_block.type.value +
+                     "::" + method.name.value;
+
+    auto* function = llvm::Function::Create(
+        static_cast<llvm::FunctionType*>(fn_type->llvm_type),
+        method.is_public ? llvm::Function::ExternalLinkage
+                         : llvm::Function::PrivateLinkage,
+        llvm_name, *m_module);
+
+    if (is<types::Never>(fn_type->return_type)) {
+        function->addFnAttr(llvm::Attribute::NoReturn);
+    }
+
+    if (fn_type->sret) {
+        function->addParamAttr(
+            0, llvm::Attribute::getWithStructRetType(
+                   m_context, fn_type->return_type->llvm_type));
+    }
+
+    type_scope.names[method.name.value] = {
+        .element = {.type = fn_type, .value = function},
+        .is_public = method.is_public,
+        .unit = m_current_unit};
+
+    if (self_type && !method.proto.params.empty()) {
+        auto* param_type = method.proto.params[0].type->codegen(*this);
+        if (param_type &&
+            (param_type == self_type ||
+             (dyn_cast<types::Pointer>(param_type) &&
+              static_cast<types::Pointer*>(param_type)->type == self_type))) {
+            self_type->methods[method.name.value] = {
+                .type = fn_type, .function = function};
+        }
+    }
+}
+
+void Codegen::generate_for_block_protos(const ast::ForBlock& decl) {
+    if (decl.is_public) {
+        error(decl.offset, "for-block cannot be public");
+    }
+
+    auto num_of_args = [&] {
+        error(
+            decl.type.offset, "incorrect number of type parameters for {}",
+            log::quoted(decl.type.value));
+    };
+
+    auto scope_types = m_current_scope->types;
+    std::vector<types::TypeParam*> type_params;
+
+    for (const auto& param : decl.template_params) {
+        m_named_types.push_back(
+            std::make_unique<types::TypeParam>(param.value));
+
+        type_params.push_back(
+            static_cast<types::TypeParam*>(m_named_types.back().get()));
+
+        m_current_scope->types[param.value] = {
+            .element = type_params.back(), .is_public = true};
+    }
+
+    auto struct_it = m_current_scope->generic_structs.find(decl.type.value);
+
+    if (struct_it != m_current_scope->generic_structs.end()) {
+        auto& gen = struct_it->second;
+
+        if (decl.template_params.size() != gen.template_params.size()) {
+            num_of_args();
+            return;
+        }
+
+        m_named_types.push_back(
+            std::make_unique<types::TemplateStructInst>(
+                &gen,
+                std::vector<Type*>(type_params.begin(), type_params.end())));
+
+        m_current_scope->types["Self"] = {
+            .element = m_named_types.back().get(), .is_public = true};
+
+        for (const auto& method : decl.methods) {
+            generate_method_proto(
+                *method, gen.methods, m_named_types.back().get(), type_params,
+                decl);
+        }
+
+        m_current_scope->types = scope_types;
+        return;
+    }
+
+    auto union_it = m_current_scope->generic_unions.find(decl.type.value);
+
+    if (union_it != m_current_scope->generic_unions.end()) {
+        auto& gen = union_it->second;
+
+        if (decl.template_params.size() != gen.template_params.size()) {
+            num_of_args();
+            return;
+        }
+
+        m_named_types.push_back(
+            std::make_unique<types::TemplateUnionInst>(
+                &gen,
+                std::vector<Type*>(type_params.begin(), type_params.end())));
+
+        m_current_scope->types["Self"] = {
+            .element = m_named_types.back().get(), .is_public = true};
+
+        for (const auto& method : decl.methods) {
+            generate_method_proto(
+                *method, gen.methods, m_named_types.back().get(), type_params,
+                decl);
+        }
+
+        m_current_scope->types = scope_types;
+        return;
+    }
+
+    auto* type = get_type(decl.type.offset, decl.type.value, *m_current_scope);
+
+    if (!type) {
+        return;
+    }
+
+    if (!decl.template_params.empty()) {
+        error(
+            decl.type.offset, "{} is not a generic type",
+            log::quoted(decl.type.value));
+
+        return;
+    }
+
+    m_current_scope->types["Self"] = {.element = type, .is_public = true};
+
+    for (const auto& method : decl.methods) {
+        generate_method_proto(
+            *method, type->generic_methods, type,
+            std::vector<types::TypeParam*>{}, decl);
+    }
+
+    m_current_scope->types = scope_types;
+}
+
+Value Codegen::generate(const ast::ForBlock& decl) {
+    auto& scope = *m_current_scope;
+    auto& type_scope = scope.scopes[decl.type.value];
+
+    if (!scope.types.contains(decl.type.value)) {
+        return Value::poisoned();
+    }
+
+    auto scope_types = scope.types;
+
+    scope.types["Self"] = {
+        .element = scope.types[decl.type.value].element, .is_public = true};
+
+    for (const auto& method : decl.methods) {
+        if (!method->block || !method->template_params.empty() ||
+            !decl.template_params.empty()) {
+            continue;
+        }
+
+        auto method_it = type_scope.names.find(method->name.value);
+
+        if (method_it != type_scope.names.end()) {
+            generate_fn_body(
+                *method, method_it->second.element.type,
+                method_it->second.element.value);
+        }
+    }
+
+    scope.types = scope_types;
+
+    return Value::poisoned();
+}
+
 void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
     auto [is_extern, alwaysinline, symbol] =
         parse_attrs_validate(decl, "extern", "alwaysinline", "symbol");
@@ -750,8 +973,7 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
         return;
     }
 
-    auto& scope = decl.type ? m_current_scope->scopes[decl.type->value]
-                            : *m_current_scope;
+    auto& scope = *m_current_scope;
 
     if (scope.names.contains(decl.name.value) ||
         scope.generic_fns.contains(decl.name.value)) {
@@ -815,15 +1037,6 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
         generic_fn.block = decl.block.get();
         generic_fn.source_file = m_filename;
 
-        if (decl.type) {
-            auto* type =
-                get_type(decl.type->offset, decl.type->value, *m_current_scope);
-
-            if (type) {
-                m_generic_methods[type][decl.name.value] = &generic_fn;
-            }
-        }
-
         return;
     }
 
@@ -842,13 +1055,7 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
     } else if (is_extern) {
         llvm_name = decl.name.value;
     } else {
-        llvm_name = m_current_scope_prefix;
-
-        if (decl.type) {
-            llvm_name += decl.type->value + "::";
-        }
-
-        llvm_name += decl.name.value;
+        llvm_name = m_current_scope_prefix + decl.name.value;
     }
 
     llvm::Function* function = nullptr;
@@ -883,41 +1090,6 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
         .element = {.type = fn_type, .value = function},
         .is_public = decl.is_public,
         .unit = m_current_unit};
-
-    if (!decl.type) {
-        return;
-    }
-
-    auto* type =
-        get_type(decl.type->offset, decl.type->value, *m_current_scope);
-
-    if (!type) {
-        return;
-    }
-
-    if (decl.proto.params.empty()) {
-        return;
-    }
-
-    auto* param_type = decl.proto.params[0].type->codegen(*this);
-
-    if (!param_type) {
-        return;
-    }
-
-    if (param_type == type) {
-        m_methods[type][decl.name.value] = {
-            .type = fn_type, .function = function};
-
-        return;
-    }
-
-    if (auto* pointer_type = dyn_cast<types::Pointer>(param_type)) {
-        if (pointer_type->type == type) {
-            m_methods[type][decl.name.value] = {
-                .type = fn_type, .function = function};
-        }
-    }
 }
 
 } // namespace cent::backend

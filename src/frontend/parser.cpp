@@ -730,7 +730,7 @@ void Parser::parse_decl(
 
     auto attrs = std::move(attributes);
 
-    if (match(Hash)) {
+    if (match_next(Hash)) {
         parse_attrs(attrs);
 
         if (match_next(LeftBrace)) {
@@ -804,7 +804,8 @@ void Parser::parse_toplevel(
 
     auto skip_until_decl = [&] {
         while (!match(
-            Eof, Type, Union, Enum, Fn, Const, Mut, Let, With, Pub, Hash)) {
+            Eof, Type, Union, Enum, Fn, For, Const, Mut, Let, With, Pub,
+            Hash)) {
             next();
         }
     };
@@ -886,6 +887,16 @@ void Parser::parse_toplevel(
 
         if (auto enum_decl = parse_enum(std::move(attrs), is_public)) {
             module.types.push_back(std::move(enum_decl));
+        } else {
+            skip_until_decl();
+        }
+
+        return;
+    case For:
+        next();
+
+        if (auto for_block = parse_for_block(std::move(attrs), is_public)) {
+            module.for_blocks.push_back(std::move(for_block));
         } else {
             skip_until_decl();
         }
@@ -1509,19 +1520,8 @@ Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
     auto template_params = parse_template_params();
     auto name = expect("function name", Token::Type::Identifier);
 
-    std::optional<OffsetValue<std::string>> type = std::nullopt;
-
     if (!name) {
         return nullptr;
-    }
-
-    if (match_next(Token::Type::ColonColon)) {
-        type = {.value = name->value, .offset = name->offset};
-        name = expect("function name", Token::Type::Identifier);
-
-        if (!name) {
-            return nullptr;
-        }
     }
 
     auto proto = parse_fn_proto();
@@ -1545,10 +1545,65 @@ Parser::parse_fn(std::vector<ast::Attribute> attrs, bool is_public) {
     }
 
     return std::make_unique<ast::FnDecl>(
-        name->offset, std::move(type),
-        OffsetValue{.value = name->value, .offset = name->offset},
+        name->offset, OffsetValue{.value = name->value, .offset = name->offset},
         std::move(*proto), std::move(body), std::move(template_params),
         std::move(attrs), is_public);
+}
+
+std::unique_ptr<ast::ForBlock>
+Parser::parse_for_block(std::vector<ast::Attribute> attrs, bool is_public) {
+    auto offset = peek().offset;
+
+    auto template_params = parse_template_params();
+    auto type = expect("type name", Token::Type::Identifier);
+
+    if (!type) {
+        return nullptr;
+    }
+
+    if (!expect("`{`", Token::Type::LeftBrace)) {
+        return nullptr;
+    }
+
+    std::vector<std::unique_ptr<ast::FnDecl>> methods;
+
+    while (!match(Token::Type::RightBrace, Token::Type::Eof)) {
+        if (match_next(Token::Type::Semicolon)) {
+            continue;
+        }
+
+        std::vector<ast::Attribute> attrs;
+
+        if (match_next(Token::Type::Hash)) {
+            parse_attrs(attrs);
+        }
+
+        bool method_is_public = false;
+
+        if (match_next(Token::Type::Pub)) {
+            method_is_public = true;
+        }
+
+        if (!expect("`fn`", Token::Type::Fn)) {
+            return nullptr;
+        }
+
+        if (auto method = parse_fn(std::move(attrs), method_is_public)) {
+            methods.push_back(std::move(method));
+            continue;
+        }
+
+        return nullptr;
+    }
+
+    if (!expect("`}`", Token::Type::RightBrace)) {
+        return nullptr;
+    }
+
+    return std::make_unique<ast::ForBlock>(
+        offset, std::move(template_params),
+        OffsetValue{.value = type->value, .offset = type->offset},
+        std::move(methods), std::move(attrs), is_public);
 }
 
 std::unique_ptr<ast::Struct>
