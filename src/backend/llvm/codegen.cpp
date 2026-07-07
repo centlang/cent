@@ -585,7 +585,8 @@ bool Codegen::deduce_template_arg(
                 param_opt->type, arg_opt->type, template_params, deduced_args);
         }
 
-        return false;
+        return deduce_template_arg(
+            param_opt->type, arg, template_params, deduced_args);
     }
 
     if (auto* param_slice = dyn_cast<types::Slice>(param)) {
