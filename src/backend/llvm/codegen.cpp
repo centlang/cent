@@ -596,6 +596,18 @@ bool Codegen::deduce_template_arg(
                 deduced_args);
         }
 
+        if (auto* arg_array = dyn_cast<types::Array>(arg)) {
+            return deduce_template_arg(
+                param_slice->type, arg_array->type, template_params,
+                deduced_args);
+        }
+
+        if (auto* arg_array = dyn_cast<types::VarLenArray>(arg)) {
+            return deduce_template_arg(
+                param_slice->type, arg_array->type, template_params,
+                deduced_args);
+        }
+
         return false;
     }
 
