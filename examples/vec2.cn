@@ -6,12 +6,14 @@ type Vec2 {
     y: f64,
 }
 
-fn Vec2::length_squared(self: Vec2) f64 {
-    return self.x * self.x + self.y * self.y;
-}
+for Vec2 {
+    pub fn length_squared(self: Self) f64 {
+        return self.x * self.x + self.y * self.y;
+    }
 
-fn Vec2::length(self: Vec2) f64 {
-    return c::sqrt(self.length_squared());
+    pub fn length(self: Self) f64 {
+        return c::sqrt(self.length_squared());
+    }
 }
 
 fn main() {

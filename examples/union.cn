@@ -9,8 +9,14 @@ union Literal {
 
 fn print_literal(l: Literal) {
     switch l {
-        Literal::int { c::printf(ffi::as_cstr("int literal: %llu\n\0"), l.int); }
-        Literal::str { c::printf(ffi::as_cstr("string literal: %s\n\0"), ffi::as_cstr(l.str)); }
+        Literal::int {
+            c::printf(ffi::as_cstr("int literal: %llu\n\0"), l.int);
+        }
+        Literal::str {
+            c::printf(
+                ffi::as_cstr("string literal: %s\n\0"), ffi::as_cstr(l.str)
+            );
+        }
         Literal::bool {
             if (l.bool) {
                 c::printf(ffi::as_cstr("bool literal: true\n\0"));

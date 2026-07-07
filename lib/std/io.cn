@@ -5,8 +5,10 @@ pub type Fd {
     _file: *mut c::FILE,
 }
 
-pub fn Fd::close(self: Fd) {
-    c::fclose(self._file);
+for Fd {
+    pub fn close(self: Self) {
+        c::fclose(self._file);
+    }
 }
 
 #(alwaysinline)

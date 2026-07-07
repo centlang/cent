@@ -10,15 +10,24 @@ type User {
 
 #(distinct) type UserId = u64;
 
-fn User::print_user(self: *User) {
-    c::puts(ffi::as_cstr("User:\0"));
-    c::printf(ffi::as_cstr("  username: %s\n\0"), ffi::as_cstr(self.username));
-    c::printf(ffi::as_cstr("  email: %s\n\0"), ffi::as_cstr(self.email));
-    c::printf(ffi::as_cstr("  age: %d\n\0"), self.age as i32);
-    c::printf(ffi::as_cstr("  id: %llu\n\0"), self.id);
+for User {
+    pub fn print_user(self: *Self) {
+        c::puts(ffi::as_cstr("User:\0"));
+
+        c::printf(
+            ffi::as_cstr("  username: %s\n\0"), ffi::as_cstr(self.username)
+        );
+
+        c::printf(ffi::as_cstr("  email: %s\n\0"), ffi::as_cstr(self.email));
+        c::printf(ffi::as_cstr("  age: %d\n\0"), self.age as i32);
+        c::printf(ffi::as_cstr("  id: %llu\n\0"), self.id);
+    }
 }
 
 fn main() {
-    let u = User { username: "lnkrr", email: "lnkrr@proton.me", age: 16, id: 42 };
+    let u = User {
+        username: "lnkrr", email: "lnkrr@proton.me", age: 16, id: 42
+    };
+
     u.print_user();
 }

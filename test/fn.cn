@@ -11,18 +11,20 @@ type BinExpr {
     kind: OperKind,
 }
 
-fn BinExpr::eval(self: BinExpr) i32 {
-    switch self.kind {
-        OperKind::add { return self.x + self.y; }
-        OperKind::sub { return self.x - self.y; }
-        OperKind::mul { return self.x * self.y; }
-        OperKind::div { return self.x / self.y; }
-        else { unreachable; }
+for BinExpr {
+    pub fn eval(self: Self) i32 {
+        switch self.kind {
+            OperKind::add { return self.x + self.y; }
+            OperKind::sub { return self.x - self.y; }
+            OperKind::mul { return self.x * self.y; }
+            OperKind::div { return self.x / self.y; }
+            else { unreachable; }
+        }
     }
-}
 
-fn BinExpr::add(x: i32, y: i32) BinExpr {
-    return BinExpr { x: x, y: y, kind: OperKind::add };
+    pub fn add(x: i32, y: i32) Self {
+        return BinExpr { x: x, y: y, kind: OperKind::add };
+    }
 }
 
 fn sum(x: i32, y: f64, z: i32, w: f64) f64 {
