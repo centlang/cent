@@ -1,16 +1,15 @@
 with c;
 
-pub fn equal(a: []u8, b: []u8) bool {
-    return a.len == b.len && c::memcmp(
-        a.ptr as *c::void, b.ptr as *c::void, a.len
+pub fn(<T, U>) equal(a: []T, b: []U) bool {
+    return a.len * sizeof(T) == b.len * sizeof(U) && c::memcmp(
+        a.ptr as *c::void, b.ptr as *c::void, a.len * sizeof(T)
     ) == 0;
 }
 
-pub fn copy(dest: []mut u8, src: []u8) {
-    core::dbg_assert(dest.len >= src.len);
-    c::memcpy(dest.ptr as *mut c::void, src.ptr as *c::void, src.len);
-}
+pub fn(<T, U>) copy(dest: []mut T, src: []U) {
+    core::dbg_assert(dest.len * sizeof(T) >= src.len * sizeof(U));
 
-pub fn copy_n(dest: *mut u8, src: *u8, len: usize) {
-    c::memcpy(dest as *mut c::void, src as *c::void, len);
+    c::memcpy(
+        dest.ptr as *mut c::void, src.ptr as *c::void, src.len * sizeof(U)
+    );
 }
