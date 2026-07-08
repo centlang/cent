@@ -672,7 +672,8 @@ Value Codegen::generate(const ast::CallExpr& expr) {
         if (scope) {
             auto generic_fn = scope->generic_fns.find(name);
 
-            if (generic_fn != scope->generic_fns.end()) {
+            if (generic_fn != scope->generic_fns.end() &&
+                generic_fn->second.parent_type_params.empty()) {
                 auto* gen = &generic_fn->second;
 
                 std::vector<OffsetValue<Value>> arguments;
@@ -779,6 +780,41 @@ Value Codegen::generate(const ast::CallExpr& expr) {
 
 Value Codegen::generate(const ast::CallExprGeneric& expr) {
     auto [name, offset] = expr.identifier->value.back();
+
+    std::vector<Type*> parent_type_args;
+    parent_type_args.reserve(expr.parent_type_args.size());
+
+    for (const auto& arg : expr.parent_type_args) {
+        auto* type = arg->codegen(*this);
+
+        if (!type) {
+            return Value::poisoned();
+        }
+
+        parent_type_args.push_back(type);
+    }
+
+    std::vector<Type*> fn_type_args;
+    fn_type_args.reserve(expr.type_args.size());
+
+    for (const auto& arg : expr.type_args) {
+        auto* type = arg->codegen(*this);
+
+        if (!type) {
+            return Value::poisoned();
+        }
+
+        fn_type_args.push_back(type);
+    }
+
+    std::vector<OffsetValue<Value>> arguments;
+    fn_type_args.reserve(expr.arguments.size());
+
+    for (const auto& argument : expr.arguments) {
+        auto arg_value = argument->codegen(*this);
+        arguments.push_back({.value = arg_value, .offset = argument->offset});
+    }
+
     auto* scope = resolve_scope(expr.identifier->value);
 
     if (!scope) {
@@ -799,48 +835,88 @@ Value Codegen::generate(const ast::CallExprGeneric& expr) {
         return Value::poisoned();
     }
 
-    if (expr.type_args.size() > generic_fn->second.type_params.size()) {
-        error(offset, "too many type arguments passed");
+    auto* gen = &generic_fn->second;
+
+    if (expr.type_args.size() > gen->type_params.size()) {
+        error(offset, "too many type arguments");
         return Value::poisoned();
     }
 
-    std::vector<Type*> type_args;
-    type_args.reserve(expr.type_args.size());
+    if (gen->kind != GenericFunction::FnKind::Normal) {
+        return create_intrinsic_call(offset, gen, fn_type_args, arguments);
+    }
 
-    for (const auto& arg : expr.type_args) {
-        auto* type = arg->codegen(*this);
+    if (gen->parent_type_params.empty()) {
+        auto result = inst_generic_fn(gen, fn_type_args);
 
-        if (!type) {
+        if (!result.ok()) {
             return Value::poisoned();
         }
 
-        type_args.push_back(type);
+        return create_call(
+            offset, static_cast<types::Function*>(result.type),
+            static_cast<llvm::Function*>(result.value), arguments);
     }
 
-    std::vector<OffsetValue<Value>> arguments;
-    arguments.reserve(expr.arguments.size());
+    if (parent_type_args.empty()) {
+        error(
+            offset,
+            "no type arguments for generictype of associated function {} "
+            "provided",
+            log::quoted(name));
 
-    for (const auto& argument : expr.arguments) {
-        auto arg_value = argument->codegen(*this);
-        arguments.push_back({.value = arg_value, .offset = argument->offset});
+        return Value::poisoned();
     }
 
-    auto* gen = &generic_fn->second;
-
-    if (gen->kind != GenericFunction::FnKind::Normal) {
-        return create_intrinsic_call(offset, gen, type_args, arguments);
+    if (parent_type_args.size() > gen->parent_type_params.size()) {
+        error(offset, "too many type arguments");
+        return Value::poisoned();
     }
 
-    auto result = inst_generic_fn(gen, type_args);
+    if (expr.type_args.empty()) {
+        fn_type_args.resize(gen->type_params.size(), nullptr);
+
+        for (std::size_t i = 0; i < gen->params.size() && i < arguments.size();
+             ++i) {
+            auto* param_type = gen->params[i].type;
+
+            if (auto* resolved = inst_type_param(
+                    gen->parent_type_params, parent_type_args, param_type)) {
+                param_type = resolved;
+            }
+
+            if (!deduce_type_arg(
+                    param_type, arguments[i].value.type, gen->type_params,
+                    fn_type_args)) {
+                error(
+                    offset, "could not deduce type for parameter {}",
+                    log::quoted(gen->params[i].name));
+
+                return Value::poisoned();
+            }
+        }
+
+        for (auto* arg : fn_type_args) {
+            if (!arg) {
+                error(
+                    offset,
+                    "could not deduce type arguments for generic function {}",
+                    log::quoted(name));
+
+                return Value::poisoned();
+            }
+        }
+    }
+
+    auto result = inst_generic_fn(gen, fn_type_args, parent_type_args);
 
     if (!result.ok()) {
         return Value::poisoned();
     }
 
-    auto* fn_type = static_cast<types::Function*>(result.type);
-
     return create_call(
-        offset, fn_type, static_cast<llvm::Function*>(result.value), arguments);
+        offset, static_cast<types::Function*>(result.type),
+        static_cast<llvm::Function*>(result.value), arguments);
 }
 
 Value Codegen::generate_self(
@@ -994,7 +1070,7 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
             log::quoted(expr.name.value));
     };
 
-    for (std::size_t i = 1; i < args.size(); ++i) {
+    for (std::size_t i = 1; i < func->params.size() && i < args.size(); ++i) {
         auto* param_type = func->params[i].type;
 
         if (!gen_method.parent_args.empty()) {
@@ -1046,7 +1122,7 @@ Value Codegen::generate(const ast::MethodExprGeneric& expr) {
     }
 
     if (expr.type_args.size() > method.function->type_params.size()) {
-        error(expr.offset, "too many type arguments passed");
+        error(expr.offset, "too many type arguments");
         return Value::poisoned();
     }
 

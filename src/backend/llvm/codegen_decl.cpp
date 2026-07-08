@@ -701,8 +701,7 @@ void Codegen::generate_method_proto(
         return;
     }
 
-    auto& scope = *m_current_scope;
-    auto& type_scope = scope.scopes[for_block.type.value];
+    auto& type_scope = m_current_scope->scopes[for_block.type.value];
 
     if (type_scope.names.contains(method.name.value) ||
         type_scope.generic_fns.contains(method.name.value)) {
@@ -713,7 +712,7 @@ void Codegen::generate_method_proto(
         return;
     }
 
-    auto scope_types = scope.types;
+    auto scope_types = m_current_scope->types;
     std::vector<types::TypeParam*> type_args;
 
     for (const auto& param : method.type_params) {
@@ -723,7 +722,7 @@ void Codegen::generate_method_proto(
         type_args.push_back(
             static_cast<types::TypeParam*>(m_named_types.back().get()));
 
-        scope.types[param.value] = {
+        m_current_scope->types[param.value] = {
             .element = type_args.back(), .is_public = true};
     }
 
@@ -733,25 +732,25 @@ void Codegen::generate_method_proto(
         return_type = method.proto.return_type->codegen(*this);
 
         if (!return_type) {
-            scope.types = scope_types;
+            m_current_scope->types = scope_types;
             return;
         }
     }
 
     std::vector<GenericFunction::Param> params;
 
-    for (const auto& param : method.proto.params) {
-        auto* type = param.type->codegen(*this);
+    for (const auto& parameter : method.proto.params) {
+        auto* type = parameter.type->codegen(*this);
 
         if (!type) {
-            scope.types = scope_types;
+            m_current_scope->types = scope_types;
             return;
         }
 
-        params.emplace_back(param.name.value, type, param.is_mutable);
+        params.emplace_back(parameter.name.value, type, parameter.is_mutable);
     }
 
-    scope.types = scope_types;
+    m_current_scope->types = scope_types;
 
     if (!for_block.type_params.empty() || !method.type_params.empty()) {
         auto& gen = type_scope.generic_fns[method.name.value];
@@ -918,17 +917,17 @@ void Codegen::generate_for_block_protos(const ast::ForBlock& decl) {
 }
 
 Value Codegen::generate(const ast::ForBlock& decl) {
-    auto& scope = *m_current_scope;
-    auto& type_scope = scope.scopes[decl.type.value];
+    auto& type_scope = m_current_scope->scopes[decl.type.value];
 
-    if (!scope.types.contains(decl.type.value)) {
+    if (!m_current_scope->types.contains(decl.type.value)) {
         return Value::poisoned();
     }
 
-    auto scope_types = scope.types;
+    auto scope_types = m_current_scope->types;
 
-    scope.types["Self"] = {
-        .element = scope.types[decl.type.value].element, .is_public = true};
+    m_current_scope->types["Self"] = {
+        .element = m_current_scope->types[decl.type.value].element,
+        .is_public = true};
 
     for (const auto& method : decl.methods) {
         if (!method->block || !method->type_params.empty() ||
@@ -945,7 +944,7 @@ Value Codegen::generate(const ast::ForBlock& decl) {
         }
     }
 
-    scope.types = scope_types;
+    m_current_scope->types = scope_types;
 
     return Value::poisoned();
 }
@@ -972,10 +971,8 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
         return;
     }
 
-    auto& scope = *m_current_scope;
-
-    if (scope.names.contains(decl.name.value) ||
-        scope.generic_fns.contains(decl.name.value)) {
+    if (m_current_scope->names.contains(decl.name.value) ||
+        m_current_scope->generic_fns.contains(decl.name.value)) {
         error(
             decl.name.offset, "{} is already defined",
             log::quoted(decl.name.value));
@@ -984,7 +981,7 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
     }
 
     if (!decl.type_params.empty()) {
-        auto& generic_fn = scope.generic_fns[decl.name.value];
+        auto& generic_fn = m_current_scope->generic_fns[decl.name.value];
 
         auto current_scope_types = m_current_scope->types;
 
@@ -1084,7 +1081,7 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
                    m_context, fn_type->return_type->llvm_type));
     }
 
-    scope.names[decl.name.value] = {
+    m_current_scope->names[decl.name.value] = {
         .element = {.type = fn_type, .value = function},
         .is_public = decl.is_public,
         .unit = m_current_unit};

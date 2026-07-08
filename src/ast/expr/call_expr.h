@@ -24,14 +24,18 @@ struct CallExpr : detail::Expr<CallExpr> {
 struct CallExprGeneric : detail::Expr<CallExprGeneric> {
     [[nodiscard]] CallExprGeneric(
         std::size_t offset, std::unique_ptr<Identifier> identifier,
+        std::vector<std::unique_ptr<ast::Type>> parent_type_args,
         std::vector<std::unique_ptr<ast::Type>> type_args,
         std::vector<std::unique_ptr<Expression>> arguments)
     : Expr{offset}, identifier{std::move(identifier)},
+      parent_type_args{std::move(parent_type_args)},
       type_args{std::move(type_args)}, arguments{std::move(arguments)} {}
 
     std::unique_ptr<Identifier> identifier;
 
+    std::vector<std::unique_ptr<ast::Type>> parent_type_args;
     std::vector<std::unique_ptr<ast::Type>> type_args;
+
     std::vector<std::unique_ptr<Expression>> arguments;
 };
 

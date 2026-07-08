@@ -790,7 +790,6 @@ Type* Codegen::inst_type_param(
         Type* return_type = inst_type_param(params, args, func->return_type);
 
         std::vector<Type*> param_types;
-
         param_types.reserve(func->param_types.size());
 
         for (auto& param_type : func->param_types) {

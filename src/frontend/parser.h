@@ -93,6 +93,10 @@ private:
         return false;
     }
 
+    [[nodiscard]] bool match_generic() {
+        return match(Token::Type::LeftParen) && match(1, Token::Type::Less);
+    }
+
     void expected(std::string_view what) { error("expected {}", what); }
 
     std::optional<Token> expect(std::string_view what, auto... types) {

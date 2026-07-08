@@ -413,8 +413,8 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
                 std::move(fields));
         }
 
-        if (!is_condition && match(LeftParen) && match(1, Less)) {
-            auto type_args = parse_type_args();
+        if (!is_condition && match_generic()) {
+            auto parent_type_args = parse_type_args();
 
             if (match_next(LeftParen)) {
                 auto args = parse_args();
@@ -427,24 +427,59 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
                     token->offset,
                     std::make_unique<ast::Identifier>(
                         token->offset, std::move(value)),
-                    std::move(type_args), std::move(args));
+                    std::vector<std::unique_ptr<ast::Type>>{},
+                    std::move(parent_type_args), std::move(args));
             }
 
-            if (!expect("`{` or `(`", LeftBrace)) {
+            if (!match_next(ColonColon)) {
+                if (!expect("`{` or `(`", LeftBrace)) {
+                    return nullptr;
+                }
+
+                auto fields = parse_field_values();
+
+                if (!expect("`,` or `}`", RightBrace)) {
+                    return nullptr;
+                }
+
+                return std::make_unique<ast::StructLiteral>(
+                    token->offset,
+                    std::make_unique<ast::NamedType>(
+                        token->offset, std::move(value),
+                        std::move(parent_type_args)),
+                    std::move(fields));
+            }
+
+            auto name = expect("name", Identifier);
+
+            if (!name) {
                 return nullptr;
             }
 
-            auto fields = parse_field_values();
+            value.push_back(
+                OffsetValue{.value = name->value, .offset = name->offset});
 
-            if (!expect("`,` or `}`", RightBrace)) {
+            std::vector<std::unique_ptr<ast::Type>> type_args =
+                parse_type_args();
+
+            std::vector<std::unique_ptr<ast::Expression>> args;
+
+            if (!expect("`(`", LeftParen)) {
                 return nullptr;
             }
 
-            return std::make_unique<ast::StructLiteral>(
+            args = parse_args();
+
+            if (!expect("`)`", RightParen)) {
+                return nullptr;
+            }
+
+            return std::make_unique<ast::CallExprGeneric>(
                 token->offset,
-                std::make_unique<ast::NamedType>(
-                    token->offset, std::move(value), std::move(type_args)),
-                std::move(fields));
+                std::make_unique<ast::Identifier>(
+                    token->offset, std::move(value)),
+                std::move(parent_type_args), std::move(type_args),
+                std::move(args));
         }
 
         return std::make_unique<ast::Identifier>(
@@ -600,7 +635,7 @@ Parser::expect_access_or_call_expr(bool is_condition) {
             return nullptr;
         }
 
-        if (!is_condition && match(LeftParen) && match(1, Less)) {
+        if (!is_condition && match_generic()) {
             auto type_args = parse_type_args();
 
             if (!expect("`(`", LeftParen)) {
@@ -1353,7 +1388,7 @@ std::vector<ast::Struct::Field> Parser::parse_fields() {
 std::vector<std::unique_ptr<ast::Type>> Parser::parse_type_args() {
     std::vector<std::unique_ptr<ast::Type>> result;
 
-    if (!match(Token::Type::LeftParen) || !match(1, Token::Type::Less)) {
+    if (!match_generic()) {
         return result;
     }
 
