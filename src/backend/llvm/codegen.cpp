@@ -1062,7 +1062,13 @@ Value Codegen::inst_generic_fn(
     m_builder.SetInsertPoint(entry);
 
     auto* current_function = m_current_function;
+    auto* current_scope = m_current_scope;
+
     m_current_function = fn_type;
+
+    if (function->scope) {
+        m_current_scope = function->scope;
+    }
 
     auto current_scope_names = m_current_scope->names;
     auto current_scope_types = m_current_scope->types;
@@ -1112,21 +1118,23 @@ Value Codegen::inst_generic_fn(
     }
 
     auto filename = m_filename;
+    auto scope_prefix = m_current_scope_prefix;
 
     if (!function->source_file.empty()) {
         m_filename = function->source_file;
     }
 
-    auto scope_prefix = m_current_scope_prefix;
     m_current_scope_prefix = name + "::";
 
     function->block->codegen(*this);
 
+    m_current_scope_prefix = scope_prefix;
     m_filename = filename;
 
-    m_current_scope_prefix = scope_prefix;
     m_current_scope->names = current_scope_names;
     m_current_scope->types = current_scope_types;
+
+    m_current_scope = current_scope;
     m_current_function = current_function;
 
     if (m_builder.GetInsertBlock()->getTerminator()) {

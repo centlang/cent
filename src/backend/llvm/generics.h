@@ -20,6 +20,8 @@ struct Expression;
 
 namespace cent::backend {
 
+struct Scope;
+
 struct GenericFunction {
     struct Param {
         std::string name;
@@ -45,6 +47,7 @@ struct GenericFunction {
 
     FnKind kind{FnKind::Normal};
 
+    Scope* scope{nullptr};
     std::string source_file;
 };
 

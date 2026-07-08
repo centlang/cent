@@ -769,6 +769,7 @@ void Codegen::generate_method_proto(
             .type_params = std::move(type_args),
             .parent_type_params = parent_params,
             .self_type = self_type,
+            .scope = m_current_scope,
             .source_file = m_filename};
 
         methods[method.name.value] = &gen;
@@ -1037,6 +1038,7 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
         generic_fn.name = decl.name;
         generic_fn.return_type = return_type;
         generic_fn.block = decl.block.get();
+        generic_fn.scope = m_current_scope;
         generic_fn.source_file = m_filename;
 
         return;
