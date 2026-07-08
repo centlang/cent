@@ -738,6 +738,7 @@ void Codegen::generate_method_proto(
     }
 
     std::vector<GenericFunction::Param> params;
+    std::vector<const ast::Expression*> default_args;
 
     for (const auto& parameter : method.proto.params) {
         auto* type = parameter.type->codegen(*this);
@@ -748,6 +749,10 @@ void Codegen::generate_method_proto(
         }
 
         params.emplace_back(parameter.name.value, type, parameter.is_mutable);
+
+        if (parameter.value) {
+            default_args.push_back(parameter.value.get());
+        }
     }
 
     m_current_scope->types = scope_types;
@@ -759,6 +764,7 @@ void Codegen::generate_method_proto(
             .name = method.name,
             .return_type = return_type,
             .params = std::move(params),
+            .default_args = std::move(default_args),
             .block = method.block.get(),
             .type_params = std::move(type_args),
             .parent_type_params = parent_params,
