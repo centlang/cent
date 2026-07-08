@@ -1104,6 +1104,13 @@ Value Codegen::inst_generic_fn(
             .element = m_named_types.back().get(), .is_public = true};
     }
 
+    if (function->self_type) {
+        m_current_scope->types["Self"] = {
+            .element =
+                inst_type_param(type_params, type_args, function->self_type),
+            .is_public = true};
+    }
+
     auto filename = m_filename;
 
     if (!function->source_file.empty()) {

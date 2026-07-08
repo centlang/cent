@@ -762,6 +762,7 @@ void Codegen::generate_method_proto(
             .block = method.block.get(),
             .type_params = std::move(type_args),
             .parent_type_params = parent_params,
+            .self_type = self_type,
             .source_file = m_filename};
 
         methods[method.name.value] = &gen;

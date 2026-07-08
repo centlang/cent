@@ -41,6 +41,8 @@ struct GenericFunction {
     std::vector<types::TypeParam*> type_params;
     std::vector<types::TypeParam*> parent_type_params;
 
+    Type* self_type{nullptr};
+
     FnKind kind{FnKind::Normal};
 
     std::string source_file;
