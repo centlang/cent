@@ -298,8 +298,12 @@ get_emit_type(std::string_view type) {
     }
 
     return target->createTargetMachine(
-        cent::g_options.target_triple, "generic", "", llvm::TargetOptions{},
-        cent::g_options.reloc_model);
+#if LLVM_VERSION_MAJOR >= 21
+        llvm::Triple{cent::g_options.target_triple},
+#else
+        cent::g_options.target_triple,
+#endif
+        "generic", "", llvm::TargetOptions{}, cent::g_options.reloc_model);
 }
 
 [[nodiscard]] bool invoke_linker(
