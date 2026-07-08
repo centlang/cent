@@ -1358,7 +1358,7 @@ Value Codegen::generate(const ast::IndexExpr& expr) {
         }
 
         auto* ptr_value = load_struct_member(
-            llvm::PointerType::get(m_context, 0), value, slice_member_ptr);
+            llvm::PointerType::getUnqual(m_context), value, slice_member_ptr);
 
         return Value{
             .type = slice->type,
@@ -1578,7 +1578,7 @@ Value Codegen::generate(const ast::SliceExpr& expr) {
     }
 
     auto* ptr_value = load_struct_member(
-        llvm::PointerType::get(m_context, 0), value, slice_member_ptr);
+        llvm::PointerType::getUnqual(m_context), value, slice_member_ptr);
 
     auto* new_ptr_value =
         m_builder.CreateGEP(type->type->llvm_type, ptr_value, low.value);

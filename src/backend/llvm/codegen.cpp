@@ -73,7 +73,7 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
     m_void_type = std::make_unique<types::Void>(void_type);
 
     m_slice_type = llvm::StructType::create(
-        {llvm::PointerType::get(m_context, 0), m_size});
+        {llvm::PointerType::getUnqual(m_context), m_size});
 
     create_core();
 
@@ -165,7 +165,7 @@ Value Codegen::create_core_panic() {
         return {.type = panic_type, .value = panic};
     }
 
-    auto* ptr_type = llvm::PointerType::get(m_context, 0);
+    auto* ptr_type = llvm::PointerType::getUnqual(m_context);
 
     auto* fputs_type = llvm::FunctionType::get(
         i32_type->llvm_type, {ptr_type, ptr_type}, false);
@@ -278,7 +278,7 @@ void Codegen::create_main() {
     auto* user_main_fn = static_cast<types::Function*>(user_main.type);
 
     auto* int32 = llvm::Type::getInt32Ty(m_context);
-    auto* pointer = llvm::PointerType::get(m_context, 0);
+    auto* pointer = llvm::PointerType::getUnqual(m_context);
 
     auto* real_main = llvm::Function::Create(
         llvm::FunctionType::get(int32, {int32, pointer}, false),
@@ -1801,7 +1801,7 @@ Value Codegen::load_lvalue(const Value& value) {
 
     while (result.ptr_depth > 1) {
         result.value = m_builder.CreateLoad(
-            llvm::PointerType::get(m_context, 0), result.value);
+            llvm::PointerType::getUnqual(m_context), result.value);
 
         --result.ptr_depth;
     }

@@ -276,8 +276,7 @@ types::Function* Codegen::get_fn_type(
         sret ? param_types.size() + 1 : param_types.size());
 
     if (sret) {
-        llvm_param_types.push_back(
-            llvm::PointerType::get(return_type->llvm_type, 0));
+        llvm_param_types.push_back(llvm::PointerType::getUnqual(m_context));
     }
 
     for (const auto& parameter : param_types) {
@@ -316,7 +315,7 @@ types::Pointer* Codegen::get_ptr_type(Type* type, bool is_mutable) {
 
     if (!result) {
         result = std::make_unique<types::Pointer>(
-            type->llvm_type ? llvm::PointerType::get(m_context, 0) : nullptr,
+            type->llvm_type ? llvm::PointerType::getUnqual(m_context) : nullptr,
             type, is_mutable);
     }
 
@@ -412,7 +411,7 @@ Codegen::get_var_len_array_type(Type* type, llvm::Value* size) {
 
     if (!result) {
         result = std::make_unique<types::VarLenArray>(
-            type->llvm_type ? llvm::PointerType::get(m_context, 0) : nullptr,
+            type->llvm_type ? llvm::PointerType::getUnqual(m_context) : nullptr,
             type, size);
     }
 

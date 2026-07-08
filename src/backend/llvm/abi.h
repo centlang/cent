@@ -153,7 +153,7 @@ classify(llvm::Type* type, std::size_t offset, const llvm::DataLayout& layout) {
 [[nodiscard]] inline llvm::Type*
 lower_eightbyte(RegClass reg, std::size_t bitsize, llvm::LLVMContext& context) {
     if (reg == RegClass::Pointer) {
-        return llvm::PointerType::get(context, 0);
+        return llvm::PointerType::getUnqual(context);
     }
 
     if (reg == RegClass::Integer) {
@@ -225,7 +225,7 @@ should_sret(llvm::Type* type, const llvm::DataLayout& layout) {
     std::size_t bitsize = layout.getTypeAllocSizeInBits(type->llvm_type);
 
     if (classification.first == RegClass::Memory) {
-        return llvm::PointerType::getUnqual(type->llvm_type);
+        return llvm::PointerType::getUnqual(context);
     }
 
     if (classification.second == RegClass::NoClass) {

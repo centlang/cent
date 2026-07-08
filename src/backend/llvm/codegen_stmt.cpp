@@ -439,7 +439,7 @@ Value Codegen::generate(const ast::ForLoop& stmt) {
         auto current_types = m_current_scope->types;
 
         auto* ptr_value = load_struct_member(
-            llvm::PointerType::get(m_context, 0), value, slice_member_ptr);
+            llvm::PointerType::getUnqual(m_context), value, slice_member_ptr);
 
         auto* index_value = m_builder.CreateLoad(m_size, index);
 
