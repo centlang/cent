@@ -1,3 +1,4 @@
+#include <array>
 #include <charconv>
 #include <cstdint>
 #include <optional>
@@ -540,145 +541,7 @@ void Lexer::ident() {
         m_token.value += get();
     }
 
-    auto keyword = [&](Token::Type type) {
-        m_token.type = type;
-        m_token.value = {};
-    };
-
-    if (m_token.value == "true") {
-        keyword(True);
-        return;
-    }
-
-    if (m_token.value == "false") {
-        keyword(False);
-        return;
-    }
-
-    if (m_token.value == "null") {
-        keyword(Null);
-        return;
-    }
-
-    if (m_token.value == "pub") {
-        keyword(Pub);
-        return;
-    }
-
-    if (m_token.value == "fn") {
-        keyword(Fn);
-        return;
-    }
-
-    if (m_token.value == "type") {
-        keyword(Type);
-        return;
-    }
-
-    if (m_token.value == "union") {
-        keyword(Union);
-        return;
-    }
-
-    if (m_token.value == "enum") {
-        keyword(Enum);
-        return;
-    }
-
-    if (m_token.value == "with") {
-        keyword(With);
-        return;
-    }
-
-    if (m_token.value == "as") {
-        keyword(As);
-        return;
-    }
-
-    if (m_token.value == "in") {
-        keyword(In);
-        return;
-    }
-
-    if (m_token.value == "if") {
-        keyword(If);
-        return;
-    }
-
-    if (m_token.value == "else") {
-        keyword(Else);
-        return;
-    }
-
-    if (m_token.value == "switch") {
-        keyword(Switch);
-        return;
-    }
-
-    if (m_token.value == "while") {
-        keyword(While);
-        return;
-    }
-
-    if (m_token.value == "for") {
-        keyword(For);
-        return;
-    }
-
-    if (m_token.value == "let") {
-        keyword(Let);
-        return;
-    }
-
-    if (m_token.value == "mut") {
-        keyword(Mut);
-        return;
-    }
-
-    if (m_token.value == "const") {
-        keyword(Const);
-        return;
-    }
-
-    if (m_token.value == "return") {
-        keyword(Return);
-        return;
-    }
-
-    if (m_token.value == "defer") {
-        keyword(Defer);
-        return;
-    }
-
-    if (m_token.value == "break") {
-        keyword(Break);
-        return;
-    }
-
-    if (m_token.value == "continue") {
-        keyword(Continue);
-        return;
-    }
-
-    if (m_token.value == "unreachable") {
-        keyword(Unreachable);
-        return;
-    }
-
-    if (m_token.value == "undefined") {
-        keyword(Undefined);
-        return;
-    }
-
-    if (m_token.value == "sizeof") {
-        keyword(Sizeof);
-        return;
-    }
-
-    if (m_token.value == "nan" || m_token.value == "inf") {
-        m_token.type = FloatLiteral;
-        return;
-    }
+    m_token.type = ident_type(m_token.value);
 }
 
 void Lexer::utf8_char() {
@@ -705,6 +568,51 @@ void Lexer::utf8_char() {
 
         m_token.value += get();
     }
+}
+
+Token::Type Lexer::ident_type(std::string_view ident) {
+    struct Kw {
+        std::string_view keyword;
+        Token::Type type;
+    };
+
+    static constexpr std::array map{
+        Kw{"true", Token::Type::True},
+        Kw{"false", Token::Type::False},
+        Kw{"null", Token::Type::Null},
+        Kw{"pub", Token::Type::Pub},
+        Kw{"fn", Token::Type::Fn},
+        Kw{"type", Token::Type::Type},
+        Kw{"union", Token::Type::Union},
+        Kw{"enum", Token::Type::Enum},
+        Kw{"with", Token::Type::With},
+        Kw{"as", Token::Type::As},
+        Kw{"in", Token::Type::In},
+        Kw{"if", Token::Type::If},
+        Kw{"else", Token::Type::Else},
+        Kw{"switch", Token::Type::Switch},
+        Kw{"while", Token::Type::While},
+        Kw{"for", Token::Type::For},
+        Kw{"let", Token::Type::Let},
+        Kw{"mut", Token::Type::Mut},
+        Kw{"const", Token::Type::Const},
+        Kw{"return", Token::Type::Return},
+        Kw{"defer", Token::Type::Defer},
+        Kw{"break", Token::Type::Break},
+        Kw{"continue", Token::Type::Continue},
+        Kw{"unreachable", Token::Type::Unreachable},
+        Kw{"undefined", Token::Type::Undefined},
+        Kw{"sizeof", Token::Type::Sizeof},
+        Kw{"nan", Token::Type::FloatLiteral},
+        Kw{"inf", Token::Type::FloatLiteral}};
+
+    for (const auto& [kw, type] : map) {
+        if (kw == ident) {
+            return type;
+        }
+    }
+
+    return Token::Type::Identifier;
 }
 
 } // namespace cent::frontend

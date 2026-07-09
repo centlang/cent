@@ -81,6 +81,8 @@ private:
                character == '_';
     }
 
+    static Token::Type ident_type(std::string_view ident);
+
     std::string_view m_source;
     std::string m_filename;
 

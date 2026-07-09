@@ -6,6 +6,7 @@ Checks: >-
   clang-analyzer-*,
   cppcoreguidelines-*,
   -modernize-use-trailing-return-type,
+  -modernize-use-designated-initializers,
   -bugprone-easily-swappable-parameters,
   -readability-implicit-bool-conversion,
   -cppcoreguidelines-pro-type-static-cast-downcast,
