@@ -32,20 +32,20 @@ inline void append_utf8(std::string& string, std::uint32_t codepoint) {
 }
 
 inline std::uint32_t get_utf8(const std::string& utf8_char) {
-    auto byte1 = static_cast<unsigned char>(utf8_char[0]);
+    auto byte1 = static_cast<std::uint8_t>(utf8_char[0]);
 
     if (byte1 <= 0x7f) {
         return static_cast<std::uint32_t>(byte1);
     }
 
-    auto byte2 = static_cast<unsigned char>(utf8_char[1]);
+    auto byte2 = static_cast<std::uint8_t>(utf8_char[1]);
 
     if ((byte1 & 0xe0) == 0xc0) {
         return (static_cast<std::uint32_t>(byte1 & 0x1f) << 6) |
                (static_cast<std::uint32_t>(byte2 & 0x3f));
     }
 
-    auto byte3 = static_cast<unsigned char>(utf8_char[2]);
+    auto byte3 = static_cast<std::uint8_t>(utf8_char[2]);
 
     if ((byte1 & 0xf0) == 0xe0) {
         return (static_cast<std::uint32_t>(byte1 & 0x0f) << 12) |
@@ -53,7 +53,7 @@ inline std::uint32_t get_utf8(const std::string& utf8_char) {
                (static_cast<std::uint32_t>(byte3 & 0x3f));
     }
 
-    auto byte4 = static_cast<unsigned char>(utf8_char[3]);
+    auto byte4 = static_cast<std::uint8_t>(utf8_char[3]);
 
     return (static_cast<std::uint32_t>(byte1 & 0x07) << 18) |
            (static_cast<std::uint32_t>(byte2 & 0x3f) << 12) |

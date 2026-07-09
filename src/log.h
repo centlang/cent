@@ -100,14 +100,14 @@ struct fmt::formatter<cent::log::Styled<ValueType>> {
             add_separator();
 
             style += CENT_ANSI_COLOR_FG;
-            style += '0' + styled.fg;
+            style += '0' + static_cast<char>(styled.fg);
         }
 
         if (styled.bg != cent::log::Default) {
             add_separator();
 
             style += CENT_ANSI_COLOR_BG;
-            style += '0' + styled.bg;
+            style += '0' + static_cast<char>(styled.bg);
         }
 
         if (!style.empty()) {

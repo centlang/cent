@@ -462,7 +462,9 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
             llvm_values.push_back(
                 llvm::UndefValue::get(
                     static_cast<llvm::StructType*>(struct_type->llvm_type)
-                        ->getElementType(struct_type->fields.size())));
+                        ->getElementType(
+                            static_cast<std::uint32_t>(
+                                struct_type->fields.size()))));
         }
 
         return Value{
@@ -487,8 +489,9 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
             return Value::poisoned();
         }
 
-        auto* member =
-            m_builder.CreateStructGEP(struct_type->llvm_type, variable, *index);
+        auto* member = m_builder.CreateStructGEP(
+            struct_type->llvm_type, variable,
+            static_cast<std::uint32_t>(*index));
 
         create_store(values[i], member);
     }
@@ -630,7 +633,9 @@ Value Codegen::generate(const ast::TupleLiteral& expr) {
     }
 
     for (std::size_t i = 0; i < values.size(); ++i) {
-        auto* ptr = m_builder.CreateStructGEP(struct_type, variable, i);
+        auto* ptr = m_builder.CreateStructGEP(
+            struct_type, variable, static_cast<std::uint32_t>(i));
+
         create_store(values[i], ptr);
     }
 
@@ -1200,7 +1205,8 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
             return Value::poisoned();
         }
 
-        return get_struct_member(tuple->types[value], parent, value);
+        return get_struct_member(
+            tuple->types[value], parent, static_cast<std::uint32_t>(value));
     }
 
     auto not_a_struct = [&] {
@@ -1304,7 +1310,8 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
         return Value{
             .type = type->fields[*index],
             .value = m_builder.CreateStructGEP(
-                type->llvm_type, parent.value, *index),
+                type->llvm_type, parent.value,
+                static_cast<std::uint32_t>(*index)),
             .ptr_depth = 1,
             .is_mutable = pointer->is_mutable};
     }
@@ -1323,7 +1330,8 @@ Value Codegen::generate(const ast::MemberExpr& expr) {
         return Value::poisoned();
     }
 
-    return get_struct_member(type->fields[*index], parent, *index);
+    return get_struct_member(
+        type->fields[*index], parent, static_cast<std::uint32_t>(*index));
 }
 
 Value Codegen::generate(const ast::IndexExpr& expr) {
@@ -1780,17 +1788,14 @@ Value Codegen::generate_bin_expr(
 
     if (oper.value == EqualEqual || oper.value == BangEqual) {
         Value value = Value::poisoned();
-        backend::Type* base_type = nullptr;
 
         if (is<types::Optional>(lhs_base_type) &&
             is<types::Null>(rhs_base_type)) {
             value = lhs.value;
-            base_type = lhs_base_type;
         } else if (
             is<types::Optional>(rhs_base_type) &&
             is<types::Null>(lhs_base_type)) {
             value = rhs.value;
-            base_type = rhs_base_type;
         }
 
         if (value.ok()) {

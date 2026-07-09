@@ -87,9 +87,6 @@ std::unique_ptr<llvm::Module> Codegen::generate() {
 }
 
 void Codegen::create_core() {
-    auto* never = m_primitive_types["never"].get();
-    auto* i32_type = m_primitive_types["i32"].get();
-    auto* u8_slice = get_slice_type(m_primitive_types["u8"].get(), false);
     auto* bool_type = m_primitive_types["bool"].get();
 
     auto* debug =
@@ -245,8 +242,11 @@ void Codegen::create_core_mem() {
                       .is_mutable = false},
                      {.name = "len", .type = usize_type, .is_mutable = false},
                  },
+             .default_args = {},
              .type_params = {t_param},
-             .kind = GenericFunction::FnKind::AsMutSlice}},
+             .parent_type_params = {},
+             .kind = GenericFunction::FnKind::AsMutSlice,
+             .source_file = ""}},
         {"as_slice",
          GenericFunction{
              .name = {.value = "as_slice", .offset = 0},
@@ -258,8 +258,11 @@ void Codegen::create_core_mem() {
                       .is_mutable = false},
                      {.name = "len", .type = usize_type, .is_mutable = false},
                  },
+             .default_args = {},
              .type_params = {t_param},
-             .kind = GenericFunction::FnKind::AsSlice}}};
+             .parent_type_params = {},
+             .kind = GenericFunction::FnKind::AsSlice,
+             .source_file = ""}}};
 }
 
 void Codegen::create_main() {
@@ -1548,7 +1551,7 @@ Value Codegen::create_call(
 
     if (!type->variadic && (args_size < params_size - default_args_size ||
                             args_size > params_size)) {
-        error(offset, "incorrect number of arguments passed");
+        error(offset, "incorrect number of arguments");
         return Value::poisoned();
     }
 
@@ -1744,6 +1747,11 @@ Value Codegen::create_intrinsic_call(
     std::size_t offset, GenericFunction* function,
     const std::vector<Type*>& types,
     const std::vector<OffsetValue<Value>>& arguments) {
+    if (function->params.size() != arguments.size()) {
+        error(offset, "incorrect number of arguments");
+        return Value::poisoned();
+    }
+
     std::vector<Type*> param_types;
     param_types.reserve(function->params.size());
 
@@ -2088,10 +2096,10 @@ Codegen::get_generic_method(Type* type, std::string_view name) {
     auto method = type->generic_methods.find(name);
 
     if (method != type->generic_methods.end()) {
-        return {.function = method->second};
+        return {.function = method->second, .parent_args = {}};
     }
 
-    return {.function = nullptr};
+    return {.function = nullptr, .parent_args = {}};
 }
 
 Scope*
@@ -2113,7 +2121,7 @@ llvm::Value* Codegen::alloca_arg(std::size_t index, Type* type) {
     auto layout = m_module->getDataLayout();
     auto* function = m_builder.GetInsertBlock()->getParent();
 
-    auto* value = function->getArg(index);
+    auto* value = function->getArg(static_cast<std::uint32_t>(index));
     auto* variable = create_alloca(type);
 
     if (get_abi(m_triple) != Abi::SysV) {

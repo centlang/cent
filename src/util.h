@@ -15,17 +15,17 @@
 
 namespace cent {
 
-[[nodiscard]] inline std::uint8_t
+[[nodiscard]] inline std::uint16_t
 edit_distance(std::string_view first, std::string_view second) {
     std::vector distances(
-        first.size() + 1, std::vector<std::uint8_t>(second.size() + 1));
+        first.size() + 1, std::vector<std::uint16_t>(second.size() + 1));
 
     for (std::size_t i = 0; i <= first.size(); ++i) {
-        distances[i][0] = i;
+        distances[i][0] = static_cast<std::uint16_t>(i);
     }
 
     for (std::size_t i = 0; i <= second.size(); ++i) {
-        distances[0][i] = i;
+        distances[0][i] = static_cast<std::uint16_t>(i);
     }
 
     for (std::size_t i = 1; i <= first.size(); ++i) {
@@ -35,7 +35,7 @@ edit_distance(std::string_view first, std::string_view second) {
                 continue;
             }
 
-            distances[i][j] = 1 + std::min<std::uint8_t>(
+            distances[i][j] = 1 + std::min<std::uint16_t>(
                                       {distances[i][j - 1], distances[i - 1][j],
                                        distances[i - 1][j - 1]});
         }

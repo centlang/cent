@@ -230,7 +230,8 @@ Value Codegen::generate(const ast::Switch& stmt) {
                            : nullptr;
 
     auto* switch_inst = m_builder.CreateSwitch(
-        value.value, else_block ? else_block : end, stmt.cases.size());
+        value.value, else_block ? else_block : end,
+        static_cast<std::uint32_t>(stmt.cases.size()));
 
     bool all_terminate = stmt.else_block != nullptr;
 

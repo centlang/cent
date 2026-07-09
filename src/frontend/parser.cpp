@@ -1428,8 +1428,6 @@ std::vector<std::unique_ptr<ast::Type>> Parser::parse_type_args() {
 }
 
 std::vector<OffsetValue<std::string>> Parser::parse_type_params() {
-    auto offset = peek().offset;
-
     std::vector<OffsetValue<std::string>> result;
 
     if (!match_next(Token::Type::LeftParen)) {

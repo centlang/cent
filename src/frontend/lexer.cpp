@@ -683,7 +683,7 @@ void Lexer::ident() {
 
 void Lexer::utf8_char() {
     m_token.value += peek();
-    auto lead = static_cast<unsigned char>(get());
+    auto lead = static_cast<std::uint8_t>(get());
 
     std::uint8_t length{};
 
