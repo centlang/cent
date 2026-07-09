@@ -13,4 +13,5 @@ Checks: >-
   -cppcoreguidelines-pro-type-static-cast-downcast,
   -cppcoreguidelines-pro-bounds-constant-array-index,
   -cppcoreguidelines-pro-bounds-pointer-arithmetic,
-  -cppcoreguidelines-avoid-magic-numbers
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-avoid-non-const-global-variables
