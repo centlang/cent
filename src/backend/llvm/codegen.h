@@ -283,9 +283,6 @@ private:
     [[nodiscard]] Scope*
     get_scope(std::size_t offset, std::string_view name, Scope& parent);
 
-    [[nodiscard]] GenericMethod
-    get_generic_method(Type* type, std::string_view name);
-
     [[nodiscard]] Scope*
     resolve_scope(const std::vector<OffsetValue<std::string>>& value);
 
@@ -468,6 +465,9 @@ private:
 
         return std::nullopt;
     }
+
+    [[nodiscard]] static GenericMethod
+    get_generic_method(Type* type, std::string_view name);
 
     static constexpr auto optional_member_value = 0;
     static constexpr auto optional_member_bool = 1;

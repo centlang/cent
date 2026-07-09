@@ -2054,53 +2054,6 @@ Codegen::get_scope(std::size_t offset, std::string_view name, Scope& parent) {
     return &iterator->second;
 }
 
-Codegen::GenericMethod
-Codegen::get_generic_method(Type* type, std::string_view name) {
-    if (auto* ptr = dyn_cast<types::Pointer>(type)) {
-        type = ptr->type;
-    } else if (auto* struct_type = dyn_cast<types::Struct>(type)) {
-        if (struct_type->origin) {
-            auto method = struct_type->origin->methods.find(name);
-
-            if (method != struct_type->origin->methods.end()) {
-                return {
-                    .function = method->second,
-                    .parent_args = struct_type->origin_args};
-            }
-        }
-    } else if (auto* union_type = dyn_cast<types::Union>(type)) {
-        if (union_type->origin) {
-            auto method = union_type->origin->methods.find(name);
-
-            if (method != union_type->origin->methods.end()) {
-                return {
-                    .function = method->second,
-                    .parent_args = union_type->origin_args};
-            }
-        }
-    } else if (auto* t_struct = dyn_cast<types::GenericStructInst>(type)) {
-        auto method = t_struct->type->methods.find(name);
-
-        if (method != t_struct->type->methods.end()) {
-            return {.function = method->second, .parent_args = t_struct->args};
-        }
-    } else if (auto* t_union = dyn_cast<types::GenericUnionInst>(type)) {
-        auto method = t_union->type->methods.find(name);
-
-        if (method != t_union->type->methods.end()) {
-            return {.function = method->second, .parent_args = t_union->args};
-        }
-    }
-
-    auto method = type->generic_methods.find(name);
-
-    if (method != type->generic_methods.end()) {
-        return {.function = method->second, .parent_args = {}};
-    }
-
-    return {.function = nullptr, .parent_args = {}};
-}
-
 Scope*
 Codegen::resolve_scope(const std::vector<OffsetValue<std::string>>& value) {
     auto* scope = m_current_scope;
@@ -2234,6 +2187,53 @@ Codegen::decl_get_attr(const ast::Declaration& decl, std::string_view attr) {
     }
 
     return std::nullopt;
+}
+
+Codegen::GenericMethod
+Codegen::get_generic_method(Type* type, std::string_view name) {
+    if (auto* ptr = dyn_cast<types::Pointer>(type)) {
+        type = ptr->type;
+    } else if (auto* struct_type = dyn_cast<types::Struct>(type)) {
+        if (struct_type->origin) {
+            auto method = struct_type->origin->methods.find(name);
+
+            if (method != struct_type->origin->methods.end()) {
+                return {
+                    .function = method->second,
+                    .parent_args = struct_type->origin_args};
+            }
+        }
+    } else if (auto* union_type = dyn_cast<types::Union>(type)) {
+        if (union_type->origin) {
+            auto method = union_type->origin->methods.find(name);
+
+            if (method != union_type->origin->methods.end()) {
+                return {
+                    .function = method->second,
+                    .parent_args = union_type->origin_args};
+            }
+        }
+    } else if (auto* t_struct = dyn_cast<types::GenericStructInst>(type)) {
+        auto method = t_struct->type->methods.find(name);
+
+        if (method != t_struct->type->methods.end()) {
+            return {.function = method->second, .parent_args = t_struct->args};
+        }
+    } else if (auto* t_union = dyn_cast<types::GenericUnionInst>(type)) {
+        auto method = t_union->type->methods.find(name);
+
+        if (method != t_union->type->methods.end()) {
+            return {.function = method->second, .parent_args = t_union->args};
+        }
+    }
+
+    auto method = type->generic_methods.find(name);
+
+    if (method != type->generic_methods.end()) {
+        return {.function = method->second, .parent_args = {}};
+    }
+
+    return {.function = nullptr, .parent_args = {}};
 }
 
 } // namespace cent::backend
