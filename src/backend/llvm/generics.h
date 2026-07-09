@@ -62,7 +62,7 @@ struct GenericStruct {
 
     std::vector<types::TypeParam*> type_params;
 
-    std::map<std::string_view, GenericFunction*> methods;
+    std::map<std::string_view, GenericFunction> associated_fns;
 };
 
 struct GenericUnion {
@@ -77,7 +77,7 @@ struct GenericUnion {
     std::vector<types::TypeParam*> type_params;
     types::Enum* tag_type{nullptr};
 
-    std::map<std::string_view, GenericFunction*> methods;
+    std::map<std::string_view, GenericFunction> associated_fns;
 };
 
 } // namespace cent::backend

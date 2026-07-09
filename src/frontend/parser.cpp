@@ -1596,7 +1596,7 @@ Parser::parse_for_block(std::vector<ast::Attribute> attrs, bool is_public) {
         return nullptr;
     }
 
-    std::vector<std::unique_ptr<ast::FnDecl>> methods;
+    std::vector<std::unique_ptr<ast::FnDecl>> fns;
 
     while (!match(Token::Type::RightBrace, Token::Type::Eof)) {
         if (match_next(Token::Type::Semicolon)) {
@@ -1609,18 +1609,18 @@ Parser::parse_for_block(std::vector<ast::Attribute> attrs, bool is_public) {
             parse_attrs(attrs);
         }
 
-        bool method_is_public = false;
+        bool fn_is_public = false;
 
         if (match_next(Token::Type::Pub)) {
-            method_is_public = true;
+            fn_is_public = true;
         }
 
         if (!expect("`fn`", Token::Type::Fn)) {
             return nullptr;
         }
 
-        if (auto method = parse_fn(std::move(attrs), method_is_public)) {
-            methods.push_back(std::move(method));
+        if (auto func = parse_fn(std::move(attrs), fn_is_public)) {
+            fns.push_back(std::move(func));
             continue;
         }
 
@@ -1634,7 +1634,7 @@ Parser::parse_for_block(std::vector<ast::Attribute> attrs, bool is_public) {
     return std::make_unique<ast::ForBlock>(
         type->offset, std::move(type_params),
         OffsetValue{.value = type->value, .offset = type->offset},
-        std::move(methods), std::move(attrs), is_public);
+        std::move(fns), std::move(attrs), is_public);
 }
 
 std::unique_ptr<ast::Struct>
@@ -1780,10 +1780,16 @@ bool Parser::parse_with(ast::Module& module) {
         return false;
     }
 
-    std::vector<std::string> path;
-    path.push_back(name->value);
+    std::vector<std::string> path{name->value};
+    std::vector<ast::NamedImport> named_imports;
 
     while (match_next(Token::Type::ColonColon)) {
+        if (match_next(Token::Type::LeftBrace)) {
+            named_imports = parse_named_imports();
+            expect("`}`", Token::Type::RightBrace);
+            break;
+        }
+
         name = expect("module name", Token::Type::Identifier);
 
         if (!name) {
@@ -1796,13 +1802,13 @@ bool Parser::parse_with(ast::Module& module) {
     auto module_name = path.back();
 
     if (match_next(Token::Type::As)) {
-        auto token = expect("module name", Token::Type::Identifier);
+        name = expect("module name", Token::Type::Identifier);
 
-        if (!token) {
+        if (!name) {
             return false;
         }
 
-        module_name = token->value;
+        module_name = name->value;
     }
 
     SearchPath search_path = {
@@ -1840,10 +1846,44 @@ bool Parser::parse_with(ast::Module& module) {
             return false;
         }
 
-        module.submodules.push_back(std::move(submodule));
+        module.imports.emplace_back(std::move(submodule), named_imports);
     }
 
     return true;
+}
+
+std::vector<ast::NamedImport> Parser::parse_named_imports() {
+    std::vector<ast::NamedImport> result;
+
+    while (true) {
+        auto name = expect("import name", Token::Type::Identifier);
+
+        if (!name) {
+            return result;
+        }
+
+        if (match_next(Token::Type::As)) {
+            auto alias = expect("import name", Token::Type::Identifier);
+
+            if (!alias) {
+                return result;
+            }
+
+            result.emplace_back(
+                OffsetValue{name->value, name->offset},
+                OffsetValue{alias->value, name->offset});
+        } else {
+            result.emplace_back(OffsetValue{name->value, name->offset});
+        }
+
+        if (match(Token::Type::RightBrace)) {
+            break;
+        }
+
+        expect("`{` or `,`", Token::Type::Comma);
+    }
+
+    return result;
 }
 
 } // namespace cent::frontend

@@ -8,12 +8,24 @@
 #include <utility>
 #include <vector>
 
+#include "offset_value.h"
+
 #include "ast/decl/fn_decl.h"
 #include "ast/decl/for_block.h"
 #include "ast/decl/var_decl.h"
 #include "ast/node.h"
 
 namespace cent::ast {
+
+struct NamedImport {
+    OffsetValue<std::string> name;
+    std::optional<OffsetValue<std::string>> alias{std::nullopt};
+};
+
+struct Import {
+    std::unique_ptr<Module> module;
+    std::vector<NamedImport> named_imports;
+};
 
 struct Module : Node {
     [[nodiscard]] Module(
@@ -26,7 +38,7 @@ struct Module : Node {
     std::vector<std::unique_ptr<VarDecl>> variables;
     std::vector<std::unique_ptr<ForBlock>> for_blocks;
 
-    std::vector<std::unique_ptr<Module>> submodules;
+    std::vector<Import> imports;
 
     std::filesystem::path path;
     std::optional<std::string> name;

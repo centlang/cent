@@ -692,22 +692,29 @@ Value Codegen::generate(const ast::VarDecl& decl) {
     return Value::poisoned();
 }
 
-void Codegen::generate_method_proto(
-    const ast::FnDecl& method,
-    std::map<std::string_view, GenericFunction*>& methods, Type* self_type,
-    const std::vector<types::TypeParam*>& parent_params,
+void Codegen::generate_for_fn_proto(
+    const ast::FnDecl& func,
+    std::map<std::string_view, GenericFunction>& associated_fns,
+    Type* self_type, const std::vector<types::TypeParam*>& parent_params,
     const ast::ForBlock& for_block) {
-    if (!matches_target(method)) {
+    if (!matches_target(func)) {
+        return;
+    }
+
+    if (associated_fns.contains(func.name.value)) {
+        error(
+            func.name.offset, "{} is already defined",
+            log::quoted(func.name.value));
+
         return;
     }
 
     auto& type_scope = m_current_scope->scopes[for_block.type.value];
 
-    if (type_scope.names.contains(method.name.value) ||
-        type_scope.generic_fns.contains(method.name.value)) {
+    if (type_scope.names.contains(func.name.value)) {
         error(
-            method.name.offset, "{} is already defined",
-            log::quoted(method.name.value));
+            func.name.offset, "{} is already defined",
+            log::quoted(func.name.value));
 
         return;
     }
@@ -715,7 +722,7 @@ void Codegen::generate_method_proto(
     auto scope_types = m_current_scope->types;
     std::vector<types::TypeParam*> type_args;
 
-    for (const auto& param : method.type_params) {
+    for (const auto& param : func.type_params) {
         m_named_types.push_back(
             std::make_unique<types::TypeParam>(param.value));
 
@@ -728,8 +735,8 @@ void Codegen::generate_method_proto(
 
     Type* return_type = m_void_type.get();
 
-    if (method.proto.return_type) {
-        return_type = method.proto.return_type->codegen(*this);
+    if (func.proto.return_type) {
+        return_type = func.proto.return_type->codegen(*this);
 
         if (!return_type) {
             m_current_scope->types = scope_types;
@@ -740,7 +747,7 @@ void Codegen::generate_method_proto(
     std::vector<GenericFunction::Param> params;
     std::vector<const ast::Expression*> default_args;
 
-    for (const auto& parameter : method.proto.params) {
+    for (const auto& parameter : func.proto.params) {
         auto* type = parameter.type->codegen(*this);
 
         if (!type) {
@@ -757,38 +764,34 @@ void Codegen::generate_method_proto(
 
     m_current_scope->types = scope_types;
 
-    if (!for_block.type_params.empty() || !method.type_params.empty()) {
-        auto& gen = type_scope.generic_fns[method.name.value];
-
-        gen = GenericFunction{
-            .name = method.name,
+    if (!for_block.type_params.empty() || !func.type_params.empty()) {
+        associated_fns[func.name.value] = GenericFunction{
+            .name = func.name,
             .return_type = return_type,
             .params = std::move(params),
             .default_args = std::move(default_args),
-            .block = method.block.get(),
+            .block = func.block.get(),
             .type_params = std::move(type_args),
             .parent_type_params = parent_params,
             .self_type = self_type,
             .scope = m_current_scope,
             .source_file = m_filename};
-
-        methods[method.name.value] = &gen;
         return;
     }
 
-    auto* fn_type = generate_fn_type(method.proto);
+    auto* fn_type = generate_fn_type(func.proto);
 
     if (!fn_type) {
         return;
     }
 
-    auto llvm_name = m_current_scope_prefix + for_block.type.value +
-                     "::" + method.name.value;
+    auto llvm_name =
+        m_current_scope_prefix + for_block.type.value + "::" + func.name.value;
 
     auto* function = llvm::Function::Create(
         static_cast<llvm::FunctionType*>(fn_type->llvm_type),
-        method.is_public ? llvm::Function::ExternalLinkage
-                         : llvm::Function::PrivateLinkage,
+        func.is_public ? llvm::Function::ExternalLinkage
+                       : llvm::Function::PrivateLinkage,
         llvm_name, *m_module);
 
     if (is<types::Never>(fn_type->return_type)) {
@@ -801,18 +804,18 @@ void Codegen::generate_method_proto(
                    m_context, fn_type->return_type->llvm_type));
     }
 
-    type_scope.names[method.name.value] = {
+    type_scope.names[func.name.value] = {
         .element = {.type = fn_type, .value = function},
-        .is_public = method.is_public,
+        .is_public = func.is_public,
         .unit = m_current_unit};
 
-    if (self_type && !method.proto.params.empty()) {
-        auto* param_type = method.proto.params[0].type->codegen(*this);
+    if (self_type && !func.proto.params.empty()) {
+        auto* param_type = func.proto.params[0].type->codegen(*this);
         if (param_type &&
             (param_type == self_type ||
              (dyn_cast<types::Pointer>(param_type) &&
               static_cast<types::Pointer*>(param_type)->type == self_type))) {
-            self_type->methods[method.name.value] = {
+            self_type->methods[func.name.value] = {
                 .type = fn_type, .function = function};
         }
     }
@@ -861,10 +864,10 @@ void Codegen::generate_for_block_protos(const ast::ForBlock& decl) {
         m_current_scope->types["Self"] = {
             .element = m_named_types.back().get(), .is_public = true};
 
-        for (const auto& method : decl.methods) {
-            generate_method_proto(
-                *method, gen.methods, m_named_types.back().get(), type_params,
-                decl);
+        for (const auto& func : decl.fns) {
+            generate_for_fn_proto(
+                *func, gen.associated_fns, m_named_types.back().get(),
+                type_params, decl);
         }
 
         m_current_scope->types = scope_types;
@@ -889,10 +892,10 @@ void Codegen::generate_for_block_protos(const ast::ForBlock& decl) {
         m_current_scope->types["Self"] = {
             .element = m_named_types.back().get(), .is_public = true};
 
-        for (const auto& method : decl.methods) {
-            generate_method_proto(
-                *method, gen.methods, m_named_types.back().get(), type_params,
-                decl);
+        for (const auto& func : decl.fns) {
+            generate_for_fn_proto(
+                *func, gen.associated_fns, m_named_types.back().get(),
+                type_params, decl);
         }
 
         m_current_scope->types = scope_types;
@@ -915,9 +918,9 @@ void Codegen::generate_for_block_protos(const ast::ForBlock& decl) {
 
     m_current_scope->types["Self"] = {.element = type, .is_public = true};
 
-    for (const auto& method : decl.methods) {
-        generate_method_proto(
-            *method, type->generic_methods, type,
+    for (const auto& func : decl.fns) {
+        generate_for_fn_proto(
+            *func, type->generic_methods, type,
             std::vector<types::TypeParam*>{}, decl);
     }
 
@@ -937,18 +940,18 @@ Value Codegen::generate(const ast::ForBlock& decl) {
         .element = m_current_scope->types[decl.type.value].element,
         .is_public = true};
 
-    for (const auto& method : decl.methods) {
-        if (!method->block || !method->type_params.empty() ||
+    for (const auto& func : decl.fns) {
+        if (!func->block || !func->type_params.empty() ||
             !decl.type_params.empty()) {
             continue;
         }
 
-        auto method_it = type_scope.names.find(method->name.value);
+        auto func_it = type_scope.names.find(func->name.value);
 
-        if (method_it != type_scope.names.end()) {
+        if (func_it != type_scope.names.end()) {
             generate_fn_body(
-                *method, method_it->second.element.type,
-                method_it->second.element.value);
+                *func, func_it->second.element.type,
+                func_it->second.element.value);
         }
     }
 

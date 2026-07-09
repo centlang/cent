@@ -315,8 +315,8 @@ void Lexer::next_token() {
         break;
     default:
         auto offset = m_offset;
-
         error(offset, "unexpected character");
+
         m_token = {
             .type = Identifier, .value = std::string{get()}, .offset = offset};
 

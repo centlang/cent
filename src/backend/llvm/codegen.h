@@ -40,6 +40,7 @@ struct SliceType;
 struct TupleType;
 struct FnPointer;
 
+struct NamedImport;
 struct Module;
 
 struct Assignment;
@@ -333,11 +334,13 @@ private:
     void generate_fn_proto(const ast::FnDecl& decl);
     void generate_for_block_protos(const ast::ForBlock& decl);
 
-    void generate_method_proto(
-        const ast::FnDecl& method,
-        std::map<std::string_view, GenericFunction*>& methods, Type* self_type,
-        const std::vector<types::TypeParam*>& parent_params,
+    void generate_for_fn_proto(
+        const ast::FnDecl& func,
+        std::map<std::string_view, GenericFunction>& associated_fns,
+        Type* self_type, const std::vector<types::TypeParam*>& parent_params,
         const ast::ForBlock& for_block);
+
+    void copy_import(const ast::NamedImport& imp, Scope& scope);
 
     [[nodiscard]] llvm::Value* alloca_arg(std::size_t index, Type* type);
 

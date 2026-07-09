@@ -203,6 +203,8 @@ private:
 
     [[nodiscard]] bool parse_with(ast::Module& module);
 
+    [[nodiscard]] std::vector<ast::NamedImport> parse_named_imports();
+
     [[nodiscard]] static std::uint8_t precedence_of(Token::Type type) {
         using enum Token::Type;
 

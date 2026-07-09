@@ -114,7 +114,7 @@ struct Type {
     llvm::Type* const llvm_type;
 
     std::map<std::string_view, Method> methods;
-    std::map<std::string_view, GenericFunction*> generic_methods;
+    std::map<std::string_view, GenericFunction> generic_methods;
 };
 
 template <typename Derived> [[nodiscard]] inline bool is(const Type* value) {

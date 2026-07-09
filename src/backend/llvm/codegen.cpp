@@ -410,7 +410,8 @@ void Codegen::create_main() {
 void Codegen::generate(const ast::Module& module) {
     const auto iterator = m_generated_modules.find(module.path);
 
-    if (iterator != m_generated_modules.end()) {
+    if (iterator != m_generated_modules.end() &&
+        m_current_scope != &iterator->second) {
         *m_current_scope = iterator->second;
         return;
     }
@@ -422,13 +423,24 @@ void Codegen::generate(const ast::Module& module) {
 
     m_current_scope->scopes["core"] = m_core_module;
 
-    for (const auto& submodule : module.submodules) {
-        m_filename = submodule->path.string();
-        m_current_scope = &scope->scopes[*submodule->name];
-        m_current_scope_prefix = *submodule->name + "::";
-        m_current_unit = get_unit(m_filename);
+    for (const auto& imported : module.imports) {
+        auto& submodule = *imported.module;
 
-        generate(*submodule);
+        m_filename = submodule.path.string();
+        m_current_unit = get_unit(m_filename);
+        m_current_scope_prefix = *submodule.name + "::";
+
+        if (imported.named_imports.empty()) {
+            m_current_scope = &scope->scopes[*submodule.name];
+            generate(submodule);
+        } else {
+            m_current_scope = &m_generated_modules[submodule.path];
+            generate(submodule);
+
+            for (const auto& imp : imported.named_imports) {
+                copy_import(imp, *scope);
+            }
+        }
     }
 
     m_filename = filename;
@@ -2069,6 +2081,41 @@ Codegen::resolve_scope(const std::vector<OffsetValue<std::string>>& value) {
     return scope;
 }
 
+void Codegen::copy_import(const ast::NamedImport& imp, Scope& scope) {
+    const auto& name = imp.name.value;
+    const auto& alias = imp.alias ? imp.alias->value : name;
+
+    if (auto type_it = m_current_scope->types.find(name);
+        type_it != m_current_scope->types.end()) {
+        scope.types[alias] = type_it->second;
+    }
+
+    if (auto name_it = m_current_scope->names.find(name);
+        name_it != m_current_scope->names.end()) {
+        scope.names[alias] = name_it->second;
+    }
+
+    if (auto fn_it = m_current_scope->generic_fns.find(name);
+        fn_it != m_current_scope->generic_fns.end()) {
+        scope.generic_fns[alias] = fn_it->second;
+    }
+
+    if (auto struct_it = m_current_scope->generic_structs.find(name);
+        struct_it != m_current_scope->generic_structs.end()) {
+        scope.generic_structs[alias] = struct_it->second;
+    }
+
+    if (auto union_it = m_current_scope->generic_unions.find(name);
+        union_it != m_current_scope->generic_unions.end()) {
+        scope.generic_unions[alias] = union_it->second;
+    }
+
+    if (auto scope_it = m_current_scope->scopes.find(name);
+        scope_it != m_current_scope->scopes.end()) {
+        scope.scopes[alias] = scope_it->second;
+    }
+}
+
 llvm::Value* Codegen::alloca_arg(std::size_t index, Type* type) {
     auto layout = m_module->getDataLayout();
     auto* function = m_builder.GetInsertBlock()->getParent();
@@ -2195,42 +2242,42 @@ Codegen::get_generic_method(Type* type, std::string_view name) {
         type = ptr->type;
     } else if (auto* struct_type = dyn_cast<types::Struct>(type)) {
         if (struct_type->origin) {
-            auto method = struct_type->origin->methods.find(name);
+            auto method = struct_type->origin->associated_fns.find(name);
 
-            if (method != struct_type->origin->methods.end()) {
+            if (method != struct_type->origin->associated_fns.end()) {
                 return {
-                    .function = method->second,
+                    .function = &method->second,
                     .parent_args = struct_type->origin_args};
             }
         }
     } else if (auto* union_type = dyn_cast<types::Union>(type)) {
         if (union_type->origin) {
-            auto method = union_type->origin->methods.find(name);
+            auto method = union_type->origin->associated_fns.find(name);
 
-            if (method != union_type->origin->methods.end()) {
+            if (method != union_type->origin->associated_fns.end()) {
                 return {
-                    .function = method->second,
+                    .function = &method->second,
                     .parent_args = union_type->origin_args};
             }
         }
     } else if (auto* t_struct = dyn_cast<types::GenericStructInst>(type)) {
-        auto method = t_struct->type->methods.find(name);
+        auto method = t_struct->type->associated_fns.find(name);
 
-        if (method != t_struct->type->methods.end()) {
-            return {.function = method->second, .parent_args = t_struct->args};
+        if (method != t_struct->type->associated_fns.end()) {
+            return {.function = &method->second, .parent_args = t_struct->args};
         }
     } else if (auto* t_union = dyn_cast<types::GenericUnionInst>(type)) {
-        auto method = t_union->type->methods.find(name);
+        auto method = t_union->type->associated_fns.find(name);
 
-        if (method != t_union->type->methods.end()) {
-            return {.function = method->second, .parent_args = t_union->args};
+        if (method != t_union->type->associated_fns.end()) {
+            return {.function = &method->second, .parent_args = t_union->args};
         }
     }
 
     auto method = type->generic_methods.find(name);
 
     if (method != type->generic_methods.end()) {
-        return {.function = method->second, .parent_args = {}};
+        return {.function = &method->second, .parent_args = {}};
     }
 
     return {.function = nullptr, .parent_args = {}};

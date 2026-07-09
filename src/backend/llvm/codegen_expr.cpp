@@ -820,15 +820,84 @@ Value Codegen::generate(const ast::CallExprGeneric& expr) {
         arguments.push_back({.value = arg_value, .offset = argument->offset});
     }
 
+    GenericFunction* gen = nullptr;
     auto* scope = resolve_scope(expr.identifier->value);
 
-    if (!scope) {
-        return Value::poisoned();
+    if (scope) {
+        if (auto generic_fn = scope->generic_fns.find(name);
+            generic_fn != scope->generic_fns.end()) {
+            gen = &generic_fn->second;
+        }
     }
 
-    auto generic_fn = scope->generic_fns.find(name);
+    auto get_generic_associated =
+        [&](auto& associated_fns) -> GenericFunction* {
+        auto func = associated_fns.find(name);
 
-    if (generic_fn == scope->generic_fns.end()) {
+        if (func != associated_fns.end()) {
+            return &func->second;
+        }
+
+        if (auto hint = did_you_mean_hint(name, associated_fns)) {
+            error_hint(
+                offset, *hint, "no such function: {}", log::quoted(name));
+        } else {
+            error(offset, "no such function: {}", log::quoted(name));
+        }
+
+        return nullptr;
+    };
+
+    if (!gen && !parent_type_args.empty() &&
+        expr.identifier->value.size() >= 2) {
+        auto& ident = expr.identifier->value;
+
+        Scope* scope = m_current_scope;
+
+        for (std::size_t i = 0; i < ident.size() - 2; ++i) {
+            scope = get_scope(ident[i].offset, ident[i].value, *scope);
+
+            if (!scope) {
+                break;
+            }
+        }
+
+        auto type = ident[ident.size() - 2].value;
+
+        auto struct_it = scope->generic_structs.find(type);
+
+        if (struct_it == scope->generic_structs.end()) {
+            auto union_it = scope->generic_unions.find(type);
+
+            if (union_it == scope->generic_unions.end()) {
+                if (auto hint = did_you_mean_hint(
+                        type, scope->generic_structs, scope->generic_unions)) {
+                    error_hint(
+                        offset, *hint, "no such generic type: {}",
+                        log::quoted(type));
+                } else {
+                    error(
+                        offset, "no such generic type: {}", log::quoted(type));
+                }
+
+                return Value::poisoned();
+            }
+
+            gen = get_generic_associated(union_it->second.associated_fns);
+
+            if (!gen) {
+                return Value::poisoned();
+            }
+        } else {
+            gen = get_generic_associated(struct_it->second.associated_fns);
+
+            if (!gen) {
+                return Value::poisoned();
+            }
+        }
+    }
+
+    if (!gen) {
         if (auto hint = did_you_mean_hint(name, scope->generic_fns)) {
             error_hint(
                 offset, *hint, "no such generic function: {}",
@@ -839,8 +908,6 @@ Value Codegen::generate(const ast::CallExprGeneric& expr) {
 
         return Value::poisoned();
     }
-
-    auto* gen = &generic_fn->second;
 
     if (expr.type_args.size() > gen->type_params.size()) {
         error(offset, "too many type arguments");
@@ -1047,6 +1114,7 @@ Value Codegen::generate(const ast::MethodExpr& expr) {
         error(
             expr.name.offset, "no such method: {}",
             log::quoted(expr.name.value));
+
         return Value::poisoned();
     }
 
