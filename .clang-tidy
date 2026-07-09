@@ -9,6 +9,8 @@ Checks: >-
   -modernize-use-designated-initializers,
   -bugprone-easily-swappable-parameters,
   -readability-implicit-bool-conversion,
+  -readability-magic-numbers,
   -cppcoreguidelines-pro-type-static-cast-downcast,
   -cppcoreguidelines-pro-bounds-constant-array-index,
-  -cppcoreguidelines-pro-bounds-pointer-arithmetic
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-avoid-magic-numbers

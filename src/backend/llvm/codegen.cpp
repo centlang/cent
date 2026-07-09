@@ -1577,7 +1577,6 @@ Value Codegen::create_call(
         }
 
         if (type->variadic && i >= params_size) {
-            static constexpr auto int_bitwidth = 32;
             auto* base_type = unwrap_type(value.type, true);
 
             if (auto* optional = dyn_cast<types::Optional>(base_type)) {
@@ -1621,7 +1620,7 @@ Value Codegen::create_call(
 
             auto bitwidth = base_type->llvm_type->getIntegerBitWidth();
 
-            if (bitwidth >= int_bitwidth) {
+            if (bitwidth >= 32) {
                 llvm_args.push_back(load_rvalue(value).value);
                 continue;
             }

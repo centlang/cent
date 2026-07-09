@@ -81,6 +81,16 @@ private:
                character == '_';
     }
 
+    [[nodiscard]] static bool is_digit(char character, std::uint8_t base) {
+        if (base <= 10) {
+            return character >= '0' && character < '0' + base;
+        }
+
+        return (character >= '0' && character <= '9') ||
+               (character >= 'a' && character < 'a' + base - 10) ||
+               (character >= 'A' && character < 'A' + base - 10);
+    }
+
     static Token::Type ident_type(std::string_view ident);
 
     std::string_view m_source;

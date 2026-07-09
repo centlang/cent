@@ -424,27 +424,7 @@ void Lexer::number() {
     m_token = {
         .type = Token::Type::IntLiteral, .value = {}, .offset = m_offset};
 
-    static constexpr auto hex = 16;
-    static constexpr auto oct = 8;
-    static constexpr auto bin = 2;
-    static constexpr auto dec = 10;
-
-    std::uint8_t base = dec;
-
-    auto is_digit = [&](char character) -> bool {
-        switch (base) {
-        case hex:
-            return std::isxdigit(static_cast<unsigned char>(character));
-        case oct:
-            return character >= '0' && character < '8';
-        case bin:
-            return character == '0' || character == '1';
-        case dec:
-            return std::isdigit(static_cast<unsigned char>(character));
-        default:
-            return false;
-        }
-    };
+    std::uint8_t base = 10;
 
     auto get_int = [&] {
         while (!eof()) {
@@ -453,7 +433,7 @@ void Lexer::number() {
                 continue;
             }
 
-            if (!is_digit(peek())) {
+            if (!is_digit(peek(), base)) {
                 break;
             }
 
@@ -469,13 +449,13 @@ void Lexer::number() {
         }
 
         if (peek() == 'x') {
-            base = hex;
+            base = 16;
             m_token.value += get();
         } else if (peek() == 'o') {
-            base = oct;
+            base = 8;
             m_token.value += get();
         } else if (peek() == 'b') {
-            base = bin;
+            base = 2;
             m_token.value += get();
         }
     }
@@ -493,7 +473,7 @@ void Lexer::number() {
     std::size_t offset = m_offset;
     get();
 
-    if (!is_digit(peek())) {
+    if (!is_digit(peek(), base)) {
         m_offset = offset;
         return;
     }
