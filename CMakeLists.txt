@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.25)
 project(centc LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -115,6 +115,12 @@ if(CENTC_STATIC)
     endif()
 endif()
 
+if(MSVC)
+    add_compile_options(/W4 /WX)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic -Wconversion -Werror)
+endif()
+
 if(CENTC_USE_SYSTEM_FMT)
     find_package(fmt REQUIRED CONFIG)
 else()
@@ -126,6 +132,7 @@ else()
         GIT_TAG 11.1.4
         GIT_PROGRESS ON
         EXCLUDE_FROM_ALL
+        SYSTEM
     )
 
     FetchContent_MakeAvailable(fmt)
@@ -134,7 +141,7 @@ endif()
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
 add_executable(centc ${SOURCES})
 
-target_include_directories(centc PRIVATE src ${LLVM_INCLUDE_DIRS})
+target_include_directories(centc SYSTEM PRIVATE src ${LLVM_INCLUDE_DIRS})
 
 if(CENTC_USE_SHARED_LLVM)
     llvm_config(centc USE_SHARED all)
@@ -154,9 +161,9 @@ set(TEST_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/test")
 
 file(MAKE_DIRECTORY ${TEST_OUTPUT_DIR})
 
-foreach(TEST_SOURCE ${TEST_SOURCES})
-    get_filename_component(TEST_NAME "${TEST_SOURCE}" NAME_WE)
-    get_filename_component(TEST_PATH "${TEST_SOURCE}" ABSOLUTE)
+foreach(test_source ${TEST_SOURCES})
+    get_filename_component(TEST_NAME "${test_source}" NAME_WE)
+    get_filename_component(TEST_PATH "${test_source}" ABSOLUTE)
 
     set(TEST_OUTPUT "${TEST_OUTPUT_DIR}/${TEST_NAME}")
 
