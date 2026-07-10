@@ -370,6 +370,10 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
     case FloatLiteral:
         return std::make_unique<ast::FloatLiteral>(token->offset, token->value);
     case StrLiteral:
+        while (match(StrLiteral)) {
+            token->value += get().value;
+        }
+
         return std::make_unique<ast::StrLiteral>(token->offset, token->value);
     case RuneLiteral:
         return std::make_unique<ast::RuneLiteral>(
