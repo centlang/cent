@@ -962,7 +962,8 @@ types::Union* Codegen::inst_generic_union(
         llvm_struct_type->setBody(max_type);
 
         result = std::make_unique<types::Union>(
-            llvm_struct_type, name, std::move(fields), nullptr, type, types);
+            llvm_struct_type, name, std::move(fields), nullptr, type->implicit,
+            type, types);
 
         return result.get();
     }
@@ -970,7 +971,8 @@ types::Union* Codegen::inst_generic_union(
     llvm_struct_type->setBody({max_type, type->tag_type->llvm_type});
 
     result = std::make_unique<types::Union>(
-        llvm_struct_type, name, std::move(fields), type->tag_type, type, types);
+        llvm_struct_type, name, std::move(fields), type->tag_type,
+        type->implicit, type, types);
 
     return result.get();
 }
@@ -1380,6 +1382,169 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
             cast_op, load_rvalue(value).value, base_type->llvm_type)};
 }
 
+std::int8_t Codegen::cast_score(Type* base_type, const Value& value) {
+    enum : std::int8_t { Invalid = -1, DiffKind, SimilarKind, SameKind, Exact };
+
+    auto* base_value_type = unwrap_type(value.type);
+
+    if (is<types::Never>(base_value_type)) {
+        return Exact;
+    }
+
+    if (base_type == base_value_type) {
+        return Exact;
+    }
+
+    if (is<types::Void, types::Null, types::Never>(base_type)) {
+        return Invalid;
+    }
+
+    if (const auto* optional = dyn_cast<types::Optional>(base_type)) {
+        auto* opt_contained_type = unwrap_type(optional->type);
+
+        if (is<types::Null>(base_value_type)) {
+            return Exact;
+        }
+
+        if (opt_contained_type == base_value_type) {
+            return SimilarKind;
+        }
+
+        auto* value_optional = dyn_cast<types::Optional>(base_value_type);
+
+        if (!value_optional) {
+            return Invalid;
+        }
+
+        auto* value_ptr =
+            dyn_cast<types::Pointer>(unwrap_type(value_optional->type));
+
+        auto* type_ptr = dyn_cast<types::Pointer>(opt_contained_type);
+
+        if (!value_ptr || !type_ptr) {
+            return Invalid;
+        }
+
+        if (((!value_ptr->is_mutable && type_ptr->is_mutable) ||
+             unwrap_type(value_ptr->type) != unwrap_type(type_ptr->type))) {
+            return Invalid;
+        }
+
+        return SimilarKind;
+    }
+
+    if (auto* slice = dyn_cast<types::Slice>(base_type)) {
+        auto* slice_contained_type = unwrap_type(slice->type);
+
+        if (auto* slice_value = dyn_cast<types::Slice>(base_value_type)) {
+            if (slice_contained_type != unwrap_type(slice_value->type)) {
+                return Invalid;
+            }
+
+            if (slice->is_mutable && !slice_value->is_mutable) {
+                return Invalid;
+            }
+
+            return slice->is_mutable == slice_value->is_mutable ? Exact
+                                                                : SameKind;
+        }
+
+        if (auto* array = dyn_cast<types::VarLenArray>(base_value_type)) {
+            if (slice_contained_type != unwrap_type(array->type)) {
+                return Invalid;
+            }
+
+            if (slice->is_mutable && !value.is_mutable) {
+                return Invalid;
+            }
+
+            return SameKind;
+        }
+
+        auto* array = dyn_cast<types::Array>(base_value_type);
+
+        if (!array) {
+            return Invalid;
+        }
+
+        if (slice_contained_type != unwrap_type(array->type)) {
+            return Invalid;
+        }
+
+        if (slice->is_mutable && !value.is_mutable) {
+            return Invalid;
+        }
+
+        return SameKind;
+    }
+
+    if (auto* type_ptr = dyn_cast<types::Pointer>(base_type)) {
+        auto* value_ptr = dyn_cast<types::Pointer>(base_value_type);
+
+        if (!value_ptr) {
+            return Invalid;
+        }
+
+        if (unwrap_type(value_ptr->type) != unwrap_type(type_ptr->type)) {
+            return Invalid;
+        }
+
+        if (type_ptr->is_mutable && !value_ptr->is_mutable) {
+            return Invalid;
+        }
+
+        return value_ptr->is_mutable == type_ptr->is_mutable ? Exact : SameKind;
+    }
+
+    bool value_is_float = base_value_type->is_float();
+    bool value_is_sint = base_value_type->is_sint();
+    bool value_is_uint = base_value_type->is_uint();
+
+    bool type_is_float = base_type->is_float();
+    bool type_is_sint = base_type->is_sint();
+    bool type_is_uint = base_type->is_uint();
+
+    if (primitive_cast_constant(base_type, value).ok()) {
+        if ((value_is_sint && type_is_sint) ||
+            (value_is_uint && type_is_uint)) {
+            return Exact;
+        }
+
+        return SameKind;
+    }
+
+    if ((value_is_sint || value_is_uint) && type_is_float) {
+        return DiffKind;
+    }
+
+    auto layout = m_module->getDataLayout();
+
+    auto from_size = layout.getTypeAllocSize(base_value_type->llvm_type);
+    auto to_size = layout.getTypeAllocSize(base_type->llvm_type);
+
+    if (to_size <= from_size) {
+        return Invalid;
+    }
+
+    if (value_is_float && type_is_float) {
+        return SameKind;
+    }
+
+    if (value_is_sint && type_is_sint) {
+        return SameKind;
+    }
+
+    if (value_is_uint && type_is_uint) {
+        return SameKind;
+    }
+
+    if ((value_is_sint || value_is_uint) && (type_is_sint || type_is_uint)) {
+        return SimilarKind;
+    }
+
+    return Invalid;
+}
+
 Value Codegen::cast(Type* type, const Value& value, bool implicit) {
     auto* base_type = unwrap_type(type, !implicit);
     auto* base_value_type = unwrap_type(value.type, !implicit);
@@ -1572,6 +1737,59 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
 
         m_builder.CreateStore(
             llvm::ConstantInt::get(m_size, array_type->size), len_member);
+
+        return {
+            .type = type, .value = variable, .ptr_depth = 1, .memcpy = true};
+    }
+
+    if (auto* union_type = dyn_cast<types::Union>(base_type)) {
+        if (!union_type->implicit) {
+            return Value::poisoned();
+        }
+
+        std::size_t best_index = 0;
+        std::int8_t best_score = -1;
+
+        bool ambiguous = false;
+
+        for (std::size_t i = 0; i < union_type->fields.size(); ++i) {
+            auto* field_type = unwrap_type(union_type->fields[i]);
+            auto score = cast_score(field_type, value);
+
+            if (score > best_score) {
+                best_index = i;
+                best_score = score;
+                ambiguous = false;
+            } else if (score == best_score) {
+                ambiguous = true;
+            }
+        }
+
+        if (ambiguous || best_score < 0) {
+            return Value::poisoned();
+        }
+
+        auto result = cast(union_type->fields[best_index], value);
+        auto* variable = create_alloca(type);
+
+        if (!variable) {
+            return Value::poisoned();
+        }
+
+        auto* value_ptr = m_builder.CreateStructGEP(
+            type->llvm_type, variable, union_member_value);
+
+        create_store(result, value_ptr);
+
+        if (union_type->tag_type) {
+            auto* tag_ptr = m_builder.CreateStructGEP(
+                type->llvm_type, variable, union_member_tag);
+
+            m_builder.CreateStore(
+                llvm::ConstantInt::get(
+                    union_type->tag_type->llvm_type, best_index),
+                tag_ptr);
+        }
 
         return {
             .type = type, .value = variable, .ptr_depth = 1, .memcpy = true};

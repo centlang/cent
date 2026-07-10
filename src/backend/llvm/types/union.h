@@ -14,10 +14,11 @@ namespace cent::backend::types {
 struct Union : detail::Ty<Union, Type::Kind::Union> {
     [[nodiscard]] Union(
         llvm::Type* llvm_type, std::string name, std::vector<Type*> fields,
-        Enum* tag_type = nullptr, GenericUnion* origin = nullptr,
-        std::vector<Type*> origin_args = {})
+        Enum* tag_type = nullptr, bool implicit = false,
+        GenericUnion* origin = nullptr, std::vector<Type*> origin_args = {})
     : Ty{llvm_type}, name{std::move(name)}, fields{std::move(fields)},
-      tag_type{tag_type}, origin{origin}, origin_args{std::move(origin_args)} {}
+      tag_type{tag_type}, implicit{implicit}, origin{origin},
+      origin_args{std::move(origin_args)} {}
 
     [[nodiscard]] std::string to_string() const override { return name; }
 
@@ -25,6 +26,7 @@ struct Union : detail::Ty<Union, Type::Kind::Union> {
     std::vector<Type*> fields;
 
     Enum* tag_type;
+    bool implicit;
 
     GenericUnion* origin;
     std::vector<Type*> origin_args;

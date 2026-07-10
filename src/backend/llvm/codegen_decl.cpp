@@ -233,7 +233,8 @@ Value Codegen::generate(const ast::Struct& decl) {
 }
 
 Value Codegen::generate(const ast::Union& decl) {
-    auto [untagged] = parse_attrs_validate(decl, "untagged");
+    auto [untagged, implicit] =
+        parse_attrs_validate(decl, "untagged", "implicit");
 
     if (m_current_scope->types.contains(decl.name.value) ||
         m_current_scope->generic_structs.contains(decl.name.value) ||
@@ -247,7 +248,6 @@ Value Codegen::generate(const ast::Union& decl) {
 
     if (!decl.type_params.empty()) {
         auto& generic_union = m_current_scope->generic_unions[decl.name.value];
-
         auto current_scope_types = m_current_scope->types;
 
         for (const auto& param : decl.type_params) {
@@ -278,6 +278,7 @@ Value Codegen::generate(const ast::Union& decl) {
 
         generic_union.name = decl.name.value;
         generic_union.fields = std::move(fields);
+        generic_union.implicit = implicit.has_value();
 
         if (untagged) {
             generic_union.tag_type = nullptr;
@@ -349,7 +350,7 @@ Value Codegen::generate(const ast::Union& decl) {
         m_named_types.push_back(
             std::make_unique<types::Union>(
                 struct_type, m_current_scope_prefix + decl.name.value,
-                std::move(fields)));
+                std::move(fields), nullptr, implicit.has_value()));
 
         m_current_scope->types[decl.name.value] = {
             .element = m_named_types.back().get(),
@@ -383,7 +384,7 @@ Value Codegen::generate(const ast::Union& decl) {
     m_named_types.push_back(
         std::make_unique<types::Union>(
             struct_type, m_current_scope_prefix + decl.name.value,
-            std::move(fields), tag_type));
+            std::move(fields), tag_type, implicit.has_value()));
 
     m_current_scope->types[decl.name.value] = {
         .element = m_named_types.back().get(),

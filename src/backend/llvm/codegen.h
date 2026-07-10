@@ -207,6 +207,8 @@ private:
         const std::vector<Type*>& type_args, std::size_t offset,
         std::string_view name, const std::vector<Type*>& parent_types = {});
 
+    [[nodiscard]] std::int8_t cast_score(Type* type, const Value& value);
+
     [[nodiscard]] Value
     primitive_cast(Type* type, const Value& value, bool implicit = true);
 

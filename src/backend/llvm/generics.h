@@ -75,7 +75,9 @@ struct GenericUnion {
     std::vector<Field> fields;
 
     std::vector<types::TypeParam*> type_params;
+
     types::Enum* tag_type{nullptr};
+    bool implicit{false};
 
     std::map<std::string_view, GenericFunction> associated_fns;
 };
