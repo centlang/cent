@@ -528,8 +528,6 @@ Value Codegen::generate(const ast::ArrayLiteral& expr) {
             return Value::poisoned();
         }
 
-        value = load_rvalue(value);
-
         auto val = cast_or_error(element->offset, array_type->type, value);
 
         if (!val.ok()) {

@@ -1184,30 +1184,79 @@ Value Codegen::inst_generic_fn(
     return generic_fn_inst[types];
 }
 
+Value Codegen::primitive_cast_constant(
+    Type* type, const Value& value, bool implicit) {
+    auto* constant = llvm::dyn_cast<llvm::ConstantInt>(value.value);
+
+    if (!constant) {
+        return Value::poisoned();
+    }
+
+    auto* base_type = unwrap_type(type, !implicit);
+    auto* base_value_type = unwrap_type(value.type, !implicit);
+
+    bool value_is_sint = base_value_type->is_sint();
+
+    bool value_is_uint = base_value_type->is_uint() ||
+                         (!implicit && is<types::Rune>(base_value_type));
+
+    bool type_is_sint = base_type->is_sint();
+
+    bool type_is_uint =
+        base_type->is_uint() || (!implicit && is<types::Rune>(base_type));
+
+    if (!type_is_sint && !type_is_uint) {
+        return Value::poisoned();
+    }
+
+    auto size_bits = base_type->llvm_type->getIntegerBitWidth();
+    const auto& val = constant->getValue();
+
+    bool non_lossy = [&] {
+        if (value_is_uint && type_is_uint && val.isIntN(size_bits)) {
+            return true;
+        }
+
+        if (value_is_sint && type_is_sint && val.isSignedIntN(size_bits)) {
+            return true;
+        }
+
+        if (value_is_sint && type_is_uint && val.isNonNegative() &&
+            val.isIntN(size_bits)) {
+            return true;
+        }
+
+        return value_is_uint && type_is_sint && val.isSignedIntN(size_bits);
+    }();
+
+    if (!non_lossy) {
+        return Value::poisoned();
+    }
+
+    return {
+        .type = type,
+        .value = llvm::ConstantInt::get(
+            base_type->llvm_type,
+            type_is_sint ? val.getSExtValue() : val.getZExtValue())};
+}
+
 Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
     using enum llvm::Instruction::CastOps;
 
     auto* base_type = unwrap_type(type, !implicit);
     auto* base_value_type = unwrap_type(value.type, !implicit);
 
-    bool value_is_rune = is<types::Rune>(base_value_type);
-    bool type_is_rune = is<types::Rune>(base_type);
-
-    if ((value_is_rune || type_is_rune) && implicit) {
-        return Value::poisoned();
-    }
-
     bool value_is_float = base_value_type->is_float();
     bool value_is_sint = base_value_type->is_sint();
-    bool value_is_uint = base_value_type->is_uint() || value_is_rune;
     bool value_is_ptr = is<types::Pointer>(base_value_type);
+
+    bool value_is_uint = base_value_type->is_uint() ||
+                         (!implicit && is<types::Rune>(base_value_type));
 
     if (!implicit) {
         if (auto* type = dyn_cast<types::Enum>(base_value_type)) {
-            auto* base_underlying = unwrap_type(type->type);
-
-            value_is_sint = base_underlying->is_sint();
-            value_is_uint = base_underlying->is_uint();
+            value_is_sint = type->type->is_sint();
+            value_is_uint = type->type->is_uint();
         }
     }
 
@@ -1217,8 +1266,10 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
 
     bool type_is_float = base_type->is_float();
     bool type_is_sint = base_type->is_sint();
-    bool type_is_uint = base_type->is_uint() || type_is_rune;
     bool type_is_ptr = is<types::Pointer>(base_type);
+
+    bool type_is_uint =
+        base_type->is_uint() || (!implicit && is<types::Rune>(base_type));
 
     if (!implicit) {
         if (auto* type = dyn_cast<types::Enum>(base_type)) {
@@ -1227,40 +1278,10 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
         }
     }
 
-    if (auto* constant = llvm::dyn_cast<llvm::ConstantInt>(value.value)) {
-        if (type_is_sint || type_is_uint) {
-            auto size_bits = base_type->llvm_type->getIntegerBitWidth();
+    auto constant_result = primitive_cast_constant(type, value, implicit);
 
-            const auto& val = constant->getValue();
-
-            bool non_lossy = [&] {
-                if (value_is_uint && type_is_uint && val.isIntN(size_bits)) {
-                    return true;
-                }
-
-                if (value_is_sint && type_is_sint &&
-                    val.isSignedIntN(size_bits)) {
-                    return true;
-                }
-
-                if (value_is_sint && type_is_uint && val.isNonNegative() &&
-                    val.isIntN(size_bits)) {
-                    return true;
-                }
-
-                return value_is_uint && type_is_sint &&
-                       val.isSignedIntN(size_bits);
-            }();
-
-            if (non_lossy) {
-                return {
-                    .type = type,
-                    .value = llvm::ConstantInt::get(
-                        base_type->llvm_type, type_is_sint
-                                                  ? val.getSExtValue()
-                                                  : val.getZExtValue())};
-            }
-        }
+    if (constant_result.ok()) {
+        return constant_result;
     }
 
     auto layout = m_module->getDataLayout();
@@ -1338,8 +1359,9 @@ Value Codegen::primitive_cast(Type* type, const Value& value, bool implicit) {
             auto* value_ptr = static_cast<types::Pointer*>(base_value_type);
             auto* type_ptr = static_cast<types::Pointer*>(base_type);
 
-            if (value_ptr->type == type_ptr->type &&
-                (value_ptr->is_mutable || !type_ptr->is_mutable)) {
+            if ((value_ptr->is_mutable || !type_ptr->is_mutable) &&
+                unwrap_type(value_ptr->type, !implicit) ==
+                    unwrap_type(type_ptr->type, !implicit)) {
                 return {
                     .type = type,
                     .value = value.value,
@@ -1389,7 +1411,7 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
     }
 
     if (const auto* optional = dyn_cast<types::Optional>(base_type)) {
-        auto* base_contained_type = unwrap_type(optional->type);
+        auto* opt_contained_type = unwrap_type(optional->type, !implicit);
 
         if (is<types::Null>(base_value_type)) {
             return {
@@ -1397,19 +1419,25 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
                 .value = llvm::Constant::getNullValue(base_type->llvm_type)};
         }
 
-        if (base_contained_type != base_value_type) {
-            if (implicit) {
-                return Value::poisoned();
-            }
-
+        if (opt_contained_type != base_value_type) {
             auto* value_optional = dyn_cast<types::Optional>(base_value_type);
 
             if (!value_optional) {
                 return Value::poisoned();
             }
 
-            if (!is<types::Pointer>(base_contained_type) ||
-                !is<types::Pointer>(unwrap_type(value_optional->type))) {
+            auto* value_ptr = dyn_cast<types::Pointer>(
+                unwrap_type(value_optional->type, !implicit));
+
+            auto* type_ptr = dyn_cast<types::Pointer>(opt_contained_type);
+
+            if (!value_ptr || !type_ptr) {
+                return Value::poisoned();
+            }
+
+            if (implicit && ((!value_ptr->is_mutable && type_ptr->is_mutable) ||
+                             unwrap_type(value_ptr->type, !implicit) !=
+                                 unwrap_type(type_ptr->type, !implicit))) {
                 return Value::poisoned();
             }
 
@@ -1420,7 +1448,7 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
                 .memcpy = value.memcpy};
         }
 
-        if (is<types::Pointer>(base_contained_type)) {
+        if (is<types::Pointer>(opt_contained_type)) {
             return {
                 .type = type,
                 .value =
@@ -1452,7 +1480,7 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
         auto* value_ptr = m_builder.CreateStructGEP(
             base_type->llvm_type, variable, optional_member_value);
 
-        m_builder.CreateStore(load_rvalue(value).value, value_ptr);
+        create_store(value, value_ptr);
 
         m_builder.CreateStore(
             llvm::ConstantInt::get(llvm::Type::getInt1Ty(m_context), true),
@@ -1463,23 +1491,28 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
     }
 
     if (const auto* slice = dyn_cast<types::Slice>(base_type)) {
-        auto* base_slice_contained_type = unwrap_type(slice->type);
+        auto* slice_contained_type = unwrap_type(slice->type, !implicit);
 
         if (auto* slice_value = dyn_cast<types::Slice>(base_value_type)) {
-            if (base_slice_contained_type == unwrap_type(slice_value->type) &&
-                (!slice->is_mutable || slice_value->is_mutable)) {
-                return {
-                    .type = type,
-                    .value = value.value,
-                    .ptr_depth = value.ptr_depth,
-                    .memcpy = value.memcpy};
+            if (slice_contained_type !=
+                    unwrap_type(slice_value->type, !implicit) ||
+                (slice->is_mutable && !slice_value->is_mutable)) {
+                return Value::poisoned();
             }
 
-            return Value::poisoned();
+            return {
+                .type = type,
+                .value = value.value,
+                .ptr_depth = value.ptr_depth,
+                .memcpy = value.memcpy};
         }
 
         if (auto* array = dyn_cast<types::VarLenArray>(base_value_type)) {
-            if (base_slice_contained_type != unwrap_type(array->type)) {
+            if (slice_contained_type != unwrap_type(array->type, !implicit)) {
+                return Value::poisoned();
+            }
+
+            if (slice->is_mutable && !value.is_mutable) {
                 return Value::poisoned();
             }
 
@@ -1511,7 +1544,11 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
             return Value::poisoned();
         }
 
-        if (base_slice_contained_type != unwrap_type(array_type->type)) {
+        if (slice_contained_type != unwrap_type(array_type->type, !implicit)) {
+            return Value::poisoned();
+        }
+
+        if (slice->is_mutable && !value.is_mutable) {
             return Value::poisoned();
         }
 
@@ -1528,7 +1565,7 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
             base_type->llvm_type, variable, slice_member_len);
 
         auto* ptr_value = m_builder.CreateGEP(
-            base_slice_contained_type->llvm_type, load_lvalue(value).value,
+            slice_contained_type->llvm_type, load_lvalue(value).value,
             llvm::ConstantInt::get(m_size, 0));
 
         m_builder.CreateStore(ptr_value, ptr_member);
@@ -1676,18 +1713,16 @@ Value Codegen::create_call(
             continue;
         }
 
-        val = load_rvalue(val);
-
         auto* lowered =
             sysv::lower(val.type, classification, layout, m_context);
 
         if (val.type->llvm_type == lowered) {
-            llvm_args.push_back(val.value);
+            llvm_args.push_back(load_rvalue(val).value);
             continue;
         }
 
         auto* variable = create_alloca(lowered);
-        m_builder.CreateStore(val.value, variable);
+        create_store(val, variable);
 
         llvm_args.push_back(m_builder.CreateLoad(lowered, variable));
     }
@@ -1796,8 +1831,8 @@ Value Codegen::create_intrinsic_call(
     auto* len_field =
         m_builder.CreateStructGEP(m_slice_type, variable, slice_member_len);
 
-    m_builder.CreateStore(load_rvalue(args[0]).value, ptr_field);
-    m_builder.CreateStore(load_rvalue(args[1]).value, len_field);
+    create_store(args[0], ptr_field);
+    create_store(args[1], len_field);
 
     return {
         .type = slice_type, .value = variable, .ptr_depth = 1, .memcpy = true};

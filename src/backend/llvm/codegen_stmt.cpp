@@ -330,7 +330,7 @@ Value Codegen::generate(const ast::ReturnStmt& stmt) {
     }
 
     if (m_current_function->sret) {
-        m_builder.CreateStore(load_rvalue(val).value, function->getArg(0));
+        create_store(val, function->getArg(0));
         m_builder.CreateRetVoid();
 
         return Value::poisoned();

@@ -210,6 +210,9 @@ private:
     [[nodiscard]] Value
     primitive_cast(Type* type, const Value& value, bool implicit = true);
 
+    [[nodiscard]] Value primitive_cast_constant(
+        Type* type, const Value& value, bool implicit = true);
+
     [[nodiscard]] Value
     cast(Type* type, const Value& value, bool implicit = true);
 
