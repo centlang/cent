@@ -233,39 +233,47 @@ void Codegen::create_core_mem() {
 
     m_core_module.scopes["mem"].generic_fns = {
         {"as_mut_slice",
-         GenericFunction{
-             .name = {.value = "as_mut_slice", .offset = 0},
-             .return_type = get_slice_type(t_param, true),
-             .params =
-                 {
-                     {.name = "ptr",
-                      .type = get_ptr_type(t_param, true),
-                      .is_mutable = false},
-                     {.name = "len", .type = usize_type, .is_mutable = false},
-                 },
-             .default_args = {},
-             .type_params = {t_param},
-             .parent_type_params = {},
-             .kind = GenericFunction::FnKind::AsMutSlice,
-             .has_params = false,
-             .source_file = ""}},
+         {.element =
+              GenericFunction{
+                  .name = {.value = "as_mut_slice", .offset = 0},
+                  .return_type = get_slice_type(t_param, true),
+                  .params =
+                      {
+                          {.name = "ptr",
+                           .type = get_ptr_type(t_param, true),
+                           .is_mutable = false},
+                          {.name = "len",
+                           .type = usize_type,
+                           .is_mutable = false},
+                      },
+                  .default_args = {},
+                  .type_params = {t_param},
+                  .parent_type_params = {},
+                  .kind = GenericFunction::FnKind::AsMutSlice,
+                  .has_params = false,
+                  .source_file = ""},
+          .is_public = true}},
         {"as_slice",
-         GenericFunction{
-             .name = {.value = "as_slice", .offset = 0},
-             .return_type = get_slice_type(t_param, false),
-             .params =
-                 {
-                     {.name = "ptr",
-                      .type = get_ptr_type(t_param, false),
-                      .is_mutable = false},
-                     {.name = "len", .type = usize_type, .is_mutable = false},
-                 },
-             .default_args = {},
-             .type_params = {t_param},
-             .parent_type_params = {},
-             .kind = GenericFunction::FnKind::AsSlice,
-             .has_params = false,
-             .source_file = ""}}};
+         {.element =
+              GenericFunction{
+                  .name = {.value = "as_slice", .offset = 0},
+                  .return_type = get_slice_type(t_param, false),
+                  .params =
+                      {
+                          {.name = "ptr",
+                           .type = get_ptr_type(t_param, false),
+                           .is_mutable = false},
+                          {.name = "len",
+                           .type = usize_type,
+                           .is_mutable = false},
+                      },
+                  .default_args = {},
+                  .type_params = {t_param},
+                  .parent_type_params = {},
+                  .kind = GenericFunction::FnKind::AsSlice,
+                  .has_params = false,
+                  .source_file = ""},
+          .is_public = true}}};
 }
 
 void Codegen::create_main() {
@@ -2187,6 +2195,51 @@ llvm::Value* Codegen::load_struct_member(
         m_builder.CreateStructGEP(val.type->llvm_type, val.value, index));
 }
 
+GenericStruct* Codegen::get_generic_struct(
+    std::size_t offset, std::string_view name, Scope& parent) {
+    auto type = parent.generic_structs.find(name);
+
+    if (type == parent.generic_structs.end()) {
+        return nullptr;
+    }
+
+    if (!is_accessible(type->second, m_current_unit)) {
+        error(offset, "{} is private", log::quoted(name));
+    }
+
+    return &type->second.element;
+}
+
+GenericUnion* Codegen::get_generic_union(
+    std::size_t offset, std::string_view name, Scope& parent) {
+    auto type = parent.generic_unions.find(name);
+
+    if (type == parent.generic_unions.end()) {
+        return nullptr;
+    }
+
+    if (!is_accessible(type->second, m_current_unit)) {
+        error(offset, "{} is private", log::quoted(name));
+    }
+
+    return &type->second.element;
+}
+
+GenericFunction* Codegen::get_generic_fn(
+    std::size_t offset, std::string_view name, Scope& parent) {
+    auto func = parent.generic_fns.find(name);
+
+    if (func == parent.generic_fns.end()) {
+        return nullptr;
+    }
+
+    if (!is_accessible(func->second, m_current_unit)) {
+        error(offset, "{} is private", log::quoted(name));
+    }
+
+    return &func->second.element;
+}
+
 Type* Codegen::get_type(
     std::size_t offset, std::string_view name, Scope& parent) {
     auto primitive = m_primitive_types.find(name);
@@ -2213,7 +2266,6 @@ Type* Codegen::get_type(
     }
 
     error(offset, "{} is private", log::quoted(name));
-
     return nullptr;
 }
 
@@ -2237,7 +2289,6 @@ Codegen::get_name(std::size_t offset, std::string_view name, Scope& parent) {
     }
 
     error(offset, "{} is private", log::quoted(name));
-
     return nullptr;
 }
 

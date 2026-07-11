@@ -51,11 +51,8 @@ Type* Codegen::generate(const ast::NamedType& type) {
             args.push_back(type);
         }
 
-        auto struct_it = scope->generic_structs.find(name);
-
-        if (struct_it != scope->generic_structs.end()) {
-            if (struct_it->second.type_params.size() !=
-                type.type_params.size()) {
+        if (auto* gen = get_generic_struct(offset, name, *scope)) {
+            if (gen->type_params.size() != type.type_params.size()) {
                 error(offset, "incorrect number of type arguments");
                 return nullptr;
             }
@@ -63,19 +60,16 @@ Type* Codegen::generate(const ast::NamedType& type) {
             if (has_generic_arg) {
                 m_named_types.push_back(
                     std::make_unique<types::GenericStructInst>(
-                        &struct_it->second, std::move(args)));
+                        gen, std::move(args)));
 
                 return m_named_types.back().get();
             }
 
-            return inst_generic_struct(&struct_it->second, args);
+            return inst_generic_struct(gen, args);
         }
 
-        auto union_it = scope->generic_unions.find(name);
-
-        if (union_it != scope->generic_unions.end()) {
-            if (union_it->second.type_params.size() !=
-                type.type_params.size()) {
+        if (auto* gen = get_generic_union(offset, name, *scope)) {
+            if (gen->type_params.size() != type.type_params.size()) {
                 error(offset, "incorrect number of type arguments");
                 return nullptr;
             }
@@ -83,12 +77,12 @@ Type* Codegen::generate(const ast::NamedType& type) {
             if (has_generic_arg) {
                 m_named_types.push_back(
                     std::make_unique<types::GenericUnionInst>(
-                        &union_it->second, std::move(args)));
+                        gen, std::move(args)));
 
                 return m_named_types.back().get();
             }
 
-            return inst_generic_union(&union_it->second, args);
+            return inst_generic_union(gen, args);
         }
 
         if (auto hint = did_you_mean_hint(

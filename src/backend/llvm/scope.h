@@ -27,9 +27,9 @@ struct Scope {
     NamesMap<Type*> types;
     NamesMap<Value> names;
 
-    std::map<std::string_view, GenericStruct> generic_structs;
-    std::map<std::string_view, GenericUnion> generic_unions;
-    std::map<std::string_view, GenericFunction> generic_fns;
+    NamesMap<GenericStruct> generic_structs;
+    NamesMap<GenericUnion> generic_unions;
+    NamesMap<GenericFunction> generic_fns;
 
     std::map<std::string_view, Scope> scopes;
 };

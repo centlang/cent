@@ -669,12 +669,9 @@ Value Codegen::generate(const ast::CallExpr& expr) {
         auto* scope = resolve_scope(identifier->value);
 
         if (scope) {
-            auto generic_fn = scope->generic_fns.find(name);
+            auto* gen = get_generic_fn(offset, name, *scope);
 
-            if (generic_fn != scope->generic_fns.end() &&
-                generic_fn->second.parent_type_params.empty()) {
-                auto* gen = &generic_fn->second;
-
+            if (gen && gen->parent_type_params.empty()) {
                 std::vector<OffsetValue<Value>> arguments;
                 arguments.reserve(expr.arguments.size());
 
@@ -818,10 +815,7 @@ Value Codegen::generate(const ast::CallExprGeneric& expr) {
     auto* scope = resolve_scope(expr.identifier->value);
 
     if (scope) {
-        if (auto generic_fn = scope->generic_fns.find(name);
-            generic_fn != scope->generic_fns.end()) {
-            gen = &generic_fn->second;
-        }
+        gen = get_generic_fn(offset, name, *scope);
     }
 
     auto get_generic_associated =
@@ -858,12 +852,18 @@ Value Codegen::generate(const ast::CallExprGeneric& expr) {
 
         auto type = ident[ident.size() - 2].value;
 
-        auto struct_it = scope->generic_structs.find(type);
+        auto* gen_struct = get_generic_struct(offset, type, *scope);
 
-        if (struct_it == scope->generic_structs.end()) {
-            auto union_it = scope->generic_unions.find(type);
+        if (gen_struct) {
+            gen = get_generic_associated(gen_struct->associated_fns);
 
-            if (union_it == scope->generic_unions.end()) {
+            if (!gen) {
+                return Value::poisoned();
+            }
+        } else {
+            auto* gen_union = get_generic_union(offset, type, *scope);
+
+            if (!gen_union) {
                 if (auto hint = did_you_mean_hint(
                         type, scope->generic_structs, scope->generic_unions)) {
                     error_hint(
@@ -877,13 +877,7 @@ Value Codegen::generate(const ast::CallExprGeneric& expr) {
                 return Value::poisoned();
             }
 
-            gen = get_generic_associated(union_it->second.associated_fns);
-
-            if (!gen) {
-                return Value::poisoned();
-            }
-        } else {
-            gen = get_generic_associated(struct_it->second.associated_fns);
+            gen = get_generic_associated(gen_union->associated_fns);
 
             if (!gen) {
                 return Value::poisoned();

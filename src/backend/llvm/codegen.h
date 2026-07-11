@@ -280,6 +280,15 @@ private:
         return std::nullopt;
     }
 
+    [[nodiscard]] GenericStruct* get_generic_struct(
+        std::size_t offset, std::string_view name, Scope& parent);
+
+    [[nodiscard]] GenericUnion*
+    get_generic_union(std::size_t offset, std::string_view name, Scope& parent);
+
+    [[nodiscard]] GenericFunction*
+    get_generic_fn(std::size_t offset, std::string_view name, Scope& parent);
+
     [[nodiscard]] Type*
     get_type(std::size_t offset, std::string_view name, Scope& parent);
 
