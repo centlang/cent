@@ -355,6 +355,9 @@ private:
         Type* self_type, const std::vector<types::TypeParam*>& parent_params,
         const ast::ForBlock& for_block);
 
+    void add_fn_attrs(
+        llvm::Function* function, types::Function* type, bool alwaysinline);
+
     void copy_import(const ast::NamedImport& imp, Scope& scope);
 
     [[nodiscard]] llvm::Value*

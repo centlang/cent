@@ -1078,15 +1078,7 @@ Value Codegen::inst_generic_fn(
     auto* llvm_function = llvm::Function::Create(
         llvm_fn_type, llvm::Function::PrivateLinkage, name, *m_module);
 
-    if (is<types::Never>(fn_type->return_type)) {
-        llvm_function->addFnAttr(llvm::Attribute::NoReturn);
-    }
-
-    if (fn_type->sret) {
-        llvm_function->addParamAttr(
-            0, llvm::Attribute::getWithStructRetType(
-                   m_context, fn_type->return_type->llvm_type));
-    }
+    add_fn_attrs(llvm_function, fn_type, false);
 
     auto* entry = llvm::BasicBlock::Create(m_context, "", llvm_function);
 
@@ -2320,6 +2312,23 @@ Codegen::resolve_scope(const std::vector<OffsetValue<std::string>>& value) {
     }
 
     return scope;
+}
+
+void Codegen::add_fn_attrs(
+    llvm::Function* function, types::Function* type, bool alwaysinline) {
+    if (alwaysinline) {
+        function->addFnAttr(llvm::Attribute::AlwaysInline);
+    }
+
+    if (is<types::Never>(type->return_type)) {
+        function->addFnAttr(llvm::Attribute::NoReturn);
+    }
+
+    if (type->sret) {
+        function->addParamAttr(
+            0, llvm::Attribute::getWithStructRetType(
+                   m_context, type->return_type->llvm_type));
+    }
 }
 
 void Codegen::copy_import(const ast::NamedImport& imp, Scope& scope) {

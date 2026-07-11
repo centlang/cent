@@ -708,6 +708,8 @@ void Codegen::generate_for_fn_proto(
         return;
     }
 
+    auto [alwaysinline] = parse_attrs_validate(func, "alwaysinline");
+
     if (associated_fns.contains(func.name.value)) {
         error(
             func.name.offset, "{} is already defined",
@@ -784,6 +786,7 @@ void Codegen::generate_for_fn_proto(
             .has_params = func.proto.has_params,
             .scope = m_current_scope,
             .source_file = m_filename};
+
         return;
     }
 
@@ -800,15 +803,7 @@ void Codegen::generate_for_fn_proto(
         static_cast<llvm::FunctionType*>(fn_type->llvm_type),
         llvm::Function::PrivateLinkage, llvm_name, *m_module);
 
-    if (is<types::Never>(fn_type->return_type)) {
-        function->addFnAttr(llvm::Attribute::NoReturn);
-    }
-
-    if (fn_type->sret) {
-        function->addParamAttr(
-            0, llvm::Attribute::getWithStructRetType(
-                   m_context, fn_type->return_type->llvm_type));
-    }
+    add_fn_attrs(function, fn_type, alwaysinline.has_value());
 
     type_scope.names[func.name.value] = {
         .element = {.type = fn_type, .value = function},
@@ -1084,19 +1079,7 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
             llvm_name, *m_module);
     }
 
-    if (alwaysinline) {
-        function->addFnAttr(llvm::Attribute::AlwaysInline);
-    }
-
-    if (is<types::Never>(fn_type->return_type)) {
-        function->addFnAttr(llvm::Attribute::NoReturn);
-    }
-
-    if (fn_type->sret) {
-        function->addParamAttr(
-            0, llvm::Attribute::getWithStructRetType(
-                   m_context, fn_type->return_type->llvm_type));
-    }
+    add_fn_attrs(function, fn_type, alwaysinline.has_value());
 
     m_current_scope->names[decl.name.value] = {
         .element = {.type = fn_type, .value = function},
