@@ -1,40 +1,23 @@
 with c;
 
-pub type AllocFn = fn(size: usize) ?*mut u8;
-pub type FreeFn = fn(ptr: *mut u8);
-
-pub type Allocator {
-    _alloc: *AllocFn,
-    _free: *FreeFn,
+pub fn(<T>) alloc() ?*mut T {
+    return c::malloc(sizeof(T)) as ?*mut T;
 }
 
-for Allocator {
-    pub fn(<T>) alloc(self: *mut Self) ?*mut T {
-        return (self._alloc)(sizeof(T)) as ?*mut T;
+pub fn(<T>) alloc_n(size: usize) ?[]mut T {
+    let data = c::malloc(size * sizeof(T));
+
+    if data == null {
+        return null;
     }
 
-    pub fn(<T>) alloc_n(self: *mut Self, size: usize) ?[]mut T {
-        let data = (self._alloc)(size * sizeof(T));
-
-        if data == null {
-            return null;
-        }
-
-        return core::mem::as_mut_slice(data.! as *mut T, size);
-    }
-
-    pub fn(<T>) free(self: *mut Self, ptr: *mut T) {
-        (self._free)(ptr as *mut u8);
-    }
-
-    pub fn(<T>) free_n(self: *mut Self, slice: []mut T) {
-        (self._free)(slice.ptr as *mut u8);
-    }
+    return core::mem::as_mut_slice(data.! as *mut T, size);
 }
 
-pub fn system() Allocator {
-    return Allocator {
-        _alloc: &c::malloc as *AllocFn,
-        _free: &c::free as *FreeFn
-    };
+pub fn(<T>) free(ptr: *mut T) {
+    c::free(ptr as *mut c::void);
+}
+
+pub fn(<T>) free_n(slice: []mut T) {
+    c::free(slice.ptr as *mut c::void);
 }
