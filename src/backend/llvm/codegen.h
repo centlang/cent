@@ -464,14 +464,34 @@ private:
     [[nodiscard]] static std::optional<OffsetValue<std::optional<std::string>>>
     decl_get_attr(const ast::Declaration& decl, std::string_view attr);
 
-    [[nodiscard]] static std::optional<llvm::Triple::OSType>
-    attr_to_os_type(std::string_view attr) {
+    [[nodiscard]] static std::vector<llvm::Triple::OSType>
+    attr_to_os_types(std::string_view attr) {
+        using enum llvm::Triple::OSType;
+
+        if (attr == "posix") {
+            return {AIX,       MacOSX,   Solaris, Linux,    FreeBSD, NetBSD,
+                    DragonFly, KFreeBSD, Hurd,    Serenity, Haiku};
+        }
+
         if (attr == "linux") {
-            return llvm::Triple::Linux;
+            return {Linux};
         }
 
         if (attr == "windows") {
-            return llvm::Triple::Win32;
+            return {Win32};
+        }
+
+        return {};
+    }
+
+    [[nodiscard]] static std::optional<llvm::Triple::EnvironmentType>
+    attr_to_env_type(std::string_view attr) {
+        if (attr == "gnu") {
+            return llvm::Triple::GNU;
+        }
+
+        if (attr == "msvc") {
+            return llvm::Triple::MSVC;
         }
 
         return std::nullopt;

@@ -2563,24 +2563,24 @@ void Codegen::report_invalid_attrs(
     const ast::Declaration& decl,
     std::initializer_list<std::string_view> allowed) {
     for (const auto& attribute : decl.attributes) {
-        if (attr_to_os_type(attribute.name.value) ||
-            attr_to_arch_type(attribute.name.value)) {
+        const auto& [name, offset] = attribute.name;
+
+        if (!attr_to_os_types(name).empty() || attr_to_arch_type(name) ||
+            attr_to_env_type(name)) {
             continue;
         }
 
         bool valid = false;
 
         for (const auto& attr : allowed) {
-            if (attribute.name.value == attr) {
+            if (name == attr) {
                 valid = true;
                 break;
             }
         }
 
         if (!valid) {
-            error(
-                attribute.name.offset, "unexpected attribute {}",
-                log::quoted(attribute.name.value));
+            error(offset, "unexpected attribute {}", log::quoted(name));
         }
     }
 }
@@ -2588,15 +2588,32 @@ void Codegen::report_invalid_attrs(
 bool Codegen::matches_target(const ast::Declaration& decl) {
     std::optional<bool> os_matches = std::nullopt;
     std::optional<bool> arch_matches = std::nullopt;
+    std::optional<bool> env_matches = std::nullopt;
 
     for (const auto& attr : decl.attributes) {
-        if (auto os_type = attr_to_os_type(attr.name.value)) {
+        if (auto os_types = attr_to_os_types(attr.name.value);
+            !os_types.empty()) {
             if (!os_matches.has_value()) {
                 os_matches = false;
             }
 
-            if (os_type == m_triple.getOS()) {
-                os_matches = true;
+            for (auto type : os_types) {
+                if (type == m_triple.getOS()) {
+                    os_matches = true;
+                    break;
+                }
+            }
+
+            continue;
+        }
+
+        if (auto env_type = attr_to_env_type(attr.name.value)) {
+            if (!env_matches.has_value()) {
+                env_matches = false;
+            }
+
+            if (env_type == m_triple.getArch()) {
+                env_matches = true;
             }
 
             continue;

@@ -14,7 +14,7 @@ namespace sysv {
 
 // https://refspecs.linuxbase.org/elf/x86_64-abi-0.99.pdf
 
-enum struct RegClass {
+enum struct RegClass : std::uint8_t {
     Pointer,
     Integer,
     Sse,
@@ -240,12 +240,12 @@ should_sret(llvm::Type* type, const llvm::DataLayout& layout) {
 
 } // namespace sysv
 
-enum struct Abi { SysV, Unknown };
+enum struct Abi : std::uint8_t { SysV, Unknown };
 
 [[nodiscard]] inline Abi get_abi(const llvm::Triple& triple) {
     switch (triple.getArch()) {
     case llvm::Triple::x86_64:
-        if (triple.isOSLinux()) {
+        if (!triple.isOSWindowsOrUEFI() && !triple.isOSUnknown()) {
             return Abi::SysV;
         }
 
