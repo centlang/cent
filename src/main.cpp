@@ -2,7 +2,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <optional>
+#include <random>
 #include <span>
 #include <string>
 #include <string_view>
@@ -310,7 +312,7 @@ get_emit_type(std::string_view type) {
     const std::filesystem::path& output, const std::filesystem::path& object) {
 #ifdef _WIN32
     std::vector<std::string> args = {
-        fmt::format("/OUT:{}", output.string()), object.string(), "ucrt.lib"};
+        fmt::format("/OUT:{}", output.string()), object.string(), "libcmt.lib"};
 
     args.insert(
         args.end(), cent::g_options.linker_options.begin(),
@@ -337,6 +339,22 @@ get_emit_type(std::string_view type) {
 
     return cent::exec_command("gcc", args) == 0;
 #endif
+}
+
+[[nodiscard]] std::filesystem::path tmp_name(std::string_view suffix) {
+    std::random_device device;
+    std::mt19937 gen{device()};
+
+    std::uniform_int_distribution<> dist{0, 15};
+
+    std::string name = "centc-";
+
+    for (std::uint8_t i = 0; i < 6; ++i) {
+        name += "0123456789abcdef"[dist(gen)];
+    }
+
+    name += suffix;
+    return std::filesystem::temp_directory_path() / name;
 }
 
 [[nodiscard]] std::optional<std::filesystem::path>
@@ -455,7 +473,7 @@ compile(llvm::TargetMachine* machine) {
         return output;
     }
     case cent::EmitType::Exe: {
-        std::filesystem::path object_file = std::tmpnam(nullptr);
+        auto object_file = tmp_name(".o");
 
         if (!cent::backend::emit_obj(*module, *machine, object_file)) {
             return std::nullopt;

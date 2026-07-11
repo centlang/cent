@@ -2612,7 +2612,7 @@ bool Codegen::matches_target(const ast::Declaration& decl) {
                 env_matches = false;
             }
 
-            if (env_type == m_triple.getArch()) {
+            if (env_type == m_triple.getEnvironment()) {
                 env_matches = true;
             }
 
@@ -2632,6 +2632,12 @@ bool Codegen::matches_target(const ast::Declaration& decl) {
 
     if (os_matches.has_value()) {
         if (!*os_matches) {
+            return false;
+        }
+    }
+
+    if (env_matches.has_value()) {
+        if (!*env_matches) {
             return false;
         }
     }

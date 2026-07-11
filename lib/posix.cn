@@ -2,7 +2,7 @@ pub const STDIN_FILENO = 0;
 pub const STDOUT_FILENO = 1;
 pub const STDERR_FILENO = 2;
 
-#(linux) {
+#(posix) {
     with c;
 
     #(x86_64) {

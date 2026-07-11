@@ -369,14 +369,30 @@ pub fn read_int(fd: Fd) ?i64 {
     return r;
 }
 
-pub fn stdout() Fd {
-    return Fd { _file: c::stdout };
+#(gnu) {
+    pub fn stdout() Fd {
+        return Fd { _file: c::stdout };
+    }
+
+    pub fn stdin() Fd {
+        return Fd { _file: c::stdin };
+    }
+
+    pub fn stderr() Fd {
+        return Fd { _file: c::stderr };
+    }
 }
 
-pub fn stdin() Fd {
-    return Fd { _file: c::stdin };
-}
+#(msvc) {
+    pub fn stdout() Fd {
+        return Fd { _file: c::stdout() };
+    }
 
-pub fn stderr() Fd {
-    return Fd { _file: c::stderr };
+    pub fn stdin() Fd {
+        return Fd { _file: c::stdin() };
+    }
+
+    pub fn stderr() Fd {
+        return Fd { _file: c::stderr() };
+    }
 }
