@@ -97,7 +97,8 @@ void Codegen::create_core() {
 
     auto panic_fn = create_core_panic();
 
-    auto* assert_type = get_fn_type(m_void_type.get(), {bool_type});
+    auto* assert_type =
+        get_fn_type(m_void_type.get(), {bool_type}, {}, false, false);
 
     auto* assert_fn = llvm::Function::Create(
         static_cast<llvm::FunctionType*>(assert_type->llvm_type),
@@ -149,7 +150,7 @@ Value Codegen::create_core_panic() {
     auto* i32_type = m_primitive_types["i32"].get();
     auto* u8_slice = get_slice_type(m_primitive_types["u8"].get(), false);
 
-    auto* panic_type = get_fn_type(never, {u8_slice});
+    auto* panic_type = get_fn_type(never, {u8_slice}, {}, false, false);
 
     auto* panic = llvm::Function::Create(
         static_cast<llvm::FunctionType*>(panic_type->llvm_type),
@@ -188,7 +189,7 @@ Value Codegen::create_core_panic() {
         *m_module, ptr_type, false, llvm::GlobalValue::ExternalLinkage,
         nullptr,   "stderr"};
 
-    auto* exit_type = get_fn_type(never, {i32_type});
+    auto* exit_type = get_fn_type(never, {i32_type}, {}, false, false);
 
     auto* exit_fn = llvm::Function::Create(
         static_cast<llvm::FunctionType*>(exit_type->llvm_type),
@@ -246,6 +247,7 @@ void Codegen::create_core_mem() {
              .type_params = {t_param},
              .parent_type_params = {},
              .kind = GenericFunction::FnKind::AsMutSlice,
+             .has_params = false,
              .source_file = ""}},
         {"as_slice",
          GenericFunction{
@@ -262,6 +264,7 @@ void Codegen::create_core_mem() {
              .type_params = {t_param},
              .parent_type_params = {},
              .kind = GenericFunction::FnKind::AsSlice,
+             .has_params = false,
              .source_file = ""}}};
 }
 
@@ -814,7 +817,8 @@ Type* Codegen::inst_type_param(
         }
 
         return get_fn_type(
-            return_type, param_types, func->default_args, func->variadic);
+            return_type, param_types, func->default_args, func->variadic,
+            func->has_params);
     }
 
     return type;
@@ -1058,7 +1062,8 @@ Value Codegen::inst_generic_fn(
 
     auto* fn_type = get_fn_type(
         inst_type_param(type_params, type_args, function->return_type),
-        std::move(param_types), std::move(default_args), false);
+        std::move(param_types), std::move(default_args), false,
+        function->has_params);
 
     auto* llvm_fn_type = static_cast<llvm::FunctionType*>(fn_type->llvm_type);
 
@@ -1816,10 +1821,17 @@ Value Codegen::create_call(
     auto args_size = arguments.size();
     auto default_args_size = type->default_args.size();
 
-    if (!type->variadic && (args_size < params_size - default_args_size ||
-                            args_size > params_size)) {
-        error(offset, "incorrect number of arguments");
-        return Value::poisoned();
+    if (type->has_params) {
+        if (args_size < params_size - 1 - default_args_size) {
+            error(offset, "not enough arguments");
+            return Value::poisoned();
+        }
+    } else if (!type->variadic) {
+        if (args_size < params_size - default_args_size ||
+            args_size > params_size) {
+            error(offset, "incorrect number of arguments");
+            return Value::poisoned();
+        }
     }
 
     std::vector<llvm::Value*> llvm_args;
@@ -1834,8 +1846,6 @@ Value Codegen::create_call(
         llvm_args.reserve(params_size);
     }
 
-    auto layout = m_module->getDataLayout();
-
     for (std::size_t i = 0; i < args_size; ++i) {
         auto value = arguments[i].value;
 
@@ -1844,62 +1854,31 @@ Value Codegen::create_call(
         }
 
         if (type->variadic && i >= params_size) {
-            auto* base_type = unwrap_type(value.type, true);
+            llvm_args.push_back(get_variadic_arg(arguments[i].offset, value));
+            continue;
+        }
 
-            if (auto* optional = dyn_cast<types::Optional>(base_type)) {
-                if (is<types::Pointer>(optional->type)) {
-                    llvm_args.push_back(load_rvalue(value).value);
+        if (type->has_params && i == params_size - 1) {
+            auto* params_type = type->param_types[i];
+            auto* element = static_cast<types::Slice*>(params_type)->type;
+
+            if (args_size - i == 1) {
+                auto val = cast(params_type, value, true);
+
+                if (val.ok()) {
+                    llvm_args.push_back(get_abi_arg(val));
                     continue;
                 }
             }
 
-            if (is<types::Pointer, types::F64>(base_type)) {
-                llvm_args.push_back(load_rvalue(value).value);
-                continue;
+            auto slice = create_params_slice(element, arguments, i);
+
+            if (!slice.ok()) {
+                return Value::poisoned();
             }
 
-            if (is<types::Bool>(base_type)) {
-                llvm_args.push_back(
-                    primitive_cast(m_primitive_types["i32"].get(), value, false)
-                        .value);
-
-                continue;
-            }
-
-            if (is<types::F32>(base_type)) {
-                llvm_args.push_back(
-                    primitive_cast(m_primitive_types["f64"].get(), value)
-                        .value);
-
-                continue;
-            }
-
-            if (!base_type->is_sint() && !base_type->is_uint()) {
-                warning(
-                    arguments[i].offset,
-                    "passing argument of type {} to a variadic function is "
-                    "undefined behavior",
-                    log::quoted(value.type->to_string()));
-
-                llvm_args.push_back(load_rvalue(value).value);
-                continue;
-            }
-
-            auto bitwidth = base_type->llvm_type->getIntegerBitWidth();
-
-            if (bitwidth >= 32) {
-                llvm_args.push_back(load_rvalue(value).value);
-                continue;
-            }
-
-            auto val = primitive_cast(m_primitive_types["i32"].get(), value);
-
-            if (!val.ok()) {
-                val = primitive_cast(m_primitive_types["u32"].get(), value);
-            }
-
-            llvm_args.push_back(val.value);
-            continue;
+            llvm_args.push_back(get_abi_arg(slice));
+            break;
         }
 
         auto val =
@@ -1909,71 +1888,31 @@ Value Codegen::create_call(
             return Value::poisoned();
         }
 
-        val = load_lvalue(val);
-
-        if (get_abi(m_triple) != Abi::SysV) {
-            llvm_args.push_back(load_rvalue(val).value);
-            continue;
-        }
-
-        auto classification = sysv::classify(val.type->llvm_type, layout);
-
-        if (classification.first == sysv::RegClass::Memory) {
-            if (val.ptr_depth == 1) {
-                llvm_args.push_back(val.value);
-                continue;
-            }
-
-            auto* variable = create_alloca(val.type->llvm_type);
-            m_builder.CreateStore(val.value, variable);
-            llvm_args.push_back(variable);
-
-            continue;
-        }
-
-        auto* lowered =
-            sysv::lower(val.type, classification, layout, m_context);
-
-        if (val.type->llvm_type == lowered) {
-            llvm_args.push_back(load_rvalue(val).value);
-            continue;
-        }
-
-        auto* variable = create_alloca(lowered);
-        create_store(val, variable);
-
-        llvm_args.push_back(m_builder.CreateLoad(lowered, variable));
+        llvm_args.push_back(get_abi_arg(val));
     }
 
-    for (std::size_t i = default_args_size - (params_size - args_size);
-         i < default_args_size; ++i) {
-        auto* arg = type->default_args[i];
+    if (type->has_params) {
+        if (args_size < params_size) {
+            for (std::size_t i = args_size; i < params_size - 1; ++i) {
+                auto* arg =
+                    type->default_args[default_args_size - params_size + 1 + i];
 
-        auto* arg_type =
-            type->param_types[(params_size - default_args_size) + i];
+                llvm_args.push_back(
+                    get_abi_const_arg(type->param_types[i], arg));
+            }
 
-        auto classification = sysv::classify(arg_type->llvm_type, layout);
+            auto* element =
+                static_cast<types::Slice*>(type->param_types[params_size - 1])
+                    ->type;
 
-        if (classification.first == sysv::RegClass::Memory) {
-            auto* variable = create_alloca(arg_type->llvm_type);
-            m_builder.CreateStore(arg, variable);
-            llvm_args.push_back(variable);
-
-            continue;
+            auto slice = create_empty_slice(element);
+            llvm_args.push_back(get_abi_arg(slice));
         }
-
-        auto* lowered =
-            sysv::lower(arg_type, classification, layout, m_context);
-
-        if (arg->getType() == lowered) {
-            llvm_args.push_back(arg);
-            continue;
+    } else {
+        for (std::size_t i = args_size; i < params_size; ++i) {
+            auto* arg = type->default_args[default_args_size - params_size + i];
+            llvm_args.push_back(get_abi_const_arg(type->param_types[i], arg));
         }
-
-        auto* variable = create_alloca(lowered);
-        m_builder.CreateStore(arg, variable);
-
-        llvm_args.push_back(m_builder.CreateLoad(lowered, variable));
     }
 
     auto* call = m_builder.CreateCall(
@@ -2367,6 +2306,173 @@ void Codegen::copy_import(const ast::NamedImport& imp, Scope& scope) {
         scope_it != m_current_scope->scopes.end()) {
         scope.scopes[alias] = scope_it->second;
     }
+}
+
+llvm::Value* Codegen::get_variadic_arg(std::size_t offset, const Value& value) {
+    auto* base_type = unwrap_type(value.type, true);
+
+    if (auto* optional = dyn_cast<types::Optional>(base_type)) {
+        if (is<types::Pointer>(unwrap_type(optional->type, true))) {
+            return load_rvalue(value).value;
+        }
+    }
+
+    if (is<types::Pointer, types::F64>(base_type)) {
+        return load_rvalue(value).value;
+    }
+
+    if (is<types::Bool>(base_type)) {
+        return primitive_cast(m_primitive_types["i32"].get(), value, false)
+            .value;
+    }
+
+    if (is<types::F32>(base_type)) {
+        return primitive_cast(m_primitive_types["f64"].get(), value).value;
+    }
+
+    if (!base_type->is_sint() && !base_type->is_uint()) {
+        warning(
+            offset,
+            "passing argument of type {} to a variadic function is undefined "
+            "behavior",
+            log::quoted(value.type->to_string()));
+
+        return load_rvalue(value).value;
+    }
+
+    auto bitwidth = base_type->llvm_type->getIntegerBitWidth();
+
+    if (bitwidth >= 32) {
+        return load_rvalue(value).value;
+    }
+
+    auto val = primitive_cast(m_primitive_types["i32"].get(), value);
+
+    if (!val.ok()) {
+        val = primitive_cast(m_primitive_types["u32"].get(), value);
+    }
+
+    return val.value;
+}
+
+llvm::Value* Codegen::get_abi_arg(const Value& value) {
+    if (get_abi(m_triple) != Abi::SysV) {
+        return load_rvalue(value).value;
+    }
+
+    auto layout = m_module->getDataLayout();
+    auto classification = sysv::classify(value.type->llvm_type, layout);
+
+    if (classification.first == sysv::RegClass::Memory) {
+        auto val = load_lvalue(value);
+
+        if (val.ptr_depth == 1) {
+            return val.value;
+        }
+
+        auto* variable = create_alloca(val.type->llvm_type);
+        create_store(val, variable);
+
+        return variable;
+    }
+
+    auto* lowered = sysv::lower(value.type, classification, layout, m_context);
+
+    if (value.type->llvm_type == lowered) {
+        return load_rvalue(value).value;
+    }
+
+    auto* variable = create_alloca(lowered);
+    create_store(value, variable);
+
+    return m_builder.CreateLoad(lowered, variable);
+}
+
+llvm::Value* Codegen::get_abi_const_arg(Type* type, llvm::Constant* constant) {
+    if (get_abi(m_triple) != Abi::SysV) {
+        return constant;
+    }
+
+    auto layout = m_module->getDataLayout();
+    auto classification = sysv::classify(type->llvm_type, layout);
+
+    if (classification.first == sysv::RegClass::Memory) {
+        auto* variable = create_alloca(type->llvm_type);
+        m_builder.CreateStore(constant, variable);
+
+        return variable;
+    }
+
+    auto* lowered = sysv::lower(type, classification, layout, m_context);
+
+    if (constant->getType() == lowered) {
+        return constant;
+    }
+
+    auto* variable = create_alloca(lowered);
+    m_builder.CreateStore(constant, variable);
+
+    return m_builder.CreateLoad(lowered, variable);
+}
+
+Value Codegen::create_params_slice(
+    Type* element, const std::vector<OffsetValue<Value>>& args,
+    std::size_t start) {
+    auto* len_val = llvm::ConstantInt::get(m_size, args.size() - start);
+    auto* params = create_alloca(element->llvm_type, len_val);
+
+    for (std::size_t j = 0; j < args.size() - start; ++j) {
+        const auto& arg = args[start + j];
+
+        if (!arg.value.ok()) {
+            return Value::poisoned();
+        }
+
+        auto casted = cast_or_error(args[start + j].offset, element, arg.value);
+
+        if (!casted.ok()) {
+            return Value::poisoned();
+        }
+
+        auto* ptr = m_builder.CreateGEP(
+            element->llvm_type, params, llvm::ConstantInt::get(m_size, j));
+
+        create_store(casted, ptr);
+    }
+
+    auto* slice_type = get_slice_type(element, false);
+
+    auto* variable = create_alloca(slice_type->llvm_type);
+
+    auto* ptr = m_builder.CreateStructGEP(
+        slice_type->llvm_type, variable, slice_member_ptr);
+
+    auto* len = m_builder.CreateStructGEP(
+        slice_type->llvm_type, variable, slice_member_len);
+
+    m_builder.CreateStore(params, ptr);
+    m_builder.CreateStore(len_val, len);
+
+    return {.type = slice_type, .value = variable, .ptr_depth = 1};
+}
+
+Value Codegen::create_empty_slice(Type* element) {
+    auto* slice_type = get_slice_type(element, false);
+    auto* variable = create_alloca(slice_type->llvm_type);
+
+    auto* ptr = m_builder.CreateStructGEP(
+        slice_type->llvm_type, variable, slice_member_ptr);
+
+    auto* len = m_builder.CreateStructGEP(
+        slice_type->llvm_type, variable, slice_member_len);
+
+    m_builder.CreateStore(
+        llvm::Constant::getNullValue(llvm::PointerType::getUnqual(m_context)),
+        ptr);
+
+    m_builder.CreateStore(llvm::ConstantInt::get(m_size, 0), len);
+
+    return {.type = slice_type, .value = variable, .ptr_depth = 1};
 }
 
 llvm::Value* Codegen::alloca_arg(std::size_t index, Type* type) {

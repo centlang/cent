@@ -46,6 +46,7 @@ struct GenericFunction {
     Type* self_type{nullptr};
 
     FnKind kind{FnKind::Normal};
+    bool has_params;
 
     Scope* scope{nullptr};
     std::string source_file;

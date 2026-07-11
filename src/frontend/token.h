@@ -103,6 +103,8 @@ struct Token {
         Mut,
         Const,
 
+        Params,
+
         Return,
         Defer,
 

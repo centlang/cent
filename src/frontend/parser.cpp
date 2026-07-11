@@ -220,14 +220,30 @@ std::optional<ast::FnProto> Parser::parse_fn_proto() {
     using enum Token::Type;
 
     bool variadic = false;
+    bool has_params = false;
+
     std::vector<ast::FnProto::Param> params;
 
     bool had_default = false;
 
     auto parse_param = [&] {
+        if (variadic) {
+            error(peek().offset, "variadic `...` must be the last");
+            return;
+        }
+
+        if (has_params) {
+            error(peek().offset, "params parameter must be the last");
+            return;
+        }
+
         if (match_next(Ellipsis)) {
             variadic = true;
             return;
+        }
+
+        if (match_next(Params)) {
+            has_params = true;
         }
 
         bool is_mutable = false;
@@ -257,7 +273,7 @@ std::optional<ast::FnProto> Parser::parse_fn_proto() {
             if (!value) {
                 return;
             }
-        } else if (had_default) {
+        } else if (had_default && !has_params) {
             error(name->offset, "default parameters must be at the end");
             return;
         }
@@ -271,7 +287,7 @@ std::optional<ast::FnProto> Parser::parse_fn_proto() {
         return std::nullopt;
     }
 
-    if (match(Mut, Identifier, Ellipsis)) {
+    if (match(Mut, Identifier, Ellipsis, Params)) {
         parse_param();
 
         while (!variadic && match_next(Comma)) {
@@ -296,7 +312,8 @@ std::optional<ast::FnProto> Parser::parse_fn_proto() {
     return ast::FnProto{
         .params = std::move(params),
         .return_type = std::move(return_type),
-        .variadic = variadic};
+        .variadic = variadic,
+        .has_params = has_params};
 }
 
 std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {

@@ -23,6 +23,7 @@ struct FnProto {
     std::unique_ptr<Type> return_type;
 
     bool variadic;
+    bool has_params;
 };
 
 } // namespace cent::ast

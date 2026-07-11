@@ -296,7 +296,8 @@ private:
 
     [[nodiscard]] types::Function* get_fn_type(
         Type* return_type, std::vector<Type*> param_types,
-        std::vector<llvm::Constant*> default_args = {}, bool variadic = false);
+        std::vector<llvm::Constant*> default_args, bool variadic,
+        bool has_params);
 
     [[nodiscard]] types::Pointer* get_ptr_type(Type* type, bool is_mutable);
     [[nodiscard]] types::Slice* get_slice_type(Type* type, bool is_mutable);
@@ -346,6 +347,20 @@ private:
         const ast::ForBlock& for_block);
 
     void copy_import(const ast::NamedImport& imp, Scope& scope);
+
+    [[nodiscard]] llvm::Value*
+    get_variadic_arg(std::size_t offset, const Value& value);
+
+    [[nodiscard]] llvm::Value* get_abi_arg(const Value& value);
+
+    [[nodiscard]] llvm::Value*
+    get_abi_const_arg(Type* type, llvm::Constant* constant);
+
+    [[nodiscard]] Value create_params_slice(
+        Type* element, const std::vector<OffsetValue<Value>>& args,
+        std::size_t start);
+
+    [[nodiscard]] Value create_empty_slice(Type* element);
 
     [[nodiscard]] llvm::Value* alloca_arg(std::size_t index, Type* type);
 
@@ -552,7 +567,7 @@ private:
     std::map<Type*, std::unique_ptr<types::Optional>> m_optional_types;
 
     using FnTypeKey = std::tuple<
-        Type*, std::vector<Type*>, std::vector<llvm::Constant*>, bool>;
+        Type*, std::vector<Type*>, std::vector<llvm::Constant*>, bool, bool>;
 
     std::map<FnTypeKey, std::unique_ptr<types::Function>> m_fn_types;
 

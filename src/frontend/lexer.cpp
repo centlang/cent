@@ -577,6 +577,7 @@ Token::Type Lexer::ident_type(std::string_view ident) {
         Kw{"mut", Token::Type::Mut},
         Kw{"const", Token::Type::Const},
         Kw{"return", Token::Type::Return},
+        Kw{"params", Token::Type::Params},
         Kw{"defer", Token::Type::Defer},
         Kw{"break", Token::Type::Break},
         Kw{"continue", Token::Type::Continue},

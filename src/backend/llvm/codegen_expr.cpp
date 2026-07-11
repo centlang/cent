@@ -501,11 +501,7 @@ Value Codegen::generate(const ast::StructLiteral& expr) {
 }
 
 Value Codegen::generate(const ast::ArrayLiteral& expr) {
-    auto* type = dynamic_cast<ast::ArrayType*>(expr.type.get());
-
-    if (!type) {
-        return Value::poisoned();
-    }
+    auto* type = static_cast<ast::ArrayType*>(expr.type.get());
 
     auto* array_type = static_cast<types::Array*>(
         type->size ? type->codegen(*this)

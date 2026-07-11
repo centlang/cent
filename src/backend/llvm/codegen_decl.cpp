@@ -636,9 +636,8 @@ Value Codegen::generate(const ast::VarDecl& decl) {
                 *m_module,
                 type->llvm_type,
                 false,
-                (decl.is_public || is_extern)
-                    ? llvm::GlobalValue::ExternalLinkage
-                    : llvm::GlobalValue::PrivateLinkage,
+                is_extern ? llvm::GlobalValue::ExternalLinkage
+                          : llvm::GlobalValue::PrivateLinkage,
                 constant,
                 is_extern ? decl.name.value
                           : m_current_scope_prefix + decl.name.value};
@@ -775,6 +774,7 @@ void Codegen::generate_for_fn_proto(
             .type_params = std::move(type_args),
             .parent_type_params = parent_params,
             .self_type = self_type,
+            .has_params = func.proto.has_params,
             .scope = m_current_scope,
             .source_file = m_filename};
         return;
@@ -791,9 +791,7 @@ void Codegen::generate_for_fn_proto(
 
     auto* function = llvm::Function::Create(
         static_cast<llvm::FunctionType*>(fn_type->llvm_type),
-        func.is_public ? llvm::Function::ExternalLinkage
-                       : llvm::Function::PrivateLinkage,
-        llvm_name, *m_module);
+        llvm::Function::PrivateLinkage, llvm_name, *m_module);
 
     if (is<types::Never>(fn_type->return_type)) {
         function->addFnAttr(llvm::Attribute::NoReturn);
@@ -1042,6 +1040,7 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
         generic_fn.name = decl.name;
         generic_fn.return_type = return_type;
         generic_fn.block = decl.block.get();
+        generic_fn.has_params = decl.proto.has_params;
         generic_fn.scope = m_current_scope;
         generic_fn.source_file = m_filename;
 
@@ -1075,8 +1074,8 @@ void Codegen::generate_fn_proto(const ast::FnDecl& decl) {
     if (!function) {
         function = llvm::Function::Create(
             llvm_fn_type,
-            (decl.is_public || is_extern) ? llvm::Function::ExternalLinkage
-                                          : llvm::Function::PrivateLinkage,
+            is_extern ? llvm::Function::ExternalLinkage
+                      : llvm::Function::PrivateLinkage,
             llvm_name, *m_module);
     }
 

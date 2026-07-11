@@ -215,11 +215,22 @@ types::Function* Codegen::generate_fn_type(const ast::FnProto& proto) {
 
     param_types.reserve(proto.params.size());
 
-    for (const auto& parameter : proto.params) {
+    for (std::size_t i = 0; i < proto.params.size(); ++i) {
+        const auto& parameter = proto.params[i];
         auto* type = parameter.type->codegen(*this);
 
         if (!type) {
             return nullptr;
+        }
+
+        if (proto.has_params && i == proto.params.size() - 1) {
+            if (!is<types::Slice>(type)) {
+                error(
+                    parameter.name.offset,
+                    "params parameter must be of slice type");
+
+                return nullptr;
+            }
         }
 
         param_types.push_back(type);
@@ -250,14 +261,14 @@ types::Function* Codegen::generate_fn_type(const ast::FnProto& proto) {
 
     return get_fn_type(
         return_type, std::move(param_types), std::move(default_args),
-        proto.variadic);
+        proto.variadic, proto.has_params);
 }
 
 types::Function* Codegen::get_fn_type(
     Type* return_type, std::vector<Type*> param_types,
-    std::vector<llvm::Constant*> default_args, bool variadic) {
+    std::vector<llvm::Constant*> default_args, bool variadic, bool has_params) {
     auto& result = m_fn_types[std::make_tuple(
-        return_type, param_types, default_args, variadic)];
+        return_type, param_types, default_args, variadic, has_params)];
 
     if (result) {
         return result.get();
@@ -305,7 +316,7 @@ types::Function* Codegen::get_fn_type(
 
     result = std::make_unique<types::Function>(
         llvm_type, return_type, std::move(param_types), std::move(default_args),
-        variadic, sret);
+        variadic, sret, has_params);
 
     return result.get();
 }
@@ -473,7 +484,8 @@ Type* Codegen::unwrap_type(Type* type, bool ignore_distinct) {
         }
 
         return get_fn_type(
-            return_type, param_types, func->default_args, func->variadic);
+            return_type, param_types, func->default_args, func->variadic,
+            func->has_params);
     }
 
     return type;
