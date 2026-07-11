@@ -12,12 +12,12 @@ for Fd {
 }
 
 #(alwaysinline)
-pub fn printf(fmt: []u8, args: []WriteArg) {
+pub fn printf(fmt: []u8, params args: []WriteArg) {
     writef(stdout(), fmt, args);
 }
 
 #(alwaysinline)
-pub fn eprintf(fmt: []u8, args: []WriteArg) {
+pub fn eprintf(fmt: []u8, params args: []WriteArg) {
     writef(stderr(), fmt, args);
 }
 
@@ -96,6 +96,7 @@ pub fn input_int() ?i64 {
     return read_int(stdin());
 }
 
+#(implicit)
 pub union WriteArg {
     float: f64,
     int: i64,
@@ -123,7 +124,7 @@ fn write_arg(fd: Fd, arg: WriteArg) {
     }
 }
 
-pub fn writef(fd: Fd, fmt: []u8, args: []WriteArg) bool {
+pub fn writef(fd: Fd, fmt: []u8, params args: []WriteArg) bool {
     mut p: usize = 0;
     mut arg: usize = 0;
 
