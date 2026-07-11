@@ -1571,9 +1571,7 @@ Value Codegen::cast(Type* type, const Value& value, bool implicit) {
             return {.type = type, .value = nullptr};
         }
 
-        return {
-            .type = type,
-            .value = llvm::Constant::getNullValue(type->llvm_type)};
+        return {.type = type, .value = llvm::UndefValue::get(type->llvm_type)};
     }
 
     if (base_type == base_value_type) {
