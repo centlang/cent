@@ -245,7 +245,8 @@ enum struct Abi : std::uint8_t { SysV, Unknown };
 [[nodiscard]] inline Abi get_abi(const llvm::Triple& triple) {
     switch (triple.getArch()) {
     case llvm::Triple::x86_64:
-        if (!triple.isOSWindowsOrUEFI() && !triple.isOSUnknown()) {
+        if (!triple.isOSWindows() && !triple.isUEFI() &&
+            !triple.isOSUnknown()) {
             return Abi::SysV;
         }
 
