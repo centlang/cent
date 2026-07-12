@@ -2329,6 +2329,16 @@ void Codegen::add_fn_attrs(
             0, llvm::Attribute::getWithStructRetType(
                    m_context, type->return_type->llvm_type));
     }
+
+    for (std::size_t i = 0; i < type->param_types.size(); ++i) {
+        auto* pointer =
+            dyn_cast<types::Pointer>(unwrap_type(type->param_types[i], true));
+
+        if (pointer && !pointer->is_mutable) {
+            function->addParamAttr(
+                type->sret ? i + 1 : i, llvm::Attribute::ReadOnly);
+        }
+    }
 }
 
 void Codegen::copy_import(const ast::NamedImport& imp, Scope& scope) {
