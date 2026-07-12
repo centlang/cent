@@ -113,7 +113,6 @@ struct Token {
 
         Unreachable,
         Undefined,
-        Sizeof,
 
         Identifier
     };

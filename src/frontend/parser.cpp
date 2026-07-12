@@ -7,7 +7,6 @@
 #include "ast/expr/literals.h"
 #include "ast/expr/member_expr.h"
 #include "ast/expr/method_expr.h"
-#include "ast/expr/sizeof_expr.h"
 #include "ast/expr/slice_expr.h"
 #include "ast/expr/unary_expr.h"
 #include "ast/expr/unwrap_expr.h"
@@ -350,26 +349,6 @@ std::unique_ptr<ast::Expression> Parser::expect_prefix(bool is_condition) {
 
             expect("`,`", Comma);
         }
-    }
-
-    if (match(Sizeof)) {
-        auto offset = get().offset;
-
-        if (!expect("`(`", LeftParen)) {
-            return nullptr;
-        }
-
-        auto type = expect_type();
-
-        if (!type) {
-            return nullptr;
-        }
-
-        if (!expect("`)`", RightParen)) {
-            return nullptr;
-        }
-
-        return std::make_unique<ast::SizeofExpr>(offset, std::move(type));
     }
 
     auto token = expect(

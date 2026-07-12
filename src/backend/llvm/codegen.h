@@ -78,7 +78,6 @@ struct MemberExpr;
 struct IndexExpr;
 struct SliceExpr;
 struct AsExpr;
-struct SizeofExpr;
 
 struct FnProto;
 struct FnDecl;
@@ -154,7 +153,6 @@ public:
     [[nodiscard]] Value generate(const ast::IndexExpr& expr);
     [[nodiscard]] Value generate(const ast::SliceExpr& expr);
     [[nodiscard]] Value generate(const ast::AsExpr& expr);
-    [[nodiscard]] Value generate(const ast::SizeofExpr& expr);
 
     Value generate(const ast::FnDecl& decl);
     Value generate(const ast::ForBlock& decl);

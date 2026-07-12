@@ -583,7 +583,6 @@ Token::Type Lexer::ident_type(std::string_view ident) {
         Kw{"continue", Token::Type::Continue},
         Kw{"unreachable", Token::Type::Unreachable},
         Kw{"undefined", Token::Type::Undefined},
-        Kw{"sizeof", Token::Type::Sizeof},
         Kw{"nan", Token::Type::FloatLiteral},
         Kw{"inf", Token::Type::FloatLiteral}};
 

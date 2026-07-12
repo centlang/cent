@@ -1,11 +1,11 @@
 with c;
 
 pub fn(<T>) alloc() ?*mut T {
-    return c::malloc(sizeof(T)) as ?*mut T;
+    return c::malloc(core::mem::sizeof(<T>)()) as ?*mut T;
 }
 
 pub fn(<T>) alloc_n(size: usize) ?[]mut T {
-    let data = c::malloc(size * sizeof(T));
+    let data = c::malloc(size * core::mem::sizeof(<T>)());
 
     if data == null {
         return null;

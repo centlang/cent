@@ -15,7 +15,6 @@
 #include "ast/expr/literals.h"
 #include "ast/expr/member_expr.h"
 #include "ast/expr/method_expr.h"
-#include "ast/expr/sizeof_expr.h"
 #include "ast/expr/slice_expr.h"
 #include "ast/expr/unary_expr.h"
 #include "ast/expr/unwrap_expr.h"
@@ -1682,20 +1681,6 @@ Value Codegen::generate(const ast::AsExpr& expr) {
     }
 
     return cast_or_error(expr.type->offset, type, value, false);
-}
-
-Value Codegen::generate(const ast::SizeofExpr& expr) {
-    auto* type = expr.type->codegen(*this);
-
-    if (!type) {
-        return Value::poisoned();
-    }
-
-    auto* usize = m_primitive_types["usize"].get();
-    auto size = m_module->getDataLayout().getTypeAllocSize(type->llvm_type);
-
-    return Value{
-        .type = usize, .value = llvm::ConstantInt::get(usize->llvm_type, size)};
 }
 
 Value Codegen::generate_bin_logical_expr(

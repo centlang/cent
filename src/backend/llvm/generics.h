@@ -29,7 +29,7 @@ struct GenericFunction {
         bool is_mutable;
     };
 
-    enum struct FnKind : std::uint8_t { Normal, AsSlice, AsMutSlice };
+    enum struct FnKind : std::uint8_t { Normal, AsSlice, AsMutSlice, Sizeof };
 
     OffsetValue<std::string> name;
 

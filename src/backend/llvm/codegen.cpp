@@ -229,50 +229,56 @@ Value Codegen::create_core_panic() {
 
 void Codegen::create_core_mem() {
     auto* t_param = new types::TypeParam("T");
-    auto* usize_type = m_primitive_types["usize"].get();
+    auto* usize = m_primitive_types["usize"].get();
 
     m_core_module.scopes["mem"].generic_fns = {
         {"as_mut_slice",
          {.element =
-              GenericFunction{
-                  .name = {.value = "as_mut_slice", .offset = 0},
-                  .return_type = get_slice_type(t_param, true),
-                  .params =
-                      {
-                          {.name = "ptr",
-                           .type = get_ptr_type(t_param, true),
-                           .is_mutable = false},
-                          {.name = "len",
-                           .type = usize_type,
-                           .is_mutable = false},
-                      },
-                  .default_args = {},
-                  .type_params = {t_param},
-                  .parent_type_params = {},
-                  .kind = GenericFunction::FnKind::AsMutSlice,
-                  .has_params = false,
-                  .source_file = ""},
+              {.name = {.value = "as_mut_slice", .offset = 0},
+               .return_type = get_slice_type(t_param, true),
+               .params =
+                   {
+                       {.name = "ptr",
+                        .type = get_ptr_type(t_param, true),
+                        .is_mutable = false},
+                       {.name = "len", .type = usize, .is_mutable = false},
+                   },
+               .default_args = {},
+               .type_params = {t_param},
+               .parent_type_params = {},
+               .kind = GenericFunction::FnKind::AsMutSlice,
+               .has_params = false,
+               .source_file = ""},
           .is_public = true}},
         {"as_slice",
          {.element =
-              GenericFunction{
-                  .name = {.value = "as_slice", .offset = 0},
-                  .return_type = get_slice_type(t_param, false),
-                  .params =
-                      {
-                          {.name = "ptr",
-                           .type = get_ptr_type(t_param, false),
-                           .is_mutable = false},
-                          {.name = "len",
-                           .type = usize_type,
-                           .is_mutable = false},
-                      },
-                  .default_args = {},
-                  .type_params = {t_param},
-                  .parent_type_params = {},
-                  .kind = GenericFunction::FnKind::AsSlice,
-                  .has_params = false,
-                  .source_file = ""},
+              {.name = {.value = "as_slice", .offset = 0},
+               .return_type = get_slice_type(t_param, false),
+               .params =
+                   {
+                       {.name = "ptr",
+                        .type = get_ptr_type(t_param, false),
+                        .is_mutable = false},
+                       {.name = "len", .type = usize, .is_mutable = false},
+                   },
+               .default_args = {},
+               .type_params = {t_param},
+               .parent_type_params = {},
+               .kind = GenericFunction::FnKind::AsSlice,
+               .has_params = false,
+               .source_file = ""},
+          .is_public = true}},
+        {"sizeof",
+         {.element =
+              {.name = {.value = "sizeof", .offset = 0},
+               .return_type = usize,
+               .params = {},
+               .default_args = {},
+               .type_params = {t_param},
+               .parent_type_params = {},
+               .kind = GenericFunction::FnKind::Sizeof,
+               .has_params = false,
+               .source_file = ""},
           .is_public = true}}};
 }
 
@@ -1951,6 +1957,17 @@ Value Codegen::create_intrinsic_call(
     if (function->params.size() != arguments.size()) {
         error(offset, "incorrect number of arguments");
         return Value::poisoned();
+    }
+
+    if (function->kind == GenericFunction::FnKind::Sizeof) {
+        auto* usize = m_primitive_types["usize"].get();
+
+        auto size =
+            m_module->getDataLayout().getTypeAllocSize(types[0]->llvm_type);
+
+        return {
+            .type = usize,
+            .value = llvm::ConstantInt::get(usize->llvm_type, size)};
     }
 
     std::vector<Type*> param_types;

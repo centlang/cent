@@ -1,15 +1,20 @@
 with c;
 
 pub fn(<T, U>) equal(a: []T, b: []U) bool {
-    return a.len * sizeof(T) == b.len * sizeof(U) && c::memcmp(
-        a.ptr as *c::void, b.ptr as *c::void, a.len * sizeof(T)
-    ) == 0;
+    return a.len * core::mem::sizeof(<T>)() == b.len * core::mem::sizeof(<U>)()
+        && c::memcmp(
+            a.ptr as *c::void, b.ptr as *c::void, a.len * core::mem::sizeof(<T>)()
+        ) == 0;
 }
 
 pub fn(<T, U>) copy(dest: []mut T, src: []U) {
-    core::dbg_assert(dest.len * sizeof(T) >= src.len * sizeof(U));
+    core::dbg_assert(
+        dest.len * core::mem::sizeof(<T>)() >= src.len *
+        core::mem::sizeof(<U>)()
+    );
 
     c::memcpy(
-        dest.ptr as *mut c::void, src.ptr as *c::void, src.len * sizeof(U)
+        dest.ptr as *mut c::void, src.ptr as *c::void, src.len *
+        core::mem::sizeof(<U>)()
     );
 }
