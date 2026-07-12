@@ -312,7 +312,8 @@ get_emit_type(std::string_view type) {
     const std::filesystem::path& output, const std::filesystem::path& object) {
 #ifdef _WIN32
     std::vector<std::string> args = {
-        fmt::format("/OUT:{}", output.string()), object.string(), "libcmt.lib"};
+        fmt::format("/OUT:{}", output.string()), object.string(), "libcmt.lib",
+        "legacy_stdio_definitions.lib"};
 
     args.insert(
         args.end(), cent::g_options.linker_options.begin(),
