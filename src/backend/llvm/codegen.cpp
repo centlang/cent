@@ -2358,7 +2358,8 @@ void Codegen::add_fn_attrs(
 
         if (pointer && !pointer->is_mutable) {
             function->addParamAttr(
-                type->sret ? i + 1 : i, llvm::Attribute::ReadOnly);
+                static_cast<std::uint32_t>(type->sret ? i + 1 : i),
+                llvm::Attribute::ReadOnly);
         }
     }
 }
