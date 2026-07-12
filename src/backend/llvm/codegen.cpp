@@ -1094,14 +1094,14 @@ Value Codegen::inst_generic_fn(
     auto* current_function = m_current_function;
     auto* current_scope = m_current_scope;
 
+    auto current_scope_names = m_current_scope->names;
+    auto current_scope_types = m_current_scope->types;
+
     m_current_function = fn_type;
 
     if (function->scope) {
         m_current_scope = function->scope;
     }
-
-    auto current_scope_names = m_current_scope->names;
-    auto current_scope_types = m_current_scope->types;
 
     for (std::size_t i = 0; i < function->params.size(); ++i) {
         const auto& param = function->params[i];
@@ -1156,15 +1156,20 @@ Value Codegen::inst_generic_fn(
 
     m_current_scope_prefix = name + "::";
 
+    auto defer_scopes = std::move(m_defer_scopes);
+
     function->block->codegen(*this);
+
+    m_defer_scopes = std::move(defer_scopes);
 
     m_current_scope_prefix = scope_prefix;
     m_filename = filename;
 
+    m_current_scope = current_scope;
+
     m_current_scope->names = current_scope_names;
     m_current_scope->types = current_scope_types;
 
-    m_current_scope = current_scope;
     m_current_function = current_function;
 
     if (m_builder.GetInsertBlock()->getTerminator()) {
